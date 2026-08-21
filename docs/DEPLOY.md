@@ -43,9 +43,13 @@ The ones added since the last deploy:
 
     0011_evidence_key_is_artifact_key.sql
     0012_scan_requests.sql
+    0013_credential_deposits.sql
 
 `0012` creates the scan queue and the quarantine record. **Nothing in the UI works without it** —
 the worker exits at startup saying so, and the run list cannot mark the five bad runs.
+
+`0013` adds merchant-supplied screening logins (M9). Without it, public crawls work normally and
+the "Screening account" mode has nowhere to store anything.
 
 ### 1.2 Confirm it took
 
@@ -57,12 +61,25 @@ Then:
 
 Expect every check to pass, with 5 quarantined runs listed below the verdict and excluded from it.
 
-### 1.3 Invite the analysts
+### 1.3 Turn off email confirmation
 
-Sign-in is invite-only and passwordless. Two steps, and **both are required** — being in
-`auth.users` is not enough, because every policy gates on a row in `public.analysts`.
+**Authentication → Sign In / Providers → Email**, and turn **Confirm email** *off*.
 
-1. **Authentication → Users → Add user → Send invitation** with the analyst's email.
+With it on, a user created with a password cannot sign in until they click a link in an email —
+which defeats the point of having a password, and fails in exactly the situation passwords were
+added for: presenting from a machine that is not signed in to that mailbox.
+
+Safe here because there is **no signup form**. Nobody can create an account; accounts are created
+by hand in the dashboard, and being in `auth.users` still grants nothing on its own.
+
+### 1.4 Create the analysts
+
+Sign-in is invite-only. Two steps, and **both are required** — being in `auth.users` is not
+enough, because every policy gates on a row in `public.analysts`.
+
+1. **Authentication → Users → Add user → Create new user.** Enter the email and a password, and
+   tick **Auto Confirm User**. That is the path that sets a password directly — "Send invitation"
+   emails a magic link and sets no password at all.
 2. **SQL Editor**, with the user id from that page:
 
 ```sql
@@ -74,11 +91,11 @@ A person who completes step 1 but not step 2 can sign in and sees **nothing** �
 merchants, not even a count. That is deliberate (`is_analyst()` gates every policy), but it looks
 like a broken app, so do both together.
 
-### 1.4 Point auth at the deployed frontend
+### 1.5 Point auth at the deployed frontend
 
-**This is the step that breaks magic-link sign-in if it is missed.** A magic link sends the user
-to whatever Supabase has recorded, so a link generated for `localhost` is useless on a phone in a
-demo.
+**This breaks magic-link sign-in if it is missed. Password sign-in is unaffected**, which is the
+main reason passwords are the default. A magic link sends the user to whatever Supabase has
+recorded, so a link generated for `localhost` is useless on a machine in a demo.
 
 **Authentication → URL Configuration**:
 
@@ -90,9 +107,10 @@ demo.
       http://localhost:5173/**
 
 The middle one keeps pull-request previews working; the last keeps local development working.
-Come back and do this after step 2, when the Netlify URL exists.
+Come back and do this after step 2, when the Netlify URL exists. Magic link is kept as a
+secondary route, so this still matters — but nothing in a demo depends on it.
 
-### 1.5 Copy three values
+### 1.6 Copy three values
 
 **Project Settings → API**. You need:
 
@@ -114,14 +132,15 @@ Note the project's **region** while you are here — you need it for Fly in step
 
 1. **Add new site → Import an existing project → GitHub →** this repo.
 2. Build settings come from `netlify.toml`. Do not override them.
-3. **Site configuration → Environment variables → Add a variable**, twice:
+3. **Site configuration → Environment variables → Add a variable**:
 
-       VITE_SUPABASE_URL        https://<project>.supabase.co
-       VITE_SUPABASE_ANON_KEY   <the anon key>
+       VITE_SUPABASE_URL             https://<project>.supabase.co
+       VITE_SUPABASE_ANON_KEY        <the anon key>
+       VITE_CREDENTIAL_PUBLIC_KEY    <the public half from step 3.4a — M9 only>
 
 4. **Deploys → Trigger deploy → Clear cache and deploy site.** Environment variables are read at
    build time, so a site deployed before you added them stays broken until it rebuilds.
-5. Copy the site URL and go back and finish **step 1.4**.
+5. Copy the site URL and go back and finish **step 1.5**.
 
 Anything prefixed `VITE_` is compiled into the browser bundle and is public. The build fails
 loudly if the frontend is misconfigured rather than rendering an empty app: the sign-in screen
@@ -129,10 +148,34 @@ names the missing variable.
 
 Push to `main` deploys. Pull requests get preview URLs.
 
+### Running the frontend locally
+
+**Vite reads `apps/web/.env`, not the repository root.** The root `.env` belongs to the worker
+scripts; a variable set only there gives a frontend that builds cleanly and then says
+"Not connected".
+
+    cp apps/web/.env.example apps/web/.env      # then fill it in
+
+**Only `VITE_`-prefixed values belong in that file.** Vite silently ignores anything else, which is
+the worse failure mode — it looks like it worked. And everything `VITE_`-prefixed is compiled into
+the bundle and is public: never the service key, never the credential private key (constraint 6).
+
+`.gitignore` covers `.env` at any depth, so `apps/web/.env` is not committed. Confirm with:
+
+    git check-ignore -v apps/web/.env
+    # .gitignore:3:.env    apps/web/.env
+
 ### If sign-in does nothing
 
-Nine times in ten it is step 1.4. Open the emailed link and look at where it points — if the host
-is `localhost`, the Site URL is still unset.
+**With a password**, "That email and password did not match an account" — when you are certain
+they do — is almost always one of two things: **Confirm email** is still on (step 1.3), or the user
+was created with "Send invitation" rather than "Create new user", so no password was ever set.
+
+**Signed in, but the app says "No access for this account"**: authentication worked and membership
+did not. The second half of step 1.4 was skipped — add the `public.analysts` row.
+
+**With a magic link**, nine times in ten it is step 1.5. Open the emailed link and look at where it
+points; if the host is `localhost`, the Site URL is still unset.
 
 ---
 
@@ -181,6 +224,19 @@ region you noted in step 1.5:
 Every scan uploads 17 objects. Getting this wrong does not break anything; it makes each scan
 noticeably slower.
 
+### 3.4a Generate the credential key pair — M9 only
+
+Skip this if you are not using merchant-supplied logins yet. Everything else works without it.
+
+    npm run make-credential-key
+
+It prints three blocks: a value for Netlify, a ready-to-paste `fly secrets set` command, and lines
+for `apps/web/.env`. Copy them out now — **the pair is printed once and stored nowhere.**
+
+Losing the private half makes every stored credential permanently unreadable. That is deliberate
+(D-038): a recovery path would be a second route to plaintext, which is exactly what the two-key
+design is paying to avoid. Re-asking a merchant costs an email.
+
 ### 3.4 Set the secrets
 
     fly secrets set \
@@ -190,6 +246,16 @@ noticeably slower.
 
 `fly secrets set` stores them encrypted and injects them as environment variables at runtime.
 They are never written to `fly.toml`, which is committed.
+
+For M9, also set the private half from step 3.4a. The generator prints the whole command with the
+key already in it, so paste that rather than retyping:
+
+    fly secrets set CREDENTIAL_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..." --app mintro-screener-worker
+
+The worker starts fine without it and screens public storefronts normally. A request that *asks*
+for a screening account then fails loudly rather than quietly running as a public crawl — a
+signed-in scan that silently became anonymous would report gated pages as unobservable and
+attribute that to the merchant's configuration.
 
 To check what is set — this shows names and digests, never values:
 
@@ -265,13 +331,20 @@ the only record of what went out and when.
 
 ## Environment variables, in one place
 
-| Variable | Netlify | Fly | Local `.env` |
-|---|---|---|---|
-| `VITE_SUPABASE_URL` | ✅ | — | ✅ |
-| `VITE_SUPABASE_ANON_KEY` | ✅ | — | ✅ |
-| `SUPABASE_URL` | — | ✅ | ✅ |
-| `SUPABASE_SERVICE_KEY` | **never** | ✅ | ✅ |
-| `SUPABASE_EVIDENCE_BUCKET` | — | optional | optional |
-| `RESEND_API_KEY` | — | later | optional |
+| Variable | Netlify | Fly | `apps/web/.env` | root `.env` |
+|---|---|---|---|---|
+| `VITE_SUPABASE_URL` | ✅ | — | ✅ | — |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | — | ✅ | — |
+| `VITE_CREDENTIAL_PUBLIC_KEY` | ✅ | — | ✅ | — |
+| `SUPABASE_URL` | — | ✅ | **never** | ✅ |
+| `SUPABASE_SERVICE_KEY` | **never** | ✅ | **never** | ✅ |
+| `CREDENTIAL_PRIVATE_KEY` | **never** | ✅ | **never** | ✅ |
+| `SUPABASE_EVIDENCE_BUCKET` | — | optional | — | optional |
+| `RESEND_API_KEY` | — | later | **never** | optional |
 
-`.env.example` is the contract. Nothing prefixed `VITE_` may carry a secret.
+Two `.env` files, and they are not interchangeable. **`apps/web/.env` is Vite's** and may hold
+only `VITE_`-prefixed values, all of which are public. **The root `.env`** is the worker's and
+holds the secrets. `.env.example` in each place is the contract.
+
+Nothing prefixed `VITE_` may ever carry a secret. A public key is not a secret — it is what makes
+a secret unreadable to everyone holding it.

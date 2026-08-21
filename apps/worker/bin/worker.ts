@@ -32,13 +32,17 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { chromium, type Browser } from 'playwright';
+import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
 import { screenStorefront } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun } from '../src/store/completeness.js';
+import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
+import { collectDeposits } from '../src/auth/deposits.js';
+import { establishSession } from '../src/auth/login.js';
+import { createHttpFetcher } from '@mintro/engine';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
@@ -51,6 +55,7 @@ interface ScanRequest {
   readonly url: string;
   readonly status: string;
   readonly claimed_at: string | null;
+  readonly mode: string;
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -67,6 +72,20 @@ async function main(argv: readonly string[]): Promise<number> {
   if (!checks.ok) {
     console.error('Preflight failed. The worker will not start against a store it cannot write to.');
     return 1;
+  }
+
+  // Optional at startup, and deliberately so: a demo that has not set up credentials should still
+  // screen public storefronts. A request that *asks* for a screening account when no key is
+  // configured fails loudly rather than quietly running as a public crawl.
+  let keys: SealedVaultKeys | undefined;
+  try {
+    keys = readVaultKeys();
+    console.log('  ok    credential deposit key                          loaded');
+  } catch (error) {
+    console.log(`  --    credential deposit key                          not configured`);
+    const [firstLine] = error instanceof Error ? error.message.split(/\r?\n/) : [''];
+    console.log(`        ${firstLine ?? ''}`);
+    console.log('        Public crawls are unaffected; screening_account requests will fail.');
   }
 
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
@@ -87,6 +106,8 @@ async function main(argv: readonly string[]): Promise<number> {
 
   try {
     while (!stopping) {
+      if (keys !== undefined) await drainDeposits(supabase, keys);
+
       const request = await claimNext(supabase);
 
       if (request === null) {
@@ -95,7 +116,7 @@ async function main(argv: readonly string[]): Promise<number> {
         continue;
       }
 
-      await handle(supabase, browser, ruleset, request);
+      await handle(supabase, browser, ruleset, request, keys);
     }
     return 0;
   } finally {
@@ -115,7 +136,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
 
   const { data, error } = await supabase.client
     .from('scan_requests')
-    .select('id, url, status, claimed_at')
+    .select('id, url, status, claimed_at, mode')
     .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -139,7 +160,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
     .update({ status: 'running', claimed_at: new Date().toISOString(), progress: 'starting' })
     .eq('id', candidate.id)
     .eq('status', candidate.status)
-    .select('id, url, status, claimed_at');
+    .select('id, url, status, claimed_at, mode');
 
   if (claimError !== null) {
     throw new Error(`could not claim request ${candidate.id}: ${claimError.message}`);
@@ -160,14 +181,26 @@ async function handle(
   browser: Browser,
   ruleset: Ruleset,
   request: ScanRequest,
+  keys: SealedVaultKeys | undefined,
 ): Promise<void> {
   const runId = randomUUID();
   const started = Date.now();
+  let authenticated: BrowserContext | null = null;
   console.log(`\n${request.url}  request ${request.id.slice(0, 8)}  run ${runId.slice(0, 8)}`);
 
   try {
+    if (request.mode === 'screening_account') {
+      const established = await signIn(supabase, browser, request, keys);
+      authenticated = established.context;
+      for (const step of established.steps) {
+        console.log(`  ${step}`);
+        void note(supabase, request.id, step);
+      }
+    }
+
     const { report, artifacts } = await screenStorefront(browser, request.url, ruleset, {
       runId,
+      ...(authenticated === null ? {} : { authenticated }),
       onProgress: (line) => {
         console.log(`  ${line}`);
         void note(supabase, request.id, line);
@@ -192,6 +225,97 @@ async function handle(
     // The request records the failure. The run, if one was opened, is already marked `failed` with
     // `finished_at` null by persistRun, so it stays resumable rather than freezing broken.
     await finish(supabase, request.id, { status: 'failed', error: message });
+  } finally {
+    // Ours to close: `renderPage` borrows a supplied context and never closes it, precisely so the
+    // session survives from one page to the next.
+    await authenticated?.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Signs in with the merchant's supplied login.
+ *
+ * Fails the request rather than continuing anonymously. A screening-account run that quietly
+ * became a public crawl would report gated product pages as unobservable and attribute that to
+ * the merchant's configuration — a false observation about a real merchant, which is the worst
+ * output this system can produce.
+ *
+ * What it cannot do is move GATE-002 or GATE-003. `screenStorefront` runs those through
+ * `runGateRules`, which builds its own anonymous access and has no parameter for a session
+ * (D-039). The context returned here reaches Layer 1 and Layer 2 rendering and nothing else.
+ */
+async function signIn(
+  supabase: WorkerSupabase,
+  browser: Browser,
+  request: ScanRequest,
+  keys: SealedVaultKeys | undefined,
+): Promise<{ context: BrowserContext | null; steps: readonly string[] }> {
+  if (keys === undefined) {
+    throw new Error(
+      'this request asked for a screening account, but CREDENTIAL_PRIVATE_KEY is not set on this ' +
+        'worker, so no stored credential can be opened. Running it as a public crawl would ' +
+        'misreport the merchant, so it is failed instead.',
+    );
+  }
+
+  const origin = new URL(request.url).origin;
+  const hostname = new URL(request.url).hostname;
+  const vaultRef = vaultRefFor(hostname);
+  const vault = createSealedVault(supabase, keys);
+
+  const credentials = await vault.open(vaultRef, `screening scan of ${origin}`);
+  if (credentials === null) {
+    throw new Error(
+      `no screening credential is stored for ${hostname}. ` +
+        'Enter the merchant-supplied login before requesting a signed-in scan.',
+    );
+  }
+
+  // The homepage markup, for platform detection. A plain fetch rather than a render: it is one
+  // request and the browser is about to do the real work anyway.
+  const fetched = await createHttpFetcher({ timeoutMs: 15_000 })(`${origin}/`);
+
+  const established = await establishSession({
+    browser,
+    origin,
+    vault,
+    vaultRef,
+    homepageHtml: fetched.body,
+    timeoutMs: 30_000,
+  });
+
+  if (established.context === null) {
+    throw new Error(
+      `could not sign in to ${origin}: ${established.steps.join('; ')}` +
+        (established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`),
+    );
+  }
+
+  return { context: established.context, steps: established.steps };
+}
+
+/**
+ * Moves sealed deposits into the vault.
+ *
+ * Runs each cycle, before claiming work: a credential entered a moment ago should be usable by
+ * the scan queued right after it. Never throws — a bad deposit must not stop the queue.
+ */
+async function drainDeposits(supabase: WorkerSupabase, keys: SealedVaultKeys): Promise<void> {
+  try {
+    const vault = createSealedVault(supabase, keys);
+    const outcomes = await collectDeposits(supabase, keys, vault.writeCredentials);
+
+    for (const outcome of outcomes) {
+      console.log(
+        outcome.stored
+          ? `credential stored for ${outcome.merchantDomain}${outcome.error === undefined ? '' : ` (${outcome.error})`}`
+          : `credential deposit for ${outcome.merchantDomain} could not be opened: ${outcome.error ?? 'unknown'}`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      `could not collect credential deposits: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

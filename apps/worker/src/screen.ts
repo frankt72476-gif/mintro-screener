@@ -21,7 +21,7 @@
  * side effects happen in the runner).
  */
 
-import type { Browser } from 'playwright';
+import type { Browser, BrowserContext } from 'playwright';
 import type { Ruleset } from '@mintro/ruleset';
 import {
   createHttpFetcher,
@@ -47,8 +47,12 @@ import {
   type SampledPage,
   type ScopeOverrides,
   type ScreeningReport,
+  type SessionDescriptor,
 } from '@mintro/engine';
 import { renderPage } from './render.js';
+import { runGateRules, type AnonymousAccess } from './gate.js';
+import { probePaths } from './probe.js';
+import { runCheckoutFlow } from './flow.js';
 
 /** Product pages sampled per run. ARCHITECTURE.md budgets 3-5. */
 export const SAMPLE_SIZE = 5;
@@ -57,6 +61,18 @@ export interface ScreenOptions {
   readonly runId: string;
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
   readonly onProgress?: (line: string) => void;
+  /**
+   * A context carrying the merchant's supplied session, for pages behind their login (M9).
+   *
+   * It is used for Layer 1 and Layer 2 rendering only. **The gate rules never see it**: they are
+   * run by `runGateRules`, whose API has no parameter that could carry a session, against an
+   * anonymous access built here from a fresh context (D-039).
+   *
+   * A credential widens what is visible. It never narrows what is reported.
+   */
+  readonly authenticated?: BrowserContext;
+  /** How the session was obtained, recorded on the findings it produced. */
+  readonly session?: SessionDescriptor;
 }
 
 export interface ScreenResult {
@@ -91,7 +107,12 @@ export async function screenStorefront(
 
   // ---- Layer 1 -------------------------------------------------------------------------
   const homepage = `${layer0.origin}/`;
-  const rendered = await renderPage(browser, homepage, { runId, pacer, timeoutMs: 30_000 });
+  const rendered = await renderPage(browser, homepage, {
+    runId,
+    pacer,
+    timeoutMs: 30_000,
+    ...(options.authenticated === undefined ? {} : { context: options.authenticated }),
+  });
   artifacts.push(...rendered.artifacts);
 
   say(
@@ -133,13 +154,44 @@ export async function screenStorefront(
       pacer,
       selectors,
       timeoutMs: 30_000,
+      // Where a merchant login earns its keep: product pages behind the wall.
+      ...(options.authenticated === undefined ? {} : { context: options.authenticated }),
     });
     artifacts.push(...result.artifacts);
     sampled.push({ selection: pick, page: result.page });
   }
 
   const layer2 = runLayer2(sampled, ruleset);
-  const findings: Finding[] = [...layer1.findings, ...after, ...layer2.findings];
+
+  // ---- the gate rules, always without a session -----------------------------------------
+  //
+  // Built here, from `browser`, and deliberately not from `options.authenticated`. `probePaths`
+  // with `authenticated: null` creates its own anonymous context; `runGateRules` could not accept
+  // a session even if one were offered.
+  const anonymous: AnonymousAccess = {
+    probe: (paths) =>
+      probePaths(browser, layer0.origin, paths, { authenticated: null, timeoutMs: 20_000 }),
+
+    async flow(productUrl) {
+      const context = await browser.newContext();
+      try {
+        return await runCheckoutFlow(context, { productUrl, origin: layer0.origin, timeoutMs: 20_000 });
+      } finally {
+        await context.close().catch(() => undefined);
+      }
+    },
+  };
+
+  const firstProduct = selected[0]?.url.url ?? improved.urls.find((url) => inScope(url, 'products'))?.url;
+  const gate = await runGateRules({
+    ruleset,
+    access: anonymous,
+    ...(firstProduct === undefined ? {} : { productUrl: firstProduct }),
+  });
+
+  say(`gate rules evaluated without a session: ${gate.map((f) => `${f.ruleId} ${f.state}`).join(', ')}`);
+
+  const findings: Finding[] = [...layer1.findings, ...after, ...layer2.findings, ...gate];
 
   const counts = tally(findings);
   say(

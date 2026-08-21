@@ -163,3 +163,18 @@ export {
 } from './findings.js';
 
 export { checkUrlPattern, findMatches, type PatternMatch } from './checks/urlPattern.js';
+
+/**
+ * Sealed envelopes for the credential deposit boundary (D-038).
+ *
+ * Lives in the engine because both the browser and the worker need it, and one format with two
+ * implementations is how `evidence.key` and its storage path diverged (D-034). WebCrypto only, so
+ * it is literally the same code in both runtimes.
+ */
+export {
+  seal,
+  unseal,
+  isSealedEnvelope,
+  generateKeyPair,
+  type SealedEnvelope,
+} from './sealed.js';

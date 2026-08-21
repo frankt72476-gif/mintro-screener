@@ -20,6 +20,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed';
 
+/**
+ * What the requester is asking for.
+ *
+ * `screening_account` uses the merchant's supplied login to reach pages behind their wall. It
+ * does not, and cannot, change GATE-002 or GATE-003 — those are decided by a request carrying no
+ * session, in `runGateRules`, whose API has no parameter for one (D-039).
+ */
+export type ScanMode = 'public' | 'screening_account';
+
 export interface ScanRequestSummary {
   readonly id: string;
   readonly url: string;
@@ -28,18 +37,22 @@ export interface ScanRequestSummary {
   readonly error: string | null;
   readonly runId: string | null;
   readonly createdAt: string;
+  readonly mode: ScanMode;
 }
 
 export interface ScanQueue {
   /** Queues a scan. Returns the error text rather than throwing, because the caller renders it. */
-  request(url: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
+  request(
+    url: string,
+    mode?: ScanMode,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
   list(limit?: number): Promise<readonly ScanRequestSummary[]>;
 }
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
   return {
-    async request(url) {
+    async request(url, mode = 'public') {
       const normalised = normaliseUrl(url);
       if (normalised === null) {
         return {
@@ -50,7 +63,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
 
       const { error } = await client
         .from('scan_requests')
-        .insert({ url: normalised, requested_by: analystId, status: 'queued' });
+        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode });
 
       if (error !== null) {
         return { ok: false, error: error.message };
@@ -61,7 +74,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
     async list(limit = 10) {
       const { data, error } = await client
         .from('scan_requests')
-        .select('id, url, status, progress, error, run_id, created_at')
+        .select('id, url, status, progress, error, run_id, created_at, mode')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -75,6 +88,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
         error: row.error,
         runId: row.run_id,
         createdAt: row.created_at,
+        mode: row.mode as ScanMode,
       }));
     },
   };
@@ -88,6 +102,7 @@ interface RequestRow {
   error: string | null;
   run_id: string | null;
   created_at: string;
+  mode: string;
 }
 
 /**

@@ -118,6 +118,49 @@ describe('migrations', () => {
   });
 });
 
+/**
+ * The frontend has its own environment file, and it is not interchangeable with the root one.
+ *
+ * Vite reads the `.env` in its own root. A `VITE_` variable set only at the repository root gives
+ * a frontend that builds cleanly and then reports "Not connected" at runtime — which reads as a
+ * broken deployment rather than a missing file.
+ */
+describe('apps/web/.env.example', () => {
+  const env = readFileSync('apps/web/.env.example', 'utf8');
+
+  const keys = env
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
+    .map((line) => line.split('=')[0]!);
+
+  it('documents what the frontend needs', () => {
+    for (const key of ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) {
+      expect(keys, `${key} is undocumented`).toContain(key);
+    }
+  });
+
+  /**
+   * Everything in this file is compiled into the bundle, so a non-`VITE_` entry is worse than
+   * useless: Vite ignores it silently, and someone reads the file as documentation of what the
+   * frontend uses. A secret listed here would look configured and be published.
+   */
+  it('holds nothing but VITE_ variables', () => {
+    for (const key of keys) {
+      expect(key, `${key} is not VITE_-prefixed and would be silently ignored`).toMatch(/^VITE_/);
+    }
+  });
+
+  it('lets none of them look like a secret', () => {
+    for (const key of keys) {
+      const lower = key.toLowerCase();
+      for (const forbidden of ['service', 'secret', 'password', 'private']) {
+        expect(lower, `${key} is compiled into the bundle`).not.toContain(forbidden);
+      }
+    }
+  });
+});
+
 describe('.env.example', () => {
   const env = readFileSync('.env.example', 'utf8');
 
@@ -128,7 +171,9 @@ describe('.env.example', () => {
     .map((line) => line.split('=')[0]!);
 
   it('documents what the worker needs', () => {
-    for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'VAULT_TOKEN']) {
+    // CREDENTIAL_PRIVATE_KEY replaced VAULT_TOKEN at D-038: the vault stopped being a symmetric
+    // store and became an envelope sealed to a key pair, so there is no shared token any more.
+    for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'CREDENTIAL_PRIVATE_KEY']) {
       expect(keys, `${key} is undocumented`).toContain(key);
     }
   });

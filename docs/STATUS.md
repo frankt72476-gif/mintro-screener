@@ -224,6 +224,35 @@ development machine, same gap as Tier 2 in D-032. The Dockerfile was corrected b
 missing workspace manifests, a build that would have pulled React into a crawl container, and no
 `.dockerignore` at all.
 
+### M9 — Merchant-supplied screening accounts · `apps/worker/src/auth`, `packages/engine/src/sealed.ts`
+
+A merchant hands over a demo login; an analyst enters it; the worker uses it to reach product
+pages behind the wall. **Authorized** (D-039). Mintro creating its own accounts on merchant sites
+remains blocked, and is a different question.
+
+**The browser seals; only the worker can open.** A key pair, public half in the bundle where being
+public is the point, private half a Fly secret. So the analyst who types a merchant's password is
+not a party who can retrieve it, and neither is the database. There is no "view credential"
+anywhere, and that is a property rather than a missing feature.
+
+**Losing the private key is unrecoverable, deliberately.** A recovery path is a second route to
+plaintext. Re-asking a merchant costs an email. Do not add escrow as a convenience (D-038).
+
+**A credential widens what is visible; it never narrows what is reported.** GATE-002 and GATE-003
+are decided by `runGateRules`, whose API has no parameter that could carry a session. Enforced at
+three levels: the signature, a rule-set test that fails if `unauthenticated: true` is removed, and
+a test asserting a credentialed run matches a public one — paired with one showing the same
+merchant probed *with* a session is auto-failed, so the first is discriminating rather than
+vacuous.
+
+**Sign-in is email and password**, with magic link kept as a secondary route. A link is unusable
+when presenting from a machine that is not signed in to the analyst's mail. Still no signup form:
+this changed how someone authenticates, not who is allowed in.
+
+**Side effect worth expecting:** wiring the gate runner into `screenStorefront` means GATE-002 and
+GATE-003 are evaluated for the first time. Until now both came back `not_evaluable` in every run,
+because nothing called the probe handlers. The five storefronts' numbers below predate that.
+
 ---
 
 ## The five storefronts, as they stand today
@@ -267,7 +296,7 @@ Nothing below is a technical problem. Each waits on a decision.
 
 | Blocked on | What it is |
 |---|---|
-| **Credential authorization** | Whether Mintro may hold merchant screening credentials and create screening accounts. **No account exists on any real merchant site.** All of M4 was built against `apps/testbed`. M9 narrows this to *merchant-supplied* demo logins, which is a different question from Mintro creating its own accounts — see the M9 proposal in this file's successor discussion. |
+| **Mintro creating merchant accounts** | Whether Mintro may create its own accounts on merchant sites — agreeing to terms under an identity we chose, without the merchant's knowledge. Still blocked. **Merchant-supplied logins are authorized and built** (D-039); the two are deliberately separate rulings. |
 | **Session authorization** | Whether Mintro may hold merchant sessions established by a *person* rather than by stored credentials. This blocks **assisted sign-in**, designed in full in `apps/worker/src/auth/assisted.ts` and deliberately unimplemented. |
 | **Resend domain verification** | SPF and DKIM on the sending domain. Until then `createDryRunMailer` composes and transmits nothing — a separate implementation, not a flag, so a test send cannot be mistaken for a delivered report. |
 

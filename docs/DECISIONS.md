@@ -1398,3 +1398,120 @@ rather than the root, which would pull React into a crawl container; and `.docke
 exist, so `fly deploy` would have uploaded `node_modules` and every stored capture. **The image
 has not been built — there is no Docker on the development machine.** Same honesty as Tier 2 in
 D-032: stated, not skipped.
+
+---
+
+## D-038 — Constraint 6 states a property, not a mechanism
+**2026-08-21 · business owner**
+
+> **Credentials must never be recoverable from the database alone.**
+
+The original wording was *"credentials go in a vault, never in Postgres columns"*. Taken literally
+it would have forced the weaker design.
+
+Supabase Vault is the option in this stack literally named "vault", and it decrypts through the
+same `service_role` connection the worker already holds. One leaked service key yields plaintext.
+Ciphertext in a Postgres column, sealed to a key that exists only in the Fly runtime, requires
+**two independent compromises** — the database and the deployment.
+
+Constraint 6 exists to prevent a database breach yielding credentials. The design that breaks its
+letter satisfies its purpose better than the one that matches its wording. So the constraint now
+states the purpose.
+
+### The mechanism it selected
+
+A key pair. The public half is compiled into the frontend as `VITE_CREDENTIAL_PUBLIC_KEY`, where
+being public is the entire point; the private half is a Fly secret.
+
+Hybrid, because RSA-OAEP at 2048 bits holds 190 bytes: a fresh AES-256-GCM key per envelope, the
+payload under AES, the key under RSA. A scheme that works until the payload grows is a scheme that
+fails in production, and a session blob is kilobytes.
+
+Written once, in `packages/engine/src/sealed.ts`, using **WebCrypto rather than `node:crypto`** so
+the browser and the worker run literally the same code. A format with two implementations agrees
+until it does not, and this project has already paid for that (D-034) — there the thing that
+diverged was an evidence key; here it would be a merchant's password.
+
+### The asymmetry is the feature, not the algorithm
+
+The browser can seal and cannot open. So an analyst who types a merchant's password is not a party
+who can retrieve it, and neither is the database, nor Supabase, nor anyone with a dump. **The
+number of parties who can read a merchant's password is one, and it is a machine.**
+
+There is no "view credential" anywhere in the application. That is a property, not a missing
+feature, and the entry screen says so — otherwise someone treats it as a password manager.
+
+### Losing the key is unrecoverable, deliberately
+
+`npm run make-credential-key` prints both halves once and stores neither. Losing the private half
+makes every stored credential permanently unreadable.
+
+That is the design working. **A recovery path is a second route to plaintext**, which is precisely
+what the two-key arrangement is paying to avoid. Re-asking a merchant costs an email. Nobody should
+later add escrow as a convenience — this paragraph exists so that doing so is a decision to
+overturn rather than a gap to fill.
+
+### What is stored where
+
+| | |
+|---|---|
+| `credential_deposits` | sealed envelope from the browser, drained and **deleted** by the worker |
+| `vault_entries` | sealed credentials and sessions, keyed by vault path |
+| `credential_access` | reference, action, purpose, outcome. Never values. Append-only by trigger |
+| `credentials` | unchanged: a `vault_ref` and nothing that could hold a secret |
+
+The deposit is deleted rather than marked consumed: a consumed deposit is a second copy of a
+credential for no purpose, and the right number of copies is one. A deposit that *cannot be opened*
+is left in place and reported — deleting the only copy of something we failed to read is
+unrecoverable, and "I could not open this" is not "the merchant supplied nothing" (D-036).
+
+Sessions are sealed identically. A Playwright `storageState` is a bearer token for a merchant
+account and is not less sensitive than the password that produced it.
+
+---
+
+## D-039 — Merchant-supplied logins are authorized; Mintro creating accounts is not
+**2026-08-21 · Frank's ruling**
+
+A merchant handing us a demo account so their product pages can be read is **authorized**.
+
+Mintro creating its own accounts on merchant sites **remains blocked**, and is a different
+question: it involves agreeing to terms on someone else's site, under an identity we chose,
+without the merchant's knowledge. The first is a merchant granting access to their own property.
+Recorded separately so the two do not get conflated when the wider question is settled.
+
+### A credential widens what is visible. It never narrows what is reported.
+
+GATE-002 (products hidden until an account exists) and GATE-003 (guest checkout disabled) ask what
+an **anonymous visitor** can reach. Both are `critical` and `auto_fail`. Both mean the opposite of
+themselves if the request carries a session — a gated merchant's catalogue answers 200 once you are
+signed in, and that reads as a merchant selling openly to anyone.
+
+The ruling was that this be **enforced, not emergent**. Three mechanisms, at three levels:
+
+1. **`runGateRules` has no parameter that could carry a session.** Its dependency is an
+   `AnonymousAccess` with two callbacks taking a path list and a product URL. A caller holding an
+   authenticated context cannot pass it in, and no future edit can add one without changing a
+   signature a test watches.
+2. **`packages/ruleset/test/anonymous-probes.test.ts`** fails the build if `unauthenticated: true`
+   is removed from either rule, or if either is downgraded from `critical` / `auto_fail`. This
+   cannot live in the runner: the runner decides its scope *from* that flag, so a rule that lost it
+   would simply stop being covered — silently, which is the failure.
+3. **`apps/worker/test/gate.test.ts`** asserts a credentialed run produces findings identical to a
+   public one and — because a test comparing two identical things proves nothing — also asserts
+   that the *same compliant merchant* probed **with** a session is auto-failed. That second test is
+   what makes the first discriminating.
+
+A signed-in scan fails rather than silently falling back to a public crawl. A run that quietly lost
+its session would report gated pages as unobservable and attribute that to the merchant's
+configuration: a false observation about a real merchant.
+
+Not every probe rule is a gate rule. FULF-002 probes checkout address validation, which on a gated
+merchant is only observable while signed in, so it inherits the run session (D-017). It is pinned
+by the same test in the other direction — nobody should "fix" it by adding the flag.
+
+### A side effect worth naming
+
+Wiring `runGateRules` into `screenStorefront` means GATE-002 and GATE-003 are **evaluated for the
+first time**. Until now both came back `not_evaluable` in every run, because nothing called the
+probe handlers. Expect the five storefronts' numbers to move.

@@ -38,3 +38,16 @@ export type {
 
 export type { SessionDescriptor, SessionMode, SessionOrigin } from './session.js';
 export type { GateContext, PageContext, PageLink, PageRegion, StyledText } from './page.js';
+
+/**
+ * Sealed envelopes (D-038).
+ *
+ * Safe in this entry precisely because `sealed.ts` uses WebCrypto and touches no Node built-in.
+ * That was a requirement rather than a convenience: the browser is the side that seals, and one
+ * format with two implementations is how `evidence.key` and its storage path diverged (D-034).
+ *
+ * `unseal` is exported here too, and harmlessly — opening an envelope needs the private key, and
+ * the browser has no way to obtain one. Withholding it would suggest the secrecy lived in which
+ * function you could reach rather than in which key you hold.
+ */
+export { seal, unseal, isSealedEnvelope, type SealedEnvelope } from './sealed.js';

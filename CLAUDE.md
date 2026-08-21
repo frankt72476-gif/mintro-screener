@@ -60,8 +60,18 @@ should mean), stop and ask. Do not guess at business rules.
 5. **Evidence storage is append-only.** Screenshots and DOM snapshots are never overwritten
    or deleted by application code. This is a defensibility requirement.
 
-6. **Credentials go in a vault, never in Postgres columns or env files in the repo.**
-   Merchant screening-account credentials are secrets. Encrypt at rest, log every access.
+6. **Credentials must never be recoverable from the database alone.** Merchant
+   screening-account credentials are secrets. Encrypt at rest, log every access.
+
+   Stated as a property, not a mechanism -- see D-038. The original wording was "credentials go in
+   a vault, never in Postgres columns", and taken literally it would have *forced the weaker
+   design*: the product named "vault" in this stack decrypts through the same `service_role`
+   connection the worker already holds, so one leaked key yields plaintext. Ciphertext in a
+   Postgres column, sealed to a key that lives only in the Fly runtime, requires two independent
+   compromises. It breaks the old rule and satisfies the reason the rule existed.
+
+   Nothing prefixed `VITE_` may carry a secret. A public key is not a secret -- it is what makes a
+   secret unreadable to everyone holding it.
 
 7. **Findings describe, they never instruct.** No report copy tells anyone what to do —
    not "do not forward", not "recommend", not "should". State the observation and attach

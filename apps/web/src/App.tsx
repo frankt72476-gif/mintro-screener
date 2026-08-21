@@ -14,7 +14,9 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
-import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
+import { createScanQueue, isPending, type ScanMode, type ScanRequestSummary } from './lib/scanQueue.js';
+import { createCredentialDeposit } from './lib/credentials.js';
+import { CredentialModal } from './components/CredentialModal.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
@@ -120,6 +122,11 @@ function Screener({
   // Screenshots come from the private bucket through short-expiry signed URLs, minted per view.
   const access = useMemo(() => createEvidenceAccess(client), [client]);
   const queue = useMemo(() => createScanQueue(client, analyst.id), [client, analyst.id]);
+  const credentials = useMemo(
+    () => createCredentialDeposit(client, analyst.id),
+    [client, analyst.id],
+  );
+  const [credentialFor, setCredentialFor] = useState<string | null>(null);
 
   /**
    * Where runs come from.
@@ -294,10 +301,16 @@ function Screener({
               onRun={load}
               source={runs.description}
               queued={queued}
-              onRequest={async (url) => {
-                const result = await queue.request(url);
+              credentialsAvailable={credentials.available}
+              onCredential={(domain) => setCredentialFor(domain)}
+              onRequest={async (url, mode) => {
+                const result = await queue.request(url, mode);
                 if (result.ok) {
-                  setToast('Scan queued — the worker will pick it up');
+                  setToast(
+                    mode === 'screening_account'
+                      ? 'Scan queued with the merchant login — gate checks still run signed out'
+                      : 'Scan queued — the worker will pick it up',
+                  );
                   setQueued(await queue.list());
                 }
                 return result;
@@ -351,6 +364,18 @@ function Screener({
         />
       )}
 
+      {credentialFor !== null && (
+        <CredentialModal
+          deposit={credentials}
+          domain={credentialFor}
+          onClose={() => setCredentialFor(null)}
+          onDeposited={(domain) => {
+            setCredentialFor(null);
+            setToast(`Credential stored for ${domain} — it cannot be read back`);
+          }}
+        />
+      )}
+
       <div className={`toast ${toast !== null ? 'on' : ''}`}>{toast}</div>
     </div>
   );
@@ -370,20 +395,26 @@ function ScanInput({
   source,
   queued,
   onRequest,
+  credentialsAvailable,
+  onCredential,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
   readonly onRun: (runId: string) => void;
   readonly source: string;
   readonly queued: readonly ScanRequestSummary[];
+  readonly credentialsAvailable: boolean;
+  readonly onCredential: (domain: string) => void;
   readonly onRequest: (
     url: string,
+    mode: ScanMode,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
   const [runId, setRunId] = useState(available[0]?.runId ?? '');
   const [url, setUrl] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ScanMode>('public');
 
   useEffect(() => {
     if (runId === '' && available.length > 0) setRunId(available[0]?.runId ?? '');
@@ -392,7 +423,7 @@ function ScanInput({
   const submit = async (): Promise<void> => {
     setRequesting(true);
     setRequestError(null);
-    const result = await onRequest(url);
+    const result = await onRequest(url, mode);
     setRequesting(false);
     if (result.ok) setUrl('');
     else setRequestError(result.error);
@@ -456,7 +487,14 @@ function ScanInput({
               {queued.map((request) => (
                 <li key={request.id} className={`queue-item ${request.status}`}>
                   <span className={`queue-state ${request.status}`}>{request.status}</span>
-                  <span className="queue-url">{request.url}</span>
+                  <span className="queue-url">
+                    {request.url}
+                    {request.mode === 'screening_account' && (
+                      <span className="mode-tag" title="Ran with the merchant's supplied login">
+                        signed in
+                      </span>
+                    )}
+                  </span>
                   <span className="queue-note">
                     {request.status === 'failed'
                       ? request.error ?? 'failed'
@@ -511,19 +549,52 @@ function ScanInput({
           <span className="flabel">Access</span>
           <p className="fhint">How we get past the login gate, if there is one.</p>
           <div className="modes">
-            <button className="mode" aria-pressed="true">
+            <button
+              className="mode"
+              aria-pressed={mode === 'public'}
+              onClick={() => setMode('public')}
+            >
               <span className="mode-t">Public crawl</span>
               <span className="mode-d">No account. Gated pages come back as not evaluable.</span>
             </button>
-            <button className="mode" aria-pressed="false" disabled>
+            <button
+              className="mode"
+              aria-pressed={mode === 'screening_account'}
+              disabled={!credentialsAvailable}
+              onClick={() => setMode('screening_account')}
+            >
               <span className="mode-t">Screening account</span>
-              <span className="mode-d">We sign in with the stored review credentials.</span>
+              <span className="mode-d">
+                {credentialsAvailable
+                  ? "We sign in with the merchant's supplied login."
+                  : 'Needs VITE_CREDENTIAL_PUBLIC_KEY.'}
+              </span>
             </button>
-            <button className="mode" aria-pressed="false" disabled>
+            <button className="mode" aria-pressed={false} disabled>
               <span className="mode-t">Assisted sign-in</span>
               <span className="mode-d">You log in once in a live window; we take it from there.</span>
             </button>
           </div>
+
+          {mode === 'screening_account' && (
+            <div className="mode-detail">
+              <p className="fhint" style={{ margin: 0 }}>
+                {/* Stated where the choice is made, because this is the question the mode
+                    invites. A supplied account widens what is visible; it never moves a gate
+                    finding (D-039). */}
+                The gate checks — products hidden until an account exists, guest checkout disabled
+                — are still decided by a request carrying no session. A merchant login lets us read
+                product pages behind the wall; it cannot change what is reported about the wall.
+              </p>
+              <button
+                className="btn btn-ghost"
+                style={{ marginTop: 10 }}
+                onClick={() => onCredential(url.trim())}
+              >
+                Enter the merchant's login
+              </button>
+            </div>
+          )}
         </div>
 
         {error !== null && (

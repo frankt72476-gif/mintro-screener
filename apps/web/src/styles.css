@@ -669,3 +669,51 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
     print-color-adjust: exact;
   }
 }
+
+/* ── Access mode ─────────────────────────────────────────────────────────────────────────── */
+
+.mode[aria-pressed='true'] {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 1px var(--violet) inset;
+}
+
+.mode-detail {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.mode-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* The credential screen says two things out loud, and they need to read as statements rather
+   than fine print: it cannot be retrieved, and it cannot flatter a merchant. */
+.cred-note {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.cred-note p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+}
+
+.cred-note p:last-child { margin-bottom: 0; }

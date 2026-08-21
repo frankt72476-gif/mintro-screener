@@ -52,6 +52,16 @@ export interface RenderOptions {
   readonly runId: string;
   /** CSS selectors the rule set asks about, evaluated in the page. */
   readonly selectors?: readonly string[];
+  /**
+   * A context carrying a merchant session, for pages behind a login (M9).
+   *
+   * When given, it is used and **not closed** — it belongs to the caller and outlives this render.
+   * Absent, an anonymous context is created and closed here, as before.
+   *
+   * The gate rules never travel this path: `runGateRules` builds its own anonymous access and has
+   * no parameter that could carry a session (D-039).
+   */
+  readonly context?: BrowserContext;
 }
 
 export interface RenderResult {
@@ -76,6 +86,9 @@ export async function renderPage(
   const capturedAt = new Date().toISOString();
 
   let context: BrowserContext | undefined;
+  // A caller-supplied context is borrowed, never closed: it holds the merchant session and the
+  // run needs it for the next page too.
+  const borrowed = options.context !== undefined;
 
   try {
     // Crawl-delay is observed before the request leaves, not after (D-013).
@@ -84,7 +97,7 @@ export async function renderPage(
     // D-017: polite mitigations, not stealth. A standard desktop viewport, a real
     // accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who
     // inspects their logs still sees who we are and can reach us.
-    context = await browser.newContext({
+    context = options.context ?? await browser.newContext({
       viewport: options.viewport ?? { width: 1440, height: 900 },
       userAgent: USER_AGENT,
       locale: 'en-US',
@@ -154,7 +167,7 @@ export async function renderPage(
       });
     }
 
-    await context.close();
+    if (!borrowed) await context.close();
     context = undefined;
 
     return {
@@ -186,7 +199,9 @@ export async function renderPage(
       artifacts: [],
     };
   } finally {
-    await context?.close().catch(() => undefined);
+    // Only ours. Closing a borrowed context would take the merchant session with it and turn the
+    // rest of the run anonymous without saying so.
+    if (!borrowed) await context?.close().catch(() => undefined);
   }
 }
 

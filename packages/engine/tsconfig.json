@@ -4,7 +4,10 @@
     "outDir": "./dist",
     "rootDir": ".",
     "composite": true,
-    "types": ["node"]
+    "types": ["node"],
+    // WebCrypto types. `sealed.ts` runs in both the browser and Node 20+, and DOM is where
+    // TypeScript keeps CryptoKey and SubtleCrypto. No DOM API is used beyond crypto.subtle.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "bin/**/*.ts"],
   "references": [{ "path": "../ruleset" }]

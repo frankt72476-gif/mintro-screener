@@ -1,9 +1,16 @@
 /**
  * Analyst sign-in.
  *
- * Invite-only, email-based, no passwords. An invited analyst receives a magic link and signs in
- * by following it — there is no password to store, reset, phish, or leak, and no signup form for
- * anyone to find.
+ * **Invite-only, two ways in.** Email and password is the default; a magic link is kept as a
+ * secondary route.
+ *
+ * Password is default because a magic link is unusable in the situation the tool is most often
+ * used in: presenting from a machine that is not signed in to the analyst's mail. A sign-in that
+ * requires a second device is a sign-in that fails in front of an audience.
+ *
+ * The two routes change *how* someone authenticates, not *who* is allowed in. There is no signup
+ * form on either. Accounts are created in the Supabase dashboard, and being in `auth.users` is
+ * still not sufficient — every policy gates on `public.is_analyst()`.
  *
  * Being in `auth.users` is not sufficient. Every policy in `supabase/migrations/` gates on
  * `public.is_analyst()`, which requires an active row in `analysts`. A signed-in visitor who is
@@ -30,6 +37,12 @@ export type AuthState =
 
 interface AuthContextValue {
   readonly state: AuthState;
+  /** Email and password. The default route. */
+  signInWithPassword(
+    email: string,
+    password: string,
+  ): Promise<{ readonly ok: boolean; readonly error?: string }>;
+  /** Magic link. Secondary, for anyone who prefers it or has forgotten a password. */
   signIn(email: string): Promise<{ readonly sent: boolean; readonly error?: string }>;
   signOut(): Promise<void>;
 }
@@ -103,6 +116,24 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
   const value = useMemo<AuthContextValue>(
     () => ({
       state,
+      async signInWithPassword(email, password) {
+        if ('missing' in config) return { ok: false, error: 'Supabase is not configured' };
+
+        const { error } = await makeClient(config).auth.signInWithPassword({ email, password });
+        if (error === null) return { ok: true };
+
+        // Supabase answers a wrong password and an unknown address identically, which is correct
+        // — distinguishing them would confirm which addresses have accounts. The message is
+        // rewritten to say so plainly rather than leaving someone to wonder whether they were
+        // invited at all.
+        return {
+          ok: false,
+          error: /invalid login credentials/i.test(error.message)
+            ? 'That email and password did not match an account. Access is by invitation — if you have not been given a password, ask for one.'
+            : error.message,
+        };
+      },
+
       async signIn(email) {
         if ('missing' in config) return { sent: false, error: 'Supabase is not configured' };
         const client = makeClient(config);
