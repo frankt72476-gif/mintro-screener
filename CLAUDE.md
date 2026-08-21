@@ -36,9 +36,10 @@ should mean), stop and ask. Do not guess at business rules.
    matched string or computed value, full-page screenshot, DOM snapshot hash, UTC timestamp.
    If evidence capture fails, the finding is `not_evaluable`, not a bare assertion.
 
-4. **Ambiguous checks never auto-fail.** Rules marked `auto_tier: "review_only"` (dosing
+4. **Ambiguous checks never auto-fail.** Rules marked `tier: "review_only"` (dosing
    co-occurrence, abbreviation matching) go to a human queue regardless of confidence.
    These are where false positives live and false positives destroy trust in the tool.
+   Severity never overrides this — see D-009.
 
 5. **Evidence storage is append-only.** Screenshots and DOM snapshots are never overwritten
    or deleted by application code. This is a defensibility requirement.

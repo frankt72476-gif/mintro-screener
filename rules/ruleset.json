@@ -4,16 +4,16 @@
   "effective": "2026-05-26",
   "states": ["fail", "review", "pass", "not_evaluable"],
   "categories": [
-    { "id": "gate",     "n": 1,  "name": "Access and identity gating" },
-    { "id": "disclose", "n": 2,  "name": "Site-wide disclosure" },
-    { "id": "product",  "n": 3,  "name": "Product page content" },
-    { "id": "naming",   "n": 4,  "name": "Naming and taxonomy" },
-    { "id": "catalog",  "n": 5,  "name": "Catalog composition" },
-    { "id": "coa",      "n": 6,  "name": "Quality documentation" },
-    { "id": "fulfil",   "n": 7,  "name": "Fulfillment and screening" },
-    { "id": "offsite",  "n": 8,  "name": "Off-site presence" },
-    { "id": "payment",  "n": 9,  "name": "Payments" },
-    { "id": "comms",    "n": 10, "name": "Customer communications" }
+    { "id": "gate",     "n": 1,  "prefix": "GATE", "name": "Access and identity gating" },
+    { "id": "disclose", "n": 2,  "prefix": "DISC", "name": "Site-wide disclosure" },
+    { "id": "product",  "n": 3,  "prefix": "PROD", "name": "Product page content" },
+    { "id": "naming",   "n": 4,  "prefix": "NAME", "name": "Naming and taxonomy" },
+    { "id": "catalog",  "n": 5,  "prefix": "CATG", "name": "Catalog composition" },
+    { "id": "coa",      "n": 6,  "prefix": "COA",  "name": "Quality documentation" },
+    { "id": "fulfil",   "n": 7,  "prefix": "FULF", "name": "Fulfillment and screening" },
+    { "id": "offsite",  "n": 8,  "prefix": "OFFS", "name": "Off-site presence" },
+    { "id": "payment",  "n": 9,  "prefix": "PAY",  "name": "Payments" },
+    { "id": "comms",    "n": 10, "prefix": "COMM", "name": "Customer communications" }
   ],
   "rules": [
     { "id": "GATE-001", "cat": "gate", "layer": 1, "sev": "major", "type": "dom_assert", "tier": "review_only",
@@ -154,8 +154,8 @@
 
     { "id": "CATG-004", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No tablets or pills",
-      "clause": "Capsules may be sold if exclusively for research use and properly labeled. Otherwise prohibited.",
-      "params": { "patterns": ["tablet", "pill", "softgel", "lozenge"], "scope": "all", "expect": "absent", "note": "OPEN QUESTION: source document describes capsules in two places with differing wording. Confirm before enforcing." } },
+      "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
+      "params": { "patterns": ["tablet", "pill", "softgel", "lozenge"], "scope": "all", "expect": "absent", "note": "Covers tablets and pills only. Capsule labelling is CATG-006." } },
 
     { "id": "CATG-005", "cat": "catalog", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
       "title": "Reconstitution solution labelling",

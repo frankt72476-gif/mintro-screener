@@ -8,10 +8,21 @@ checks it against the program rule set, and produces an evidence-backed report f
     demo/index.html        Design spec for M3. Open locally. Not deployed — see D-004.
     brand/                 Logo assets derived from the supplied PNG. See D-007.
     rules/ruleset.json     51 rules, the single source of truth. Data, not code.
+    packages/ruleset/      M0 — loader, schema and validator for the rule set.
+    fixtures/ruleset/      Valid and deliberately malformed rule sets for the test suite.
     CLAUDE.md              Standing brief for Claude Code. Read first.
     docs/ARCHITECTURE.md   Stack and technical rulings.
     docs/DECISIONS.md      Business rulings, dated, with reasoning.
     docs/DEPLOY.md         git -> Netlify, step by step.
+
+## Working on it
+
+    npm install
+    npm run check       # typecheck + tests
+    npm run validate    # validate rules/ruleset.json, exit 1 if it is malformed
+
+`npm run check` runs both halves for a reason: some guarantees are enforced by `tsc` rather
+than by an assertion, and the tests pass without them.
 
 ## What this is not
 

@@ -1,0 +1,123 @@
+{
+  "version": "1.0.0",
+  "source_document": "Fixture_Ruleset.pdf",
+  "effective": "2026-01-01",
+  "states": [
+    "fail",
+    "review",
+    "pass",
+    "not_evaluable"
+  ],
+  "categories": [
+    {
+      "id": "gate",
+      "n": 1,
+      "prefix": "GATE",
+      "name": "Access and identity gating"
+    },
+    {
+      "id": "product",
+      "n": 2,
+      "prefix": "PROD",
+      "name": "Product page content"
+    }
+  ],
+  "rules": [
+    {
+      "id": "PROD-001",
+      "cat": "product",
+      "layer": 0,
+      "sev": "critical",
+      "type": "url_pattern",
+      "tier": "auto_fail",
+      "title": "No therapeutic categories",
+      "clause": "Cannot categorize products under therapeutic headings.",
+      "params": {
+        "patterns": [
+          "weight-loss"
+        ],
+        "scope": "collections",
+        "expect": "absent"
+      }
+    },
+    {
+      "id": "PROD-002",
+      "cat": "product",
+      "layer": 2,
+      "sev": "major",
+      "type": "text_match",
+      "tier": "review_only",
+      "title": "CAS number listed",
+      "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+      "params": {
+        "surface": "product",
+        "pattern": "\\b\\d{2,7}-\\d{2}-\\d\\b",
+        "expect": "present"
+      }
+    },
+    {
+      "id": "PROD-003",
+      "cat": "product",
+      "layer": 2,
+      "sev": "critical",
+      "type": "text_cooccurrence",
+      "tier": "review_only",
+      "title": "No dosing information",
+      "clause": "Never include dosing information.",
+      "params": {
+        "surface": "product",
+        "class_a": [
+          "mg"
+        ],
+        "class_b": [
+          "daily"
+        ],
+        "window_tokens": 12
+      }
+    },
+    {
+      "id": "GATE-001",
+      "cat": "gate",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "title": "Research field stored with each order",
+      "clause": "Store the selected field with every order in your database.",
+      "params": {
+        "reason": "Order records are server-side. Requires merchant attestation."
+      }
+    },
+    {
+      "id": "GATE-002",
+      "cat": "gate",
+      "layer": 1,
+      "sev": "major",
+      "type": "dom_assert",
+      "tier": "review_only",
+      "title": "Age affirmation before entry",
+      "clause": "Every visitor must be stopped before accessing the website.",
+      "params": {
+        "surface": "homepage",
+        "expect": "present",
+        "signals": [
+          "age-gate"
+        ]
+      }
+    },
+    {
+      "id": "PROD-004",
+      "cat": "product",
+      "layer": 2,
+      "sev": "critical",
+      "type": "doc_parse",
+      "tier": "auto_fail",
+      "title": "Purity at or above 98%",
+      "clause": "98% purity for all products.",
+      "params": {
+        "extract": "purity_pct",
+        "min": 98
+      }
+    }
+  ]
+}

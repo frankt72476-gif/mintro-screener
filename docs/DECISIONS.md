@@ -126,3 +126,50 @@ Ask the designer for the **SVG source**, ideally with a transparent-background v
 white knockout. Everything in `brand/` was extracted from a flattened raster and will not
 scale cleanly past its exported sizes. This is a five-minute request to whoever made the
 original and it removes a whole class of future asset problems.
+
+---
+
+## D-008 — The rule set is the source of truth for its own field names
+**2026-08-20 · architect's ruling**
+
+The tier field is named `tier` in `rules/ruleset.json`. `CLAUDE.md` hard constraint 4
+previously called it `auto_tier`. There is no `auto_tier` field and there never was.
+`CLAUDE.md` has been corrected.
+
+**Reasoning.** Hard constraint 1 makes `rules/ruleset.json` the single source of truth. That
+applies to the shape of the data, not only its contents. When prose and data disagree about
+a field name, the data is right by definition and the prose is a bug — fix the prose.
+
+**Follow-on: `categories[].prefix` added.** Rule IDs use a prefix that is not the category
+id (`GATE`/`gate`, `DISC`/`disclose`, `CATG`/`catalog`, `FULF`/`fulfil`, `OFFS`/`offsite`,
+`PAY`/`payment`, `COMM`/`comms`). That mapping was real but undeclared, which meant
+validating it would have required hardcoding the table in the engine. It is now a `prefix`
+field on each entry in the `categories` block, and the loader validates prefix-matches-
+category from that data. The same rule applies to anything else the engine needs to know
+about the rule set: declare it in the data, do not encode it in code.
+
+---
+
+## D-009 — State is determined by tier alone; severity is presentation
+**2026-08-20 · business owner**
+
+The four states are produced by exactly two inputs — whether the check observed a violation,
+and the rule's `tier`.
+
+    violation + tier auto_fail      -> fail
+    violation + tier review_only    -> review
+    no violation                    -> pass
+    check could not run             -> not_evaluable
+
+`sev` (`critical` / `major` / `minor`) **never affects state.** It drives ordering within the
+report and nothing else. A `critical` rule with `tier: review_only` produces `review`, not
+`fail`. Severity must never escalate a `review_only` finding to `fail` under any circumstance.
+
+**Reasoning.** Severity says how much a finding matters if it is real. Tier says how confident
+the check is that it is real. Collapsing the two lets a high-stakes-but-ambiguous check —
+exactly the dosing and abbreviation cases hard constraint 4 exists to protect — auto-fail a
+merchant on a guess. Those are the checks where false positives live, and a false `fail` on a
+critical rule is the most expensive error the tool can make.
+
+Note the fourth line: a check that could not run is `not_evaluable`, never `pass`. This
+restates hard constraint 2 and is not negotiable.
