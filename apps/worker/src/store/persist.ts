@@ -13,10 +13,26 @@
  * The run is written before its findings deliberately. A run that fails halfway should leave a
  * record that it was attempted; a screening system whose failures are invisible is worse than one
  * whose failures are ugly.
+ *
+ * ## Not atomic, and what is done about that instead
+ *
+ * Storage writes and Postgres writes cannot share a transaction, so a partial write is possible
+ * and always will be. Three things make it survivable rather than terminal:
+ *
+ *   1. **A failure marks the run `failed`** rather than leaving it in `running` forever. An
+ *      abandoned run that looks identical to one still in progress is how five half-written runs
+ *      sat unnoticed.
+ *   2. **`finished_at` stays null on failure**, so the immutability trigger still permits writes
+ *      and the run can be resumed. Freezing a broken run would make it unrepairable, and runs are
+ *      never deleted (D-002) — resume is the only way out.
+ *   3. **Every write is idempotent.** Artifacts collide on their key, evidence rows on their
+ *      primary key, findings on `(run_id, ordinal)`. Re-running fills gaps and changes nothing
+ *      that is already there.
  */
 
 import type { EvidenceArtifact, ReportFinding, ScreeningReport } from '@mintro/engine';
 import { putEvidence, storagePathFor, type WorkerSupabase } from './supabase.js';
+import { assessRun, countFindings } from './completeness.js';
 
 export interface PersistInput {
   readonly report: ScreeningReport;
@@ -31,6 +47,8 @@ export interface PersistResult {
   readonly findings: number;
   readonly evidenceWritten: number;
   readonly evidenceAlreadyPresent: number;
+  /** True when this filled in an existing incomplete run rather than creating a new one. */
+  readonly resumed: boolean;
 }
 
 export async function persistRun(
@@ -39,8 +57,49 @@ export async function persistRun(
 ): Promise<PersistResult> {
   const { report, artifacts, runId } = input;
 
+  const before = await assessRun(supabase, runId);
+
+  // A run that is already complete is left exactly as it is. This is the check that was wrong:
+  // it must ask whether the run is *complete*, never whether a row exists.
+  if (before.complete) {
+    return {
+      runId,
+      merchantId: '',
+      findings: before.findingsInDb,
+      evidenceWritten: 0,
+      evidenceAlreadyPresent: before.evidenceRows,
+      resumed: true,
+    };
+  }
+
   const merchantId = await upsertMerchant(supabase, report);
-  await insertRun(supabase, runId, merchantId, report);
+  const resumed = before.exists;
+
+  if (!resumed) {
+    await insertRun(supabase, runId, merchantId, report);
+  }
+
+  try {
+    return await writeRunContents(supabase, input, merchantId, resumed);
+  } catch (error) {
+    // Mark it failed, but leave `finished_at` null so it stays repairable. A run frozen in a
+    // broken state could never be completed, and D-002 forbids deleting it.
+    await supabase.client
+      .from('runs')
+      .update({ status: 'failed' })
+      .eq('id', runId)
+      .then(() => undefined, () => undefined);
+    throw error;
+  }
+}
+
+async function writeRunContents(
+  supabase: WorkerSupabase,
+  input: PersistInput,
+  merchantId: string,
+  resumed: boolean,
+): Promise<PersistResult> {
+  const { report, artifacts, runId } = input;
 
   let written = 0;
   let present = 0;
@@ -74,9 +133,10 @@ export async function persistRun(
   return {
     runId,
     merchantId,
-    findings: report.categories.reduce((sum, category) => sum + category.findings.length, 0),
+    findings: countFindings(report),
     evidenceWritten: written,
     evidenceAlreadyPresent: present,
+    resumed,
   };
 }
 
@@ -140,12 +200,17 @@ async function insertFindings(
   runId: string,
   report: ScreeningReport,
 ): Promise<void> {
+  let ordinal = 0;
   const rows = report.categories.flatMap((category) =>
     category.findings.map((finding: ReportFinding) => {
       const primary = finding.evidence.find((entry) => entry.matchedValue !== undefined) ?? finding.evidence[0];
 
       return {
         run_id: runId,
+        // Deterministic: the report orders categories by rule-set position and findings by state
+        // then severity, so the same report always produces the same ordinals. That is what makes
+        // a resumed write collide rather than duplicate.
+        ordinal: ordinal++,
         rule_id: finding.ruleId,
         state: finding.state,
         note: finding.note,
@@ -163,7 +228,12 @@ async function insertFindings(
   // Chunked: a run produces up to ~100 findings today, but Layer 2 sampling is configurable and
   // a single oversized insert is a poor failure mode.
   for (let i = 0; i < rows.length; i += 200) {
-    const { error } = await supabase.client.from('findings').insert(rows.slice(i, i + 200));
+    // `ignoreDuplicates` issues ON CONFLICT DO NOTHING, which performs no UPDATE and therefore
+    // does not fire the append-only trigger. A finding already present is left untouched.
+    const { error } = await supabase.client
+      .from('findings')
+      .upsert(rows.slice(i, i + 200), { onConflict: 'run_id,ordinal', ignoreDuplicates: true });
+
     if (error !== null) {
       throw new Error(`could not record findings for run ${runId}: ${error.message}`);
     }

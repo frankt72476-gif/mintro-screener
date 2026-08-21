@@ -1053,3 +1053,65 @@ publishes a credential.
 overwritten, so getting it wrong is not recoverable by re-running with different arguments.
 Digests are recomputed from the bytes on disk rather than copied from the report: if a local file
 has been altered since the run, the migrated record should describe the file that actually exists.
+
+---
+
+## D-031 — "Already done" must mean complete, not present
+**2026-08-21 · business owner**
+
+The first migration into Supabase failed partway: the bucket did not yet exist, every artifact
+upload failed, and five runs were left with a row, no findings, no evidence and no report.
+
+Every retry then reported **"already migrated"** and skipped them — permanently. Runs are never
+deleted (D-002), so there was no way back.
+
+### Two defects, and the second is the one that matters
+
+**1. The migration was not atomic.** Storage writes and Postgres writes cannot share a
+transaction, so a partial write was always possible. What was missing was not atomicity — it is
+not available — but a survivable failure:
+
+- A failure now marks the run `failed` rather than leaving it in `running` indefinitely. A run
+  abandoned mid-write looked exactly like one still in progress, which is how five of them sat
+  unnoticed.
+- `finished_at` stays null on failure, so the immutability trigger still permits writes and the
+  run can be **resumed**. Freezing a broken run would make it unrepairable, and since it can never
+  be deleted, resume is the only way out.
+- Every write is idempotent: artifacts collide on their key, evidence rows on their primary key,
+  findings on a new `(run_id, ordinal)` index (migration 0009). Re-running fills gaps and changes
+  nothing already there.
+
+**2. The idempotency check tested existence rather than completeness.** This is the D-026 shape
+again, this time in a migration:
+
+> It returned "already done" when it could not distinguish done from half-done.
+
+A guard that cannot tell must not answer. The check now asks whether the run is *complete* —
+status, `finished_at`, a stored report, the expected number of findings, and a row for every
+evidence key the report cites.
+
+### The two scripts disagreed, and neither was right
+
+`migrate-to-supabase` reported **5/5 present**. `verify-supabase` reported **0 complete runs**.
+Same database. Each had implemented its own idea of "present": one asked whether a row existed,
+the other whether `status = 'complete'`.
+
+The definition now lives in `apps/worker/src/store/completeness.ts` and both read it — the same
+reasoning as the shared directive-term list in D-029. Two implementations of one concept will
+diverge, and the moment they do, one of them is lying.
+
+The definition is **intrinsic**: it evaluates from the database alone, with no reference to local
+files, so it answers identically for a run migrated today and one migrated months ago.
+
+### Reporting success on the absence of an exception
+
+The migration counted a run as successful because `persistRun` had not thrown. It now
+re-assesses after writing and counts the run only if it is complete. Not throwing is not the same
+as having worked, and the gap between those two is exactly where this failure lived.
+
+### Recovery
+
+`--repair` resumes runs left in this state. It is deliberately **not** the default: resuming
+writes into a partially written run, and that should be an explicit instruction rather than
+something a routine re-run does by itself. Without it, an incomplete run is reported and skipped
+with its problems named.

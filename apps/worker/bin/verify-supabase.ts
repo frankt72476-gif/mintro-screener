@@ -15,6 +15,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { createWorkerSupabase } from '../src/store/supabase.js';
+import { assessRun, describeCompleteness } from '../src/store/completeness.js';
 
 interface Check {
   readonly name: string;
@@ -26,18 +27,30 @@ async function main(): Promise<number> {
   const checks: Check[] = [];
   const supabase = createWorkerSupabase();
 
-  // ---- 1. runs are present -------------------------------------------------------------
+  // ---- 1. runs are complete -------------------------------------------------------------
+  //
+  // "Complete" is defined once, in store/completeness.ts, and this script and the migration read
+  // the same definition. They previously each had their own and disagreed — one reported 5/5
+  // present while the other reported 0 complete runs, from the same database.
   const { data: runs, error: runsError } = await supabase.client
     .from('runs')
-    .select('id, status, finished_at, report, merchants ( domain )')
-    .eq('status', 'complete')
+    .select('id, report')
     .order('started_at', { ascending: false });
 
   const rows = (runs ?? []) as { id: string; report: { merchantDomain: string } | null }[];
+  const assessments = await Promise.all(rows.map((row) => assessRun(supabase, row.id, { checkObjects: true })));
+  const incomplete = assessments.filter((assessment) => !assessment.complete);
+
   checks.push({
-    name: 'runs persisted',
-    ok: runsError === null && rows.length > 0,
-    detail: runsError !== null ? runsError.message : `${rows.length} complete run(s)`,
+    name: 'every run is complete',
+    ok: runsError === null && rows.length > 0 && incomplete.length === 0,
+    detail:
+      runsError !== null
+        ? runsError.message
+        : `${assessments.length - incomplete.length}/${assessments.length} complete` +
+          (incomplete.length > 0
+            ? ` · first problem: ${describeCompleteness(incomplete[0]!)}`
+            : ''),
   });
 
   // ---- 2. every screenshot resolves through a signed URL --------------------------------

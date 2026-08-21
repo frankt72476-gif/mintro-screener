@@ -3,15 +3,28 @@
  *
  *     npm run migrate-supabase              # dry run: says what it would do
  *     npm run migrate-supabase -- --commit  # writes
+ *     npm run migrate-supabase -- --commit --repair
+ *                                           # also resumes runs left half-written
  *
  * The five existing runs must survive and render — that is the acceptance test for M7. This
  * reads `reports/*.json` and `evidence/<run-id>/...` as the worker wrote them, and reconstructs
  * the rows and objects that would have been written had Supabase existed at the time.
  *
- * **Idempotent by construction, not by checking.** Evidence writes use `upsert: false` and the
- * `evidence` table keys on the storage path, so re-running collides rather than overwriting
- * (D-002, hard constraint 5). A second run of this script reports what already existed and
- * changes nothing.
+ * **Idempotent by construction.** Evidence writes use `upsert: false`, evidence rows key on the
+ * storage path, and findings key on `(run_id, ordinal)`, so re-running collides rather than
+ * overwriting (D-002, hard constraint 5).
+ *
+ * ## "Already migrated" means complete, not present
+ *
+ * An earlier version asked whether a run *row existed* and reported "already migrated" if it did.
+ * That was wrong in the worst available way: a failed migration left five runs with no findings
+ * and no evidence, and every subsequent attempt skipped them as done. The state was
+ * unrecoverable — runs are never deleted (D-002), so there was no way back.
+ *
+ * It is the D-026 shape in a migration: a check that answered "already done" when it could not
+ * distinguish done from half-done. The definition of complete now lives in one place,
+ * `store/completeness.ts`, and both this script and `verify-supabase` read it — they previously
+ * disagreed, one reporting 5/5 present while the other reported 0.
  */
 
 import { createHash } from 'node:crypto';
@@ -20,6 +33,7 @@ import { join, relative, sep } from 'node:path';
 import type { EvidenceArtifact, ScreeningReport } from '@mintro/engine';
 import { createWorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
+import { assessRun, describeCompleteness } from '../src/store/completeness.js';
 
 interface LocalArtifact {
   readonly key: string;
@@ -28,6 +42,7 @@ interface LocalArtifact {
 
 async function main(argv: readonly string[]): Promise<number> {
   const commit = argv.includes('--commit');
+  const repair = argv.includes('--repair');
   const reportsDir = 'reports';
   const evidenceDir = 'evidence';
 
@@ -42,46 +57,81 @@ async function main(argv: readonly string[]): Promise<number> {
 
   console.log(`${reports.length} local run(s) to migrate\n`);
 
+  const supabase = createWorkerSupabase();
+
   if (!commit) {
     // A dry run is the default because this writes to a store that refuses to be overwritten.
     // Getting it wrong is not recoverable by re-running with different arguments.
+    //
+    // It now reports the *actual* state of each run rather than only what is on disk, because the
+    // question that matters is what is missing, not what exists locally.
+    let incomplete = 0;
+
     for (const report of reports) {
       const artifacts = collectArtifacts(evidenceDir, report.runId);
-      console.log(`  ${report.merchantDomain.padEnd(28)} run ${report.runId.slice(0, 8)}  ${String(artifacts.length).padStart(3)} artifact(s)  ${countFindings(report)} finding(s)`);
+      const assessment = await assessRun(supabase, report.runId);
+      if (assessment.exists && !assessment.complete) incomplete += 1;
+
+      console.log(
+        `  ${report.merchantDomain.padEnd(28)} ${String(artifacts.length).padStart(3)} local artifact(s), ` +
+          `${countFindings(report)} finding(s)  →  ${describeCompleteness(assessment)}`,
+      );
     }
-    console.log('\nDry run. Nothing was written. Re-run with --commit.');
+
+    console.log('\nDry run. Nothing was written.');
+    if (incomplete > 0) {
+      console.log(`${incomplete} run(s) exist but are incomplete. Re-run with --commit --repair to resume them.`);
+    } else {
+      console.log('Re-run with --commit to write.');
+    }
     return 0;
   }
 
-  const supabase = createWorkerSupabase();
   let ok = 0;
 
   for (const report of reports) {
+    const label = report.merchantDomain.padEnd(28);
+    const before = await assessRun(supabase, report.runId);
+
+    if (before.complete) {
+      console.log(`  ${label} already complete — left untouched`);
+      ok += 1;
+      continue;
+    }
+
+    // A run that exists but is incomplete is not silently resumed. Resuming writes into a
+    // partially written run, and that should be an explicit instruction rather than something a
+    // routine re-run does by itself.
+    if (before.exists && !repair) {
+      console.error(`  ${label} INCOMPLETE and --repair was not given: ${before.problems.join('; ')}`);
+      continue;
+    }
+
     const local = collectArtifacts(evidenceDir, report.runId);
     const artifacts = local.map((entry) => toArtifact(entry, report));
 
     try {
       const result = await persistRun(supabase, { report, artifacts, runId: report.runId });
+      const after = await assessRun(supabase, report.runId);
+
       console.log(
-        `  ${report.merchantDomain.padEnd(28)} ${result.findings} finding(s), ` +
-          `${result.evidenceWritten} artifact(s) written` +
-          (result.evidenceAlreadyPresent > 0 ? `, ${result.evidenceAlreadyPresent} already present` : ''),
+        `  ${label} ${result.resumed ? 'resumed' : 'migrated'} — ` +
+          `${result.findings} finding(s), ${result.evidenceWritten} artifact(s) written` +
+          (result.evidenceAlreadyPresent > 0 ? `, ${result.evidenceAlreadyPresent} already present` : '') +
+          `  →  ${describeCompleteness(after)}`,
       );
-      ok += 1;
+
+      // The migration reports success only if the run is *complete* afterwards. Reporting
+      // success on the strength of no exception having been thrown is what produced the state
+      // this script now has to repair.
+      if (after.complete) ok += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // A run that was already migrated collides on its primary key. That is the append-only
-      // rule working, and it is reported rather than treated as a failure of the migration.
-      if (message.includes('duplicate') || message.includes('already exists')) {
-        console.log(`  ${report.merchantDomain.padEnd(28)} already migrated — left untouched`);
-        ok += 1;
-        continue;
-      }
-      console.error(`  ${report.merchantDomain.padEnd(28)} FAILED: ${message}`);
+      console.error(`  ${label} FAILED: ${message}`);
     }
   }
 
-  console.log(`\n${ok}/${reports.length} run(s) present in Supabase.`);
+  console.log(`\n${ok}/${reports.length} run(s) complete in Supabase.`);
   return ok === reports.length ? 0 : 1;
 }
 
