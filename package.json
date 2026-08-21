@@ -20,7 +20,9 @@
     "scan-full": "tsc --build && node apps/worker/dist/bin/scan.js",
     "link-runs": "node scripts/link-runs.mjs",
     "web": "npm run link-runs && npm run -w @mintro/web dev",
-    "web:build": "npm run -w @mintro/web build"
+    "web:build": "npm run -w @mintro/web build",
+    "testbed": "node apps/testbed/server.mjs",
+    "auth-check": "tsc --build && node apps/worker/dist/bin/auth-check.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -8,6 +8,7 @@
  */
 
 import type { Rule, State } from '@mintro/ruleset';
+import type { SessionDescriptor } from './session.js';
 
 /**
  * What kind of capture backs a finding. Named explicitly on every finding so the report shows
@@ -97,6 +98,15 @@ export interface Evidence {
    * to the record of what was tried.
    */
   readonly attempts?: readonly FetchAttempt[];
+  /**
+   * The session the request carried.
+   *
+   * Required on every `http_probe` and `flow_probe` finding: those checks mean opposite things
+   * depending on whether a merchant session was in force, so a finding without this is not
+   * evidence of anything (docs/ARCHITECTURE.md § Handler requirements). Carries a vault
+   * reference at most — never a credential.
+   */
+  readonly session?: SessionDescriptor;
 }
 
 export interface Finding {

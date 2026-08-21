@@ -682,3 +682,67 @@ judgement with no recorded reasoning cannot be defended — which is the failure
 to prevent.
 
 Recorded in `CLAUDE.md` § Conventions.
+
+---
+
+## D-026 — Authenticated crawling: session handling and its safety properties
+**2026-08-21 · architect's rulings, built against a local testbed only**
+
+M4 builds scripted login for Shopify and WooCommerce. Four rulings were made in the building and
+each exists because the alternative fails silently.
+
+### A session is valid only on positive evidence
+
+Session revalidation asks *"is the signed-in marker present?"*, never *"is a login form absent?"*.
+
+The first draft asked the second question and returned "valid" for a **404** — no signed-in
+marker and no password field, and the absence of both was read as the presence of a session. That
+is hard constraint 9 in the session layer: locating a thing by what it is not.
+
+The consequence is the worst available here. A run proceeding logged-out while reporting as
+authenticated **inverts the meaning of every GATE-002 and GATE-003 finding it produces** — the
+rules whose entire question is what a session changes.
+
+### A redirect away is not the path being served
+
+`http_probe` treats a request that ended somewhere other than the path asked for as *not served*,
+whatever status the destination returned.
+
+A merchant who gates their catalogue answers an anonymous `/collections/all` with a redirect to
+the login form. The browser follows it and the login page returns **200**. Before this,
+compliant gating and no gating at all were indistinguishable, and the testbed — which gates
+correctly — was auto-failed for doing the right thing. The redirect is now reported, because
+"redirected to /account/login" is the observation that the gate works.
+
+### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
+
+Both rules carry `unauthenticated: true`, so the unauthenticated probe is the finding. The
+authenticated run is the **contrast** that gives it meaning: it establishes the catalogue exists
+and is reachable with an account, which is what separates "gated" from "broken or empty". The
+contrast is never reported as a second finding under the same rule id.
+
+### Nothing that reaches a report can carry a credential
+
+`SessionDescriptor` — the type that travels into findings, reports, PDFs and emails — has fields
+for a mode, an origin, a **vault reference**, a timestamp and a platform. It has nowhere to put a
+password. The guarantee is structural rather than remembered, and a test asserts the field list
+so that adding one has to confront this.
+
+Storage follows hard constraint 6: AES-256-GCM at rest with a fresh IV per write, keyed from
+`VAULT_TOKEN` supplied by the runtime environment and never a file in the repo; every access
+logged with its purpose and outcome; the log asserted never to contain a credential. A Playwright
+`storageState` is a bearer token for the merchant's account and is encrypted identically to the
+password that produced it.
+
+### What is not built
+
+**Assisted sign-in is designed, not implemented** (`apps/worker/src/auth/assisted.ts`). It is the
+fallback for Magento, BigCommerce, bespoke platforms and heavily customised themes. The design is
+recorded there in full; three decisions block building it, and the blocking one is whether Mintro
+is authorised to hold merchant sessions established by a person rather than by stored
+credentials.
+
+**No account exists on any real merchant site.** Everything here was built and proven against
+`apps/testbed`, a local storefront serving Shopify-style and WooCommerce-style login forms and a
+gated catalogue. The credential-authorization question is unsettled and nothing in M4 depends on
+settling it.

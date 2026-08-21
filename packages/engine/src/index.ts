@@ -97,6 +97,23 @@ export {
   type Similarity,
 } from './textSimilarity.js';
 
+export {
+  resolveProbeSession,
+  describeSession,
+  canCompareAuthenticated,
+  NO_SESSION,
+  type SessionDescriptor,
+  type SessionMode,
+  type SessionOrigin,
+} from './session.js';
+
+export { checkHttpProbe, type HttpProbeInput, type ProbeResult } from './checks/httpProbe.js';
+export {
+  checkFlowProbe,
+  type FlowObservation,
+  type FlowProbeInput,
+  type FlowStage,
+} from './checks/flowProbe.js';
 export { checkDomAssert } from './checks/domAssert.js';
 export { checkTextCooccurrence, findCooccurrences, type Cooccurrence } from './checks/textCooccurrence.js';
 export { runLayer2, layer2Rules, type Layer2Run, type SampledPage } from './layer2.js';
