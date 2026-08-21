@@ -176,11 +176,36 @@ restates hard constraint 2 and is not negotiable.
 
 ---
 
-## D-010 — Not used
+## D-010 — Closed param schemas, and the case that proved them
+**2026-08-20 · reserved · 2026-08-21 · empirical record added**
 
-Number reserved and skipped. The catalogue-scope decision below was drafted as D-010 before
-the ruling assigned it D-011; the number is left unused rather than renumbering a decision
-that may already have been cited.
+The number was reserved and skipped: the catalogue-scope decision below was drafted as D-010
+before the ruling assigned it D-011. It is used now to record something the closed-schema
+decision earned.
+
+**The argument, made abstractly at M0.** `params` schemas are closed — an unrecognised key is a
+load error. The case for it was that a misspelt param would otherwise load fine, match nothing,
+and report `pass`. That was reasoning about a hypothetical.
+
+**The case, observed at M2.** A schema check caught two rules that its own author's audit had
+missed.
+
+The D-014 audit reviewed every handler for rules that locate their subject by its compliant
+form. It named DISC-003 as dangerous. It did not notice that DISC-003 had **no matcher at all** —
+no `signals`, no `selector`, nothing — so the rule matched nothing and, being `expect: present`
+and `auto_fail`, failed every merchant scanned.
+
+The fix added a schema rule: a `dom_assert` declaring `expect` must also declare something to
+recognise its subject by. That check immediately reported **two further rules** — GATE-005 and
+PAY-002 — that the same audit had passed over. Both turned out to be legitimate (they recognise
+their subjects via `prefer_types` and `detect`, which the first draft of the check omitted), so
+the schema was corrected rather than the rules. But the schema found them, and a careful manual
+review of the same file had not.
+
+**What this establishes.** A schema check is not a stricter version of reading the rules
+carefully. It is a different instrument, and it catches a class of defect that attention does
+not — including in the work of the person who wrote the audit. Every argument for loosening a
+param schema should be weighed against that.
 
 ---
 
@@ -454,3 +479,39 @@ already captured as the evidence of why — which the worker does today.
 **Escalation trigger.** Move to a hosted browser vendor (Browserbase, Steel — see
 `docs/ARCHITECTURE.md`) when **a second or third merchant blocks** after these mitigations. One
 is a site; three is our approach.
+
+---
+
+## D-018 — A clean `expect: absent` result is worded to the surface examined
+**2026-08-21 · business owner**
+
+A `pass` on any `expect: absent` rule must state what was actually searched. It may never be
+worded as a universal claim about the merchant.
+
+    not this:  "No testimonials were observed."
+    this:      "No elements matching '[class*=review], [class*=testimonial]' were observed.
+                Content of this kind presented in other markup was not examined."
+
+**Reasoning.** OFFS-002 looks for testimonials by review-widget markup. A merchant whose
+testimonials sit in `class="customer-stories"` is invisible to it, and the honest report of that
+search is not "there are none" — it is "none of this kind of markup was found". Stating what was
+searched and what was not is more informative than declining to report, which is why this is a
+wording discipline rather than a blanket `not_evaluable`.
+
+It is the same failure as D-011 and D-016 expressed in copy rather than in logic: a claim
+reaching further than the surface that was established. The triage axis in
+`docs/ARCHITECTURE.md` is where this belongs in a reviewer's head.
+
+**Applies to every `expect: absent` rule.** Audited at M3:
+
+| Handler | Rules | Wording |
+|---|---|---|
+| `url_pattern` | NAME-001/002, CATG-001–004, OFFS-001 | already scoped — names the URL count and the scope examined |
+| `dom_assert` selector | OFFS-002 | scoped — names the selector and says other markup was not examined |
+| `dom_assert` signals/links | PROD-009 | already scoped — names the page and the terms searched |
+| `text_cooccurrence` | PROD-005, COMM-001 | **widened at M3** — now names the surface and the window |
+| `text_match` terms | PROD-006/007/008/010, PAY-001 | **widened at M3** — was "4 terms were checked; none was observed", which named neither the surface nor the limits of the search |
+
+**This is a reporting rule, not a state rule.** The state is still `pass` — the check ran and
+observed nothing prohibited. What changes is that the report says how far the observation
+reaches, so a reader is never left to assume it reached further than it did.

@@ -100,6 +100,18 @@ export {
 export { checkDomAssert } from './checks/domAssert.js';
 export { checkTextCooccurrence, findCooccurrences, type Cooccurrence } from './checks/textCooccurrence.js';
 export { runLayer2, layer2Rules, type Layer2Run, type SampledPage } from './layer2.js';
+
+export {
+  assembleReport,
+  computeCoverage,
+  describeVerdict,
+  type AssembleInput,
+  type ReportCategory,
+  type ReportCoverage,
+  type ReportFinding,
+  type ScanMode,
+  type ScreeningReport,
+} from './report.js';
 export {
   scoreProductUrls,
   selectSample,

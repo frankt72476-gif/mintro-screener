@@ -1,18 +1,18 @@
 /**
  * Loading and validating the rule set.
  *
+ * This module validates a document already in memory and touches no filesystem, so it is safe
+ * to bundle for the browser. Reading from disk lives in `loadFile.ts`, which the frontend never
+ * imports — a `node:fs` import anywhere in the browser's module graph breaks the build even when
+ * the function is never called.
+ *
  * Two entry points, because the rule set has two kinds of consumer:
  *
- *   - `loadRulesetFile(path)` reads from disk — the crawl worker and the test suite.
- *   - `parseRuleset(value)` validates an object already in memory — the frontend, which
- *     imports `ruleset.json` through the bundler and never touches a filesystem.
- *
- * There is deliberately no default path. A path baked in relative to this module resolves
- * correctly in the repo and incorrectly once bundled, and the failure would be a rule set
- * that silently could not be found.
+ *   - `loadRulesetFile(path)` (in `loadFile.ts`) reads from disk — the worker and the tests.
+ *   - `parseRuleset(value)` validates an object already in memory — the frontend, which imports
+ *     `ruleset.json` through the bundler.
  */
 
-import { readFileSync } from 'node:fs';
 import { categorySchema, ruleSchema, rulesetSchema, type Category, type Ruleset } from './schema.js';
 import { checkInvariants, checkInvariantsOn, type IndexedRule } from './invariants.js';
 import {
@@ -89,33 +89,6 @@ export function parseRuleset(value: unknown, source = '<in-memory>'): Ruleset {
 }
 
 /**
- * Reads, parses and validates a rule set file.
- *
- * @throws {RulesetValidationError} if the file is unreadable, is not JSON, or is invalid.
- */
-export function loadRulesetFile(path: string): Ruleset {
-  let text: string;
-  try {
-    text = readFileSync(path, 'utf8');
-  } catch (error) {
-    throw new RulesetValidationError(path, [
-      { path: '(file)', message: `could not be read: ${(error as Error).message}` },
-    ]);
-  }
-
-  let document: unknown;
-  try {
-    document = JSON.parse(text);
-  } catch (error) {
-    throw new RulesetValidationError(path, [
-      { path: '(file)', message: `is not valid JSON: ${(error as Error).message}` },
-    ]);
-  }
-
-  return parseRuleset(document, path);
-}
-
-/**
  * Non-throwing variant, for callers that want to report defects rather than fail.
  *
  * The success case still yields the whole rule set or nothing at all — there is no partial
@@ -138,14 +111,3 @@ export function tryParseRuleset(value: unknown, source = '<in-memory>'): Ruleset
   }
 }
 
-/** As {@link loadRulesetFile}, returning the failure instead of throwing it. */
-export function tryLoadRulesetFile(path: string): RulesetLoadResult {
-  try {
-    return { ok: true, ruleset: loadRulesetFile(path) };
-  } catch (error) {
-    if (error instanceof RulesetValidationError) {
-      return { ok: false, error, defects: error.defects };
-    }
-    throw error;
-  }
-}

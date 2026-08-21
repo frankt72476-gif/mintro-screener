@@ -358,11 +358,15 @@ function termsFinding(
   const violates = expect === 'absent' ? found.length > 0 : found.length === 0;
 
   if (!violates) {
+    // D-018: a clean `expect: absent` result names the surface it searched. "4 terms were
+    // checked; none was observed" named neither what was searched nor how far the search
+    // reached, which invites reading it as a claim about the merchant rather than the page.
+    const scope = rule.params.surface === 'all_sampled' ? 'this sampled page' : `the ${rule.params.surface}`;
     return satisfied(
       rule,
       expect === 'absent'
-        ? `${terms.length} terms were checked; none was observed.`
-        : `Observed: ${found.map((f) => `'${f}'`).join(', ')}.`,
+        ? `None of ${terms.length} prohibited term(s) was observed in the rendered text of ${scope}: ${quote(terms)}. Text not rendered on the page was not examined.`
+        : `Observed: ${quote(found)}.`,
       RENDERED,
       pageEvidence(page),
     );

@@ -139,16 +139,40 @@ allowed to match.
 This matters beyond one rule. Rules that reach human review are the ones whose accuracy
 decides whether analysts trust the tool; a noisy review queue is not a cosmetic problem.
 
+## The triage axis — check this first when adding a rule
+
+**Absent + cannot-locate reads as clean.** That is the silent false-pass signature, and it is the
+defect this project keeps rediscovering under different names. Before writing or reviewing any
+rule, work out which row it sits in:
+
+| `expect` | If the check fails to locate its subject | Result | Who notices |
+|---|---|---|---|
+| `absent` | reads as "the thing is not there" | **false `pass`** | **nobody** |
+| `present` | reads as "the thing is missing" | false `fail`, or review-queue noise | a human, eventually |
+
+The asymmetry is the whole point. A false `fail` reaches a person who can correct it. A false
+`pass` is indistinguishable from a clean merchant and is never looked at again.
+
+Every occurrence so far has been the same shape — **a verdict resting on a surface that was
+never established**:
+
+- **D-011** — CATG rules reported "no needles, no wipes, no tablets" against a catalogue the
+  crawler had never identified. Three false passes on `critical` / `auto_fail` rules.
+- **D-014** — DISC-002 located the disclaimer by its compliant wording, so a merchant whose
+  disclaimer was worded differently and rendered at 2.94:1 contrast came back `not_evaluable`.
+- **D-016** — GATE-001 reported an age gate because the string `21+` appeared somewhere in the
+  markup, with no interstitial anywhere on the page.
+- **D-018** — a clean `expect: absent` result worded as a universal claim, when only one kind of
+  markup had actually been searched.
+
+The rule that follows from all four: **a check may only report on a surface it established it
+could see.** Where it could not, the answer is `not_evaluable`, whichever direction the partial
+evidence appears to point.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by
 consequence, not by rule number.
-
-The consequence of finding-by-form depends entirely on `expect`, and this is the axis that
-matters when triaging:
-
-    expect: absent   + located by form  ->  failure to locate reads as a clean result -> false PASS
-    expect: present  + located by form  ->  failure to locate reads as missing        -> false FAIL / noise
 
 ### Fixed
 

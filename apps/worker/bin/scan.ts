@@ -28,6 +28,7 @@ import {
   resolveCrawlDelay,
   runLayer1,
   tally,
+  assembleReport,
   checkUrlPattern,
   inScope,
   layer2Rules,
@@ -51,9 +52,11 @@ const LABEL: Record<Finding['state'], string> = {
 };
 
 async function main(argv: readonly string[]): Promise<number> {
-  const { targets, evidenceDir } = parseArgs(argv);
+  const { targets, evidenceDir, reportDir } = parseArgs(argv);
   if (targets.length === 0) {
-    console.error('usage: npm run scan-l1 -- [--evidence-dir <dir>] <storefront-url> [more...]');
+    console.error(
+      'usage: npm run scan-full -- [--evidence-dir <dir>] [--report-dir <dir>] <storefront-url> [more...]',
+    );
     return 2;
   }
 
@@ -64,7 +67,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
   try {
     for (const target of targets) {
-      await scan(browser, target, ruleset, evidenceDir);
+      await scan(browser, target, ruleset, evidenceDir, reportDir);
     }
     return 0;
   } finally {
@@ -96,7 +99,9 @@ async function scan(
   target: string,
   ruleset: Ruleset,
   evidenceDir: string | undefined,
+  reportDir: string | undefined,
 ): Promise<void> {
+  const startedAt = new Date().toISOString();
   const runId = randomUUID();
   const artifacts: EvidenceArtifact[] = [];
 
@@ -184,6 +189,31 @@ async function scan(
   console.log(`  evidence   ${artifacts.length} artifacts, ${formatBytes(storedBytes(artifacts))} stored`);
 
   if (evidenceDir !== undefined) writeEvidence(artifacts, evidenceDir);
+
+  if (reportDir !== undefined) {
+    const allFindings: Finding[] = [...layer1.findings, ...after, ...layer2.findings];
+    const report = assembleReport(
+      {
+        runId,
+        merchantDomain: new URL(layer0.origin).host,
+        ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
+        ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
+        mode: 'public',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        findings: allFindings,
+        truncations: layer0.truncations,
+        politeness: describeCrawlDelay(delay),
+      },
+      ruleset,
+    );
+
+    const path = join(reportDir, `${report.merchantDomain}.json`);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(report, null, 2), 'utf8');
+    console.log(`  report     ${path}`);
+  }
+
   console.log();
 }
 
@@ -284,20 +314,32 @@ function writeEvidence(artifacts: readonly EvidenceArtifact[], root: string): vo
   console.log(`  written    ${written} artifact(s) to ${root}`);
 }
 
-function parseArgs(argv: readonly string[]): { targets: string[]; evidenceDir?: string } {
+function parseArgs(argv: readonly string[]): {
+  targets: string[];
+  evidenceDir?: string;
+  reportDir?: string;
+} {
   const targets: string[] = [];
   let evidenceDir: string | undefined;
+  let reportDir: string | undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--evidence-dir') {
       evidenceDir = argv[i + 1];
       i += 1;
+    } else if (arg === '--report-dir') {
+      reportDir = argv[i + 1];
+      i += 1;
     } else if (arg !== undefined) {
       targets.push(arg);
     }
   }
-  return { targets, ...(evidenceDir === undefined ? {} : { evidenceDir }) };
+  return {
+    targets,
+    ...(evidenceDir === undefined ? {} : { evidenceDir }),
+    ...(reportDir === undefined ? {} : { reportDir }),
+  };
 }
 
 const storedBytes = (artifacts: readonly EvidenceArtifact[]): number =>

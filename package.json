@@ -17,7 +17,10 @@
     "check": "npm run typecheck && npm run test",
     "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js",
     "render-check": "tsc --build && node apps/worker/dist/bin/render-check.js",
-    "scan-full": "tsc --build && node apps/worker/dist/bin/scan.js"
+    "scan-full": "tsc --build && node apps/worker/dist/bin/scan.js",
+    "link-runs": "node scripts/link-runs.mjs",
+    "web": "npm run link-runs && npm run -w @mintro/web dev",
+    "web:build": "npm run -w @mintro/web build"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

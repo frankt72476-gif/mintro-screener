@@ -55,9 +55,10 @@ export function checkTextCooccurrence(
   const hits = findCooccurrences(page.text, rule.params.class_a, rule.params.class_b, rule.params.window_tokens);
 
   if (hits.length === 0) {
+    // D-018: names the surface and the window, so the reach of the observation is on the record.
     return satisfied(
       rule,
-      `No term from the quantity list was observed within ${rule.params.window_tokens} tokens of a schedule or route term.`,
+      `In the rendered text of the ${rule.params.surface} surface, no quantity term (${rule.params.class_a.join(', ')}) was observed within ${rule.params.window_tokens} tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.`,
       RENDERED,
       pageEvidence(page),
     );

@@ -11,13 +11,13 @@
  * type a new param, is a code change and needs review.
  */
 
-export {
-  loadRulesetFile,
-  parseRuleset,
-  tryLoadRulesetFile,
-  tryParseRuleset,
-  type RulesetLoadResult,
-} from './load.js';
+export { parseRuleset, tryParseRuleset, type RulesetLoadResult } from './load.js';
+
+/**
+ * Filesystem loading. Node only — importing this from browser code pulls `node:fs` into the
+ * bundle. The frontend uses `parseRuleset` on an already-imported document instead.
+ */
+export { loadRulesetFile, tryLoadRulesetFile } from './loadFile.js';
 
 export {
   RulesetValidationError,

@@ -10,3 +10,8 @@ fixtures/**/*.png
 evidence/
 playwright-report/
 test-results/
+
+# Local worker output, copied into apps/web/public for development.
+reports/
+apps/web/public/reports/
+apps/web/public/evidence/
