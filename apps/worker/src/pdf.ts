@@ -11,13 +11,28 @@
  */
 
 import type { Browser } from 'playwright';
+import type { ScreeningReport } from '@mintro/engine';
 
 export interface PdfOptions {
   /** Origin serving the report route. */
   readonly origin: string;
-  /** Merchant domain — the report to print. */
+  /** Merchant domain — used for the filename and the page footer. */
   readonly domain: string;
   readonly timeoutMs?: number;
+  /**
+   * The report and its pre-signed evidence URLs, handed to the page directly.
+   *
+   * The report route is behind analyst auth. Rather than put a session into a headless browser,
+   * the worker — which already holds the assembled report and can mint signed URLs with the
+   * service key — injects both. Same component, different data source; not a second template.
+   *
+   * Omit to render from the route's own authenticated fetch, which is what a signed-in analyst's
+   * browser does.
+   */
+  readonly inject?: {
+    readonly report: ScreeningReport;
+    readonly evidence: Readonly<Record<string, string>>;
+  };
 }
 
 export interface PdfResult {
@@ -43,6 +58,13 @@ export async function renderReportPdf(browser: Browser, options: PdfOptions): Pr
   const page = await context.newPage();
 
   try {
+    if (options.inject !== undefined) {
+      // Before any script on the page runs, so the app sees it on first render.
+      await page.addInitScript((payload) => {
+        (window as unknown as { __MINTRO_PRINT__: unknown }).__MINTRO_PRINT__ = payload;
+      }, options.inject);
+    }
+
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
 
     const failed = await page

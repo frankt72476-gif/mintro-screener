@@ -523,3 +523,20 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   font-size:11.5px;line-height:1.6;
 }
 .note-warning b{display:block;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;font-weight:700}
+
+/* Who is signed in, in the rail. An analyst reading a merchant's evidence should be able to see
+   at a glance which account is doing so. */
+.rail-user{
+  margin-top:auto;padding:10px;border-top:1px solid rgba(255,255,255,.1);
+  display:flex;flex-direction:column;gap:7px;align-items:flex-start;
+}
+.rail-user .who{
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);
+  word-break:break-all;line-height:1.5;
+}
+.rail-user .btn-ghost{
+  background:transparent;border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.72);
+  padding:5px 10px;font-size:11.5px;
+}
+.rail-user .btn-ghost:hover{border-color:rgba(255,255,255,.4);color:#fff}
+.rail-foot{margin-top:0}

@@ -9,14 +9,16 @@
  */
 
 import type { Ruleset } from '@mintro/ruleset';
+import { SignOutButton } from './SignIn.js';
 
 interface Props {
   readonly pane: 'scan' | 'docs';
   readonly onPane: (pane: 'scan' | 'docs') => void;
   readonly ruleset: Ruleset;
+  readonly analystEmail: string;
 }
 
-export function Rail({ pane, onPane, ruleset }: Props): JSX.Element {
+export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Element {
   return (
     <nav className="rail">
       <div className="brand">
@@ -53,6 +55,13 @@ export function Rail({ pane, onPane, ruleset }: Props): JSX.Element {
         <button className="nav-item" onClick={() => onPane('scan')}>
           <span className="ic">⚙</span>Rule set
         </button>
+      </div>
+
+      {/* Who is signed in. An analyst reading a merchant's evidence should be able to see, at a
+          glance, which account is doing so. */}
+      <div className="rail-user">
+        <span className="who">{analystEmail}</span>
+        <SignOutButton />
       </div>
 
       {/* Read from the loaded rule set, not typed in — the demo's "v2.4 / 26 May 2026" was copy. */}

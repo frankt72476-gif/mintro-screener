@@ -930,3 +930,89 @@ test had been carrying, which is the argument for sharing it in one line.
 Bare `must` is deliberately excluded: rule clauses quote the program document and legitimately
 say what a merchant must do. That exception is upheld by a test asserting every rendered clause
 is byte-identical to the rule set.
+
+---
+
+## D-030 — Persistence and auth, and why they shipped together
+**2026-08-21 · business owner**
+
+Migrations for the documented data model, RLS on every table in the same migration that creates
+it, and invite-only analyst auth. Auth is in scope now because **RLS policies are far harder to
+add to populated tables than to empty ones** — and getting it wrong on a populated table means a
+window in which merchant evidence was readable.
+
+### RLS decides reads; triggers decide changes
+
+`service_role` carries `BYPASSRLS`. The worker's key ignores every policy in
+`supabase/migrations/`, which means row-level security cannot enforce append-only against the
+process that writes the evidence.
+
+So hard constraint 5 and D-002 are enforced by **triggers and primary keys**, which are not
+bypassed:
+
+| Guarantee | Mechanism |
+|---|---|
+| Evidence never overwritten | `evidence.key` primary key + `upsert: false` on the storage write |
+| Evidence, findings, sends never change | `before update or delete` triggers that raise |
+| A finished run is frozen | trigger rejecting any update once `finished_at` is set |
+
+The run trigger is deliberately precise rather than blanket: a run is mutable while in progress —
+it has to be, to be finished — and immutable from the moment it completes. That is exactly what
+D-002 says.
+
+### `analysts`, an addition to the documented model
+
+`docs/ARCHITECTURE.md` documents a *minimum* data model. One table is added to it.
+
+Supabase's "disable signups" toggle is dashboard configuration: not version-controlled, not
+reviewable, not testable. Gating policies on `auth.role() = 'authenticated'` would mean that if
+that toggle were ever flipped, anyone who signed up could read every merchant's evidence.
+
+Every policy therefore gates on `public.is_analyst()`, which requires an active row in
+`analysts`. Membership is granted by insert, not by signing up, and revoked by setting
+`active = false` — which keeps the account so the `sends` records naming that analyst stay
+intact.
+
+### No passwords anywhere
+
+Sign-in is a magic link (`signInWithOtp`, `shouldCreateUser: false`). There is no password to
+store, reset, phish or leak, and no signup form for anyone to find. An uninvited address receives
+no email at all.
+
+### The PDF path had to change, and the change is not a second stack
+
+The report route is now behind auth, which broke the M5 PDF pipeline.
+
+Putting an analyst session into a headless browser to print a document was the wrong shape — a
+long-lived credential in a process that exists to render one file. Instead the worker, which
+already holds the assembled report and can mint signed URLs with the service key, **hands both to
+the page**.
+
+This is the same `ReportView` fed from an object rather than a fetch. What `ARCHITECTURE.md` rules
+out is a second *template*, because two templates drift; one component with two data sources
+cannot say two different things.
+
+### The readiness check was wrong in the code written to prevent it
+
+Injecting the report made it render synchronously, and the print-ready signal — which existed
+precisely to stop `page.pdf()` firing before captures load — began reporting **`1/1`**: the brand
+lockup, while 66 screenshots were still arriving.
+
+That is D-026 again, inside its own countermeasure: a check that reports ready when it cannot yet
+tell. Fixed the same way — require positive evidence of the state being asserted. The signal now
+waits for the image count to stop changing *and* every image to settle. Back to **66/66**.
+
+### The service key never reaches the browser
+
+The frontend gets the project URL and the anon key. The anon key is not a secret; it is an
+identifier that RLS constrains. `createWorkerSupabase` throws if `VITE_SUPABASE_SERVICE_KEY` is
+set at all, and `apps/worker/test/migrations.test.ts` fails if any `VITE_` variable in
+`.env.example` looks like a secret — because that mistake looks entirely ordinary in a diff and
+publishes a credential.
+
+### Migration of the existing runs
+
+`npm run migrate-supabase` is a **dry run by default**. It writes to a store that refuses to be
+overwritten, so getting it wrong is not recoverable by re-running with different arguments.
+Digests are recomputed from the bytes on disk rather than copied from the report: if a local file
+has been altered since the run, the migrated record should describe the file that actually exists.

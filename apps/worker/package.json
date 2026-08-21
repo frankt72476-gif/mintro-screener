@@ -5,10 +5,13 @@
   "type": "module",
   "description": "Playwright crawl worker. Runs on Fly.io — see docs/ARCHITECTURE.md.",
   "main": "./dist/src/index.js",
-  "scripts": { "typecheck": "tsc --build" },
+  "scripts": {
+    "typecheck": "tsc --build"
+  },
   "dependencies": {
     "@mintro/engine": "*",
     "@mintro/ruleset": "*",
+    "@supabase/supabase-js": "^2.47.0",
     "playwright": "^1.49.0"
   }
 }

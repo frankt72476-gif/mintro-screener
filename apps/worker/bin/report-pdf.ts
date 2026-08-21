@@ -15,6 +15,7 @@ import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import type { ScreeningReport } from '@mintro/engine';
 import { startReportServer } from '../src/reportServer.js';
+import { createWorkerSupabase, signEvidenceUrl } from '../src/store/supabase.js';
 import { renderReportPdf } from '../src/pdf.js';
 import {
   createDryRunMailer,
@@ -47,12 +48,20 @@ async function main(argv: readonly string[]): Promise<number> {
   try {
     console.log(`report route  ${server.origin}/?report=${domain}&print=1`);
 
-    const started = Date.now();
-    const pdf = await renderReportPdf(browser, { origin: server.origin, domain });
-
     const report = (await fetch(`${server.origin}/reports/${domain}.json`).then((r) =>
       r.json(),
     )) as ScreeningReport;
+
+    // Pre-mint a signed URL for every capture the report cites. The headless browser therefore
+    // needs no session of its own — see the note on `PdfOptions.inject`.
+    const evidence = await signEvidence(report, server.origin);
+
+    const started = Date.now();
+    const pdf = await renderReportPdf(browser, {
+      origin: server.origin,
+      domain,
+      inject: { report, evidence },
+    });
 
     const path = resolve(outDir, attachmentName(report));
     mkdirSync(dirname(path), { recursive: true });
@@ -101,3 +110,40 @@ async function main(argv: readonly string[]): Promise<number> {
 }
 
 main(process.argv.slice(2)).then((code) => process.exit(code));
+
+/**
+ * Signed URLs for every capture a report cites.
+ *
+ * Falls back to the local report server when Supabase is not configured, which is what makes the
+ * PDF pipeline usable before a project exists. The report states which access produced a capture,
+ * so a locally served screenshot is never mistaken for one from the private bucket.
+ */
+async function signEvidence(
+  report: ScreeningReport,
+  localOrigin: string,
+): Promise<Record<string, string>> {
+  const keys = new Set<string>();
+  for (const category of report.categories) {
+    for (const finding of category.findings) {
+      for (const entry of finding.evidence) {
+        if (entry.evidenceKey !== '' && entry.evidenceKey.endsWith('.png')) {
+          keys.add(entry.evidenceKey);
+        }
+      }
+    }
+  }
+
+  const signed: Record<string, string> = {};
+
+  if (process.env['SUPABASE_URL'] !== undefined && process.env['SUPABASE_SERVICE_KEY'] !== undefined) {
+    const supabase = createWorkerSupabase();
+    for (const key of keys) {
+      const url = await signEvidenceUrl(supabase, key, 300);
+      if (url !== null) signed[key] = url;
+    }
+    return signed;
+  }
+
+  for (const key of keys) signed[key] = `${localOrigin}/evidence/${key}`;
+  return signed;
+}

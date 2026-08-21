@@ -70,12 +70,28 @@ export function createLocalEvidenceAccess(root = '/evidence'): EvidenceAccess {
 }
 
 /**
- * Picks the access path from the environment.
+ * Access that reaches nothing, and says so.
  *
- * Defaults to local. A misconfigured deployment that silently fell back to unsigned access would
- * be serving merchant evidence without authentication, so the fallback is the one that is
- * obviously and visibly a development mode.
+ * Used when Supabase is not configured. It is deliberately not a fallback to unsigned local
+ * paths: a deployment that silently served merchant evidence without authentication would be the
+ * exact failure the private bucket exists to prevent, and it would look like it was working.
  */
-export function createEvidenceAccess(): EvidenceAccess {
-  return createLocalEvidenceAccess();
+export function createUnavailableEvidenceAccess(reason: string): EvidenceAccess {
+  return {
+    description: `evidence unavailable — ${reason}`,
+    urlFor: async () => null,
+  };
+}
+
+/**
+ * Picks the access path.
+ *
+ * Supabase when a client is available, the local directory only in development, and neither
+ * silently. The report shows which one produced a capture, so a screenshot loaded from a dev
+ * directory can never be mistaken for one retrieved from the private bucket.
+ */
+export function createEvidenceAccess(client?: SupabaseLike): EvidenceAccess {
+  if (client !== undefined) return createSupabaseEvidenceAccess(client);
+  if (import.meta.env.DEV) return createLocalEvidenceAccess();
+  return createUnavailableEvidenceAccess('no Supabase session');
 }
