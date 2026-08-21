@@ -1515,3 +1515,102 @@ by the same test in the other direction — nobody should "fix" it by adding the
 Wiring `runGateRules` into `screenStorefront` means GATE-002 and GATE-003 are **evaluated for the
 first time**. Until now both came back `not_evaluable` in every run, because nothing called the
 probe handlers. Expect the five storefronts' numbers to move.
+
+---
+
+## D-040 — Access mode is detected, not chosen
+**2026-08-21 · business owner · first use**
+
+The three-way access picker is removed. The analyst chooses nothing.
+
+    crawl anonymous
+      → product pages served?          that is the answer
+      → refused, credential stored?    use it, for those pages
+      → refused, no credential?        report not_evaluable, and say coverage would widen
+
+Asking was redundant: the tool already detects the platform and already knows when it has hit a
+login wall. And a picker invites the wrong answer — which produces a report whose coverage does
+not match what was actually possible, without anyone noticing that is what happened.
+
+### The wall is located structurally
+
+`assessWall` asks one question of each sampled page: **did the request end at the URL we asked
+for, with a success status?** Not "does the final URL look like a login page" — that finds every
+merchant who words their login the way we expected and misses the rest (hard constraint 9, D-014).
+The same rule `http_probe` already applies to GATE-002, for the same reason.
+
+Two boundaries worth stating:
+
+- **A partly gated catalogue is not a wall.** Some merchants gate a subset; escalating there would
+  be using a merchant's own account to read pages they chose to gate for everyone.
+- **No product pages is not a wall.** That is a catalogue we never found — a different problem
+  with a different answer, and treating it as a wall would send the run hunting a credential to
+  fix a discovery failure.
+
+### A credential is kept only if it changed what was served
+
+After re-rendering with a session, the run compares. If the pages that were refused anonymously
+are still refused, the public crawl stands and the report says `public`. A credential that widened
+nothing has widened nothing, and reporting `screening_account` on the strength of having *tried*
+would overstate what the run saw — the same false-coverage shape as reporting an unobservable rule
+as passing.
+
+### D-039 is untouched, and now enforced in a fourth place
+
+The unauthenticated probe still runs first and still decides GATE-002 and GATE-003. Three things
+keep that true under auto-detection:
+
+1. `runGateRules` still has no parameter that could carry a session, and is still called with an
+   anonymous access built from a fresh context.
+2. The **homepage** is rendered anonymously too, always. The footer disclosure rules describe what
+   a customer sees; reading them signed in would answer a different question. Escalation reaches
+   the product sample and nothing else.
+3. `scan_requests`' insert policy now **pins `mode = 'public'`**. A requester cannot ask for a
+   credentialed scan at all; the worker rewrites the column afterwards to record what happened.
+   Every scan begins anonymous as a schema property rather than a convention.
+
+`scan_requests.mode` therefore changes meaning: it was a request and is now an outcome.
+
+### The report says what it could reach
+
+`ScreeningReport.access` carries the mode, whether a wall was met, whether a credential got past
+it, and a sentence. Shown at the top of the report only when a wall was met — on an ordinary
+public crawl the coverage line already says everything there is to say.
+
+It is descriptive, like the rest of the report. *"Coverage of those rules would be wider with a
+merchant-supplied login"* is an observation about this run. *"Obtain a screening account"* would be
+an instruction, and D-001 is the difference.
+
+---
+
+## Three defects from first use, fixed alongside
+
+**Navigation did nothing from a report.** The rail changed `pane` while the scan pane was still
+showing a report, so "Site check" appeared inert. Navigating to a pane now means going to that
+pane, not to whatever it was last showing.
+
+**Download PDF did nothing.** The M5 pipeline works, but it is `page.pdf()` driven by Playwright
+and a browser cannot reach it. It is now a queued job with the same shape as a scan — `pdf_requests`,
+the same compare-and-swap claim, the same two constraints refusing a finished job that says nothing
+about what happened. The file lands in the evidence bucket keyed by *request* rather than run, so a
+second render does not collide with the first (D-002), and the browser downloads it through the
+same signed-URL path every capture uses.
+
+Nothing is reported as downloaded until the worker says the file exists and a URL for it comes
+back. The old toast fired immediately and said "Downloaded" when nothing had been produced at all.
+
+**This is why the container now builds the frontend.** The PDF is the same React component the
+analyst sees — ARCHITECTURE.md rules out a second rendering stack precisely so the export and the
+report cannot say different things — so `apps/web` is part of the image. It costs build time. The
+alternative is a second template that drifts, and the thing that would drift is a compliance
+document.
+
+**Send to IQwallet looked like it worked.** It never reached a mailer: the send path runs in the
+worker and is not wired, and the sending domain is unverified. The button showed a success toast.
+
+It is now disabled with the reason on the button itself. Not a change of the D-001 rule that
+sending is never blocked by an *outcome* — this is not an outcome, it is that there is no path. A
+`VITE_SEND_ENABLED` flag was considered and rejected: the frontend cannot observe whether
+`RESEND_API_KEY` is set, so the flag would be a claim rather than an observation, and this project
+has spent long enough on verdicts resting on surfaces that were never established. When sending is
+wired it becomes a queued job like the PDF, and the button re-enables on what the worker reports.

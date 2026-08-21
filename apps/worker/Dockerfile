@@ -38,9 +38,18 @@ COPY tsconfig.base.json tsconfig.json ./
 COPY packages/        packages/
 COPY apps/worker/     apps/worker/
 
-# The worker project only. Building from the root tsconfig would pull in apps/web, whose React
-# toolchain has no business in a crawl container.
-RUN npx tsc --build apps/worker/tsconfig.json && npm prune --omit=dev
+# The frontend's source, because the worker prints it. Its brand assets live in
+# `apps/web/public/` and Vite copies them into `dist`, so the print header's lockup comes along
+# without a second copy of the repository's `brand/` directory.
+#
+# The PDF is `page.pdf()` against the report route — the same React component an analyst sees.
+# ARCHITECTURE.md rules out a second rendering stack precisely so the export and the on-screen
+# report cannot say different things, and the price of that is a React build inside the crawl
+# container. It is a price, and it is the right one: the alternative is a second template that
+# drifts, and the thing that would drift is a compliance document.
+COPY apps/web/        apps/web/
+
+RUN npx tsc --build apps/worker/tsconfig.json  && npm run --workspace @mintro/web build  && npm prune --omit=dev
 
 # Chromium in a container needs a writable home for its profile and crash dumps.
 ENV HOME=/tmp
@@ -50,6 +59,7 @@ ENV HOME=/tmp
 # 5). The worker is given no evidence directory and no report directory, so there is nothing to
 # get this wrong with.
 #
-# The queue worker: polls scan_requests, screens, writes to Supabase. Same crawl path and same
-# write path as `npm run scan-full` — there is exactly one of each (D-035).
+# The queue worker: polls scan_requests and pdf_requests, screens, renders, writes to Supabase.
+# Same crawl path and same write path as `npm run scan-full` — there is exactly one of each
+# (D-035) — and the same report component the analyst sees.
 CMD ["node", "apps/worker/dist/bin/worker.js"]

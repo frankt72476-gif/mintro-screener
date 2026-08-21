@@ -17,9 +17,16 @@ out
 **/*.tsbuildinfo
 
 # Local run artifacts.
+#
+# apps/web/public/{evidence,reports} are symlinked local output (see `npm run link-runs`). They
+# must be excluded explicitly now that apps/web is part of the build context — otherwise every
+# stored merchant capture would be baked into a pullable container image.
 evidence
 reports
 .tmp
+apps/web/public/evidence
+apps/web/public/reports
+apps/web/dist
 
 # Never in an image.
 .env
@@ -32,14 +39,13 @@ reports
 .idea
 
 # Not used by the worker.
-apps/web/src
-apps/web/public
-apps/web/index.html
-apps/web/vite.config.ts
+#
+# apps/web is NOT excluded: the worker prints the report route to make a PDF, so the container
+# builds the frontend. `brand/` goes with it — the print header carries the lockup, and a PDF
+# with a broken image where the mark should be is not a document anyone sends to an underwriter.
 apps/web/dist-types
 apps/testbed
 demo
-brand
 fixtures
 docs
 *.md

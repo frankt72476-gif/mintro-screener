@@ -132,6 +132,7 @@ export {
   describeVerdict,
   type AssembleInput,
   type ReportCategory,
+  type ReportAccess,
   type ReportCoverage,
   type ReportFinding,
   type ScanMode,
@@ -171,6 +172,8 @@ export { checkUrlPattern, findMatches, type PatternMatch } from './checks/urlPat
  * implementations is how `evidence.key` and its storage path diverged (D-034). WebCrypto only, so
  * it is literally the same code in both runtimes.
  */
+export { assessWall, wasServed, type WallAssessment } from './wall.js';
+
 export {
   seal,
   unseal,

@@ -22,6 +22,8 @@ interface Props {
   readonly access: EvidenceAccess;
   readonly onSend: () => void;
   readonly onDownload: () => void;
+  /** True while the worker is rendering. The button says so rather than appearing inert. */
+  readonly downloading?: boolean;
   /**
    * Print mode: every category and every finding expanded, no filtering, no actions.
    *
@@ -33,7 +35,14 @@ interface Props {
   readonly print?: boolean;
 }
 
-export function ReportView({ report, access, onSend, onDownload, print = false }: Props): JSX.Element {
+export function ReportView({
+  report,
+  access,
+  onSend,
+  onDownload,
+  downloading = false,
+  print = false,
+}: Props): JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
 
   return (
@@ -47,15 +56,49 @@ export function ReportView({ report, access, onSend, onDownload, print = false }
               .filter((part): part is string => part !== undefined && part !== '')
               .join(' · ')}
           </p>
+          {/*
+            What the run could reach, stated where the reader decides how much weight to give the
+            coverage numbers. Only when a wall was met: on an ordinary public crawl there is
+            nothing to say that the coverage line does not already say.
+
+            Descriptive. It states what was and was not served; it never says a credential should
+            be obtained (D-001, D-040).
+          */}
+          {report.access?.wall === true && (
+            <p className={`access-note ${report.access.usedCredential ? 'used' : 'limited'}`}>
+              <strong>
+                {report.access.usedCredential
+                  ? 'Product pages read with a merchant-supplied login.'
+                  : 'Coverage limited by a login wall.'}
+              </strong>{' '}
+              {report.access.note}
+            </p>
+          )}
         </div>
         {!print && (
           <div className="acts">
-            <button className="btn btn-ghost" onClick={onDownload}>
-              Download PDF
+            <button className="btn btn-ghost" onClick={onDownload} disabled={downloading}>
+              {downloading ? 'Rendering…' : 'Download PDF'}
             </button>
-            {/* Always enabled. Send is never blocked by an outcome — D-001. */}
-            <button className="btn btn-primary" onClick={onSend}>
-              Send to IQwallet
+            {/*
+              Disabled, and the reason is on the button rather than in a tooltip.
+
+              Send is never blocked by an *outcome* — D-001 — and this is not that. Nothing here
+              reaches the mailer: the send path runs in the worker and is not wired, and the
+              sending domain is not verified. An analyst who clicked Send and saw a success toast
+              would have been told a report went out when nothing was transmitted, which is the
+              exact false-success shape this project has spent its time eliminating.
+
+              When sending is wired it becomes a queued job like the PDF, and this re-enables on
+              what the worker reports rather than on a flag someone remembered to set.
+            */}
+            <button
+              className="btn btn-primary"
+              onClick={onSend}
+              disabled
+              title="Sending is not connected yet"
+            >
+              Send to IQwallet — not connected
             </button>
           </div>
         )}

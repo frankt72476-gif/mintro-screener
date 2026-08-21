@@ -44,12 +44,16 @@ The ones added since the last deploy:
     0011_evidence_key_is_artifact_key.sql
     0012_scan_requests.sql
     0013_credential_deposits.sql
+    0014_pdf_requests.sql
 
 `0012` creates the scan queue and the quarantine record. **Nothing in the UI works without it** —
 the worker exits at startup saying so, and the run list cannot mark the five bad runs.
 
-`0013` adds merchant-supplied screening logins (M9). Without it, public crawls work normally and
-the "Screening account" mode has nowhere to store anything.
+`0013` adds merchant-supplied screening logins. Without it, public crawls work normally and there
+is nowhere to store a merchant's account.
+
+`0014` adds the PDF queue and pins every scan to start anonymous. **Download PDF does nothing
+without it.**
 
 ### 1.2 Confirm it took
 
@@ -268,7 +272,9 @@ To check what is set — this shows names and digests, never values:
 From the repository root, because the worker compiles the shared packages in `packages/`. The
 build runs on Fly's builders, so you do not need Docker installed.
 
-First build takes 3–5 minutes — it pulls the Playwright image, which is large.
+First build takes 5–8 minutes — it pulls the Playwright image, which is large, and builds the
+frontend. The frontend is in the image because the PDF is `page.pdf()` against the report route:
+the same React component an analyst sees, so the export cannot drift from the report (D-040).
 
 ### 3.6 Confirm it is running
 
@@ -310,8 +316,18 @@ configuration it cannot write to and then fails every job individually is much h
    A full scan takes 40–90 seconds: it renders the homepage and samples five product pages,
    honouring the site's `Crawl-delay`.
 4. The report appears in the **Reports** list. Open it. Screenshots load through signed URLs.
-5. Open one of the five older runs marked **EVIDENCE INCOMPLETE**. The report opens with a notice
+5. Press **Download PDF**. The button says "Rendering…" while the worker prints it, then the file
+   downloads. A render takes 10–30 seconds. Nothing reports as downloaded until the file exists.
+6. Press **Site check** in the rail — it returns to the input pane.
+7. Open one of the five older runs marked **EVIDENCE INCOMPLETE**. The report opens with a notice
    at the top saying some captures cannot be retrieved, and why.
+
+**Send to IQwallet is disabled and says so.** That is correct: nothing reaches a mailer yet, and a
+button that appeared to succeed would be reporting a send that did not happen.
+
+**There is no access-mode picker.** Every scan starts signed out; if product pages turn out to be
+behind a login and a merchant account is stored, the scan uses it for those pages and the report
+says so at the top (D-040).
 
 If the request sits at `queued` forever, the worker is not running: `fly logs`.
 

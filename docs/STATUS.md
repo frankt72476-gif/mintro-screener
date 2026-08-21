@@ -245,9 +245,21 @@ a test asserting a credentialed run matches a public one — paired with one sho
 merchant probed *with* a session is auto-failed, so the first is discriminating rather than
 vacuous.
 
+**Access mode is detected, not chosen** (D-040). Every crawl starts anonymous; a stored merchant
+login is applied only if the sampled product pages come back unserved, and kept only if it changed
+what was served. The database pins `scan_requests.mode = 'public'` on insert, so a scan beginning
+anonymous is a schema property rather than a convention. The report states what it could reach.
+
 **Sign-in is email and password**, with magic link kept as a secondary route. A link is unusable
 when presenting from a machine that is not signed in to the analyst's mail. Still no signup form:
 this changed how someone authenticates, not who is allowed in.
+
+**PDF is a queued job.** `pdf_requests`, same shape as the scan queue. The container builds
+`apps/web` because the PDF is `page.pdf()` against the report route — the same component the
+analyst sees, so the export cannot drift from the report.
+
+**Send is disabled and says why.** Nothing reaches a mailer; a button that appeared to succeed
+would report a send that did not happen. It re-enables on what the worker reports, not a flag.
 
 **Side effect worth expecting:** wiring the gate runner into `screenStorefront` means GATE-002 and
 GATE-003 are evaluated for the first time. Until now both came back `not_evaluable` in every run,

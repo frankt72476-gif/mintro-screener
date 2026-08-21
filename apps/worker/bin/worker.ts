@@ -43,12 +43,22 @@ import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } f
 import { collectDeposits } from '../src/auth/deposits.js';
 import { establishSession } from '../src/auth/login.js';
 import { createHttpFetcher } from '@mintro/engine';
+import { renderRunPdf } from '../src/pdfJob.js';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
 
 /** A claim older than this is assumed to belong to a machine that died. */
 const STALE_CLAIM_MS = 15 * 60 * 1000;
+
+/**
+ * The built frontend, which the PDF renderer prints.
+ *
+ * The report route is the same React component an analyst sees — ARCHITECTURE.md rules out a
+ * second rendering stack precisely so the PDF and the web report cannot say different things. The
+ * container therefore has to carry `apps/web/dist`; the Dockerfile builds it.
+ */
+const WEB_ROOT = process.env['WEB_ROOT'] ?? 'apps/web/dist';
 
 interface ScanRequest {
   readonly id: string;
@@ -109,14 +119,21 @@ async function main(argv: readonly string[]): Promise<number> {
       if (keys !== undefined) await drainDeposits(supabase, keys);
 
       const request = await claimNext(supabase);
-
-      if (request === null) {
-        if (once) break;
-        await sleep(POLL_INTERVAL_MS);
+      if (request !== null) {
+        await handle(supabase, browser, ruleset, request, keys);
         continue;
       }
 
-      await handle(supabase, browser, ruleset, request, keys);
+      // Scans first: a PDF is a re-render of something already observed, and a queued scan is an
+      // observation not yet made. If the observation is waiting, it goes first.
+      const pdf = await claimNextPdf(supabase);
+      if (pdf !== null) {
+        await handlePdf(supabase, browser, pdf);
+        continue;
+      }
+
+      if (once) break;
+      await sleep(POLL_INTERVAL_MS);
     }
     return 0;
   } finally {
@@ -185,22 +202,31 @@ async function handle(
 ): Promise<void> {
   const runId = randomUUID();
   const started = Date.now();
-  let authenticated: BrowserContext | null = null;
+  // A holder rather than a `let`: the assignment happens inside the `escalate` callback, and
+  // TypeScript's control-flow analysis cannot see through a closure — it would narrow the variable
+  // to `null` and reject the close below.
+  //
+  // Held at all because `renderPage` borrows a supplied context and never closes it, precisely so
+  // the session survives from one page to the next. Closing it is this function's job.
+  const held: { context: BrowserContext | null } = { context: null };
   console.log(`\n${request.url}  request ${request.id.slice(0, 8)}  run ${runId.slice(0, 8)}`);
 
   try {
-    if (request.mode === 'screening_account') {
-      const established = await signIn(supabase, browser, request, keys);
-      authenticated = established.context;
-      for (const step of established.steps) {
-        console.log(`  ${step}`);
-        void note(supabase, request.id, step);
-      }
-    }
-
     const { report, artifacts } = await screenStorefront(browser, request.url, ruleset, {
       runId,
-      ...(authenticated === null ? {} : { authenticated }),
+
+      // Called only if the anonymous crawl is refused. The analyst chose nothing; this is the
+      // escalation D-040 describes, and it happens on evidence or not at all.
+      escalate: async () => {
+        const established = await signIn(supabase, browser, request, keys);
+        for (const step of established.steps) {
+          console.log(`  ${step}`);
+          void note(supabase, request.id, step);
+        }
+        held.context = established.context;
+        return established.context;
+      },
+
       onProgress: (line) => {
         console.log(`  ${line}`);
         void note(supabase, request.id, line);
@@ -208,6 +234,14 @@ async function handle(
     });
 
     await persistRun(supabase, { report, artifacts, runId });
+
+    // What the run actually did, recorded against the request. `mode` stopped being a choice at
+    // D-040; it is now an outcome, and this is where the outcome is written.
+    await supabase.client
+      .from('scan_requests')
+      .update({ mode: report.mode })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
 
     // Read back from the database. The writer's own return value is not evidence that the write
     // landed — that habit is what the whole M7 sequence was about.
@@ -228,17 +262,19 @@ async function handle(
   } finally {
     // Ours to close: `renderPage` borrows a supplied context and never closes it, precisely so the
     // session survives from one page to the next.
-    await authenticated?.close().catch(() => undefined);
+    await held.context?.close().catch(() => undefined);
   }
 }
 
 /**
- * Signs in with the merchant's supplied login.
+ * Signs in with the merchant's supplied login, if there is one.
  *
- * Fails the request rather than continuing anonymously. A screening-account run that quietly
- * became a public crawl would report gated product pages as unobservable and attribute that to
- * the merchant's configuration — a false observation about a real merchant, which is the worst
- * output this system can produce.
+ * Returns null rather than throwing when there is no credential or the sign-in does not take. The
+ * run continues anonymously and the report states that coverage was limited by a login wall —
+ * which is true, useful, and different from a broken scan.
+ *
+ * What it must never do is let a failed sign-in look like a successful one. The caller only keeps
+ * the session if the pages it could not reach anonymously actually come back served.
  *
  * What it cannot do is move GATE-002 or GATE-003. `screenStorefront` runs those through
  * `runGateRules`, which builds its own anonymous access and has no parameter for a session
@@ -250,12 +286,15 @@ async function signIn(
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
 ): Promise<{ context: BrowserContext | null; steps: readonly string[] }> {
+  // Null, not an exception. A merchant we hold no credential for is the ordinary case, and the
+  // report says coverage was limited by a wall rather than the run failing. Failing here would
+  // turn "we could not see past their login" into "the scan broke", which is a worse answer to a
+  // question the analyst can act on.
   if (keys === undefined) {
-    throw new Error(
-      'this request asked for a screening account, but CREDENTIAL_PRIVATE_KEY is not set on this ' +
-        'worker, so no stored credential can be opened. Running it as a public crawl would ' +
-        'misreport the merchant, so it is failed instead.',
-    );
+    return {
+      context: null,
+      steps: ['no credential key is configured on this worker, so no stored login can be opened'],
+    };
   }
 
   const origin = new URL(request.url).origin;
@@ -265,10 +304,7 @@ async function signIn(
 
   const credentials = await vault.open(vaultRef, `screening scan of ${origin}`);
   if (credentials === null) {
-    throw new Error(
-      `no screening credential is stored for ${hostname}. ` +
-        'Enter the merchant-supplied login before requesting a signed-in scan.',
-    );
+    return { context: null, steps: [`no screening account is stored for ${hostname}`] };
   }
 
   // The homepage markup, for platform detection. A plain fetch rather than a render: it is one
@@ -284,14 +320,18 @@ async function signIn(
     timeoutMs: 30_000,
   });
 
-  if (established.context === null) {
-    throw new Error(
-      `could not sign in to ${origin}: ${established.steps.join('; ')}` +
-        (established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`),
-    );
-  }
-
-  return { context: established.context, steps: established.steps };
+  // A sign-in that failed is reported and the run continues anonymously. It is honest about
+  // coverage either way, and a merchant whose login script we cannot drive is a coverage limit,
+  // not a broken scan.
+  return {
+    context: established.context,
+    steps: [
+      ...established.steps,
+      ...(established.context === null
+        ? [`could not sign in to ${origin}${established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`}`]
+        : []),
+    ],
+  };
 }
 
 /**
@@ -363,3 +403,99 @@ main(process.argv.slice(2)).then(
     process.exit(1);
   },
 );
+
+/* -------------------------------------------------------------------------------------------
+ * PDF jobs
+ * ----------------------------------------------------------------------------------------- */
+
+interface PdfRequest {
+  readonly id: string;
+  readonly run_id: string;
+  readonly status: string;
+}
+
+/** Same compare-and-swap as the scan queue, for the same reasons. */
+async function claimNextPdf(supabase: WorkerSupabase): Promise<PdfRequest | null> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+
+  const { data, error } = await supabase.client
+    .from('pdf_requests')
+    .select('id, run_id, status')
+    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error !== null) {
+    const hint = /pdf_requests/i.test(error.message)
+      ? `
+  The PDF queue table is created by supabase/migrations/0014_pdf_requests.sql. Apply it.`
+      : '';
+    throw new Error(`could not read the PDF queue: ${error.message}${hint}`);
+  }
+
+  const candidate = (data ?? [])[0] as PdfRequest | undefined;
+  if (candidate === undefined) return null;
+
+  const { data: claimed, error: claimError } = await supabase.client
+    .from('pdf_requests')
+    .update({ status: 'running', claimed_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', candidate.status)
+    .select('id, run_id, status');
+
+  if (claimError !== null) {
+    throw new Error(`could not claim PDF request ${candidate.id}: ${claimError.message}`);
+  }
+
+  return ((claimed ?? [])[0] as PdfRequest | undefined) ?? null;
+}
+
+/** Renders one PDF and records what happened. Never throws: the queue row carries the outcome. */
+async function handlePdf(
+  supabase: WorkerSupabase,
+  browser: Browser,
+  request: PdfRequest,
+): Promise<void> {
+  console.log(`
+pdf  request ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}`);
+  const started = Date.now();
+
+  try {
+    const result = await renderRunPdf(supabase, browser, {
+      runId: request.run_id,
+      requestId: request.id,
+      webRoot: WEB_ROOT,
+    });
+
+    const { error } = await supabase.client
+      .from('pdf_requests')
+      .update({
+        status: 'done',
+        storage_key: result.storageKey,
+        pages: result.pages,
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', request.id);
+
+    if (error !== null) {
+      // The file is stored; only the bookkeeping failed. The request will be reclaimed as stale
+      // and re-rendered, which costs a render and loses nothing.
+      console.error(`  could not record the PDF outcome: ${error.message}`);
+      return;
+    }
+
+    console.log(
+      `  ${result.pages} page(s), ${(result.bytes / 1024 / 1024).toFixed(2)} MB in ` +
+        `${Math.round((Date.now() - started) / 1000)}s`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`  FAILED: ${message}`);
+
+    await supabase.client
+      .from('pdf_requests')
+      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
+  }
+}

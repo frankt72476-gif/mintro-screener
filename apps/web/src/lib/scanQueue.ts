@@ -21,11 +21,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed';
 
 /**
- * What the requester is asking for.
+ * How a scan actually ran — an outcome, not a request (D-040).
  *
- * `screening_account` uses the merchant's supplied login to reach pages behind their wall. It
- * does not, and cannot, change GATE-002 or GATE-003 — those are decided by a request carrying no
- * session, in `runGateRules`, whose API has no parameter for one (D-039).
+ * Every scan is inserted as `public`; the database's insert policy refuses anything else. The
+ * worker rewrites this to `screening_account` only if the sampled product pages came back
+ * unserved *and* a stored merchant login then reached them. Nobody chooses it.
+ *
+ * It never changes GATE-002 or GATE-003 — those are decided by requests carrying no session, in
+ * `runGateRules`, whose API has no parameter for one (D-039).
  */
 export type ScanMode = 'public' | 'screening_account';
 
@@ -42,17 +45,14 @@ export interface ScanRequestSummary {
 
 export interface ScanQueue {
   /** Queues a scan. Returns the error text rather than throwing, because the caller renders it. */
-  request(
-    url: string,
-    mode?: ScanMode,
-  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
+  request(url: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
   list(limit?: number): Promise<readonly ScanRequestSummary[]>;
 }
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
   return {
-    async request(url, mode = 'public') {
+    async request(url) {
       const normalised = normaliseUrl(url);
       if (normalised === null) {
         return {
@@ -63,7 +63,9 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
 
       const { error } = await client
         .from('scan_requests')
-        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode });
+        // Always public. The insert policy in 0014 refuses anything else, so this is the client
+        // agreeing with a rule the database enforces rather than a decision made here.
+        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public' });
 
       if (error !== null) {
         return { ok: false, error: error.message };

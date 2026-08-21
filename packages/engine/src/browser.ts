@@ -29,6 +29,7 @@ export type {
 
 export type {
   AssembleInput,
+  ReportAccess,
   ReportCategory,
   ReportCoverage,
   ReportFinding,

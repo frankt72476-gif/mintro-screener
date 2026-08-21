@@ -14,8 +14,9 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
-import { createScanQueue, isPending, type ScanMode, type ScanRequestSummary } from './lib/scanQueue.js';
+import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
 import { createCredentialDeposit } from './lib/credentials.js';
+import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
 import { CredentialModal } from './components/CredentialModal.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
@@ -127,6 +128,8 @@ function Screener({
     [client, analyst.id],
   );
   const [credentialFor, setCredentialFor] = useState<string | null>(null);
+  const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   /**
    * Where runs come from.
@@ -189,6 +192,66 @@ function Screener({
 
   // Same readiness signal the injected print path uses.
   usePrintReady(printDomain === null ? null : report);
+
+  /**
+   * Queues a render, waits for it, and hands the file to the browser.
+   *
+   * The wait is a poll rather than a spinner over a promise, because the render happens on another
+   * machine. Nothing is reported as downloaded until the worker says the file exists and a signed
+   * URL for it comes back — the toast that used to fire immediately said "Downloaded" when nothing
+   * had been produced at all, which is the false-success shape this project keeps removing.
+   */
+  async function downloadPdf(current: ScreeningReport): Promise<void> {
+    setPdfBusy(true);
+    setToast('Rendering the PDF…');
+
+    const queued = await pdfs.request(current.runId);
+    if ('error' in queued) {
+      setPdfBusy(false);
+      setToast(`The PDF could not be queued: ${queued.error}`);
+      return;
+    }
+
+    const deadline = Date.now() + 180_000;
+
+    const tick = async (): Promise<void> => {
+      if (Date.now() > deadline) {
+        setPdfBusy(false);
+        setToast('The PDF is taking longer than expected — it may still be rendering.');
+        return;
+      }
+
+      const state = await pdfs.poll(queued.id);
+
+      // Null is "could not read", not "failed". Keep waiting.
+      if (state === null || isPdfPending(state.status)) {
+        setTimeout(() => void tick(), 2000);
+        return;
+      }
+
+      setPdfBusy(false);
+
+      if (state.status === 'failed' || state.storageKey === null) {
+        setToast(`The PDF failed to render: ${state.error ?? 'no reason recorded'}`);
+        return;
+      }
+
+      const url = await pdfs.downloadUrl(
+        state.storageKey,
+        pdfFilename(current.merchantDomain, current.finishedAt),
+      );
+
+      if (url === null) {
+        setToast('The PDF was rendered but its download link could not be minted.');
+        return;
+      }
+
+      window.location.assign(url);
+      setToast(`${current.merchantDomain} report downloaded`);
+    };
+
+    void tick();
+  }
 
   async function load(runId: string): Promise<void> {
     setStage('running');
@@ -290,7 +353,23 @@ function Screener({
 
   return (
     <div className="shell">
-      <Rail pane={pane} onPane={setPane} ruleset={ruleset.value} analystEmail={analystEmail} />
+      <Rail
+        pane={pane}
+        onPane={(next) => {
+          setPane(next);
+          // The bug Frank hit: the rail changed pane while the scan pane was still showing a
+          // report, so "Site check" appeared to do nothing. Navigating to a pane means going to
+          // that pane, not to whatever it was last showing.
+          if (next === 'scan') {
+            setStage('input');
+            setReport(null);
+            setQuarantine(null);
+            setError(null);
+          }
+        }}
+        ruleset={ruleset.value}
+        analystEmail={analystEmail}
+      />
 
       <main className="main">
         <section className={`pane ${pane === 'scan' ? 'on' : ''}`}>
@@ -303,14 +382,10 @@ function Screener({
               queued={queued}
               credentialsAvailable={credentials.available}
               onCredential={(domain) => setCredentialFor(domain)}
-              onRequest={async (url, mode) => {
-                const result = await queue.request(url, mode);
+              onRequest={async (url) => {
+                const result = await queue.request(url);
                 if (result.ok) {
-                  setToast(
-                    mode === 'screening_account'
-                      ? 'Scan queued with the merchant login — gate checks still run signed out'
-                      : 'Scan queued — the worker will pick it up',
-                  );
+                  setToast('Scan queued — the worker will pick it up');
                   setQueued(await queue.list());
                 }
                 return result;
@@ -338,7 +413,8 @@ function Screener({
               report={report}
               access={access}
                 onSend={() => setSending(true)}
-                onDownload={() => setToast(`Downloaded ${report.merchantDomain}.pdf`)}
+                onDownload={() => void downloadPdf(report)}
+                downloading={pdfBusy}
               />
             </>
           )}
@@ -407,14 +483,12 @@ function ScanInput({
   readonly onCredential: (domain: string) => void;
   readonly onRequest: (
     url: string,
-    mode: ScanMode,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
   const [runId, setRunId] = useState(available[0]?.runId ?? '');
   const [url, setUrl] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
-  const [mode, setMode] = useState<ScanMode>('public');
 
   useEffect(() => {
     if (runId === '' && available.length > 0) setRunId(available[0]?.runId ?? '');
@@ -423,7 +497,7 @@ function ScanInput({
   const submit = async (): Promise<void> => {
     setRequesting(true);
     setRequestError(null);
-    const result = await onRequest(url, mode);
+    const result = await onRequest(url);
     setRequesting(false);
     if (result.ok) setUrl('');
     else setRequestError(result.error);
@@ -490,8 +564,11 @@ function ScanInput({
                   <span className="queue-url">
                     {request.url}
                     {request.mode === 'screening_account' && (
-                      <span className="mode-tag" title="Ran with the merchant's supplied login">
-                        signed in
+                      <span
+                        className="mode-tag"
+                        title="Product pages were behind a login; the merchant's stored account was used for them"
+                      >
+                        used merchant login
                       </span>
                     )}
                   </span>
@@ -545,56 +622,34 @@ function ScanInput({
           )}
         </div>
 
-        <div className="field">
-          <span className="flabel">Access</span>
-          <p className="fhint">How we get past the login gate, if there is one.</p>
-          <div className="modes">
-            <button
-              className="mode"
-              aria-pressed={mode === 'public'}
-              onClick={() => setMode('public')}
-            >
-              <span className="mode-t">Public crawl</span>
-              <span className="mode-d">No account. Gated pages come back as not evaluable.</span>
-            </button>
-            <button
-              className="mode"
-              aria-pressed={mode === 'screening_account'}
-              disabled={!credentialsAvailable}
-              onClick={() => setMode('screening_account')}
-            >
-              <span className="mode-t">Screening account</span>
-              <span className="mode-d">
-                {credentialsAvailable
-                  ? "We sign in with the merchant's supplied login."
-                  : 'Needs VITE_CREDENTIAL_PUBLIC_KEY.'}
-              </span>
-            </button>
-            <button className="mode" aria-pressed={false} disabled>
-              <span className="mode-t">Assisted sign-in</span>
-              <span className="mode-d">You log in once in a live window; we take it from there.</span>
-            </button>
-          </div>
+        {/*
+          No access picker (D-040).
 
-          {mode === 'screening_account' && (
-            <div className="mode-detail">
-              <p className="fhint" style={{ margin: 0 }}>
-                {/* Stated where the choice is made, because this is the question the mode
-                    invites. A supplied account widens what is visible; it never moves a gate
-                    finding (D-039). */}
-                The gate checks — products hidden until an account exists, guest checkout disabled
-                — are still decided by a request carrying no session. A merchant login lets us read
-                product pages behind the wall; it cannot change what is reported about the wall.
-              </p>
-              <button
-                className="btn btn-ghost"
-                style={{ marginTop: 10 }}
-                onClick={() => onCredential(url.trim())}
-              >
-                Enter the merchant's login
-              </button>
-            </div>
-          )}
+          The crawl starts anonymous and stays that way unless the sampled product pages come
+          back unserved, at which point a stored credential is applied if one exists. The tool
+          already detects the platform and already knows when it has hit a login wall, so asking
+          was redundant — and a picker invites the wrong answer, which produces a report whose
+          coverage does not match what was actually possible.
+
+          What remains is the one thing an analyst can supply that the tool cannot work out for
+          itself: the merchant's login, if they have been given one.
+        */}
+        <div className="field">
+          <span className="flabel">Merchant logins</span>
+          <p className="fhint">
+            Every scan runs signed out. If a merchant's product pages turn out to be behind a
+            login and we hold an account they supplied, the scan uses it for those pages and the
+            report says so. The access-gating checks are always decided signed out.
+          </p>
+          <button
+            className="btn btn-ghost"
+            disabled={!credentialsAvailable}
+            onClick={() => onCredential(url.trim())}
+          >
+            {credentialsAvailable
+              ? "Store a merchant's login"
+              : 'Storing a login needs VITE_CREDENTIAL_PUBLIC_KEY'}
+          </button>
         </div>
 
         {error !== null && (
@@ -608,7 +663,7 @@ function ScanInput({
             Open report
           </button>
           <span className="note">
-            Authenticated modes land in M9. A queued scan is a public crawl.
+            Every scan starts signed out. Coverage is reported as it was actually reached.
           </span>
         </div>
       </div>

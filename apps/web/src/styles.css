@@ -717,3 +717,28 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 
 .cred-note p:last-child { margin-bottom: 0; }
+
+/* ── Access note ─────────────────────────────────────────────────────────────────────────
+   Shown only when an anonymous request was refused. It states what was reached and stops —
+   never that a credential should be obtained (D-001, D-040). */
+
+.access-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-width: 76ch;
+}
+
+.access-note.limited {
+  background: #FEF1E2;
+  border: 1px solid #F3D9B4;
+  color: #6B4A15;
+}
+
+.access-note.used {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-mid);
+}

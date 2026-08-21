@@ -71,6 +71,31 @@ export interface ScreeningReport {
   readonly truncations: readonly string[];
   /** What the run did about `Crawl-delay` (D-013). */
   readonly politeness: string;
+  /**
+   * How the crawl got at the catalogue, and what limited it (D-040).
+   *
+   * Absent on runs written before auto-detection existed. Present, it states plainly whether a
+   * login wall was met and whether anything got past it — because a report whose coverage was
+   * bounded by a wall says something different from one whose coverage was bounded by the
+   * merchant having nothing to show.
+   */
+  readonly access?: ReportAccess;
+}
+
+/**
+ * What the run could reach.
+ *
+ * Descriptive, like every other part of the report: it states what happened and stops. `note`
+ * never tells anyone to obtain a credential — it says coverage was limited and why (D-001).
+ */
+export interface ReportAccess {
+  /** How the pages in this report were actually fetched. */
+  readonly mode: ScanMode;
+  /** True when an anonymous request reached none of the sampled product pages. */
+  readonly wall: boolean;
+  /** True when a stored screening account was used to get past it. */
+  readonly usedCredential: boolean;
+  readonly note: string;
 }
 
 export interface AssembleInput {
@@ -84,6 +109,7 @@ export interface AssembleInput {
   readonly findings: readonly Finding[];
   readonly truncations?: readonly string[];
   readonly politeness: string;
+  readonly access?: ReportAccess;
 }
 
 /**
@@ -166,6 +192,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     ),
     truncations: input.truncations ?? [],
     politeness: input.politeness,
+    ...(input.access === undefined ? {} : { access: input.access }),
   };
 }
 

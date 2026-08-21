@@ -40,14 +40,17 @@ import {
   scoreProductUrls,
   selectSample,
   tally,
+  assessWall,
   type EvidenceArtifact,
   type Finding,
   type Layer0Result,
   type PageContext,
   type SampledPage,
+  type ReportAccess,
+  type ScanMode,
   type ScopeOverrides,
   type ScreeningReport,
-  type SessionDescriptor,
+  type WallAssessment,
 } from '@mintro/engine';
 import { renderPage } from './render.js';
 import { runGateRules, type AnonymousAccess } from './gate.js';
@@ -62,17 +65,21 @@ export interface ScreenOptions {
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
   readonly onProgress?: (line: string) => void;
   /**
-   * A context carrying the merchant's supplied session, for pages behind their login (M9).
+   * Establishes a merchant session, when one turns out to be needed (D-040).
    *
-   * It is used for Layer 1 and Layer 2 rendering only. **The gate rules never see it**: they are
-   * run by `runGateRules`, whose API has no parameter that could carry a session, against an
-   * anonymous access built here from a fresh context (D-039).
+   * **Called only after an anonymous crawl has been refused**, and never before. The analyst does
+   * not choose an access mode: the crawl runs public, and if the sampled product pages come back
+   * unserved *and* this callback yields a session, the product pages are re-rendered with it.
    *
-   * A credential widens what is visible. It never narrows what is reported.
+   * Returns null when no credential is stored for this merchant, which is not a failure — it is
+   * the honest answer, and the report says coverage was limited by a wall rather than pretending
+   * the catalogue was empty.
+   *
+   * **The gate rules never see the result.** They are run by `runGateRules`, whose API has no
+   * parameter that could carry a session, against an anonymous access built here from a fresh
+   * context (D-039). A credential widens what is visible; it never narrows what is reported.
    */
-  readonly authenticated?: BrowserContext;
-  /** How the session was obtained, recorded on the findings it produced. */
-  readonly session?: SessionDescriptor;
+  readonly escalate?: () => Promise<BrowserContext | null>;
 }
 
 export interface ScreenResult {
@@ -107,12 +114,10 @@ export async function screenStorefront(
 
   // ---- Layer 1 -------------------------------------------------------------------------
   const homepage = `${layer0.origin}/`;
-  const rendered = await renderPage(browser, homepage, {
-    runId,
-    pacer,
-    timeoutMs: 30_000,
-    ...(options.authenticated === undefined ? {} : { context: options.authenticated }),
-  });
+  // Anonymous, always. The homepage is where the footer disclosure rules are read, and those
+  // describe what a customer sees — reading them while signed in would answer a different
+  // question. Escalation, if it happens at all, reaches the product sample and nothing else.
+  const rendered = await renderPage(browser, homepage, { runId, pacer, timeoutMs: 30_000 });
   artifacts.push(...rendered.artifacts);
 
   say(
@@ -146,19 +151,59 @@ export async function screenStorefront(
   say(`sampling ${selected.length} of ${productUrls.length} product page(s)`);
 
   const selectors = ruleSelectors(ruleset);
-  const sampled: SampledPage[] = [];
 
-  for (const pick of selected) {
-    const result = await renderPage(browser, pick.url.url, {
-      runId,
-      pacer,
-      selectors,
-      timeoutMs: 30_000,
-      // Where a merchant login earns its keep: product pages behind the wall.
-      ...(options.authenticated === undefined ? {} : { context: options.authenticated }),
-    });
-    artifacts.push(...result.artifacts);
-    sampled.push({ selection: pick, page: result.page });
+  const renderSample = async (context?: BrowserContext): Promise<SampledPage[]> => {
+    const pages: SampledPage[] = [];
+    for (const pick of selected) {
+      const result = await renderPage(browser, pick.url.url, {
+        runId,
+        pacer,
+        selectors,
+        timeoutMs: 30_000,
+        ...(context === undefined ? {} : { context }),
+      });
+      artifacts.push(...result.artifacts);
+      pages.push({ selection: pick, page: result.page });
+    }
+    return pages;
+  };
+
+  // ---- public first, always ---------------------------------------------------------------
+  let sampled = await renderSample();
+  let wall = assessWall(sampled.map((entry) => entry.page));
+  let usedCredential = false;
+  let mode: ScanMode = 'public';
+
+  say(wall.reason);
+
+  // ---- escalate only on an observed refusal ------------------------------------------------
+  //
+  // The condition is what was *observed*, not what anyone selected. A credential is applied when
+  // the anonymous crawl was refused and one exists; otherwise the report says coverage was
+  // limited and why. Nobody is asked to predict which it will be (D-040).
+  if (wall.walled && options.escalate !== undefined) {
+    const context = await options.escalate();
+
+    if (context === null) {
+      say('a login wall was met and no screening account is stored for this merchant');
+    } else {
+      say('a login wall was met; re-rendering the sample with the stored screening account');
+      const retried = await renderSample(context);
+      const afterWall = assessWall(retried.map((entry) => entry.page));
+
+      // Kept only if it actually got further. A credential that failed to change what was served
+      // has widened nothing, and reporting `screening_account` on that basis would overstate what
+      // the run saw — the same false-coverage shape as reporting an unobservable rule as passing.
+      if (afterWall.served > wall.served) {
+        sampled = retried;
+        wall = afterWall;
+        usedCredential = true;
+        mode = 'screening_account';
+        say(`signed in: ${afterWall.reason}`);
+      } else {
+        say('the screening account did not reach the product pages either; keeping the public crawl');
+      }
+    }
   }
 
   const layer2 = runLayer2(sampled, ruleset);
@@ -202,10 +247,11 @@ export async function screenStorefront(
   const report = assembleReport(
     {
       runId,
+      access: describeAccess(wall, mode, usedCredential, options.escalate !== undefined),
       merchantDomain: new URL(layer0.origin).host,
       ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
       ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
-      mode: 'public',
+      mode,
       startedAt,
       finishedAt: new Date().toISOString(),
       findings,
@@ -268,4 +314,50 @@ function commonSegment(urls: readonly string[]): string | null {
   const candidate = firstSegments[0];
   if (candidate === undefined || candidate === '') return null;
   return firstSegments.every((segment) => segment === candidate) ? candidate : null;
+}
+
+/**
+ * What the report says about its own reach.
+ *
+ * Descriptive throughout. It states what was served and what was not; it never says a credential
+ * *should* be obtained, because report copy does not instruct (D-001). "Coverage would widen with
+ * a screening account" is an observation about this run; "get a screening account" would be an
+ * instruction, and the difference is the whole of D-001.
+ */
+function describeAccess(
+  wall: WallAssessment,
+  mode: ScanMode,
+  usedCredential: boolean,
+  escalationAvailable: boolean,
+): ReportAccess {
+  if (usedCredential) {
+    return {
+      mode,
+      wall: true,
+      usedCredential: true,
+      note:
+        'Product pages were not served to an anonymous request. They were read with the ' +
+        'merchant-supplied screening account. The access-gating findings are unaffected: they are ' +
+        'decided by requests carrying no session.',
+    };
+  }
+
+  if (wall.walled) {
+    return {
+      mode,
+      wall: true,
+      usedCredential: false,
+      note:
+        `${wall.reason}. No screening account was ${escalationAvailable ? 'stored for this merchant' : 'available to this run'}, ` +
+        'so product-surface rules could not be observed and are reported as not evaluable. ' +
+        'Coverage of those rules would be wider with a merchant-supplied login.',
+    };
+  }
+
+  return {
+    mode,
+    wall: false,
+    usedCredential: false,
+    note: wall.reason.charAt(0).toUpperCase() + wall.reason.slice(1) + '.',
+  };
 }

@@ -183,3 +183,111 @@ describe('the quarantine record', () => {
     expect(error).toMatch(/duplicate key|already exists/i);
   });
 });
+
+/**
+ * Every scan starts anonymous, as a schema property (D-040).
+ *
+ * The access picker is gone. A credential is applied by the worker after it observes a refusal,
+ * never because a requester asked for one — and the insert policy is what makes that true rather
+ * than conventional. A UI that offered the choice again would be refused by the database.
+ */
+describe('scan mode is an outcome, not a request', () => {
+  it('has an insert policy that pins the mode to public', async () => {
+    const [policy] = await schema.query<{ with_check: string | null }>(
+      `select with_check from pg_policies
+       where tablename = 'scan_requests' and policyname = 'scan_requests_insert'`,
+    );
+
+    expect(policy?.with_check ?? '').toMatch(/mode\s*=\s*'public'/);
+  });
+
+  it('still lets the worker record what actually happened', async () => {
+    const [row] = await queue('https://escalated.example');
+
+    // service_role bypasses RLS, which is exactly the asymmetry wanted here: the requester cannot
+    // choose the mode and the worker can record it.
+    const error = await schema.attempt(
+      `update public.scan_requests set mode = 'screening_account' where id = $1`,
+      [row!.id],
+    );
+    expect(error).toBeNull();
+  });
+});
+
+describe('the PDF queue', () => {
+  it('refuses to mark a render done with no file', async () => {
+    const { runId } = await seedRun(schema, 'pdf-silent.example');
+    const [row] = await schema.query<{ id: string }>(
+      `insert into public.pdf_requests (run_id, requested_by) values ($1, $2) returning id`,
+      [runId, analystId],
+    );
+
+    // Same refusal as the scan queue: a finished job that says nothing about what happened is the
+    // shape every defect in this project has taken.
+    const error = await schema.attempt(
+      `update public.pdf_requests set status = 'done' where id = $1`,
+      [row!.id],
+    );
+    expect(error).toMatch(/finished_pdf_requests_have_a_file/i);
+  });
+
+  it('refuses to mark a render failed with no reason', async () => {
+    const { runId } = await seedRun(schema, 'pdf-mute.example');
+    const [row] = await schema.query<{ id: string }>(
+      `insert into public.pdf_requests (run_id, requested_by) values ($1, $2) returning id`,
+      [runId, analystId],
+    );
+
+    const error = await schema.attempt(
+      `update public.pdf_requests set status = 'failed' where id = $1`,
+      [row!.id],
+    );
+    expect(error).toMatch(/failed_pdf_requests_say_why/i);
+  });
+
+  it('accepts a render that produced a file', async () => {
+    const { runId } = await seedRun(schema, 'pdf-ok.example');
+    const [row] = await schema.query<{ id: string }>(
+      `insert into public.pdf_requests (run_id, requested_by) values ($1, $2) returning id`,
+      [runId, analystId],
+    );
+
+    const error = await schema.attempt(
+      `update public.pdf_requests set status = 'done', storage_key = $2, pages = 45,
+       finished_at = now() where id = $1`,
+      [row!.id, `${runId}/report/${row!.id}.pdf`],
+    );
+    expect(error).toBeNull();
+  });
+
+  it('lets exactly one claim succeed', async () => {
+    const { runId } = await seedRun(schema, 'pdf-contended.example');
+    const [row] = await schema.query<{ id: string }>(
+      `insert into public.pdf_requests (run_id, requested_by) values ($1, $2) returning id`,
+      [runId, analystId],
+    );
+
+    const first = await schema.query(
+      `update public.pdf_requests set status = 'running', claimed_at = now()
+       where id = $1 and status = 'queued' returning id`,
+      [row!.id],
+    );
+    const second = await schema.query(
+      `update public.pdf_requests set status = 'running', claimed_at = now()
+       where id = $1 and status = 'queued' returning id`,
+      [row!.id],
+    );
+
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(0);
+  });
+
+  it('requires a run that exists', async () => {
+    const error = await schema.attempt(
+      `insert into public.pdf_requests (run_id, requested_by)
+       values ('00000000-0000-0000-0000-000000000000', $1)`,
+      [analystId],
+    );
+    expect(error).toMatch(/foreign key/i);
+  });
+});
