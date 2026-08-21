@@ -22,9 +22,18 @@ interface Props {
   readonly access: EvidenceAccess;
   readonly onSend: () => void;
   readonly onDownload: () => void;
+  /**
+   * Print mode: every category and every finding expanded, no filtering, no actions.
+   *
+   * The PDF is `page.pdf()` against this same component (ARCHITECTURE.md — no second rendering
+   * stack), so the export cannot drift from the web report. It also cannot collapse anything:
+   * a PDF that hid a finding behind a closed disclosure would be a different document from the
+   * one on screen while claiming to be the same.
+   */
+  readonly print?: boolean;
 }
 
-export function ReportView({ report, access, onSend, onDownload }: Props): JSX.Element {
+export function ReportView({ report, access, onSend, onDownload, print = false }: Props): JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
 
   return (
@@ -39,21 +48,23 @@ export function ReportView({ report, access, onSend, onDownload }: Props): JSX.E
               .join(' · ')}
           </p>
         </div>
-        <div className="acts">
-          <button className="btn btn-ghost" onClick={onDownload}>
-            Download PDF
-          </button>
-          {/* Always enabled. Send is never blocked by an outcome — D-001. */}
-          <button className="btn btn-primary" onClick={onSend}>
-            Send to IQwallet
-          </button>
-        </div>
+        {!print && (
+          <div className="acts">
+            <button className="btn btn-ghost" onClick={onDownload}>
+              Download PDF
+            </button>
+            {/* Always enabled. Send is never blocked by an outcome — D-001. */}
+            <button className="btn btn-primary" onClick={onSend}>
+              Send to IQwallet
+            </button>
+          </div>
+        )}
       </div>
 
       <VerdictBanner report={report} />
       <TickStrip report={report} />
 
-      <Filters filter={filter} onChange={setFilter} report={report} />
+      {print ? <Coverage report={report} /> : <Filters filter={filter} onChange={setFilter} report={report} />}
 
       <div>
         {report.categories.map((category, index) => (
@@ -61,8 +72,9 @@ export function ReportView({ report, access, onSend, onDownload }: Props): JSX.E
             key={category.id}
             category={category}
             index={index}
-            filter={filter}
+            filter={print ? 'all' : filter}
             access={access}
+            print={print}
           />
         ))}
       </div>
@@ -177,16 +189,38 @@ function Filters({
   );
 }
 
+/**
+ * The coverage line on its own, for print mode where there are no filter chips to sit beside.
+ *
+ * Computed in the report, never a constant — the demo's "31 of 40" was placeholder copy.
+ */
+function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element {
+  const { evaluable, total, notReachable } = report.coverage;
+  return (
+    <div className="filters">
+      <span className="coverage" style={{ marginLeft: 0 }}>
+        <b>
+          {evaluable} of {total}
+        </b>{' '}
+        findings evaluable from this crawl
+        {notReachable > 0 && ` · ${notReachable} need a surface no crawl reaches`}
+      </span>
+    </div>
+  );
+}
+
 function CategoryCard({
   category,
   index,
   filter,
   access,
+  print = false,
 }: {
   readonly category: ReportCategory;
   readonly index: number;
   readonly filter: Filter;
   readonly access: EvidenceAccess;
+  readonly print?: boolean;
 }): JSX.Element | null {
   const visible = useMemo(
     () => category.findings.filter((finding) => filter === 'all' || finding.state === filter),
@@ -196,13 +230,13 @@ function CategoryCard({
   // Matches the demo: open when filtering, or when the category contains a failure.
   const [open, setOpen] = useState<boolean | null>(null);
   const defaultOpen = filter !== 'all' || category.findings.some((f) => f.state === 'fail');
-  const isOpen = open ?? defaultOpen;
+  const isOpen = print ? true : (open ?? defaultOpen);
 
   if (visible.length === 0) return null;
 
   return (
     <div className={`card cat ${isOpen ? 'open' : ''}`}>
-      <button className="cat-head" onClick={() => setOpen(!isOpen)}>
+      <button className="cat-head" onClick={() => setOpen(!isOpen)} disabled={print}>
         <span className="cat-idx">{String(index + 1).padStart(2, '0')}</span>
         <span className="cat-name">{category.name}</span>
         <span className="pips">
@@ -214,7 +248,7 @@ function CategoryCard({
       </button>
       <div className="cat-body">
         {visible.map((finding, i) => (
-          <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} />
+          <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} print={print} />
         ))}
       </div>
     </div>
@@ -224,22 +258,26 @@ function CategoryCard({
 function FindingRow({
   finding,
   access,
+  print = false,
 }: {
   readonly finding: ReportFinding;
   readonly access: EvidenceAccess;
+  readonly print?: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const source = finding.evidence[0]?.sourceUrl;
+  // Every finding is expanded in the export. Nothing is collapsed, grouped or dropped.
+  const isOpen = print || open;
 
   return (
-    <div className={`find ${stateClass(finding.state)} ${open ? 'open' : ''}`}>
-      <button className="find-head" onClick={() => setOpen(!open)}>
+    <div className={`find ${stateClass(finding.state)} ${isOpen ? 'open' : ''}`}>
+      <button className="find-head" onClick={() => setOpen(!open)} disabled={print}>
         <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
         <span className="find-main">
           <span className="find-title">
             {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{finding.ruleId}</span>
           </span>
-          <span className="find-note">{finding.note}</span>
+          <span className={`find-note${print ? ' full' : ''}`}>{finding.note}</span>
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
         </span>
       </button>

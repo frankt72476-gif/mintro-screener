@@ -19,7 +19,20 @@ import { Rail } from './components/Rail.js';
 type Pane = 'scan' | 'docs';
 type Stage = 'input' | 'running' | 'report';
 
+/**
+ * Print route: `?report=<domain>&print=1`.
+ *
+ * The worker navigates here and calls `page.pdf()`. It is the same `ReportView` the analyst sees
+ * — ARCHITECTURE.md rules out a second rendering stack precisely so the PDF and the web report
+ * cannot say different things.
+ */
+function printRequest(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('print') === '1' ? params.get('report') : null;
+}
+
 export function App(): JSX.Element {
+  const printDomain = useMemo(() => printRequest(), []);
   const [pane, setPane] = useState<Pane>('scan');
   const [stage, setStage] = useState<Stage>('input');
   const [report, setReport] = useState<ScreeningReport | null>(null);
@@ -54,11 +67,64 @@ export function App(): JSX.Element {
       .catch(() => setAvailable([]));
   }, []);
 
+  // Print route: load the requested report immediately and mark the document so the print
+  // stylesheet applies. The worker waits for `data-print-ready` before calling `page.pdf()`.
+  useEffect(() => {
+    if (printDomain === null) return;
+    document.documentElement.classList.add('printing');
+    void load(printDomain);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printDomain]);
+
   useEffect(() => {
     if (toast === null) return;
     const timer = setTimeout(() => setToast(null), 2400);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  /**
+   * Tells the worker the page is safe to print.
+   *
+   * Screenshots load asynchronously through signed URLs, so `page.pdf()` fired on navigation
+   * would capture half of them as empty frames — a PDF quietly missing the captures that D-012
+   * requires it to show. `data-print-ready` is set only once every image has settled, and
+   * `data-print-images` records how many resolved so the worker can check rather than assume.
+   */
+  useEffect(() => {
+    if (printDomain === null || report === null) return;
+
+    let cancelled = false;
+
+    const settle = async (): Promise<void> => {
+      // One frame for React to commit the expanded findings, then wait on the images they added.
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const images = [...document.querySelectorAll('img')];
+
+      const results = await Promise.all(
+        images.map(
+          (image) =>
+            new Promise<boolean>((resolve) => {
+              if (image.complete) {
+                resolve(image.naturalWidth > 0);
+                return;
+              }
+              image.addEventListener('load', () => resolve(true), { once: true });
+              image.addEventListener('error', () => resolve(false), { once: true });
+            }),
+        ),
+      );
+
+      if (cancelled) return;
+      const loaded = results.filter(Boolean).length;
+      document.documentElement.dataset.printImages = `${loaded}/${images.length}`;
+      document.documentElement.dataset.printReady = 'true';
+    };
+
+    void settle();
+    return () => {
+      cancelled = true;
+    };
+  }, [printDomain, report]);
 
   async function load(domain: string): Promise<void> {
     setStage('running');
@@ -72,6 +138,31 @@ export function App(): JSX.Element {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStage('input');
     }
+  }
+
+  if (printDomain !== null) {
+    return (
+      <div className="shell">
+        <main className="main">
+          {report === null ? (
+            <div className="empty" data-print-state={error === null ? 'loading' : 'error'}>
+              {error ?? 'Loading report…'}
+            </div>
+          ) : (
+            <>
+              <PrintHeader report={report} />
+              <ReportView
+                report={report}
+                access={access}
+                print
+                onSend={() => undefined}
+                onDownload={() => undefined}
+              />
+            </>
+          )}
+        </main>
+      </div>
+    );
   }
 
   if (!ruleset.ok) {
@@ -241,6 +332,26 @@ function ScanInput({
             Authenticated modes land in M4. This view reads runs the worker has already produced.
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The PDF header.
+ *
+ * On white, the tiled lockup is the correct asset — D-007 reserves the glyph for the deep violet
+ * rail, where the lockup's own violet tile reads as a mismatched rectangle. This is the other
+ * context that ruling names.
+ */
+function PrintHeader({ report }: { readonly report: ScreeningReport }): JSX.Element {
+  return (
+    <div className="print-head">
+      <img src="/brand/mintro-lockup-full.png" alt="Mintro" />
+      <div className="meta">
+        Rule set v{report.rulesetVersion} · effective {report.rulesetEffective}
+        <br />
+        Run {report.runId}
       </div>
     </div>
   );

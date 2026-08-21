@@ -460,3 +460,57 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   font-size:12px;color:var(--ink-mid);line-height:1.55;margin-bottom:10px;
   padding-bottom:10px;border-bottom:1px solid var(--line-soft);
 }
+
+/* ---------- print / PDF ----------
+ *
+ * The PDF is `page.pdf()` against this same component (ARCHITECTURE.md — no second rendering
+ * stack). These rules apply in print mode, whether reached by the print route or by a browser's
+ * own print dialog, so the two produce the same document.
+ *
+ * Nothing here hides a finding. The only things removed are chrome that has no meaning on paper:
+ * the rail, the action buttons, the filter chips.
+ */
+.printing .rail,
+.printing .acts,
+.printing .chip,
+.printing .caret,
+.printing .veil,
+.printing .toast{display:none !important}
+
+.printing .shell{display:block}
+.printing .main{max-width:none;padding:0}
+.printing body{background:#fff}
+
+/* Every finding is expanded and every evidence slip visible. */
+.printing .cat-body,
+.printing .ev{display:block !important}
+.printing .find-note{display:block !important;-webkit-line-clamp:none;overflow:visible}
+.printing .cat-head{cursor:default}
+
+/* Keep a finding and its evidence on one page where the page break allows. */
+.printing .find{break-inside:avoid;page-break-inside:avoid}
+.printing .cat{break-inside:auto;box-shadow:none}
+.printing .slip{break-inside:avoid;page-break-inside:avoid}
+.printing .strip-wrap,
+.printing .verdict{break-inside:avoid}
+
+.printing .card{box-shadow:none}
+
+/* The PDF header block, shown only on paper. */
+.print-head{display:none}
+.printing .print-head{
+  display:flex;align-items:center;gap:11px;
+  padding-bottom:14px;margin-bottom:18px;border-bottom:2px solid var(--violet);
+}
+.printing .print-head img{height:34px;width:auto;display:block}
+.printing .print-head .meta{margin-left:auto;text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--slate);line-height:1.7}
+
+@media print{
+  .rail,.acts,.chip,.caret{display:none !important}
+  .shell{display:block}
+  .main{max-width:none;padding:0}
+  .cat-body,.ev{display:block !important}
+  .find,.slip{break-inside:avoid;page-break-inside:avoid}
+  .card{box-shadow:none}
+  .print-head{display:flex !important}
+}

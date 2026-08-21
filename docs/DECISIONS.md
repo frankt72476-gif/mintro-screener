@@ -792,3 +792,96 @@ as D-011 and D-020 in a new place. This rule surfaces the candidate; a human res
 **Finding wording** follows D-018: it names how many links were examined, quotes the matching
 text with its destination, and states that *"the visible text of these links was examined; their
 destinations were not followed."*
+
+### Do not harmonise `critical` with `review_only`
+
+`sev` and `tier` answer different questions and are **orthogonal by D-009**:
+
+    sev   how bad the violation is, if it is real
+    tier  how confident the detection is that it is real
+
+An affiliate programme is `critical` either way — the severity is a property of the violation,
+not of how it was spotted. But a nav label pointing at `/` is weaker evidence than a dedicated
+URL: it could be a stale link, a theme default, or a dead page.
+
+**That this pairing appears nowhere else in the rule set reflects the rule set, not a schema
+error.** It is the first rule whose detection method is materially weaker than its subject is
+serious, and it will not be the last.
+
+**Do not promote OFFS-007 to `auto_fail`.** That would auto-fail a merchant on link text whose
+destination was never followed — a verdict on a page nobody opened. OFFS-001 is the `auto_fail`
+half of this pair and it earns that by matching a URL that is hard to produce accidentally.
+
+---
+
+## D-028 — PDF and send
+**2026-08-21 · architect's rulings, built against a dry-run mailer**
+
+### The PDF is the report route, printed
+
+`page.pdf()` against the same React component the analyst sees, rendered in print mode. No second
+template, no PDF library. `docs/ARCHITECTURE.md` rules this out for one reason: two templates
+would eventually say different things about the same run, and the PDF is the artifact that
+travels.
+
+**The export collapses nothing.** Every finding is expanded, every evidence slip visible. A PDF
+that hid a finding behind a closed disclosure would be a different document from the one on
+screen while claiming to be the same. Note that finding *grouping* was never built — the
+question was raised at M3 and left open, so there is nothing to collapse; if grouping is added
+later it is presentation only and must not reach the export.
+
+**The print stylesheet removes chrome, never content**: the rail, the action buttons, the filter
+chips. Nothing that carries an observation is hidden.
+
+### The PDF waits for its captures
+
+`page.pdf()` fires only after the page sets `data-print-ready`, which it does once every image
+has settled. Printing on navigation would capture screenshots as empty frames — a PDF quietly
+missing the captures D-012 requires it to show. The page also reports how many resolved
+(`data-print-images`), so the worker checks rather than assumes; the swisschems run reports
+**66/66**.
+
+This is the same failure family as D-026: a precondition that, when unmet, produces a document
+indistinguishable from a correct one.
+
+### On white, the lockup; on violet, the glyph
+
+The PDF header uses `mintro-lockup-full.png`. D-007 reserves the glyph for the deep violet rail,
+where the lockup's own violet tile reads as a mismatched rectangle. This is the other context
+that ruling names.
+
+### Sending is never blocked, so the log carries the weight
+
+No confirmation interstitial, no supervisor override, and no code path that inspects the fail
+count before sending (D-001). A test sends reports with 0 and 16 failures and asserts identical
+behaviour.
+
+Because sending is never blocked, **the `sends` log is the only record of what went out and
+when**. It therefore records **rejections as well as acceptances** — "we tried to send and the
+provider refused" is precisely the fact a dispute turns on, and a log of successes only answers
+the easy half of the question. Fields per the data model: run id, recipient, Resend message id,
+timestamp, who triggered it, plus the outcome and the attachment size.
+
+### The dry-run mailer is a different implementation, not a flag
+
+Until the sending domain is verified, `createDryRunMailer` composes the message and transmits
+nothing. It is a separate implementation rather than a boolean on the real one so that a test
+send cannot be mistaken for a delivered report — its `description` says what it is and that
+string goes into the run record.
+
+### The copy audit covers the email, not just the findings
+
+`apps/worker/test/copy.test.ts` audits every generated string across all five real runs —
+verdicts, finding notes, not-evaluable reasons, the subject line and the covering email — for
+directive language.
+
+The email is the surface most at risk. A covering note is the most natural place to write
+"please review" and the least likely place anyone inspects for a compliance problem.
+
+**Rule clauses are the deliberate exception.** A clause quotes the program document — "Guest
+checkout must be disabled" — and is source material, not Mintro's characterisation. Rewriting
+them to avoid imperatives would misquote the rules the merchant is being screened against. A test
+asserts every rendered clause is byte-identical to the rule set.
+
+**The analyst's note is passed through unaudited.** That is recorded rather than fixed: whether
+an analyst may write a directive in the covering note is a business question, not a code one.

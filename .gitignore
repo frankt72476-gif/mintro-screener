@@ -16,3 +16,6 @@ reports/
 apps/web/public/reports/
 apps/web/public/evidence/
 dist-types/
+
+# PDF output
+out/
