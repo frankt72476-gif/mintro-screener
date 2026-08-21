@@ -85,3 +85,83 @@ export function describeNoteWarning(audit: CopyAudit): string {
   const quoted = audit.flagged.map((term) => `"${term}"`).join(', ');
   return `This note contains language that reads as a recommendation: ${quoted}. Findings describe what was observed; the determination is IQwallet's. You can send it as written — the send record will note that this was flagged.`;
 }
+
+/* -------------------------------------------------------------------------------------------
+ * The requirement column (D-041)
+ * ----------------------------------------------------------------------------------------- */
+
+/**
+ * What a finding presents beside its observation.
+ *
+ * The report states what was seen and quotes the standard it was screened against. It does not
+ * say what to change — that would be remediation advice, which makes Mintro a party to the
+ * compliance determination and creates reliance. Quoting the clause gives the merchant everything
+ * they need to act while Mintro states a fact and cites a source.
+ */
+export interface RequirementAudit {
+  /** True when the displayed requirement is byte-identical to the rule's clause. */
+  readonly verbatim: boolean;
+  /** Directive terms found in the *observation*, which is Mintro's own words. */
+  readonly flaggedInObservation: readonly string[];
+  readonly problems: readonly string[];
+  readonly clean: boolean;
+}
+
+/**
+ * Audits one finding's Observed / Program requirement pair.
+ *
+ * Two different standards, deliberately:
+ *
+ *   - **The requirement is checked for being verbatim, not for being polite.** It is the program
+ *     document's wording, and it says "must". Rewriting it to avoid imperatives would misquote
+ *     the standard the merchant is screened against — which is why `DIRECTIVE_TERMS` excludes
+ *     bare "must" in the first place. The only thing that can go wrong here is drift, so drift is
+ *     what is checked: byte-identical, or it fails.
+ *   - **The observation is checked for directive language**, because that half is Mintro's own
+ *     words about what it saw.
+ *
+ * The distinction is the whole design. A paraphrased requirement is Mintro characterising the
+ * standard; an exact quotation is Mintro citing it.
+ */
+export function auditRequirement(observation: string, requirement: string, clause: string): RequirementAudit {
+  const problems: string[] = [];
+
+  const verbatim = requirement === clause;
+  if (!verbatim) {
+    problems.push(
+      requirement.trim() === clause.trim()
+        ? 'the requirement differs from the rule clause only in surrounding whitespace, which is still not verbatim'
+        : 'the requirement is not byte-identical to the rule clause — it has been paraphrased or edited',
+    );
+  }
+
+  const observed = auditCopy(observation);
+  if (!observed.clean) {
+    problems.push(
+      `the observation uses directive language: ${observed.flagged.join(', ')}. It states what was seen; ` +
+        'what the program requires is the other column.',
+    );
+  }
+
+  return {
+    verbatim,
+    flaggedInObservation: observed.flagged,
+    problems,
+    clean: problems.length === 0,
+  };
+}
+
+/**
+ * The column headers, defined once.
+ *
+ * The framing is the headers: "Observed" and "Program requirement" are both nouns, and neither
+ * addresses the reader. A header like "Required action" or "How to fix" would turn the same two
+ * pieces of text into instructions without a word of the content changing, which is why these are
+ * a constant rather than a string typed into a component.
+ */
+export const REQUIREMENT_HEADINGS = {
+  observed: 'Observed',
+  required: 'Program requirement',
+  /** For not_evaluable: the requirement stands, and why it could not be assessed is stated. */
+  notAssessed: 'Not assessed',
+} as const;

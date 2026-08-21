@@ -1614,3 +1614,111 @@ sending is never blocked by an *outcome* — this is not an outcome, it is that 
 `RESEND_API_KEY` is set, so the flag would be a claim rather than an observation, and this project
 has spent long enough on verdicts resting on surfaces that were never established. When sending is
 wired it becomes a queued job like the PDF, and the button re-enables on what the worker reports.
+
+---
+
+## D-041 — Requirement restatement, not corrective actions
+**2026-08-21 · Frank's ruling**
+
+Each finding shows what was observed beside what the program requires:
+
+    Observed             "For research use only."
+    Program requirement  "For research and laboratory use only. Not for human or
+                          animal consumption."
+
+### The alternative was considered and rejected
+
+A suggested-corrective-actions column was on the table. Telling a merchant how to fix a finding is
+**remediation advice**, which makes Mintro a party to the compliance determination and creates
+reliance. This system reports observations; IQwallet decides.
+
+Quoting the standard beside the observation gives the merchant everything they need to act while
+Mintro states a fact and cites a source. The information is the same; the act is not.
+
+### Verbatim is the whole guarantee
+
+The requirement is the rule's `clause`, byte-identical. Not trimmed, not sentence-cased, not
+shortened with an ellipsis. **An exact quotation is Mintro citing the standard; a paraphrase would
+be Mintro characterising it.**
+
+This is why `DIRECTIVE_TERMS` has always excluded bare "must" — clauses say "Guest checkout must
+be disabled", and rewriting them to avoid imperatives would misquote the document the merchant is
+screened against. The M5 clause exception was the same reasoning applied to a smaller surface.
+
+So the two columns are audited to **different standards**, deliberately:
+
+| Column | Checked for |
+|---|---|
+| Observed | directive language — it is Mintro's own words |
+| Program requirement | being byte-identical to the clause — it is not ours to word |
+
+`auditRequirement()` enforces both, and a whitespace-only difference fails: it looks harmless and
+is still not a quotation.
+
+### Where it appears
+
+`fail` and `review` show the pair. `not_evaluable` shows the requirement beside the reason it
+could not be assessed — the standard still applies to a rule the crawl could not observe, and
+saying so is the honest form of hard constraint 2.
+
+`pass` shows nothing. A satisfied rule quoted back at the reader carries no tension between the
+two columns and is noise.
+
+### The framing is the headings
+
+"Observed" and "Program requirement" are both nouns and neither addresses the reader. The
+identical two pieces of text under "Required action" or "How to fix" would be an instruction
+without a word of the content changing — which is why the headings are a constant in the engine
+(`REQUIREMENT_HEADINGS`) rather than strings typed into a component, and why a test asserts they
+contain no verb of instruction.
+
+---
+
+## D-042 — The report reads as a report
+**2026-08-21 · Frank's ruling**
+
+97 findings rendered as a flat wall. This is where D-022 — raised at M3, never implemented —
+finally gets built.
+
+### Failures never collapse
+
+A critical failure on one product page and the same failure on all five are **different facts
+about a merchant**, and a collapsed row presents them identically. The one it flatters is the
+merchant with five. IQwallet needs to see which it is, so `fail` groups stay expanded regardless
+of count.
+
+`pass` and `not_evaluable` collapse freely — five identical passes carry nothing the count does
+not. `review` collapses with the count prominent, because a human examines each one and the count
+is how many examinations that is.
+
+A group of one never collapses in any state: hiding a single finding behind a disclosure costs a
+click and gains nothing.
+
+### Shape before detail
+
+Failures first with full evidence, then review, then a compact pass summary, then not-evaluable
+with reasons. A reader who stops after the first section has read the part that decides anything.
+Rule-set ordering is preserved *inside* each section, so the report still reads the way the rules
+do. The tick strip and coverage line are unchanged.
+
+### Presentation only, and that is load-bearing
+
+Grouping runs in the reading view and nowhere else. `print` bypasses it entirely: the PDF keeps
+the category structure and every finding individually. **A grouped export would be a document that
+quietly held less than the run produced**, and it is the export that reaches an underwriter.
+
+Verified against the real print path rather than asserted — the swisschems run, rendered:
+
+    findings in the DOM      97      every finding, individually
+    collapsed findings        0      nothing hidden in the export
+    category cards           10      print keeps the category structure
+    group cards               0      grouping bypassed entirely
+    requirement blocks       69      = 4 fail + 18 review + 47 not_evaluable
+    captures resolved     66/66
+
+69 is exactly the report's `fail + review + not_evaluable`, which is the D-041 rule holding in the
+document rather than only in the component. The PDF grew from 45 pages to 70 — the requirement
+column is real, printed, and part of what gets sent.
+
+`demo/index.html` remains the visual language (D-004). This extends it for real data volume; the
+cards, chips, tick strip and evidence slips are unchanged.

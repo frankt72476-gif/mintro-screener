@@ -117,9 +117,12 @@ export {
 export {
   DIRECTIVE_TERMS,
   auditCopy,
+  auditRequirement,
+  REQUIREMENT_HEADINGS,
   auditAnalystNote,
   describeNoteWarning,
   type CopyAudit,
+  type RequirementAudit,
 } from './copy.js';
 
 export { checkDomAssert } from './checks/domAssert.js';

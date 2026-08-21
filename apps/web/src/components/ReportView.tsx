@@ -10,7 +10,8 @@
 
 import { useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
-import type { ReportCategory, ReportFinding, ScreeningReport } from '@mintro/engine';
+import { REQUIREMENT_HEADINGS, type ReportCategory, type ReportFinding, type ScreeningReport } from '@mintro/engine';
+import { describeGroup, groupReport, type FindingGroup } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
@@ -109,18 +110,40 @@ export function ReportView({
 
       {print ? <Coverage report={report} /> : <Filters filter={filter} onChange={setFilter} report={report} />}
 
-      <div>
-        {report.categories.map((category, index) => (
-          <CategoryCard
-            key={category.id}
-            category={category}
-            index={index}
-            filter={print ? 'all' : filter}
-            access={access}
-            print={print}
-          />
-        ))}
-      </div>
+      {/*
+        Two renderings of the same findings (D-042).
+
+        **Print keeps the category structure and every finding individually.** The exported
+        document must contain what the run produced — a grouped export would quietly hold less,
+        and it is the document that reaches an underwriter.
+
+        **The reading view is ordered by state**: failures first with their evidence, then review,
+        then a compact pass summary, then what could not be assessed. A reader who stops after the
+        first section has read the part that decides anything. The rule-set ordering is preserved
+        inside each section, so the report still reads the way the rules do.
+      */}
+      {print ? (
+        <div>
+          {report.categories.map((category, index) => (
+            <CategoryCard
+              key={category.id}
+              category={category}
+              index={index}
+              filter="all"
+              access={access}
+              print
+            />
+          ))}
+        </div>
+      ) : (
+        <div>
+          {groupReport(report)
+            .filter((section) => filter === 'all' || section.state === filter)
+            .map((section) => (
+              <StateSection key={section.state} section={section} access={access} />
+            ))}
+        </div>
+      )}
 
       <RunMeta report={report} access={access} />
     </div>
@@ -325,7 +348,134 @@ function FindingRow({
         </span>
       </button>
       <div className="ev">
+        <Requirement finding={finding} />
         <EvidenceSlip finding={finding} access={access} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What was observed, beside what the program requires (D-041).
+ *
+ * The requirement is the rule's `clause`, rendered **verbatim**. It is the program document's own
+ * wording and it says "must" — that is why `DIRECTIVE_TERMS` excludes bare "must", and why
+ * nothing here trims, softens or paraphrases it. An exact quotation is Mintro citing the standard;
+ * a paraphrase would be Mintro characterising it.
+ *
+ * ## Why this is not a corrective-actions column
+ *
+ * Telling a merchant how to fix a finding is remediation advice. It would make Mintro a party to
+ * the compliance determination and create reliance — and this system reports observations, it does
+ * not make determinations. Quoting the standard beside the observation gives the merchant
+ * everything they need to act while Mintro states a fact and cites a source.
+ *
+ * The framing is the headings, which is why they come from `REQUIREMENT_HEADINGS` in the engine
+ * rather than being typed here. "Observed" and "Program requirement" are both nouns and neither
+ * addresses the reader; "Required action" would turn the identical two pieces of text into an
+ * instruction without a word of the content changing.
+ */
+function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Element | null {
+  // Passes carry no tension between the two columns, and a satisfied rule quoted back at the
+  // reader is noise. Everything else shows the pair.
+  if (finding.state === 'pass') return null;
+
+  const notEvaluable = finding.state === 'not_evaluable';
+
+  return (
+    <div className="req">
+      <div className="req-col">
+        <span className="req-h">
+          {notEvaluable ? REQUIREMENT_HEADINGS.notAssessed : REQUIREMENT_HEADINGS.observed}
+        </span>
+        <p className="req-t">
+          {notEvaluable ? finding.notEvaluableReason ?? finding.note : finding.note}
+        </p>
+      </div>
+      <div className="req-col">
+        <span className="req-h">{REQUIREMENT_HEADINGS.required}</span>
+        {/* Verbatim. No trim, no ellipsis, no sentence case. */}
+        <blockquote className="req-t req-quote">{finding.clause}</blockquote>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One state's findings.
+ *
+ * The lede says what the section is and how it is grouped, because a reader who sees "×5" needs
+ * to know whether that is five pages or five rules — and because a failure section that looks
+ * grouped when it is not would be read as understating.
+ */
+function StateSection({
+  section,
+  access,
+}: {
+  readonly section: import('../lib/grouping.js').ReportSection;
+  readonly access: EvidenceAccess;
+}): JSX.Element {
+  return (
+    <section className={`sect ${stateClass(section.state)}`}>
+      <div className="sect-head">
+        <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
+        <span className="sect-count">
+          {section.count} finding{section.count === 1 ? '' : 's'}
+        </span>
+      </div>
+      <p className="sect-lede">{section.lede}</p>
+
+      {section.groups.map((group) => (
+        <GroupCard key={`${group.ruleId}-${group.state}`} group={group} access={access} />
+      ))}
+    </section>
+  );
+}
+
+/**
+ * A rule's findings of one state.
+ *
+ * Collapsed only where `grouping.ts` permits it — never for `fail`, and never for a group of one.
+ * A critical failure on one product page and the same failure on all five are different facts
+ * about a merchant, and the collapsed row would present them identically.
+ */
+function GroupCard({
+  group,
+  access,
+}: {
+  readonly group: FindingGroup;
+  readonly access: EvidenceAccess;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+
+  if (!group.collapsible) {
+    return (
+      <div className="card cat open">
+        <div className="cat-body">
+          {group.findings.map((finding, i) => (
+            <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`card cat group ${open ? 'open' : ''}`}>
+      <button className="cat-head" onClick={() => setOpen(!open)}>
+        <span className={`state ${stateClass(group.state)}`}>{STATE_LABEL[group.state]}</span>
+        <span className="cat-name">
+          {group.title} <span className="mono group-rule">{group.ruleId}</span>
+        </span>
+        {/* The count is the point of the collapsed row, so it is the loudest thing on it. */}
+        <span className="group-count">×{group.findings.length}</span>
+        <span className="caret">▶</span>
+      </button>
+      <div className="cat-body">
+        <p className="group-lede">{describeGroup(group)}</p>
+        {group.findings.map((finding, i) => (
+          <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} />
+        ))}
       </div>
     </div>
   );

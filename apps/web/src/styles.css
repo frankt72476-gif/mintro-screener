@@ -742,3 +742,102 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   border: 1px solid var(--line);
   color: var(--ink-mid);
 }
+
+/* ── Observed / Program requirement (D-041) ──────────────────────────────────────────────
+   Two columns of equal weight. Neither is styled as the answer to the other: the report
+   states a fact and cites a source, and the layout should not imply a correction. */
+
+.req {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+}
+
+.req-col { min-width: 0; }
+
+.req-h {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 6px;
+}
+
+.req-t {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* Quoted, and visibly so. The mark is the point: this is the program's wording, not ours. */
+.req-quote {
+  border-left: 3px solid var(--violet);
+  padding-left: 12px;
+  font-style: normal;
+  color: var(--ink-mid);
+}
+
+@media (max-width: 780px) {
+  .req { grid-template-columns: 1fr; gap: 14px; }
+}
+
+/* ── State sections and rule groups (D-042) ─────────────────────────────────────────────── */
+
+.sect { margin-bottom: 26px; }
+
+.sect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.sect-count {
+  font-size: 12px;
+  color: var(--slate);
+}
+
+.sect-lede {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--slate);
+  max-width: 82ch;
+}
+
+.cat.group .cat-head { cursor: pointer; }
+
+.group-rule {
+  color: var(--slate);
+  font-size: 10.5px;
+}
+
+/* The count is why the row is collapsed, so it is the loudest thing on it. */
+.group-count {
+  margin-left: auto;
+  margin-right: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.group-lede {
+  margin: 0;
+  padding: 8px 16px 0;
+  font-size: 12px;
+  color: var(--slate);
+}
+
+/* Print keeps categories and expands everything — the export holds every finding (D-042). */
+@media print {
+  .sect, .cat.group { break-inside: auto; }
+  .req { break-inside: avoid; }
+}

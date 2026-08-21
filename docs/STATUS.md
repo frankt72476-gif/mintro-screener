@@ -265,6 +265,25 @@ would report a send that did not happen. It re-enables on what the worker report
 GATE-003 are evaluated for the first time. Until now both came back `not_evaluable` in every run,
 because nothing called the probe handlers. The five storefronts' numbers below predate that.
 
+### The report · `apps/web/src/components/ReportView.tsx`
+
+**Every finding shows what was observed beside what the program requires** (D-041), quoted
+verbatim from the rule's `clause`. Deliberately not a corrective-actions column: remediation
+advice would make Mintro a party to the compliance determination and create reliance. Quoting the
+standard gives the merchant everything they need to act while Mintro states a fact and cites a
+source.
+
+The two columns are audited to different standards — the observation for directive language, the
+requirement for being byte-identical. A whitespace-only difference fails.
+
+**The reading view is ordered by state** (D-042): failures first with full evidence, then review,
+then a compact pass summary, then not-evaluable with reasons. Repeated findings of one rule are
+grouped — **except failures, which never collapse**, because a failure on one page and the same
+failure on five are different facts and a collapsed row presents them identically.
+
+Grouping is presentation only. The PDF keeps the category structure and every finding
+individually; a grouped export would quietly hold less than the run produced.
+
 ---
 
 ## The five storefronts, as they stand today
@@ -326,7 +345,6 @@ an analyst uses, and whether a hosted browser vendor is acceptable for a live ha
 | **`doc_parse` COA parsing** | — | COA-002, COA-003 and COA-004 report `not_evaluable` naming the gap. A COA rule silently passing because nobody wrote the parser would be a false pass. |
 | **`doc_parse` `max`** | — | Only `min` exists, because only `min` appears in the data. Adding an upper bound is a one-line schema change when a rule needs one. |
 | **COA authenticity** | `ARCHITECTURE.md` | COA-005 is a `manual` rule. Forged COAs are a known failure mode and accreditation cannot be verified from a PDF; an independent assay is the only real control. |
-| **Finding grouping in the report** | — | Layer 2 produces one finding per rule *per sampled page*, so CATG-005 yields five near-identical rows. Grouping was raised at M3 and left open. If added it is presentation only and must not reach the PDF export (D-028). |
 | **OFFS-003 bio-link inspection** | — | Social links are collected; where each leads is not examined. The finding says so. |
 
 ---
