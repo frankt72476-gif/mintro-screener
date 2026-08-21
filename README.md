@@ -12,6 +12,7 @@ checks it against the program rule set, and produces an evidence-backed report f
     packages/engine/       M1 — Layer 0 crawler and check handlers. No browser.
     fixtures/ruleset/      Valid and deliberately malformed rule sets for the test suite.
     CLAUDE.md              Standing brief for Claude Code. Read first.
+    docs/STATUS.md         Where the project stands. Start here if you are new.
     docs/ARCHITECTURE.md   Stack and technical rulings.
     docs/DECISIONS.md      Business rulings, dated, with reasoning.
     docs/DEPLOY.md         git -> Netlify, step by step.

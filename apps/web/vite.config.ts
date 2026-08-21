@@ -16,7 +16,9 @@ export default defineConfig({
     alias: {
       // Browser entry: same validator, without the filesystem loader (see packages/ruleset/src/browser.ts).
       '@mintro/ruleset': pkg('ruleset', 'browser'),
-      '@mintro/engine': pkg('engine'),
+      // Browser entry: report types plus the directive-language audit, without the crawl
+      // machinery, which imports Node built-ins (see packages/engine/src/browser.ts).
+      '@mintro/engine': pkg('engine', 'browser'),
     },
   },
   build: { outDir: 'dist', sourcemap: true },

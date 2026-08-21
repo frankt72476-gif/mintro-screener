@@ -11,7 +11,7 @@
  * when.** That makes it the load-bearing part of this module, not the email.
  */
 
-import type { ScreeningReport } from '@mintro/engine';
+import { auditAnalystNote, type ScreeningReport } from '@mintro/engine';
 
 /** A row in the `sends` table (docs/ARCHITECTURE.md § Data model). */
 export interface SendRecord {
@@ -28,6 +28,22 @@ export interface SendRecord {
   readonly outcome: 'accepted' | 'rejected';
   readonly error?: string;
   readonly attachmentBytes: number;
+  /**
+   * The analyst's covering note, as sent.
+   *
+   * It is the part of the email a recipient reads first and the only text Mintro does not
+   * generate, so the record of what went out has to include it verbatim.
+   */
+  readonly note: string;
+  /**
+   * Directive language found in the note at compose time (D-029). Empty when it was clean.
+   *
+   * Recorded whether or not the analyst changed the note, so the log shows a flagged note was
+   * sent anyway rather than leaving that invisible.
+   */
+  readonly noteFlagged: readonly string[];
+  /** True when the analyst was shown the warning and chose to send regardless. */
+  readonly noteWarningAcknowledged: boolean;
 }
 
 export interface SendLog {
@@ -51,6 +67,13 @@ export interface SendRequest {
   readonly from: string;
   readonly note: string;
   readonly sentBy: string;
+  /**
+   * Set when the analyst was shown a directive-language warning and sent anyway (D-029).
+   *
+   * The audit runs here regardless — this records whether a human saw it. A caller that never
+   * warned still produces a truthful record: flagged terms present, acknowledgement false.
+   */
+  readonly noteWarningAcknowledged?: boolean;
 }
 
 export interface SendOutcome {
@@ -146,6 +169,12 @@ export async function sendReport(
   log: SendLog,
   request: SendRequest,
 ): Promise<SendRecord> {
+  // Audited at send time, not only at compose time. A note that reached here without passing
+  // through the modal — a scripted send, a future API — is still recorded honestly.
+  const noteAudit = auditAnalystNote(request.note);
+
+  // D-029 and D-001 together: we surface, we do not gate. Nothing below consults `noteAudit`
+  // before sending.
   const outcome = await mailer.send(request);
 
   const entry: SendRecord = {
@@ -158,6 +187,9 @@ export async function sendReport(
     outcome: outcome.accepted ? 'accepted' : 'rejected',
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
     attachmentBytes: request.pdf.byteLength,
+    note: request.note,
+    noteFlagged: noteAudit.flagged,
+    noteWarningAcknowledged: request.noteWarningAcknowledged ?? false,
   };
 
   await log.record(entry);

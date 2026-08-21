@@ -15,38 +15,20 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
-import { assembleReport, type Finding, type ScreeningReport } from '@mintro/engine';
+import { DIRECTIVE_TERMS, assembleReport, auditCopy, type Finding, type ScreeningReport } from '@mintro/engine';
 import { bodyFor, subjectFor, attachmentName } from '../src/send.js';
 
 /**
- * Words that tell the reader what to do, or characterise the merchant.
+ * The audited vocabulary lives in `@mintro/engine` (D-029), not here.
  *
- * Each is matched with word boundaries: "should" must not fire on "shoulder", and — the case
- * that actually came up — "must" must not fire on rule *clause* text, which quotes the program
- * document and legitimately says what a merchant must do. Clauses are quoted source material,
- * not our copy, and are audited separately below.
+ * The same list guards the analyst's covering note at compose time in the browser. A second copy
+ * in this file would drift from the one the product actually uses, on the surface where drift
+ * matters most.
  */
-const DIRECTIVE = [
-  'should',
-  'recommend',
-  'recommended',
-  'advise',
-  'advised',
-  'do not forward',
-  'must not forward',
-  'non-compliant',
-  'noncompliant',
-  'violation of law',
-  'illegal',
-  'we suggest',
-  'please review',
-  'action required',
-  'take action',
-];
+const DIRECTIVE = DIRECTIVE_TERMS;
 
 function offending(text: string): string[] {
-  const lower = text.toLowerCase();
-  return DIRECTIVE.filter((term) => new RegExp(`\\b${term.replace(/ /g, '\\s+')}\\b`).test(lower));
+  return [...auditCopy(text).flagged];
 }
 
 /** The most recent real run, when one has been produced. */
@@ -66,7 +48,8 @@ describe('the audit catches what it is looking for', () => {
     // Word boundaries, so a longer word containing a flagged term is not a match.
     expect(offending('The shoulder injury claim was observed.')).toEqual([]);
     expect(offending('Illegally obtained is a different token.')).toEqual([]);
-    expect(offending('The page recommends nothing in particular.')).toEqual([]);
+    expect(offending('The copy was suggestive rather than explicit.')).toEqual([]);
+    expect(offending('An advisory notice was observed in the footer.')).toEqual([]);
   });
 });
 

@@ -114,6 +114,14 @@ export {
   type FlowProbeInput,
   type FlowStage,
 } from './checks/flowProbe.js';
+export {
+  DIRECTIVE_TERMS,
+  auditCopy,
+  auditAnalystNote,
+  describeNoteWarning,
+  type CopyAudit,
+} from './copy.js';
+
 export { checkDomAssert } from './checks/domAssert.js';
 export { checkTextCooccurrence, findCooccurrences, type Cooccurrence } from './checks/textCooccurrence.js';
 export { runLayer2, layer2Rules, type Layer2Run, type SampledPage } from './layer2.js';

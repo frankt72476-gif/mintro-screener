@@ -139,3 +139,65 @@ describe('the dry-run mailer', () => {
     expect(mailer.outbox[0]?.to).toBe('underwriting@iqwallet.com');
   });
 });
+
+describe('the analyst note audit (D-029)', () => {
+  const flagged = (note: string) => ({ ...request(reportWith(1)), note });
+
+  it('warns but never blocks: a directive note still sends', async () => {
+    // D-001: we surface, we do not gate. A screener that refused to send would be making the
+    // determination it exists to avoid making.
+    const mailer = createDryRunMailer();
+    const entry = await sendReport(mailer, createMemorySendLog(), flagged('Recommend declining this merchant.'));
+
+    expect(entry.outcome).toBe('accepted');
+    expect(mailer.outbox).toHaveLength(1);
+  });
+
+  it('records what was flagged, so the log shows a directive note went anyway', async () => {
+    const entry = await sendReport(
+      createDryRunMailer(),
+      createMemorySendLog(),
+      flagged('Recommend declining. You should not approve this.'),
+    );
+
+    expect(entry.noteFlagged).toContain('recommend');
+    expect(entry.noteFlagged).toContain('should');
+  });
+
+  it('records the note verbatim, since it is the part a recipient reads first', async () => {
+    const entry = await sendReport(createDryRunMailer(), createMemorySendLog(), flagged('Recommend declining.'));
+    expect(entry.note).toBe('Recommend declining.');
+  });
+
+  it('records whether the analyst was shown the warning and proceeded', async () => {
+    const acknowledged = await sendReport(createDryRunMailer(), createMemorySendLog(), {
+      ...flagged('Recommend declining.'),
+      noteWarningAcknowledged: true,
+    });
+    expect(acknowledged.noteWarningAcknowledged).toBe(true);
+
+    // A send that never passed through the modal still produces a truthful record: the terms
+    // are flagged, and the acknowledgement is false because nobody saw a warning.
+    const scripted = await sendReport(createDryRunMailer(), createMemorySendLog(), flagged('Recommend declining.'));
+    expect(scripted.noteFlagged.length).toBeGreaterThan(0);
+    expect(scripted.noteWarningAcknowledged).toBe(false);
+  });
+
+  it('leaves a clean note unflagged', async () => {
+    const entry = await sendReport(
+      createDryRunMailer(),
+      createMemorySendLog(),
+      flagged('4 failed, 18 for review. Captures attached.'),
+    );
+
+    expect(entry.noteFlagged).toEqual([]);
+    expect(entry.noteWarningAcknowledged).toBe(false);
+  });
+
+  it('audits at send time, not only at compose time', async () => {
+    // The modal is one caller. A scripted send or a future API is another, and the record has to
+    // be honest either way.
+    const entry = await sendReport(createDryRunMailer(), createMemorySendLog(), flagged('We suggest rejecting.'));
+    expect(entry.noteFlagged).toContain('we suggest');
+  });
+});

@@ -224,9 +224,13 @@ export function App(): JSX.Element {
         <SendModal
           report={report}
           onCancel={() => setSending(false)}
-          onSent={(to) => {
+          onSent={(to, acknowledgedWarning) => {
             setSending(false);
-            setToast(`Sent to ${to}`);
+            setToast(
+              acknowledgedWarning
+                ? `Sent to ${to} — the note was flagged and recorded as sent`
+                : `Sent to ${to}`,
+            );
           }}
         />
       )}

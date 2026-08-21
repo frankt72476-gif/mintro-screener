@@ -8,13 +8,13 @@
  * The default note states counts as facts. It does not characterise the merchant.
  */
 
-import { useEffect, useState } from 'react';
-import type { ScreeningReport } from '@mintro/engine';
+import { useEffect, useMemo, useState } from 'react';
+import { auditAnalystNote, describeNoteWarning, type ScreeningReport } from '@mintro/engine';
 
 interface Props {
   readonly report: ScreeningReport;
   readonly onCancel: () => void;
-  readonly onSent: (to: string) => void;
+  readonly onSent: (to: string, acknowledgedWarning: boolean) => void;
 }
 
 export function SendModal({ report, onCancel, onSent }: Props): JSX.Element {
@@ -22,6 +22,20 @@ export function SendModal({ report, onCancel, onSent }: Props): JSX.Element {
   const [note, setNote] = useState(
     `${report.counts.fail} failed, ${report.counts.review} for review, ${report.counts.not_evaluable} not evaluable. Captures attached.`,
   );
+
+  /**
+   * D-029: the analyst's note is audited as they type.
+   *
+   * This is the highest-risk copy surface in the product. Every other string is generated and
+   * audited in tests; this one is written by a person, and it sits in the most-read part of the
+   * email. An analyst writing "recommend declining" would put a Mintro determination in front of
+   * IQwallet, undoing the posture every other surface maintains.
+   *
+   * It **warns and does not block** — D-001 says we surface rather than gate, and a screener that
+   * refused to send would be making the determination it is trying not to make. The Send button
+   * stays enabled; the send record notes that a flagged note went anyway.
+   */
+  const audit = useMemo(() => auditAnalystNote(note), [note]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -56,6 +70,13 @@ export function SendModal({ report, onCancel, onSent }: Props): JSX.Element {
               onChange={(e) => setNote(e.target.value)}
             />
           </div>
+          {!audit.clean && (
+            <div className="note-warning" role="status">
+              <b>Reads as a recommendation</b>
+              {describeNoteWarning(audit)}
+            </div>
+          )}
+
           <div className="attach">
             <span>▤</span>
             <span className="fname">
@@ -69,8 +90,9 @@ export function SendModal({ report, onCancel, onSent }: Props): JSX.Element {
           <button className="btn btn-ghost" onClick={onCancel}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={() => onSent(to)}>
-            Send
+          {/* Always enabled, whatever the audit found. We surface; we do not gate (D-001). */}
+          <button className="btn btn-primary" onClick={() => onSent(to, !audit.clean)}>
+            {audit.clean ? 'Send' : 'Send as written'}
           </button>
         </div>
       </div>
