@@ -267,13 +267,26 @@ To check what is set — this shows names and digests, never values:
 
 ### 3.5 Deploy
 
-    fly deploy --config apps/worker/fly.toml --dockerfile apps/worker/Dockerfile
+    fly deploy --config apps/worker/fly.toml
 
-From the repository root, because the worker compiles the shared packages in `packages/`. The
-build runs on Fly's builders, so you do not need Docker installed.
+From the repository root, because the worker compiles the shared packages in `packages/` — the
+build context is the directory you run this from. The build itself runs on Fly's builders, so you
+do not need Docker installed.
+
+**Do not pass `--dockerfile`.** `fly.toml` names it as `Dockerfile`, which Fly resolves relative
+to the config file's own directory. Passing `apps/worker/Dockerfile` on top of that makes Fly look
+for `apps/worker/apps/worker/Dockerfile`. See *Paths in config files* below.
 
 First build takes 5–8 minutes — it pulls the Playwright image, which is large, and builds the
-frontend. The frontend is in the image because the PDF is `page.pdf()` against the report route:
+frontend. Watch for the toolchain line early on:
+
+    ok    typescript 5.9.3 (lockfile 5.9.3)
+    ok    tsc --version -> Version 5.9.3
+    ok    vite 5.4.21
+    toolchain ok
+
+That step exists because the build once reached for a compiler, was handed an unrelated package
+called `tsc` from the registry, and could not tell. The frontend is in the image because the PDF is `page.pdf()` against the report route:
 the same React component an analyst sees, so the export cannot drift from the report (D-040).
 
 ### 3.6 Confirm it is running
@@ -342,6 +355,30 @@ implementation rather than a flag, so a test send cannot be mistaken for a deliv
 Log every send: run id, recipient, Resend message id, timestamp, who triggered it. The `sends`
 table models this. Sending is never blocked by a report outcome (D-001), which makes the send log
 the only record of what went out and when.
+
+---
+
+## Paths in config files
+
+Two deploys were lost to the same mistake, so it is written down.
+
+**Every tool resolves paths relative to a base it already knows.** A path written from the
+repository root gets that base applied again:
+
+| File | Resolves relative to | Correct | What broke |
+|---|---|---|---|
+| `netlify.toml` `publish` | `base` (`apps/web`) | `dist` | `apps/web/dist` → `apps/web/apps/web/dist` |
+| `fly.toml` `[build] dockerfile` | the config file's own directory | `Dockerfile` | `apps/worker/Dockerfile` → `apps/worker/apps/worker/Dockerfile` |
+| `fly deploy` build context | the directory you run it in | run from the repo root | — |
+| `vite.config.ts` `build.outDir` | `apps/web` | `dist` | — |
+| `vitest.config.ts` `include` | the repo root | `apps/*/test/**` | — |
+
+The tell is a doubled segment in the error path. If a tool cannot find something at
+`apps/web/apps/web/…`, the path in the config is written from the wrong place — and the fix is
+always to shorten it, never to add another prefix.
+
+Application paths are the other way round: the worker runs with its working directory at the
+repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as written in the code.
 
 ---
 

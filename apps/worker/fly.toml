@@ -2,7 +2,7 @@
 #
 # Deploy from the REPOSITORY ROOT, not from this directory:
 #
-#     fly deploy --config apps/worker/fly.toml --dockerfile apps/worker/Dockerfile
+#     fly deploy --config apps/worker/fly.toml
 #
 # The build context has to be the whole repo, because the worker compiles the shared packages in
 # packages/. `.dockerignore` keeps node_modules and stored evidence out of the upload.
@@ -17,7 +17,7 @@ app = "mintro-screener-worker"
 primary_region = "iad"
 
 [build]
-  dockerfile = "apps/worker/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   NODE_ENV = "production"
