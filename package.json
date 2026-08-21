@@ -18,14 +18,14 @@
     "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js",
     "render-check": "tsc --build && node apps/worker/dist/bin/render-check.js",
     "scan-full": "tsc --build && node apps/worker/dist/bin/scan.js",
+    "scan-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/scan.js --supabase",
     "link-runs": "node scripts/link-runs.mjs",
     "web": "npm run link-runs && npm run -w @mintro/web dev",
     "web:build": "npm run -w @mintro/web build",
     "testbed": "node apps/testbed/server.mjs",
     "auth-check": "tsc --build && node apps/worker/dist/bin/auth-check.js",
     "pdf": "npm run web:build --silent && npm run link-runs --silent && tsc --build && node apps/worker/dist/bin/report-pdf.js",
-    "migrate-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/migrate-to-supabase.js",
-    "verify-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/verify-supabase.js",
+      "verify-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/verify-supabase.js",
     "inspect-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/inspect-supabase.js"
   },
   "devDependencies": {

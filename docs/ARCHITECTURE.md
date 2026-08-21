@@ -253,6 +253,28 @@ Two instances, same family, both found by running against a real target rather t
 When adding anything that a finding depends on, ask what the component returns when it cannot
 tell. If the answer is the same as when the precondition holds, it is wrong.
 
+### It reaches the storage layer too
+
+The rule engine has been disciplined about this since M1. The storage layer was not, and it cost
+six defects in one sequence (STATUS.md lists them). Two are the same sentence as the session check:
+
+- **The bucket guard** asserted the evidence bucket at migration time. The uploads happened later.
+  A guard that runs once, long before the thing it guards, is not guarding it. Preflight now runs
+  immediately before the first write, against the project being written to.
+- **Closing a run before verifying it.** Closing sets `finished_at`, and the trigger in
+  `0004_runs.sql` then refuses every write — so closing *is* the assertion that a run is complete,
+  and an assertion of completeness can never precede the evidence for it. Five runs froze
+  permanently incomplete. `finishRun` is now the last step and runs only after the check passes
+  (D-033).
+
+The completeness check had the same problem inside its own fix. `assessRun` derives what a run
+should contain from the report it reads back, and before `finishRun` there is no stored report —
+so calling it before the close finds nothing, expects nothing, and passes vacuously. The check
+takes the report as an argument for exactly this reason.
+
+**The operational test extends unchanged:** ask what the guard reports when the thing it guards
+has not happened yet.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by

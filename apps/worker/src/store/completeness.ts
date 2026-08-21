@@ -16,7 +16,7 @@
  */
 
 import type { ScreeningReport } from '@mintro/engine';
-import type { WorkerSupabase } from './supabase.js';
+import { storagePathForKey, type WorkerSupabase } from './supabase.js';
 
 export interface RunCompleteness {
   readonly runId: string;
@@ -38,6 +38,17 @@ export interface RunCompleteness {
   readonly problems: readonly string[];
 }
 
+/** The contents half of completeness: what is in the tables, versus what a report cites. */
+export interface ContentsAssessment {
+  readonly findingsInDb: number;
+  readonly findingsExpected: number;
+  readonly evidenceRows: number;
+  readonly evidenceKeysCited: number;
+  readonly missingEvidenceKeys: readonly string[];
+  readonly missingObjects: readonly string[];
+  readonly problems: readonly string[];
+}
+
 export interface AssessOptions {
   /**
    * Also confirm each cited key exists in the bucket.
@@ -50,10 +61,77 @@ export interface AssessOptions {
 }
 
 /**
+ * Are this run's contents all present, judged against a report in hand?
+ *
+ * Split out from `assessRun` for one reason: **the run has to be checked before it is closed**,
+ * and at that moment the report is not yet in the database. `assessRun` reads the stored report,
+ * so calling it before `finishRun` asks the database what it should contain and is told nothing —
+ * cited keys come back empty, expected findings come back zero, and every check passes vacuously.
+ * That is the D-026 shape one layer up: a verification whose own subject had not been established.
+ *
+ * So the report is passed in. The writer already has it; it does not need to be told.
+ */
+export async function assessContents(
+  supabase: WorkerSupabase,
+  runId: string,
+  report: ScreeningReport,
+  options: AssessOptions = {},
+): Promise<ContentsAssessment> {
+  const { findingsInDb, storedKeys } = await readContents(supabase, runId);
+
+  const citedKeys = citedEvidenceKeys(report);
+  const missingEvidenceKeys = [...citedKeys].filter((key) => !storedKeys.has(key));
+
+  const missingObjects: string[] = [];
+  if (options.checkObjects === true) {
+    for (const [key, kind] of storedKeys) {
+      if (!citedKeys.has(key)) continue;
+      // Through the derived storage path, never the key directly: the bytes for a gzipped
+      // artifact live at `<key>.gz`, and a check that looked for them at `<key>` would report
+      // every text capture missing.
+      const { data: signed } = await supabase.client.storage
+        .from(supabase.bucket)
+        .createSignedUrl(storagePathForKey(key, kind), 60);
+      if (signed?.signedUrl === undefined) missingObjects.push(key);
+    }
+  }
+
+  const findingsExpected = countFindings(report);
+  const problems: string[] = [];
+
+  if (findingsInDb !== findingsExpected) {
+    problems.push(`${findingsInDb} finding(s) stored, report expects ${findingsExpected}`);
+  }
+  if (missingEvidenceKeys.length > 0) {
+    problems.push(
+      `${missingEvidenceKeys.length} cited evidence key(s) have no row: ${missingEvidenceKeys.slice(0, 3).join(', ')}` +
+        (missingEvidenceKeys.length > 3 ? ` (+${missingEvidenceKeys.length - 3} more)` : ''),
+    );
+  }
+  if (missingObjects.length > 0) {
+    problems.push(`${missingObjects.length} evidence row(s) have no object in the bucket`);
+  }
+
+  return {
+    findingsInDb,
+    findingsExpected,
+    evidenceRows: storedKeys.size,
+    evidenceKeysCited: citedKeys.size,
+    missingEvidenceKeys,
+    missingObjects,
+    problems,
+  };
+}
+
+/**
  * Assesses one run.
  *
  * Never throws for a missing run: absence is an answer, and the caller decides what to do about
  * it. It throws only when the database itself cannot be read, because that is not an answer.
+ *
+ * This asks the *closure* questions — is it finished, does it carry a report — and then delegates
+ * the contents to `assessContents` against the report it found. One definition, two entry points:
+ * the writer supplies the report, a reader reads it back.
  */
 export async function assessRun(
   supabase: WorkerSupabase,
@@ -77,46 +155,19 @@ export async function assessRun(
   const row = data as { status: string; finished_at: string | null; report: ScreeningReport | null };
   const report = row.report;
 
-  const { count: findingsInDb } = await supabase.client
-    .from('findings')
-    .select('*', { count: 'exact', head: true })
-    .eq('run_id', runId);
+  // With no stored report there is nothing to compare against, so the counts are reported bare.
+  // They are not judged: a run missing its report is already incomplete, and inventing an
+  // expectation for it would be guessing.
+  const contents = report === null
+    ? await countContentsOnly(supabase, runId)
+    : await assessContents(supabase, runId, report, options);
 
-  const { data: evidenceRows } = await supabase.client
-    .from('evidence')
-    .select('key')
-    .eq('run_id', runId);
-
-  const storedKeys = new Set((evidenceRows ?? []).map((entry) => (entry as { key: string }).key));
-  const citedKeys = report === null ? new Set<string>() : citedEvidenceKeys(report);
-  const missingEvidenceKeys = [...citedKeys].filter((key) => !storedKeys.has(key));
-
-  const missingObjects: string[] = [];
-  if (options.checkObjects === true) {
-    for (const key of citedKeys) {
-      if (!storedKeys.has(key)) continue;
-      const { data: signed } = await supabase.client.storage
-        .from(supabase.bucket)
-        .createSignedUrl(key, 60);
-      if (signed?.signedUrl === undefined) missingObjects.push(key);
-    }
-  }
-
-  const findingsExpected = report === null ? 0 : countFindings(report);
   const problems: string[] = [];
 
   if (row.status !== 'complete') problems.push(`status is '${row.status}', not 'complete'`);
   if (row.finished_at === null) problems.push('finished_at is not set');
   if (report === null) problems.push('no assembled report is stored');
-  if (report !== null && (findingsInDb ?? 0) !== findingsExpected) {
-    problems.push(`${findingsInDb ?? 0} finding(s) stored, report expects ${findingsExpected}`);
-  }
-  if (missingEvidenceKeys.length > 0) {
-    problems.push(`${missingEvidenceKeys.length} cited evidence key(s) have no row`);
-  }
-  if (missingObjects.length > 0) {
-    problems.push(`${missingObjects.length} evidence row(s) have no object in the bucket`);
-  }
+  problems.push(...contents.problems);
 
   return {
     runId,
@@ -124,15 +175,44 @@ export async function assessRun(
     status: row.status,
     finished: row.finished_at !== null,
     hasReport: report !== null,
-    findingsInDb: findingsInDb ?? 0,
-    findingsExpected,
-    evidenceRows: storedKeys.size,
-    evidenceKeysCited: citedKeys.size,
-    missingEvidenceKeys,
-    missingObjects,
+    findingsInDb: contents.findingsInDb,
+    findingsExpected: contents.findingsExpected,
+    evidenceRows: contents.evidenceRows,
+    evidenceKeysCited: contents.evidenceKeysCited,
+    missingEvidenceKeys: contents.missingEvidenceKeys,
+    missingObjects: contents.missingObjects,
     complete: problems.length === 0,
     problems,
   };
+}
+
+async function countContentsOnly(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<ContentsAssessment> {
+  const { findingsInDb, storedKeys } = await readContents(supabase, runId);
+  return { ...emptyContents(), findingsInDb, evidenceRows: storedKeys.size };
+}
+
+/** The findings count and every stored evidence key, with the kind needed to locate its bytes. */
+async function readContents(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<{ findingsInDb: number; storedKeys: Map<string, string> }> {
+  const { count } = await supabase.client
+    .from('findings')
+    .select('*', { count: 'exact', head: true })
+    .eq('run_id', runId);
+
+  const { data } = await supabase.client.from('evidence').select('key, kind').eq('run_id', runId);
+
+  const storedKeys = new Map<string, string>();
+  for (const entry of data ?? []) {
+    const row = entry as { key: string; kind: string };
+    storedKeys.set(row.key, row.kind);
+  }
+
+  return { findingsInDb: count ?? 0, storedKeys };
 }
 
 /** Every distinct, non-empty evidence key the report's findings cite. */
@@ -159,6 +239,18 @@ export function describeCompleteness(assessment: RunCompleteness): string {
     return `complete — ${assessment.findingsInDb} finding(s), ${assessment.evidenceRows} evidence row(s)`;
   }
   return `INCOMPLETE — ${assessment.problems.join('; ')}`;
+}
+
+function emptyContents(): ContentsAssessment {
+  return {
+    findingsInDb: 0,
+    findingsExpected: 0,
+    evidenceRows: 0,
+    evidenceKeysCited: 0,
+    missingEvidenceKeys: [],
+    missingObjects: [],
+    problems: [],
+  };
 }
 
 function absent(runId: string): RunCompleteness {

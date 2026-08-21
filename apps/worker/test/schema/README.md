@@ -9,16 +9,22 @@ defects reached production through a green suite.
 well-formed: RLS enabled in the creating migration, writes revoked, append-only triggers present.
 It never executes any of it.
 
-That gap let three defects ship:
+That gap let six defects ship:
 
 | Defect | What it was |
 |---|---|
 | Bucket guard | `0008` asserted the bucket exists; the migration passed and uploads still failed with "Bucket not found" |
 | Existence vs completeness | the migration reported "already migrated" for runs with no findings and no evidence |
 | `ON CONFLICT` vs partial index | `.upsert({ onConflict: 'run_id,ordinal' })` could not infer the partial index from `0009` |
+| Close before verify | the run was closed and verified afterwards; five runs froze permanently incomplete (D-033) |
+| Key vs storage path | `evidence.key` held the storage path while findings cite the artifact key, so nothing joined (D-034) |
+| An unexercised write path | `persistRun`'s only caller was a migration script that had never succeeded (D-035) |
 
-All three were **DML failing against the real schema**. The suite asserted the shape of the
-schema and nothing about working with it.
+All six were **DML failing against the real schema**. The suite asserted the shape of the schema
+and nothing about working with it.
+
+The last one is why a test tier is not the whole answer. `scan-supabase` is now the only way a run
+reaches Supabase, so the production path is exercised every time anyone uses the tool (D-035).
 
 ---
 
@@ -29,7 +35,11 @@ schema and nothing about working with it.
 here.
 
 **Catches:** `ON CONFLICT` inference, trigger firing, check constraints, `NOT NULL`, uniqueness
-scoping, the resumed-write path.
+scoping, the resumed-write path, and — in `evidence-key.test.ts` — a finding citing a capture that
+is not there.
+
+`evidence-key.test.ts` is written the way the closing section asks for: remove `0011` and two of
+its tests fail. They reproduce the defect, not the fix.
 
 Two tests in `schema.test.ts` exist purely to prove the tier has teeth: they demonstrate that a
 partial unique index *cannot* be inferred without its predicate, and that nulls are distinct in a

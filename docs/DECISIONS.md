@@ -1176,3 +1176,104 @@ needed rather than teaching the client a clause it cannot express.
 the expected index nor the cause, and cost a round trip. It now states what was expected, the
 query to check it with, and what the answer means — the same discipline as the env-var and
 bucket-name errors.
+
+---
+
+## D-033 — Close a run last, and only after verifying it
+**2026-08-21 · business owner**
+
+`persistRun` wrote evidence, wrote findings, closed the run, and verified afterwards. Closing sets
+`finished_at`, and the trigger in `0004_runs.sql` refuses every later write.
+
+All five runs were frozen while their findings cited captures that had no evidence row. They
+cannot be completed, because the run is immutable. They cannot be deleted, because runs are never
+deleted (D-002). Stuck by design.
+
+**The trigger is right. Closing an unverified run was wrong.** Closing a run *is* the assertion
+that it is complete, so it can never precede the evidence for that assertion. `finishRun` is now
+the last step and runs only after the check passes; a failure leaves the run open and repairable.
+
+### The check had to take the report as an argument
+
+The obvious form — `if ((await assessRun(supabase, runId)).complete) await finishRun(...)` — is
+wrong, and wrong in the way this project keeps being wrong. `assessRun` derives what a run should
+contain from the report it reads back. Before `finishRun` there is no stored report. Asked early
+it finds nothing, expects nothing, reports nothing missing, and **passes vacuously**.
+
+That is D-026 one layer up: a check whose own subject had not been established. The contents check
+now takes the report the writer already holds. `assessContents` is the shared definition;
+`assessRun` reads the report back and delegates to it, so a reader and a writer still cannot
+disagree (D-031).
+
+### No escape hatch for the five
+
+Weakening D-002 to salvage test data is the wrong trade — the guarantee is worth more than the
+runs. They stay as `complete` with incomplete contents: honest history, costing nothing.
+
+---
+
+## D-034 — `evidence.key` is the artifact key, not the storage path
+**2026-08-21 · found while fixing D-033**
+
+Every finding cites `artifact.key`. The writer recorded `storagePathFor(artifact)`, which appends
+`.gz` to gzipped text. So every robots.txt and sitemap capture was filed under a name no finding
+referenced. The rows existed, the objects existed, and nothing could join them.
+
+`0006` had documented the column as the key all along. The writer drifted from its own schema.
+
+**Screenshots hid it for four milestones.** Their key and path are the same string, so every
+capture a person actually looks at resolved correctly. The invisible half was the documentary
+evidence behind hard constraint 3 — L0 findings, where the artifact body *is* the finding.
+
+Three changes:
+
+1. The row records `artifact.key`. Where the bytes sit is derived by `storagePathForKey()`, in one
+   place, because two call sites spelling the rule out separately is how they diverged.
+2. An empty `evidenceKey` is stored as null. A finding that retained no capture is not making a
+   citation; `''` would be a citation of something that cannot exist.
+3. `0011` adds a foreign key from `findings.evidence_key` to `evidence.key`. Hard constraint 3 was
+   being enforced by application code that had the same blind spot as the writer. It is now a
+   schema property.
+
+The constraint is `NOT VALID`: it binds every row written from now on and does not re-check the
+five frozen runs, which cannot be repaired. Validating it would have required deleting them.
+
+It covers the primary citation. A finding's full `evidence` array may cite several, and those are
+checked by `assessContents` before the run is allowed to close.
+
+---
+
+## D-035 — Delete the migration path; prove the real one
+**2026-08-21 · business owner**
+
+`migrate-to-supabase.ts` read local reports and reconstructed the rows a run would have written.
+It was the **only caller of `persistRun`** — the path every real scan would use had never once
+completed successfully, and the script itself had never completed successfully either.
+
+That is the sixth defect's real cause. A second write path that nothing exercises is not a
+fallback; it is an untested duplicate of the thing that matters, and it is where four of the six
+defects were found.
+
+The script is deleted. `npm run scan-supabase` writes through the ordinary scan path: preflight
+before the browser starts, `persistRun` after the report is assembled, and a read-back from the
+database rather than a success reported from the writer's own return value.
+
+Re-scanning produces clean runs *and* exercises the production path. The migration produced
+neither.
+
+Preserving the original five runs was never the goal — they were test data. `evidence/` and
+`reports/` on disk still hold what those scans captured.
+
+### On the pattern
+
+Six defects in one sequence, all the same shape: the bucket guard that checked at migration time
+and not at upload time; the idempotency check that tested existence rather than completeness;
+`ON CONFLICT` against an index it could not infer; a run closed before it was verified; evidence
+filed under a name findings did not use; and a write path nothing had ever run.
+
+Every one is *a verdict resting on a surface that was never established* — the same sentence as
+hard constraint 9 and D-014, which the rule engine has been disciplined about since M1. The
+storage layer had no equivalent discipline until now.
+
+The Tier 1/2/3 harness (D-032) addresses the SQL layer. This addresses the other half: there is
+one write path, and the way it gets exercised is by using it.

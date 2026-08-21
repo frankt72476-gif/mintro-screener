@@ -1,8 +1,14 @@
 /**
  * Runs Layer 0 and Layer 1 against a storefront and prints what was found.
  *
- *     npm run scan-l1 -- https://shop.example [more-urls...]
- *     npm run scan-l1 -- --evidence-dir ./evidence https://shop.example
+ *     npm run scan-full -- https://shop.example [more-urls...]
+ *     npm run scan-full -- --evidence-dir ./evidence https://shop.example
+ *     npm run scan-supabase -- https://shop.example      # writes the run to Supabase
+ *
+ * `--supabase` is the production write path, and until now nothing ran it. A separate migration
+ * script was the only caller of `persistRun`, which meant the path that would carry every real
+ * scan had never once completed successfully. That script is gone: a second write path that
+ * nothing exercises is not a fallback, it is an untested duplicate of the thing that matters.
  *
  * The order matters. Layer 0 runs first because robots.txt carries the `Crawl-delay` the
  * browser must then observe (D-013) — rendering before reading it would mean the first browser
@@ -43,6 +49,10 @@ import {
   type ScopeOverrides,
 } from '@mintro/engine';
 import { renderPage } from '../src/render.js';
+import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
+import { persistRun } from '../src/store/persist.js';
+import { preflight } from '../src/store/preflight.js';
+import { assessRun, describeCompleteness } from '../src/store/completeness.js';
 
 const LABEL: Record<Finding['state'], string> = {
   fail: 'FAIL         ',
@@ -52,10 +62,10 @@ const LABEL: Record<Finding['state'], string> = {
 };
 
 async function main(argv: readonly string[]): Promise<number> {
-  const { targets, evidenceDir, reportDir } = parseArgs(argv);
+  const { targets, evidenceDir, reportDir, supabase: toSupabase } = parseArgs(argv);
   if (targets.length === 0) {
     console.error(
-      'usage: npm run scan-full -- [--evidence-dir <dir>] [--report-dir <dir>] <storefront-url> [more...]',
+      'usage: npm run scan-full -- [--evidence-dir <dir>] [--report-dir <dir>] [--supabase] <storefront-url> [more...]',
     );
     return 2;
   }
@@ -63,13 +73,39 @@ async function main(argv: readonly string[]): Promise<number> {
   const ruleset = loadRulesetFile('rules/ruleset.json');
   console.log(`Rule set ${ruleset.version} (effective ${ruleset.effective})\n`);
 
+  // Before the browser starts, so a misconfigured store costs nothing. `0008` asserted the bucket
+  // at migration time and the failure arrived at upload time; a guard that runs long before the
+  // thing it guards is not guarding it.
+  let supabase: WorkerSupabase | undefined;
+  if (toSupabase) {
+    supabase = createWorkerSupabase();
+    const checks = await preflight(supabase);
+    for (const check of checks.checks) {
+      console.log(`  ${check.ok ? 'ok  ' : 'FAIL'}  ${check.name.padEnd(48)} ${check.detail}`);
+    }
+    if (!checks.ok) {
+      console.error('Preflight failed. Nothing was scanned and nothing was written.');
+      return 1;
+    }
+    console.log();
+  }
+
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  let failures = 0;
 
   try {
     for (const target of targets) {
-      await scan(browser, target, ruleset, evidenceDir, reportDir);
+      try {
+        await scan(browser, target, ruleset, evidenceDir, reportDir, supabase);
+      } catch (error) {
+        // One storefront failing must not abandon the rest. It is reported and counted, and the
+        // exit code carries it — a scan that half-worked and exited 0 is how this all started.
+        failures += 1;
+        console.error(`  ${target} FAILED: ${error instanceof Error ? error.message : String(error)}`);
+        console.log();
+      }
     }
-    return 0;
+    return failures === 0 ? 0 : 1;
   } finally {
     await browser.close();
   }
@@ -100,6 +136,7 @@ async function scan(
   ruleset: Ruleset,
   evidenceDir: string | undefined,
   reportDir: string | undefined,
+  supabase: WorkerSupabase | undefined,
 ): Promise<void> {
   const startedAt = new Date().toISOString();
   const runId = randomUUID();
@@ -190,28 +227,45 @@ async function scan(
 
   if (evidenceDir !== undefined) writeEvidence(artifacts, evidenceDir);
 
-  if (reportDir !== undefined) {
-    const allFindings: Finding[] = [...layer1.findings, ...after, ...layer2.findings];
-    const report = assembleReport(
-      {
-        runId,
-        merchantDomain: new URL(layer0.origin).host,
-        ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
-        ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
-        mode: 'public',
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        findings: allFindings,
-        truncations: layer0.truncations,
-        politeness: describeCrawlDelay(delay),
-      },
-      ruleset,
-    );
+  // Assembled unconditionally. It is pure and cheap, and both outputs below need it — a report
+  // built only when someone asked for a file is a report the Supabase path could not persist.
+  const allFindings: Finding[] = [...layer1.findings, ...after, ...layer2.findings];
+  const report = assembleReport(
+    {
+      runId,
+      merchantDomain: new URL(layer0.origin).host,
+      ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
+      ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
+      mode: 'public',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      findings: allFindings,
+      truncations: layer0.truncations,
+      politeness: describeCrawlDelay(delay),
+    },
+    ruleset,
+  );
 
+  if (reportDir !== undefined) {
     const path = join(reportDir, `${report.merchantDomain}.json`);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(report, null, 2), 'utf8');
     console.log(`  report     ${path}`);
+  }
+
+  if (supabase !== undefined) {
+    const result = await persistRun(supabase, { report, artifacts, runId });
+    // Read back rather than reported from the writer's own return value. `persistRun` refuses to
+    // close an incomplete run, and this confirms from the database that it did close one.
+    const after = await assessRun(supabase, runId, { checkObjects: true });
+    console.log(
+      `  supabase   ${result.findings} finding(s), ${result.evidenceWritten} artifact(s) written` +
+        (result.evidenceAlreadyPresent > 0 ? `, ${result.evidenceAlreadyPresent} already present` : ''),
+    );
+    console.log(`             ${describeCompleteness(after)}`);
+    if (!after.complete) {
+      throw new Error(`run ${runId} closed but is not complete: ${after.problems.join('; ')}`);
+    }
   }
 
   console.log();
@@ -318,10 +372,12 @@ function parseArgs(argv: readonly string[]): {
   targets: string[];
   evidenceDir?: string;
   reportDir?: string;
+  supabase: boolean;
 } {
   const targets: string[] = [];
   let evidenceDir: string | undefined;
   let reportDir: string | undefined;
+  let supabase = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -331,12 +387,15 @@ function parseArgs(argv: readonly string[]): {
     } else if (arg === '--report-dir') {
       reportDir = argv[i + 1];
       i += 1;
+    } else if (arg === '--supabase') {
+      supabase = true;
     } else if (arg !== undefined) {
       targets.push(arg);
     }
   }
   return {
     targets,
+    supabase,
     ...(evidenceDir === undefined ? {} : { evidenceDir }),
     ...(reportDir === undefined ? {} : { reportDir }),
   };

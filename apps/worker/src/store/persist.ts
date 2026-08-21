@@ -8,11 +8,24 @@
  *                  nothing at all
  *   3. evidence  — bytes to the bucket, then metadata rows
  *   4. findings  — which reference evidence keys, so the evidence must exist first
- *   5. run       — finished: report, status, finished_at. The row becomes immutable here.
+ *   5. verify    — every finding stored, every cited key backed by a row and a retrievable object
+ *   6. run       — finished: report, status, finished_at. The row becomes immutable here.
  *
  * The run is written before its findings deliberately. A run that fails halfway should leave a
  * record that it was attempted; a screening system whose failures are invisible is worse than one
  * whose failures are ugly.
+ *
+ * ## Step 5 is not optional, and it cannot move
+ *
+ * Closing a run is an assertion that it is complete, and step 6 makes that assertion permanent —
+ * the trigger in `0004_runs.sql` refuses every later write. An earlier version closed the run and
+ * verified afterwards. Five runs were frozen carrying findings that cite captures with no evidence
+ * row, and because runs are never deleted (D-002) there is no way to complete them and no way to
+ * remove them. The trigger is right; closing an unverified run was wrong.
+ *
+ * This is the same defect as every other one in this sequence: an operation that declared success
+ * before it was in a position to tell. The ordering is the fix — an assertion of completeness must
+ * never precede the evidence for it.
  *
  * ## Not atomic, and what is done about that instead
  *
@@ -31,8 +44,8 @@
  */
 
 import type { EvidenceArtifact, ReportFinding, ScreeningReport } from '@mintro/engine';
-import { putEvidence, storagePathFor, type WorkerSupabase } from './supabase.js';
-import { assessRun, countFindings } from './completeness.js';
+import { putEvidence, type WorkerSupabase } from './supabase.js';
+import { assessContents, assessRun, countFindings } from './completeness.js';
 
 export interface PersistInput {
   readonly report: ScreeningReport;
@@ -112,7 +125,11 @@ async function writeRunContents(
     // Metadata after the bytes. A row pointing at an object that failed to upload would be a
     // finding citing a capture that does not exist.
     const { error } = await supabase.client.from('evidence').insert({
-      key: storagePathFor(artifact),
+      // The artifact key, which is what a finding cites — not the storage path. Recording the
+      // path here filed every gzipped capture under a name no finding referenced, so the rows
+      // and the findings could not be joined at all. `0006` documents this column as the key;
+      // the writer was the thing that drifted.
+      key: artifact.key,
       run_id: runId,
       kind: artifact.kind,
       sha256: artifact.sha256,
@@ -128,6 +145,21 @@ async function writeRunContents(
   }
 
   await insertFindings(supabase, runId, report);
+
+  // Verified against the report in hand, not the stored one — there is no stored one yet, and a
+  // check that read the database for its own expectations would find none and pass vacuously.
+  const contents = await assessContents(supabase, runId, report, { checkObjects: true });
+  if (contents.problems.length > 0) {
+    const listed = contents.problems.map((problem) => `  ${problem}`).join(`
+`);
+    throw new Error(`run ${runId} is not complete and was not closed:
+${listed}
+
+  The run is left open (finished_at null, status 'failed') so it can be resumed.
+  Closing it would freeze it permanently — runs are immutable once finished (D-002).`);
+  }
+
+  // Last, and only now. Everything above is repairable; this is not.
   await finishRun(supabase, runId, report);
 
   return {
@@ -218,7 +250,10 @@ async function insertFindings(
         not_evaluable_reason: finding.notEvaluableReason ?? null,
         source_url: primary?.sourceUrl ?? null,
         matched_value: primary?.matchedValue ?? null,
-        evidence_key: primary?.evidenceKey ?? null,
+        // An empty key means no capture was retained, which is null, not the empty string. The
+        // foreign key added in 0011 would reject '' as a citation of a capture that cannot exist
+        // — correctly, but the finding is not making a citation at all.
+        evidence_key: primary?.evidenceKey === undefined || primary.evidenceKey === '' ? null : primary.evidenceKey,
         captured_at: primary?.capturedAt ?? null,
         evidence: finding.evidence,
       };

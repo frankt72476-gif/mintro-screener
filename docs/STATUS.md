@@ -79,6 +79,39 @@ The rule that came out of it, now hard constraint 9 and a standing section in
 **The operational test when adding anything:** ask what your component returns when it *cannot
 tell*. If that is the same as when the thing holds, it is wrong.
 
+### The same failure, six times, in the storage layer
+
+The rule engine has been disciplined about the shape above since M1. The storage layer was not,
+and getting five runs into Supabase produced six consecutive defects with **the same shape and one
+common cause**.
+
+| | What happened |
+|---|---|
+| **Bucket guard** | `0008` asserted the evidence bucket at *migration* time. The failure arrived at *upload* time and nothing re-checked in between. |
+| **Existence vs completeness** | The idempotency check asked whether a run *row* existed and answered "already migrated" for runs with no findings and no evidence (D-031). |
+| **`ON CONFLICT` inference** | `upsert({onConflict: 'run_id,ordinal'})` could not infer a partial index, and PostgREST has no syntax for the predicate (D-032). |
+| **Close before verify** | The run was closed and then verified. Five runs froze permanently with findings citing captures that had no row (D-033). |
+| **Key vs storage path** | `evidence.key` recorded the storage path while findings cite the artifact key, so no gzipped capture could be joined to the finding citing it (D-034). |
+| **An unexercised write path** | `persistRun`'s only caller was a migration script. The path every real scan would use had never once completed (D-035). |
+
+Every one is *a verdict resting on a surface that was never established*. Two of them — the bucket
+guard and close-before-verify — are literally the D-026 sentence: a check that ran before its own
+subject existed.
+
+**All six reached Frank through a green suite**, because nothing executed SQL against the actual
+schema and nothing ran the write path end to end. The suite asserted the DDL was well-formed and
+said nothing about working with it.
+
+Two things close that, and neither is sufficient alone:
+
+- **`apps/worker/test/schema/`** — three tiers, real Postgres in Tier 1 via PGlite (D-032). This
+  covers the SQL layer: `ON CONFLICT`, triggers, constraints, the resumed write.
+- **One write path, exercised by using it** (D-035). The migration script is deleted. A run
+  reaches Supabase through `npm run scan-supabase` or it does not reach Supabase.
+
+The five original runs are still in the project, closed and incomplete. They are not repairable —
+runs are immutable once finished (D-002) — and they are left in place deliberately as history.
+
 ---
 
 ## What is built
@@ -140,6 +173,26 @@ Resend integration, and the `sends` log.
 
 **Proved:** swisschems.is → 45 pages, **66/66 screenshots resolved**, 5.43 MB, 3.0s. The copy
 audit passes across all five real runs.
+
+### M7 — Persistence and auth · `apps/worker/src/store`, `supabase/migrations`
+
+Eleven migrations. RLS is declared in the same file as the table it protects, so a new table
+cannot be added without a policy in the diff. **RLS decides reads; triggers decide changes** —
+`service_role` carries `BYPASSRLS`, so an append-only guarantee expressed as a policy would not
+hold against the process doing the writing.
+
+`persistRun` is the one write path, reached by `npm run scan-supabase`. It writes merchant, run,
+evidence, findings, **verifies, and only then closes the run** — closing is what makes the row
+immutable, so it cannot precede the evidence that the run is complete (D-033). A failure leaves
+the run open and resumable.
+
+Verification lives in one place, `store/completeness.ts`, and takes the report as an argument so
+it can run before the report is stored (D-033). Three tiers of schema testing back it, described
+in `apps/worker/test/schema/README.md`.
+
+**Standing:** the frontend gets URL + anon key only; nothing prefixed `VITE_` carries a secret.
+Credentials hold vault references, never secrets. Evidence is private and reached through
+short-expiry signed URLs minted on demand.
 
 ---
 
@@ -266,3 +319,6 @@ store.
   and OFFS-007 are permanently review-only, and D-020 and D-027 say why.
 - **Evidence is append-only.** Nothing in application code overwrites or deletes a completed run's
   captures (hard constraint 5, D-002).
+- **There is one path into Supabase, and `finishRun` is the last thing it does.** Do not add a
+  second writer, and do not move the completeness check after the close — D-033 and D-035 say what
+  that cost. A run is closed only once it has been verified, because closing it says it is done.

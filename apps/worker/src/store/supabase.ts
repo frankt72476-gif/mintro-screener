@@ -101,11 +101,29 @@ export async function putEvidence(
  * The storage path for an artifact.
  *
  * Text artifacts are stored gzipped and carry `.gz`; screenshots are PNG and already compressed.
- * The key the `evidence` table records is this path, so the two can never disagree about where a
- * capture lives.
+ *
+ * ## The path is derived from the key. It is not the key.
+ *
+ * An earlier version recorded this path *as* the `evidence` row's key, on the reasoning that the
+ * two "can never disagree about where a capture lives". They then disagreed about something more
+ * important: findings cite `artifact.key`, so every gzipped artifact's row was filed under a name
+ * no finding referenced. The rows existed, the objects existed, and nothing could join them.
+ *
+ * `evidence.key` is the artifact key — what a finding cites, and what `0006` documents the column
+ * to be. Where the bytes sit is a storage detail computed from it, here and nowhere else.
  */
 export function storagePathFor(artifact: EvidenceArtifact): string {
-  return artifact.kind === 'screenshot' ? artifact.key : `${artifact.key}.gz`;
+  return storagePathForKey(artifact.key, artifact.kind);
+}
+
+/**
+ * The same derivation, for a stored row rather than an artifact in hand.
+ *
+ * Anything holding an `evidence` row and wanting its bytes goes through this. Two call sites
+ * spelling the rule out separately is how the divergence above happened.
+ */
+export function storagePathForKey(key: string, kind: string): string {
+  return kind === 'screenshot' ? key : `${key}.gz`;
 }
 
 function contentTypeFor(artifact: EvidenceArtifact): string {
