@@ -693,17 +693,28 @@ each exists because the alternative fails silently.
 
 ### A session is valid only on positive evidence
 
+**This is the most consequential defect found in the project so far**, and the ruling it produced
+is larger than the bug.
+
 Session revalidation asks *"is the signed-in marker present?"*, never *"is a login form absent?"*.
-
 The first draft asked the second question and returned "valid" for a **404** — no signed-in
-marker and no password field, and the absence of both was read as the presence of a session. That
-is hard constraint 9 in the session layer: locating a thing by what it is not.
+marker and no password field, and the absence of both was read as the presence of a session.
 
-The consequence is the worst available here. A run proceeding logged-out while reporting as
-authenticated **inverts the meaning of every GATE-002 and GATE-003 finding it produces** — the
-rules whose entire question is what a session changes.
+A run proceeding logged-out while reporting as authenticated **inverts the meaning of every
+GATE-002 and GATE-003 finding it produces** — the rules whose entire question is what a session
+changes. Nothing in the report would look wrong.
 
-### A redirect away is not the path being served
+**The generalisation, recorded in `docs/ARCHITECTURE.md`:**
+
+> Constraint 9 applies to any component that establishes a precondition for findings, not only to
+> check handlers. Preconditions must be established by positive evidence of the state they
+> assert, never by absence of its contradiction.
+
+A precondition is anything a finding silently depends on: that a session is live, that a page
+rendered, that a footer was located, that the catalogue was identified. None appears in the
+finding's text, which is precisely why getting one wrong is invisible.
+
+### A redirect away is not the path being served — the same family
 
 `http_probe` treats a request that ended somewhere other than the path asked for as *not served*,
 whatever status the destination returned.
@@ -746,3 +757,38 @@ credentials.
 `apps/testbed`, a local storefront serving Shopify-style and WooCommerce-style login forms and a
 gated catalogue. The credential-authorization question is unsettled and nothing in M4 depends on
 settling it.
+
+---
+
+## D-027 — OFFS-007, affiliate program by link text
+**2026-08-21 · business owner**
+
+A new rule. Layer 1, `dom_assert`, **`critical`**, **`review_only`**, surface `homepage`,
+`link_text_contains: ["affiliate", "ambassador", "referral program", "partner program"]`,
+`expect: absent`.
+
+**Why OFFS-001 cannot cover this.** D-024 rescoped OFFS-001 to `content` and it immediately
+caught sportstechnologylabs.com on `/affiliate-area/`, `/affiliate-login/` and
+`/affiliate-registration/`. It did not catch swisschems.is, and could not have:
+
+> swisschems.is links **"Affiliate Program"** and **"Affiliate Login"** from its footer. Both
+> point at `/` and `/login`. No affiliate page appears in its sitemap.
+
+The programme is visible to a person reading the page and invisible to every `url_pattern` rule,
+because the signal is in the link text and not in any URL. The two rules are complements: one
+matches where the URL says it, one matches where the label does.
+
+**`critical` but `review_only`, and the split is the point.** The severity matches OFFS-001 —
+an affiliate programme is the same finding whichever way it is discovered. The tier does not,
+because the *evidence* is weaker:
+
+- A dedicated `/affiliate-registration/` URL is a programme. Little else produces that path.
+- A nav label reading "Affiliate Program" may be a programme, a page explaining there is no
+  programme, or a link to somebody else's. Only a person opening it can tell.
+
+Auto-failing on a label would be judging a destination that was never visited — the same defect
+as D-011 and D-020 in a new place. This rule surfaces the candidate; a human resolves it.
+
+**Finding wording** follows D-018: it names how many links were examined, quotes the matching
+text with its destination, and states that *"the visible text of these links was examined; their
+destinations were not followed."*

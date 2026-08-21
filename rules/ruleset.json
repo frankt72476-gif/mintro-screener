@@ -245,6 +245,16 @@
       "clause": "Reviews of all social media channels at minimum monthly.",
       "params": { "reason": "Internal process. Requires merchant attestation." } },
 
+    { "id": "OFFS-007", "cat": "offsite", "layer": 1, "sev": "critical", "type": "dom_assert", "tier": "review_only",
+      "title": "Affiliate program linked from the homepage",
+      "clause": "No affiliate or influencer marketing program.",
+      "params": {
+        "surface": "homepage",
+        "link_text_contains": ["affiliate", "ambassador", "referral program", "partner program"],
+        "expect": "absent",
+        "note": "Companion to OFFS-001, which matches affiliate URLs. A merchant whose affiliate links carry no distinguishing URL — swisschems.is links 'Affiliate Program' to / — is invisible to any url_pattern rule. Link text is weaker evidence than a dedicated URL and a nav label can be incidental, so this is permanently review_only. See D-027."
+      } },
+
     { "id": "OFFS-006", "cat": "offsite", "layer": 0, "sev": "major", "type": "url_pattern", "tier": "review_only",
       "title": "Editorial content on therapeutic topics",
       "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",

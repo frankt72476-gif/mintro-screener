@@ -16,7 +16,7 @@ describe('rules/ruleset.json', () => {
   it('loads and validates', () => {
     expect(ruleset.version).toBe('2.4.0');
     expect(ruleset.effective).toBe('2026-05-26');
-    expect(ruleset.rules).toHaveLength(52);
+    expect(ruleset.rules).toHaveLength(53);
     expect(ruleset.categories).toHaveLength(10);
   });
 

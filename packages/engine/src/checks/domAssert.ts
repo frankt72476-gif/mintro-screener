@@ -67,6 +67,11 @@ function assertFinding(
     return gateFinding(rule, page);
   }
 
+  // A rule whose subject is the visible text of links — OFFS-007's shape.
+  if (rule.params.link_text_contains !== undefined) {
+    return linkTextFinding(rule, page, expect, rule.params.link_text_contains);
+  }
+
   // A rule whose subject is a selector with no link criteria — OFFS-002's shape.
   const selector = rule.params.selector;
   if (
@@ -169,6 +174,105 @@ function declaredSubjectFinding(
 
 const truncate = (value: string, limit = 160): string =>
   value.length <= limit ? value : `${value.slice(0, limit)}…`;
+
+/**
+ * Presence or absence of links whose visible text matches.
+ *
+ * OFFS-007 exists because OFFS-001 cannot reach every affiliate program. swisschems.is links
+ * "Affiliate Program" and "Affiliate Login" from its footer, both pointing at `/` and `/login`,
+ * with no affiliate page in the sitemap — invisible to any rule that matches URLs.
+ *
+ * Link text is weaker evidence than a dedicated URL, which is why the rule is permanently
+ * `review_only`: a nav label can be incidental, and only a person opening the link can tell an
+ * affiliate programme from a page that mentions one. The finding says exactly that, per D-018 —
+ * link text was examined, destinations were not followed.
+ */
+function linkTextFinding(
+  rule: RuleOfType<'dom_assert'>,
+  page: PageContext,
+  expect: 'present' | 'absent',
+  terms: readonly string[],
+): Finding {
+  const matches: { text: string; href: string; term: string }[] = [];
+
+  for (const link of page.links) {
+    const text = link.text.toLowerCase();
+    if (text === '') continue;
+    const term = terms.find((candidate) => text.includes(candidate.toLowerCase()));
+    if (term !== undefined) matches.push({ text: link.text, href: link.href, term });
+  }
+
+  const found = matches.length > 0;
+  const violates = expect === 'absent' ? found : !found;
+
+  const examined = page.links.filter((link) => link.text.trim() !== '').length;
+  const caveat =
+    ' The visible text of these links was examined; their destinations were not followed.';
+
+  if (!violates) {
+    return satisfied(
+      rule,
+      expect === 'absent'
+        ? `${examined} link(s) with visible text on the rendered homepage were examined for ${quoteAll(terms)}; none matched.${caveat}`
+        : `Observed link text matching ${quoteAll(terms)}.${caveat}`,
+      RENDERED,
+      pageEvidence(page),
+    );
+  }
+
+  if (!found) {
+    return violation(
+      rule,
+      `No link with visible text matching ${quoteAll(terms)} was observed among ${examined} link(s) on the rendered homepage.${caveat}`,
+      RENDERED,
+      pageEvidence(page),
+    );
+  }
+
+  const listed = dedupe(matches)
+    .slice(0, 5)
+    .map((match) => `"${match.text}" → ${pathOf(match.href)}`)
+    .join('; ');
+  const more = dedupe(matches).length > 5 ? ` and ${dedupe(matches).length - 5} more` : '';
+
+  return violation(
+    rule,
+    `${dedupe(matches).length} of ${examined} link(s) on the rendered homepage have visible text matching ${quoteAll(terms)}: ${listed}${more}.${caveat}`,
+    RENDERED,
+    [
+      {
+        ...pageEvidence(page)[0]!,
+        matchedValue: dedupe(matches).map((match) => `${match.text} (${match.term})`).join(', '),
+        matchedUrls: [...new Set(dedupe(matches).map((match) => match.href))],
+      },
+    ],
+  );
+}
+
+/** One entry per distinct text-and-destination pair; a repeated footer link is one observation. */
+function dedupe(
+  matches: readonly { text: string; href: string; term: string }[],
+): { text: string; href: string; term: string }[] {
+  const seen = new Map<string, { text: string; href: string; term: string }>();
+  for (const match of matches) {
+    const key = `${match.text.toLowerCase()}|${match.href}`;
+    if (!seen.has(key)) seen.set(key, match);
+  }
+  return [...seen.values()];
+}
+
+function quoteAll(terms: readonly string[]): string {
+  return terms.map((term) => `'${term}'`).join(', ');
+}
+
+function pathOf(href: string): string {
+  try {
+    const url = new URL(href);
+    return url.pathname === '/' ? '/' : url.pathname;
+  } catch {
+    return href;
+  }
+}
 
 /**
  * Presence or absence of elements matching a selector.

@@ -83,6 +83,7 @@ describe('rule selection', () => {
       'DISC-001',
       'DISC-002',
       'OFFS-003',
+      'OFFS-007',
     ]);
   });
 

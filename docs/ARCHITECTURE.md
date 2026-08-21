@@ -186,6 +186,36 @@ actually distinguished and weigh the finding accordingly.
 This is required, not stylistic (D-023). It applies to every scope defined by exclusion, present
 and future.
 
+## Constraint 9 governs preconditions, not just checks
+
+**Hard constraint 9 applies to any component that establishes a precondition for findings, not
+only to check handlers.**
+
+The session layer asked *"is a login form absent?"* — find-by-nothing — so a **404 read as a valid
+session**. A run proceeding logged-out while reporting as authenticated inverts every GATE-002
+and GATE-003 finding it produces, since those rules' entire question is what a session changes.
+
+> **Preconditions must be established by positive evidence of the state they assert, never by
+> absence of its contradiction.**
+
+A precondition is anything a finding silently depends on being true: that a session is live, that
+a page rendered, that a footer was located, that the catalogue was identified. None of these
+appears in a finding's text, which is exactly why getting one wrong is invisible — the finding
+looks the same whether the precondition held or not.
+
+Two instances, same family, both found by running against a real target rather than by review:
+
+- **The session check.** Absence of a login form was read as presence of a session. Fixed by
+  requiring the signed-in marker positively; a non-success status is decisive on its own.
+- **The redirect-to-login probe.** A merchant who gates their catalogue answers an anonymous
+  request with a redirect to the login form; the browser follows it and the login page returns
+  200. Compliant gating and no gating were **indistinguishable**, and a correctly-gating testbed
+  was auto-failed for gating correctly. Fixed by treating a request that ended elsewhere as not
+  served, and reporting the redirect as the observation that the gate works.
+
+When adding anything that a finding depends on, ask what the component returns when it cannot
+tell. If the answer is the same as when the precondition holds, it is wrong.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by
