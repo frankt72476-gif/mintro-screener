@@ -10,9 +10,25 @@
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 
-/** Identifies the crawler to the sites it fetches from. */
+/**
+ * Identifies the crawler to the sites it fetches from.
+ *
+ * D-017: a realistic browser UA with the crawler named in the comment. Not stealth — the
+ * identity is still declared, and a merchant who looks will see who we are. The bare
+ * `MintroScreener/0.1` token alone drew a 403 from a merchant who had already applied to the
+ * program, which is a poor outcome for both sides.
+ */
 export const USER_AGENT =
-  'MintroScreener/0.1 (pre-underwriting compliance screen; +https://mintro.com)';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+  'Chrome/131.0.0.0 Safari/537.36 MintroScreener/0.1 (+https://mintro.com/screener)';
+
+/** Headers a real browser sends. Their absence is itself a bot signal. */
+export const DEFAULT_HEADERS: Readonly<Record<string, string>> = {
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+  'accept-encoding': 'gzip, deflate, br',
+  'upgrade-insecure-requests': '1',
+};
 
 export interface FetchResult {
   /** URL requested. */
@@ -86,7 +102,7 @@ export function createHttpFetcher(options: HttpFetcherOptions = {}): Fetcher {
       response = await fetch(url, {
         redirect: 'follow',
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { 'user-agent': userAgent, accept: '*/*' },
+        headers: { ...DEFAULT_HEADERS, 'user-agent': userAgent },
       });
     } catch (error) {
       const cause = error as Error;

@@ -144,6 +144,26 @@ const CASES: readonly Case[] = [
     why: 'a shared prefix makes prefix-matches-category undecidable',
   },
 
+  // --- declared subjects (D-015) --------------------------------------------------------
+  {
+    fixture: 'dangling-target-rule',
+    ruleId: 'GATE-003',
+    message: 'is not in the rule set',
+    why: 'a dangling reference would leave a critical rule with no subject, silently disabling it',
+  },
+  {
+    fixture: 'self-referencing-target',
+    ruleId: 'GATE-003',
+    message: 'references itself',
+    why: 'a rule cannot define its own subject',
+  },
+  {
+    fixture: 'computed-style-no-target',
+    ruleId: 'GATE-003',
+    message: 'target_phrases_from',
+    why: 'a computed_style rule that does not say what it measures leaves the engine to infer it',
+  },
+
   // --- cross-field invariants ----------------------------------------------------------
   {
     fixture: 'cooccurrence-auto-fail',

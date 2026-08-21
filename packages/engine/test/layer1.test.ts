@@ -16,6 +16,7 @@ import {
   disclaimerPhrases,
   layer1Rules,
   locateDisclaimer,
+  NO_GATE,
   parseCssColour,
   relativeLuminance,
   runLayer1,
@@ -59,6 +60,9 @@ function page(overrides: Partial<PageContext> = {}): PageContext {
     styledText: [styled(footerText)],
     shop: { productUrls: [], collectionUrls: [], catalogueEntryUrls: [], signals: [] },
     footerPaymentTerms: [],
+    gate: NO_GATE,
+    selectorMatches: {},
+    productTitle: 'Test product',
     capturedAt: '2026-08-20T00:00:00.000Z',
     screenshotKey: 'run-1/layer1/shot.png',
     domKey: 'run-1/layer1/dom.html',
@@ -259,19 +263,84 @@ describe('DISC-002 — footer disclaimer legibility', () => {
   });
 });
 
-describe('GATE-001 — age affirmation', () => {
+describe('GATE-001 — age affirmation (D-016)', () => {
   const gate001 = rule<'dom_assert'>('GATE-001');
 
-  it('passes when an age-gate signal is present', () => {
-    const p = page({ html: '<div class="age-gate">Are you 21 or older?</div>' });
-    expect(checkDomAssert(gate001, p).state).toBe('pass');
+  const withGate = (text: string, blocksEntry = true) =>
+    page({
+      gate: { found: true, locatedBy: 'age-gate class or id', text, blocksEntry },
+      html: `<div class="age-gate">${text}</div>`,
+      text,
+    });
+
+  it('passes when the signal is inside an entry interstitial', () => {
+    const finding = checkDomAssert(gate001, withGate('Are you 21 or older?'));
+
+    expect(finding.state).toBe('pass');
+    expect(finding.note).toContain('entry interstitial');
   });
 
-  it('reviews when no signal is present', () => {
-    const p = page({ text: 'Welcome', html: '<html><body>Welcome</body></html>' });
-    const finding = checkDomAssert(gate001, p);
+  it('notes when the interstitial blocks entry', () => {
+    expect(checkDomAssert(gate001, withGate('Are you 21 or older?', true)).note).toContain(
+      'covers the viewport',
+    );
+  });
 
-    expect(finding.state).toBe('review'); // review_only, so never `fail`
+  /**
+   * The D-016 case. Previously a `pass`: the string appeared somewhere in the markup and the
+   * rule asserted an age gate existed. Same false-pass class as claiming a clean catalogue
+   * without having identified the catalogue.
+   */
+  it('reviews when the signal appears on the page but no interstitial was observed', () => {
+    const p = page({
+      text: 'Trusted for 21+ years of peptide research.',
+      html: '<html><body>Trusted for 21+ years of peptide research.</body></html>',
+    });
+
+    const finding = checkDomAssert(gate001, p);
+    expect(finding.state).toBe('review');
+    expect(finding.state).not.toBe('pass');
+    expect(finding.note).toContain('no entry interstitial');
+  });
+
+  it('reviews when an interstitial exists but carries no age signal', () => {
+    // A newsletter pop-up is an interstitial, but it is not an age gate.
+    const p = page({
+      gate: { found: true, locatedBy: 'modal or overlay container', text: 'Subscribe for 10% off', blocksEntry: true },
+      text: 'Welcome. 21+ research supplies.',
+      html: '<html><body>Welcome. 21+ research supplies.</body></html>',
+    });
+
+    const finding = checkDomAssert(gate001, p);
+    expect(finding.state).toBe('review');
+    expect(finding.note).toContain('not found inside it');
+  });
+
+  it('reviews when no signal is present anywhere', () => {
+    const p = page({ text: 'Welcome', html: '<html><body>Welcome</body></html>' });
+    expect(checkDomAssert(gate001, p).state).toBe('review'); // review_only, never `fail`
+  });
+
+  it('locates a differently-worded gate structurally, then judges it on the declared signals', () => {
+    // Hard constraint 9 is satisfied: the finder is the interstitial, not the compliant wording,
+    // so this gate IS found. The verdict then rests on GATE-001's declared `signals`, and
+    // "21 or older" is not among them — so the honest answer is `review`, not `pass`.
+    //
+    // The narrowness is in the rule's vocabulary, which is data. Broadening it is a change to
+    // `ruleset.json`, not to this handler.
+    const finding = checkDomAssert(gate001, withGate('Please confirm you are 21 or older to continue.'));
+
+    expect(finding.state).toBe('review');
+    expect(finding.note).toContain('not found inside it');
+  });
+
+  it('does not pass a gate whose signal only matches outside the interstitial', () => {
+    const p = page({
+      gate: { found: true, locatedBy: 'dialog or role=dialog', text: 'Accept cookies?', blocksEntry: true },
+      text: 'Are you 21 or older? appears in body copy. 21+',
+      html: '<html><body>21+</body></html>',
+    });
+    expect(checkDomAssert(gate001, p).state).toBe('review');
   });
 
   it('is not_evaluable when the page did not render', () => {

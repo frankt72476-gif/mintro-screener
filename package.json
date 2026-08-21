@@ -17,7 +17,7 @@
     "check": "npm run typecheck && npm run test",
     "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js",
     "render-check": "tsc --build && node apps/worker/dist/bin/render-check.js",
-    "scan-l1": "tsc --build && node apps/worker/dist/bin/scan-layer1.js"
+    "scan-full": "tsc --build && node apps/worker/dist/bin/scan.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -59,12 +59,12 @@
     { "id": "DISC-002", "cat": "disclose", "layer": 1, "sev": "critical", "type": "computed_style", "tier": "auto_fail",
       "title": "Footer disclaimer is legible",
       "clause": "In legible font, not hidden or collapsed.",
-      "params": { "min_font_px": 11, "min_contrast": 4.5, "reject_hidden": true, "reject_collapsed_ancestors": true } },
+      "params": { "target_phrases_from": "DISC-001", "min_font_px": 11, "min_contrast": 4.5, "reject_hidden": true, "reject_collapsed_ancestors": true } },
 
     { "id": "DISC-003", "cat": "disclose", "layer": 2, "sev": "critical", "type": "dom_assert", "tier": "auto_fail",
       "title": "Disclaimer on every page",
       "clause": "Must appear in the footer of every page of the website.",
-      "params": { "surface": "all_sampled", "expect": "present", "threshold": "all" } },
+      "params": { "surface": "all_sampled", "target_phrases_from": "DISC-001", "expect": "present", "threshold": "all" } },
 
     { "id": "PROD-001", "cat": "product", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
       "title": "CAS number listed",

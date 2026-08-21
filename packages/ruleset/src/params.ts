@@ -25,6 +25,7 @@
 
 import { z } from 'zod';
 import {
+  RULE_ID_PATTERN,
   COA_FIELDS,
   DOC_EXTRACTS,
   DOM_COLLECTS,
@@ -124,6 +125,18 @@ export const domAssertParams = z
   .object({
     surface,
     expect: expect.optional(),
+    /**
+     * The rule whose wording identifies what this rule looks for (D-015).
+     *
+     * DISC-003 requires the disclaimer on every sampled page but does not itself say what the
+     * disclaimer is — DISC-001 does. Without this the rule has no subject at all, and a
+     * `critical` / `auto_fail` rule with nothing to look for reports a violation against every
+     * merchant. Declaring the subject is what makes it evaluable.
+     */
+    target_phrases_from: z
+      .string()
+      .regex(RULE_ID_PATTERN, 'must be a rule id such as DISC-001')
+      .optional(),
     collect: z.enum(DOM_COLLECTS).optional(),
     detect: z.enum(DOM_DETECTS).optional(),
     selector: nonEmptyText.optional(),
@@ -141,6 +154,32 @@ export const domAssertParams = z
   .strict()
   .superRefine((value, ctx) => {
     requireAtLeastOne(value, ctx, ['expect', 'collect', 'detect'], 'assertion');
+
+    // An assertion needs something to assert *about*. A rule with `expect` and no way to
+    // recognise its subject examines nothing, and — depending on `expect` — reports every
+    // merchant as passing or every merchant as failing.
+    if (value.expect !== undefined) {
+      const finders = [
+        value.signals,
+        value.selector,
+        value.href_contains,
+        value.text_or_href_contains,
+        value.link_text_contains,
+        value.near_text,
+        value.target_phrases_from,
+        // GATE-005 recognises a required research-status field by the control types it accepts.
+        value.prefer_types,
+        // PAY-002 pairs `detect` with `expect`: the detector is the finder.
+        value.detect,
+      ];
+      if (finders.every((finder) => finder === undefined)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "declares 'expect' but nothing to recognise its subject by: add one of signals, selector, detect, href_contains, text_or_href_contains, link_text_contains, near_text, prefer_types, target_phrases_from",
+        });
+      }
+    }
   });
 
 /** Every way a `text_match` rule can be told what to look for. */
@@ -211,6 +250,22 @@ export const textCooccurrenceParams = z
  */
 export const computedStyleParams = z
   .object({
+    /**
+     * The rule whose wording identifies the element this rule measures (D-015).
+     *
+     * A `computed_style` rule carries thresholds but nothing saying *what* to measure. DISC-002
+     * measures the footer disclaimer, which DISC-001 defines. Naming that rule here makes the
+     * coupling data rather than an inference in the engine, and the loader validates that the
+     * referenced rule exists — a dangling reference fails loudly rather than silently
+     * disabling a critical check.
+     *
+     * The phrases locate the subject by *resemblance*, never by requiring the compliant form
+     * (hard constraint 9, D-014).
+     */
+    target_phrases_from: z
+      .string()
+      .regex(RULE_ID_PATTERN, 'must be a rule id such as DISC-001')
+      .optional(),
     min_font_px: z.number().positive().optional(),
     min_contrast: z.number().positive().optional(),
     reject_hidden: z.boolean().optional(),
@@ -225,6 +280,13 @@ export const computedStyleParams = z
       ['min_font_px', 'min_contrast', 'reject_hidden', 'reject_collapsed_ancestors'],
       'style constraint',
     );
+    if (value.target_phrases_from === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "must declare 'target_phrases_from': a computed_style rule that does not say what it measures leaves the engine to infer its subject (D-015)",
+      });
+    }
   });
 
 /**

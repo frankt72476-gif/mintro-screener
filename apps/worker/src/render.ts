@@ -13,6 +13,7 @@ import { gzipSync } from 'node:zlib';
 import type { Browser, BrowserContext } from 'playwright';
 import {
   MISSING_REGION,
+  NO_GATE,
   NO_SHOP_STRUCTURE,
   parseCssColour,
   type EvidenceArtifact,
@@ -22,6 +23,7 @@ import {
   type Rgb,
   type ShopStructure,
   type StyledText,
+  USER_AGENT,
 } from '@mintro/engine';
 import { extractPage, type RawExtraction, type RawStyledText } from './extract.js';
 
@@ -48,6 +50,8 @@ export interface RenderOptions {
   readonly pacer?: Pacer;
   /** Run id, so evidence keys are unique per run (D-002). */
   readonly runId: string;
+  /** CSS selectors the rule set asks about, evaluated in the page. */
+  readonly selectors?: readonly string[];
 }
 
 export interface RenderResult {
@@ -77,8 +81,15 @@ export async function renderPage(
     // Crawl-delay is observed before the request leaves, not after (D-013).
     await options.pacer?.before();
 
+    // D-017: polite mitigations, not stealth. A standard desktop viewport, a real
+    // accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who
+    // inspects their logs still sees who we are and can reach us.
     context = await browser.newContext({
       viewport: options.viewport ?? { width: 1440, height: 900 },
+      userAgent: USER_AGENT,
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      extraHTTPHeaders: { 'accept-language': 'en-US,en;q=0.9' },
       ignoreHTTPSErrors: false,
       javaScriptEnabled: true,
     });
@@ -94,7 +105,10 @@ export async function renderPage(
     const status = response?.status() ?? 0;
     const finalUrl = page.url();
 
-    const extraction = (await page.evaluate(extractPage, PAYMENT_TERMS)) as RawExtraction;
+    const extraction = (await page.evaluate(extractPage, {
+      paymentTerms: [...PAYMENT_TERMS],
+      selectors: [...(options.selectors ?? [])],
+    })) as RawExtraction;
     const html = await page.content();
     const htmlSha256 = sha256(html);
 
@@ -157,6 +171,9 @@ export async function renderPage(
         styledText: extraction.styledText.map(toStyledText),
         shop: toShopStructure(extraction),
         footerPaymentTerms: extraction.footerPaymentTerms,
+        gate: extraction.gate,
+        selectorMatches: extraction.selectorMatches,
+        productTitle: extraction.productTitle,
         capturedAt,
         ...(screenshotKey === undefined ? {} : { screenshotKey }),
         ...(domKey === undefined ? {} : { domKey }),
@@ -187,6 +204,9 @@ function failedPage(url: string, capturedAt: string, renderError: string): PageC
     styledText: [],
     shop: NO_SHOP_STRUCTURE,
     footerPaymentTerms: [],
+    gate: NO_GATE,
+    selectorMatches: {},
+    productTitle: '',
     capturedAt,
     renderError,
   };

@@ -101,7 +101,12 @@ export interface IndexedRule {
 }
 
 /** Per-rule invariants that depend on the document around the rule. */
-function checkRule(rule: Rule, index: number, categoriesById: Map<string, Category>): RulesetDefect[] {
+function checkRule(
+  rule: Rule,
+  index: number,
+  categoriesById: Map<string, Category>,
+  knownRuleIds: ReadonlySet<string>,
+): RulesetDefect[] {
   const defects: RulesetDefect[] = [];
   const at = (field: string): string => `rules[${index}].${field}`;
 
@@ -149,6 +154,27 @@ function checkRule(rule: Rule, index: number, categoriesById: Map<string, Catego
     );
   }
 
+  // A rule referenced by another must exist. A dangling `target_phrases_from` would leave a
+  // critical rule with no subject, which would silently disable it (D-015). Checked for every
+  // check type that can declare a subject, not just the first one that needed to.
+  if (rule.type === 'computed_style' || rule.type === 'dom_assert') {
+    const target = rule.params.target_phrases_from;
+    if (target !== undefined && !knownRuleIds.has(target)) {
+      defects.push(
+        defect(
+          rule.id,
+          at('params.target_phrases_from'),
+          `references rule '${target}', which is not in the rule set — this rule would have no subject to measure`,
+        ),
+      );
+    }
+    if (target === rule.id) {
+      defects.push(
+        defect(rule.id, at('params.target_phrases_from'), 'references itself'),
+      );
+    }
+  }
+
   // Tiers that the check type forbids. Hard constraint 4.
   const forbidden = ALWAYS_REVIEW_ONLY[rule.type as keyof typeof ALWAYS_REVIEW_ONLY];
   if (forbidden !== undefined && rule.tier !== 'review_only') {
@@ -186,8 +212,9 @@ export function checkInvariantsOn(
   ];
 
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
+  const knownRuleIds = new Set(rules.map(({ rule }) => rule.id));
   for (const { rule, index } of rules) {
-    defects.push(...checkRule(rule, index, categoriesById));
+    defects.push(...checkRule(rule, index, categoriesById, knownRuleIds));
   }
 
   return defects;

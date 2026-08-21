@@ -92,6 +92,26 @@ export const NO_SHOP_STRUCTURE: ShopStructure = {
 };
 
 /**
+ * An age-gate interstitial, located structurally.
+ *
+ * D-016: a `pass` on GATE-001 must mean an age gate exists, not that the characters `21+` appear
+ * somewhere on the page. A gate is a thing that blocks entry, so it is located by that structure
+ * — a dialog, a modal, a viewport-covering overlay — and the signal words are matched inside it.
+ *
+ * Locating it this way also satisfies hard constraint 9: the finder is the structure, not the
+ * compliant wording, so a gate reading "Please confirm your age" is still found.
+ */
+export interface GateContext {
+  readonly found: boolean;
+  readonly locatedBy: string;
+  readonly text: string;
+  /** The container covers a substantial part of the viewport, or locks page scrolling. */
+  readonly blocksEntry: boolean;
+}
+
+export const NO_GATE: GateContext = { found: false, locatedBy: '', text: '', blocksEntry: false };
+
+/**
  * A rendered page.
  *
  * `screenshotKey` and `domKey` point at artifacts in the evidence store. They are set by the
@@ -122,6 +142,19 @@ export interface PageContext {
    * declared layer. This carries the observation forward rather than re-fetching for it.
    */
   readonly footerPaymentTerms: readonly string[];
+  /** The age-gate interstitial, if one was present. See D-016. */
+  readonly gate: GateContext;
+  /**
+   * How many elements matched each selector the rule set asked about.
+   *
+   * The selectors come from the rules and are evaluated inside the page, because a handler here
+   * has no DOM to query. The distinction the map preserves matters: a selector present with
+   * count `0` means "we looked and found none"; a selector *absent* from the map was never
+   * asked about, which is not the same thing and must not be read as absence.
+   */
+  readonly selectorMatches: Readonly<Record<string, number>>;
+  /** The product title as rendered, for rules that apply only to certain products. */
+  readonly productTitle: string;
   /** UTC, ISO 8601. */
   readonly capturedAt: string;
   /** Evidence store key for the full-page screenshot, once captured. */

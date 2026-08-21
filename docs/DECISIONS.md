@@ -332,3 +332,125 @@ quietly dropped — and which of those happened must be visible in the run recor
 
 **Retrofitting politeness after being blocked is worse than building it in**, which is why this
 lands with the first browser code rather than after the first block.
+
+---
+
+## D-014 — Never locate a subject by its compliant form
+**2026-08-20 · business owner · standing principle**
+
+> A check that locates its subject by matching the compliant form is blind to every
+> non-compliant instance. Locate the subject structurally — position, role, selector, semantic
+> region — then evaluate compliance. Never use the compliant wording as the finder.
+
+Added to `CLAUDE.md` as hard constraint 9.
+
+**Where this came from.** DISC-002 measures whether the footer disclaimer is legible. It located
+the disclaimer by matching the *required wording* from DISC-001. Against swisschems.is it found
+nothing and reported `not_evaluable` — while the merchant's footer carried:
+
+> FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for
+> human consumption.
+
+rendered at a contrast ratio of **2.94:1**, well under the rule's 4.5:1 threshold. The rule was
+blind in exactly the case it exists to catch: a merchant whose disclaimer is worded slightly
+differently and rendered illegibly. Locating by resemblance rather than by required wording
+turned that into a correct `fail`.
+
+**Why it generalises.** The bug is not about disclaimers. Any check that says "find the thing
+that looks compliant, then check whether it is compliant" has already excluded the answer. The
+finder must be independent of the property being tested.
+
+**Both failure directions are real**, and which one you get depends on `expect`:
+
+| `expect` | Failing to locate reads as | Result |
+|---|---|---|
+| `absent` | the thing is not there | false `pass` — nobody looks again |
+| `present` | the thing is missing | false `fail`, or a review queue full of compliant merchants |
+
+**When the subject cannot be located structurally**, say so. `not_evaluable` is the honest
+output of a search known to be partial; a verdict is not.
+
+---
+
+## D-015 — A rule declares its own subject
+**2026-08-20 · business owner**
+
+`computed_style` params gain a required `target_phrases_from`, naming the rule whose wording
+identifies the element being measured. DISC-002 now carries `"target_phrases_from": "DISC-001"`.
+
+**Reasoning.** DISC-002 carried thresholds — font size, contrast, visibility — but nothing saying
+*what* to measure. Its subject is the footer disclaimer, which a different rule defines. The
+engine was inferring the link. A `critical` / `auto_fail` rule inferring its own subject is a
+coupling that lives in code where it cannot be reviewed, and hard constraint 1 says that
+knowledge belongs in the data.
+
+**A dangling reference fails loudly.** The loader validates that the referenced rule exists and
+that a rule does not reference itself. Both are load errors naming the rule, because the
+alternative is a critical check silently measuring nothing — the false-pass class again, arriving
+through a typo in a rule id. Fixtures: `dangling-target-rule`, `self-referencing-target`,
+`computed-style-no-target`.
+
+**The phrases locate by resemblance, never by requiring the compliant form** — hard constraint 9
+and D-014.
+
+---
+
+## D-016 — A GATE-001 pass means an age gate exists
+**2026-08-20 · business owner**
+
+GATE-001 requires its signal to appear inside an entry interstitial. The rule now resolves:
+
+    gate found, signal inside it     -> pass    an age gate exists
+    signal on the page, no gate      -> review  the words appear; nothing blocks entry
+    interstitial with no age signal  -> review  something blocks entry, but not an age gate
+    no signal anywhere               -> review  no age affirmation observed
+
+**This changes what a GATE-001 pass asserts.** It previously meant "the string `21+` occurs
+somewhere in the markup". It now means "an interstitial was observed and it carries age
+affirmation language". A merchant whose homepage says "Trusted for 21+ years of peptide
+research" no longer passes.
+
+**Reasoning.** The old behaviour is the same false-pass class as reporting a clean catalogue
+without having identified the catalogue (D-011): a verdict resting on a surface that was never
+established. The rule is `review_only`, so nothing auto-fails either way — but a `pass` is a
+positive assertion that an analyst will rely on, and it has to be true.
+
+**The gate is located structurally** — `dialog`, `role=dialog`, age-gate class or id, or a
+viewport-covering overlay — then the signal is matched inside it. That ordering is hard
+constraint 9: a gate reading "Please confirm your age" is still *found*, and is then judged on
+the rule's declared signal vocabulary.
+
+**Known narrowness, in the data not the engine.** GATE-001's `signals` are
+`["age-gate", "age-verify", "21+", "are you 21"]`. A gate reading "Please confirm you are 21 or
+older" is located but not recognised, and returns `review`. Broadening that vocabulary is a
+change to `ruleset.json`; it is flagged rather than made.
+
+---
+
+## D-017 — Polite mitigations before hosted browsers
+**2026-08-20 · business owner**
+
+peptidesciences.com returned **HTTP 403** to the Layer 1 render. We do not switch to a hosted
+browser vendor over it.
+
+**Reasoning.** One merchant in five is not a pattern, and it is the same operator that declared
+no sitemap — a site configured to be difficult to read is one data point about that site, not
+evidence that our approach is wrong.
+
+**Mitigations applied first**, all of them polite rather than evasive:
+
+- a realistic browser user-agent, with the screener still named in it and a contact URL
+- standard desktop viewport, locale and timezone
+- `accept-language` and the other headers a real browser sends
+- `Crawl-delay` honoured before the first request, not after it (D-013)
+
+This is not stealth. The identity remains declared and a merchant inspecting their logs can see
+who we are and reach us. We are not trying to defeat bot detection; we are trying not to look
+like something worth blocking.
+
+**If it still blocks, that is a finding.** `not_evaluable`, with the 403 screenshot and DOM
+already captured as the evidence of why — which the worker does today.
+
+**Escalation trigger.** Move to a hosted browser vendor (Browserbase, Steel — see
+`docs/ARCHITECTURE.md`) when **a second or third merchant blocks** after these mitigations. One
+is a site; three is our approach.

@@ -36,12 +36,34 @@ export function layer1Rules(ruleset: Ruleset): Rule[] {
 }
 
 /**
- * Wording that identifies the footer disclaimer, read from the rule set rather than hardcoded.
+ * The phrases that identify what a `computed_style` rule measures, read from the rule it names.
  *
- * DISC-002 measures the legibility of an element it does not itself identify; DISC-001 is the
- * rule that carries the required wording. Deriving the phrases from the data keeps the wording
- * in `ruleset.json` where it belongs.
+ * D-015: the rule declares its subject via `target_phrases_from`, so the engine looks it up
+ * rather than inferring it. The loader has already validated that the referenced rule exists
+ * (a dangling reference is a load error), so an empty result here means the referenced rule
+ * carries no wording — which the caller must treat as "no subject", never as "no constraint".
+ *
+ * The phrases locate by resemblance, never by requiring the compliant form (hard constraint 9).
  */
+export function targetPhrases(
+  rule: RuleOfType<'computed_style'> | RuleOfType<'dom_assert'>,
+  ruleset: Ruleset,
+): string[] {
+  const targetId = rule.params.target_phrases_from;
+  if (targetId === undefined) return [];
+
+  const target = ruleset.rules.find((candidate) => candidate.id === targetId);
+  if (target === undefined || target.type !== 'text_match') return [];
+
+  const { exact, require_all: requireAll, require_any: requireAny } = target.params;
+  return [
+    ...(exact === undefined ? [] : [exact]),
+    ...(requireAll ?? []),
+    ...(requireAny ?? []),
+  ];
+}
+
+/** Convenience for callers that only need the footer-disclaimer wording. */
 export function disclaimerPhrases(ruleset: Ruleset): string[] {
   return ruleset.rules
     .filter(
@@ -59,16 +81,20 @@ export function disclaimerPhrases(ruleset: Ruleset): string[] {
  * report, which is the same defect as reporting it wrongly.
  */
 export function runLayer1(page: PageContext, ruleset: Ruleset): Layer1Run {
-  const targets = locateDisclaimer(page.footer, disclaimerPhrases(ruleset));
-
   const findings = layer1Rules(ruleset).map((rule): Finding => {
     switch (rule.type) {
       case 'dom_assert':
-        return checkDomAssert(rule, page);
+        return checkDomAssert(rule, page, targetPhrases(rule, ruleset));
       case 'text_match':
         return checkTextMatch(rule, page);
       case 'computed_style':
-        return checkComputedStyle(rule, page, targets);
+        // The subject is declared by the rule (D-015), looked up per rule rather than
+        // computed once — two computed_style rules may measure different things.
+        return checkComputedStyle(
+          rule,
+          page,
+          locateDisclaimer(page.footer, targetPhrases(rule, ruleset)),
+        );
       default:
         // Selected by LAYER1_TYPES above, so unreachable. `not_evaluable` rather than a throw:
         // a rule set that outgrows this switch should degrade to "not observed", never vanish.

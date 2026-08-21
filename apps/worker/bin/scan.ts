@@ -29,10 +29,16 @@ import {
   runLayer1,
   tally,
   checkUrlPattern,
+  inScope,
+  layer2Rules,
+  runLayer2,
+  scoreProductUrls,
+  selectSample,
   type EvidenceArtifact,
   type Finding,
   type Layer0Result,
   type PageContext,
+  type SampledPage,
   type ScopeOverrides,
 } from '@mintro/engine';
 import { renderPage } from '../src/render.js';
@@ -64,6 +70,25 @@ async function main(argv: readonly string[]): Promise<number> {
   } finally {
     await browser.close();
   }
+}
+
+/** Product pages sampled per run. ARCHITECTURE.md budgets 3-5. */
+const SAMPLE_SIZE = 5;
+
+/**
+ * Every CSS selector the rule set asks about, so the renderer can evaluate them in the page.
+ *
+ * Read from the rules rather than listed here: a selector is rule content, and a handler that
+ * cannot query the DOM still needs the answer.
+ */
+function ruleSelectors(ruleset: Ruleset): string[] {
+  const selectors = new Set<string>();
+  for (const rule of layer2Rules(ruleset)) {
+    if (rule.type === 'dom_assert' && rule.params.selector !== undefined) {
+      selectors.add(rule.params.selector);
+    }
+  }
+  return [...selectors];
 }
 
 async function scan(
@@ -115,7 +140,44 @@ async function scan(
     console.log(`  ${LABEL[finding.state]}  ${finding.ruleId}  ${truncate(finding.note)}`);
   }
 
-  const combined = tally([...layer1.findings, ...after]);
+  // ---- Layer 2: sample product pages by suspicion score --------------------------------
+  const productUrls = improved.urls.filter((url) => inScope(url, 'products'));
+  const scored = scoreProductUrls(productUrls, ruleset);
+  const selected = selectSample(scored, SAMPLE_SIZE);
+
+  console.log(`\n  LAYER 2 — ${selected.length} of ${productUrls.length} product page(s), by suspicion score`);
+  for (const pick of selected) {
+    const why =
+      pick.reasons.length === 0
+        ? 'no signal; sampled to fill the quota'
+        : pick.reasons.slice(0, 3).map((r) => `${r.ruleId}:${r.matched}`).join(', ');
+    console.log(`    score ${String(pick.score).padStart(3)}  ${new URL(pick.url.url).pathname}  (${why})`);
+  }
+
+  const selectors = ruleSelectors(ruleset);
+  const sampled: SampledPage[] = [];
+
+  for (const pick of selected) {
+    const result = await renderPage(browser, pick.url.url, {
+      runId,
+      pacer,
+      selectors,
+      timeoutMs: 30_000,
+    });
+    artifacts.push(...result.artifacts);
+    sampled.push({ selection: pick, page: result.page });
+  }
+
+  const layer2 = runLayer2(sampled, ruleset);
+
+  const renderedCount = sampled.filter((entry) => entry.page.renderError === undefined).length;
+  console.log(`    rendered ${renderedCount}/${sampled.length}${pacer.waitedMs() > 0 ? ` · waited ${pacer.waitedMs()}ms total for Crawl-delay` : ''}`);
+  console.log();
+  for (const finding of layer2.findings) {
+    console.log(`  ${LABEL[finding.state]}  ${finding.ruleId}  ${truncate(finding.note)}`);
+  }
+
+  const combined = tally([...layer1.findings, ...after, ...layer2.findings]);
   console.log(
     `\n  combined   ${combined.fail} fail · ${combined.review} review · ${combined.pass} pass · ${combined.not_evaluable} not evaluable`,
   );

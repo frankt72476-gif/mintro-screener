@@ -138,3 +138,64 @@ allowed to match.
 
 This matters beyond one rule. Rules that reach human review are the ones whose accuracy
 decides whether analysts trust the tool; a noisy review queue is not a cosmetic problem.
+
+## D-014 audit — checks that locate by compliant form
+
+Every implemented and pending handler, reviewed against hard constraint 9. Ordered by
+consequence, not by rule number.
+
+The consequence of finding-by-form depends entirely on `expect`, and this is the axis that
+matters when triaging:
+
+    expect: absent   + located by form  ->  failure to locate reads as a clean result -> false PASS
+    expect: present  + located by form  ->  failure to locate reads as missing        -> false FAIL / noise
+
+### Fixed
+
+**DISC-002** (`computed_style`, critical, auto_fail) — located the disclaimer by the required
+wording. Blind to any merchant whose disclaimer was worded differently, which is the case the
+rule exists to catch. Now locates by resemblance (`textSimilarity.ts`) and the subject is
+declared in data (D-015). Caught on swisschems.is: a real disclaimer at 2.94:1 contrast that had
+been reported `not_evaluable`.
+
+### Must be built correctly — not yet implemented
+
+**OFFS-002** (`dom_assert`, critical, `expect: absent`) — the worst instance remaining.
+Locates testimonials by `[class*=review], [class*=testimonial], [data-product-reviews]`. A
+merchant whose testimonials sit in `class="customer-stories"` or `class="results"` is invisible,
+and invisibility reads as `pass` — "no testimonials observed" on a critical rule.
+
+There is no reliable structural marker for a testimonial. Therefore: where the selector matches
+nothing, this rule may **not** report `pass` on the general claim. Either report `not_evaluable`,
+or word the finding to the scope actually searched ("no review-widget markup was observed"),
+never "no testimonials". Do not let it assert more than it looked for.
+
+**DISC-003** (`dom_assert`, critical, auto_fail, `expect: present`, `threshold: all`) — the
+mirror image, and dangerous in the opposite direction. If it locates the per-page disclaimer by
+the required wording, a merchant whose disclaimer is worded differently **auto-fails on every
+sampled page**. It must use the same resemblance locator as DISC-002, not verbatim matching.
+
+### Same shape, safe direction — noted, not urgent
+
+All are `expect: present`, so failure to locate produces a review rather than a false pass. Each
+still generates avoidable noise in the human queue.
+
+- **COA-001** — finds the COA link by `text_or_href_contains: ["coa", "certificate of
+  analysis"]`. A COA linked as "Independent Test Results" (swisschems.is uses exactly that
+  wording in its footer) or "Lab Report" is missed, and a compliant merchant is queued for review.
+- **PROD-002 / PROD-003 / PROD-004** — locate a spec field by its label (`molecular weight`,
+  `storage`, `store at`). A page rendering `MW: 1419.5 g/mol` without the spelt-out label is
+  reported as missing it.
+- **GATE-001** — finds the age gate by a fixed signal vocabulary. A gate reading "Please confirm
+  you are of legal age" is missed. See D-016, which tightens the opposite problem.
+
+### Compliant
+
+- **`url_pattern` scope classification** — locates by path structure and by URLs observed on a
+  rendered page, never by whether the slug looks compliant. This is what D-011 fixed.
+- **Footer region location** — `<footer>`, `[role=contentinfo]`, then class fallback; failure to
+  locate yields `not_evaluable`, not a verdict.
+- **Shop structure discovery** — schema.org `Product`, cart forms, product-card markup. Failure
+  to locate yields `not_evaluable` for the affected scope.
+- **OFFS-003** — collects social links by platform domain. Collection only; asserts nothing about
+  compliance, and its note already states that off-site content was not examined.

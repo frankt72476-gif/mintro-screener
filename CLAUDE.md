@@ -70,6 +70,20 @@ should mean), stop and ask. Do not guess at business rules.
 8. **Runs are immutable.** Re-scanning a merchant creates a new run. Nothing in application
    code updates or deletes a completed run or overwrites its evidence. See D-002.
 
+9. **Never locate a subject by its compliant form.** A check that finds what it is looking for
+   by matching the compliant wording, class name, or label is blind to every non-compliant
+   instance — which is precisely the set it exists to find. Locate the subject **structurally**
+   (position, role, selector, semantic region), then evaluate compliance against it. See D-014.
+
+   The consequence depends on the rule's `expect`, and both directions are wrong:
+
+   - `expect: absent` — failing to locate reads as absence, producing a false `pass`.
+   - `expect: present` — failing to locate reads as missing, producing a false `fail` or a
+     review queue full of merchants who complied in wording you did not anticipate.
+
+   Where a subject genuinely cannot be located structurally, the honest result is
+   `not_evaluable` — not a verdict derived from a search you know to be partial.
+
 ## Build order
 
 Do these in sequence. Do not start the next until the previous is working and reviewed.

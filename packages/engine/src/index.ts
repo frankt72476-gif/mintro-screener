@@ -46,12 +46,20 @@ export {
   type SlugUrl,
 } from './slug.js';
 
-export { runLayer1, layer1Rules, disclaimerPhrases, type Layer1Run } from './layer1.js';
+export {
+  runLayer1,
+  layer1Rules,
+  disclaimerPhrases,
+  targetPhrases,
+  type Layer1Run,
+} from './layer1.js';
 
 export {
   isRendered,
   MISSING_REGION,
+  NO_GATE,
   NO_SHOP_STRUCTURE,
+  type GateContext,
   type PageContext,
   type PageLink,
   type PageRegion,
@@ -90,6 +98,15 @@ export {
 } from './textSimilarity.js';
 
 export { checkDomAssert } from './checks/domAssert.js';
+export { checkTextCooccurrence, findCooccurrences, type Cooccurrence } from './checks/textCooccurrence.js';
+export { runLayer2, layer2Rules, type Layer2Run, type SampledPage } from './layer2.js';
+export {
+  scoreProductUrls,
+  selectSample,
+  DEFAULT_SAMPLE_SIZE,
+  type ScoredUrl,
+  type SuspicionReason,
+} from './suspicion.js';
 export { checkTextMatch } from './checks/textMatch.js';
 export { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
 export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, RENDERED } from './checks/pageEvidence.js';
