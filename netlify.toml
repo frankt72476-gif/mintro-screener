@@ -1,0 +1,21 @@
+# Frontend only. The Playwright worker runs on Fly — see docs/ARCHITECTURE.md.
+# Until apps/web exists this config will not build; that is expected.
+
+[build]
+  base    = "apps/web"
+  command = "npm run build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"

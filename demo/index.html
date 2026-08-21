@@ -1,0 +1,794 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mintro — Merchant Screener</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --violet-deep:#2A0F63;
+  --violet:#4318A8;
+  --violet-lift:#5B23C9;
+  --purple:#A03CE8;
+  --amber:#F59E42;
+  --rose:#E0344F;
+  --jade:#0E9F6E;
+  --slate:#6D6788;
+
+  --paper:#F6F5FA;
+  --card:#FFFFFF;
+  --line:#E4E0EF;
+  --line-soft:#EFECF6;
+  --ink:#1B1233;
+  --ink-mid:#4A4265;
+
+  --r:10px;
+  --shadow:0 1px 2px rgba(42,15,99,.06), 0 8px 24px -12px rgba(42,15,99,.18);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:Inter,system-ui,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--purple);outline-offset:2px;border-radius:4px}
+
+/* ---------- shell ---------- */
+.shell{display:flex;min-height:100vh}
+
+.rail{
+  width:212px;flex:0 0 212px;
+  background:var(--violet-deep);
+  padding:18px 12px;
+  display:flex;flex-direction:column;gap:26px;
+  position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 8px}
+.brand-tile{
+  width:28px;height:28px;border-radius:8px;
+  background:linear-gradient(145deg,var(--purple),#7B2BD4);
+  position:relative;flex:0 0 28px;
+}
+.brand-tile::after{
+  content:"";position:absolute;left:7px;top:6px;
+  width:13px;height:16px;border-radius:3px 7px 2px 2px;
+  background:rgba(255,255,255,.92);
+  clip-path:polygon(0 100%,0 22%,42% 0,42% 100%,58% 100%,58% 0,100% 22%,100% 100%);
+}
+.brand-word{
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;
+  color:#fff;letter-spacing:-.02em;
+}
+.brand-word i{font-style:normal;position:relative}
+.brand-word i::after{
+  content:"";position:absolute;top:-1px;left:1px;width:4px;height:4px;
+  border-radius:50%;background:var(--amber);
+}
+
+.nav-label{
+  font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:rgba(255,255,255,.36);padding:0 10px;margin-bottom:6px;font-weight:600;
+}
+.nav-item{
+  display:flex;align-items:center;gap:9px;width:100%;
+  padding:8px 10px;border-radius:8px;
+  color:rgba(255,255,255,.66);font-size:13px;font-weight:500;
+  text-align:left;transition:background .15s,color .15s;
+}
+.nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.9)}
+.nav-item[aria-current="true"]{background:rgba(160,60,232,.26);color:#fff}
+.nav-item .ic{width:15px;text-align:center;opacity:.85;font-size:13px}
+.soon{
+  margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8.5px;
+  letter-spacing:.06em;padding:2px 5px;border-radius:4px;
+  background:rgba(245,158,66,.18);color:var(--amber);
+}
+.rail-foot{margin-top:auto;padding:0 10px;font-size:10.5px;color:rgba(255,255,255,.3);line-height:1.6}
+
+.main{flex:1;min-width:0;padding:26px 30px 70px;max-width:1120px}
+
+/* ---------- shared bits ---------- */
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--slate);font-weight:500;
+}
+h1{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:600;letter-spacing:-.02em;margin:5px 0 0}
+h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0}
+.sub{color:var(--ink-mid);margin:7px 0 0;max-width:66ch}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;justify-content:center;
+  padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;
+  transition:transform .12s,background .15s,box-shadow .15s;
+}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--violet);color:#fff;box-shadow:0 1px 2px rgba(67,24,168,.3)}
+.btn-primary:hover{background:var(--violet-lift)}
+.btn-ghost{border:1px solid var(--line);background:#fff;color:var(--ink-mid)}
+.btn-ghost:hover{border-color:#CFC7E4;color:var(--ink)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ---------- new scan ---------- */
+.form-card{padding:22px;margin-top:20px}
+.field{margin-bottom:18px}
+.field:last-child{margin-bottom:0}
+.flabel{display:block;font-size:12px;font-weight:600;margin-bottom:3px}
+.fhint{font-size:11.5px;color:var(--slate);margin:0 0 8px}
+.input{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;background:#FCFBFE;color:var(--ink);
+}
+.input:focus{outline:2px solid var(--purple);outline-offset:-1px;border-color:transparent}
+
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.mode{
+  border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+  text-align:left;background:#fff;transition:border-color .15s,background .15s;
+}
+.mode:hover{border-color:#CFC7E4}
+.mode[aria-pressed="true"]{border-color:var(--violet);background:#F7F3FE;box-shadow:inset 0 0 0 1px var(--violet)}
+.mode-t{font-size:12.5px;font-weight:600;display:block;margin-bottom:2px}
+.mode-d{font-size:11px;color:var(--slate);line-height:1.45;display:block}
+
+.form-foot{
+  display:flex;align-items:center;gap:14px;margin-top:20px;
+  padding-top:16px;border-top:1px solid var(--line-soft);
+}
+.form-foot .note{font-size:11.5px;color:var(--slate);max-width:44ch}
+
+/* ---------- progress ---------- */
+.prog{padding:26px 22px;margin-top:20px}
+.layer{display:flex;align-items:center;gap:11px;padding:9px 0;font-size:13px;color:var(--slate)}
+.layer + .layer{border-top:1px solid var(--line-soft)}
+.dot{
+  width:16px;height:16px;border-radius:50%;flex:0 0 16px;
+  border:2px solid var(--line);position:relative;
+}
+.layer.run .dot{border-color:var(--purple);animation:pulse 1s ease-in-out infinite}
+.layer.run{color:var(--ink);font-weight:500}
+.layer.done .dot{border-color:var(--jade);background:var(--jade)}
+.layer.done .dot::after{
+  content:"";position:absolute;left:3.5px;top:1px;width:4px;height:8px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg);
+}
+.layer.done{color:var(--ink-mid)}
+.layer .cnt{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(160,60,232,.35)}50%{box-shadow:0 0 0 5px rgba(160,60,232,0)}}
+
+/* ---------- report head ---------- */
+.rhead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.rhead .grow{flex:1;min-width:260px}
+.rhead .acts{display:flex;gap:8px;align-items:center}
+
+.verdict{
+  margin-top:18px;border-radius:var(--r);border:1px solid;
+  padding:16px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.verdict.fail{background:#FEF2F4;border-color:#F6C9D1}
+.v-badge{
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;
+  letter-spacing:.09em;padding:6px 11px;border-radius:6px;color:#fff;background:var(--rose);
+}
+.v-text{flex:1;min-width:220px;font-size:13px;color:#7A1F31;line-height:1.55}
+.v-text b{font-weight:600}
+
+/* signature: the tick strip */
+.strip-wrap{margin-top:16px}
+.strip-top{display:flex;align-items:baseline;gap:10px;margin-bottom:7px}
+.strip-top .eyebrow{flex:1}
+.strip{display:flex;gap:2px;height:26px;align-items:stretch}
+.tick{flex:1;border-radius:2px;min-width:3px;transition:transform .12s;position:relative}
+.tick:hover{transform:scaleY(1.18)}
+.tick.fail{background:var(--rose)}
+.tick.review{background:var(--amber)}
+.tick.pass{background:#B7E7D2}
+.tick.na{background:#DCD8E8}
+
+.legend{display:flex;gap:15px;margin-top:9px;flex-wrap:wrap}
+.lg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-mid)}
+.lg .sw{width:9px;height:9px;border-radius:2px}
+.lg b{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--ink);font-size:11.5px}
+
+/* ---------- filters ---------- */
+.filters{display:flex;gap:7px;margin:22px 0 12px;flex-wrap:wrap;align-items:center}
+.chip{
+  padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:#fff;
+  font-size:12px;font-weight:500;color:var(--ink-mid);transition:.15s;
+}
+.chip:hover{border-color:#CFC7E4}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.coverage{margin-left:auto;font-size:11.5px;color:var(--slate)}
+.coverage b{font-family:'JetBrains Mono',monospace;color:var(--ink)}
+
+/* ---------- categories ---------- */
+.cat{margin-bottom:10px;overflow:hidden}
+.cat-head{
+  width:100%;display:flex;align-items:center;gap:11px;padding:12px 15px;
+  text-align:left;transition:background .12s;
+}
+.cat-head:hover{background:#FBFAFD}
+.cat-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px}
+.cat-idx{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--slate);width:16px}
+.pips{display:flex;gap:3px;margin-left:auto}
+.pip{width:7px;height:7px;border-radius:2px}
+.pip.fail{background:var(--rose)}.pip.review{background:var(--amber)}
+.pip.pass{background:#B7E7D2}.pip.na{background:#DCD8E8}
+.caret{font-size:10px;color:var(--slate);transition:transform .18s;margin-left:9px}
+.cat.open .caret{transform:rotate(90deg)}
+.cat-body{display:none;border-top:1px solid var(--line-soft)}
+.cat.open .cat-body{display:block}
+
+/* ---------- findings ---------- */
+.find{border-bottom:1px solid var(--line-soft)}
+.find:last-child{border-bottom:0}
+.find-head{
+  width:100%;display:flex;align-items:flex-start;gap:11px;
+  padding:11px 15px 11px 0;text-align:left;border-left:3px solid transparent;transition:background .12s;
+}
+.find-head:hover{background:#FBFAFD}
+.find.fail .find-head{border-left-color:var(--rose)}
+.find.review .find-head{border-left-color:var(--amber)}
+.find.pass .find-head{border-left-color:#B7E7D2}
+.find.na .find-head{border-left-color:#DCD8E8}
+.find-head{padding-left:12px}
+
+.state{
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.07em;
+  padding:3px 6px;border-radius:4px;flex:0 0 auto;margin-top:1px;
+}
+.state.fail{background:#FDE7EB;color:#B0203A}
+.state.review{background:#FEF1E2;color:#A5620E}
+.state.pass{background:#E3F6EE;color:#0A7A54}
+.state.na{background:#EFEDF5;color:#6D6788}
+
+.find-main{flex:1;min-width:0}
+.find-title{font-size:13px;font-weight:500;line-height:1.4}
+.find-note{font-size:12px;color:var(--ink-mid);margin-top:2px;line-height:1.5}
+.find-ev{
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--slate);
+  margin-top:4px;display:flex;align-items:center;gap:5px;
+}
+
+.ev{display:none;padding:0 15px 16px 27px}
+.find.open .ev{display:block}
+
+/* signature: evidence slip */
+.slip{
+  border:1px solid var(--line);border-radius:9px;background:#FCFBFE;overflow:hidden;
+}
+.slip-bar{
+  display:flex;align-items:center;gap:8px;padding:7px 11px;
+  background:#F4F1FB;border-bottom:1px solid var(--line);
+}
+.slip-bar .eyebrow{font-size:9px}
+.slip-bar .stamp{
+  margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--slate);
+}
+.slip-body{display:flex;gap:14px;padding:13px 13px;flex-wrap:wrap}
+.slip-txt{flex:1;min-width:230px}
+.kv{display:flex;gap:9px;font-size:11px;margin-bottom:5px;align-items:baseline}
+.kv .k{
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--slate);flex:0 0 74px;
+}
+.kv .v{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-mid);word-break:break-all;flex:1}
+.capture{
+  margin-top:9px;padding:9px 11px;border-radius:7px;
+  background:#fff;border:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;color:var(--ink-mid);
+}
+.capture mark{background:#FEE7B8;color:#7A4A05;padding:1px 3px;border-radius:3px;font-weight:700}
+.rule-ref{
+  margin-top:9px;font-size:11px;color:var(--slate);border-left:2px solid var(--line);padding-left:9px;line-height:1.5;
+}
+.rule-ref b{color:var(--ink-mid);font-weight:600}
+
+/* fake screenshot */
+.shot{flex:0 0 148px;width:148px}
+.shot-frame{
+  border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;
+  box-shadow:0 2px 8px -4px rgba(42,15,99,.25);
+}
+.shot-bar{height:13px;background:#F1EEF8;display:flex;align-items:center;gap:3px;padding:0 5px;border-bottom:1px solid var(--line)}
+.shot-bar span{width:4px;height:4px;border-radius:50%;background:#D3CCE4}
+.shot-canvas{height:88px;padding:7px;display:flex;flex-direction:column;gap:4px;background:#fff}
+.ln{height:5px;border-radius:2px;background:#EDEAF4}
+.ln.w80{width:80%}.ln.w60{width:60%}.ln.w45{width:45%}.ln.w95{width:95%}
+.ln.hit{background:#FBD9A2;box-shadow:0 0 0 2px #F59E42}
+.shot-cap{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--slate);margin-top:5px;text-align:center}
+
+/* ---------- modal ---------- */
+.veil{
+  position:fixed;inset:0;background:rgba(27,18,51,.44);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;padding:20px;z-index:60;
+}
+.veil.on{display:flex}
+.modal{background:#fff;border-radius:13px;width:100%;max-width:440px;box-shadow:0 24px 60px -18px rgba(42,15,99,.5);overflow:hidden}
+.modal-head{padding:17px 20px 0}
+.modal-body{padding:15px 20px 20px}
+.modal-foot{padding:14px 20px;background:#FBFAFD;border-top:1px solid var(--line);display:flex;gap:9px;align-items:center}
+.resend{
+  margin-right:auto;font-size:10.5px;color:var(--slate);display:flex;align-items:center;gap:5px;
+}
+.attach{
+  display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);
+  border-radius:8px;background:#FCFBFE;font-size:12px;margin-top:9px;
+}
+.attach .fname{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.attach .fsize{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--slate)}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translate(-50%,14px);
+  background:var(--ink);color:#fff;padding:10px 17px;border-radius:9px;font-size:12.5px;
+  opacity:0;pointer-events:none;transition:.22s;z-index:70;box-shadow:0 10px 30px -8px rgba(0,0,0,.4);
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- documents tab ---------- */
+.planned{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:99px;
+  background:#FEF1E2;color:#A5620E;font-size:11px;font-weight:600;margin-bottom:10px;
+}
+.drop{
+  margin-top:18px;border:2px dashed var(--line);border-radius:var(--r);padding:32px 20px;
+  text-align:center;background:#FBFAFD;
+}
+.drop .big{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--ink-mid)}
+.drop .small{font-size:12px;color:var(--slate);margin-top:5px}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:11px;margin-top:20px}
+.doc-card{padding:16px}
+.doc-card h3{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:0 0 3px}
+.doc-card .d{font-size:11.5px;color:var(--slate);margin:0 0 11px;line-height:1.5}
+.doc-list{list-style:none;margin:0;padding:0}
+.doc-list li{
+  font-size:12px;color:var(--ink-mid);padding:6px 0;border-top:1px solid var(--line-soft);
+  display:flex;gap:8px;align-items:baseline;line-height:1.45;
+}
+.doc-list li .m{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--slate);flex:0 0 auto}
+
+.pane{display:none}
+.pane.on{display:block}
+
+@media (max-width:820px){
+  .rail{position:static;width:100%;height:auto;flex:auto;flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center}
+  .rail-foot{display:none}
+  .shell{flex-direction:column}
+  .main{padding:20px 16px 60px}
+  .modes{grid-template-columns:1fr}
+  .nav-item{width:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+
+<div class="shell">
+  <nav class="rail">
+    <div class="brand">
+      <div class="brand-tile"></div>
+      <div class="brand-word">M<i>i</i>ntro</div>
+    </div>
+    <div>
+      <div class="nav-label">Screening</div>
+      <button class="nav-item" data-pane="scan" aria-current="true"><span class="ic">◎</span>Site check</button>
+      <button class="nav-item" data-pane="docs"><span class="ic">▤</span>Documents check<span class="soon">SOON</span></button>
+    </div>
+    <div>
+      <div class="nav-label">Library</div>
+      <button class="nav-item" data-pane="scan"><span class="ic">⛁</span>Past reports</button>
+      <button class="nav-item" data-pane="scan"><span class="ic">⚙</span>Rule set</button>
+    </div>
+    <div class="rail-foot">
+      Rule set v2.4<br>
+      Updated 26 May 2026
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ============ SITE CHECK ============ -->
+    <section class="pane on" id="pane-scan">
+
+      <!-- input -->
+      <div id="stage-input">
+        <div class="eyebrow">Site check</div>
+        <h1>Screen a merchant</h1>
+        <p class="sub">Give us a storefront URL. We crawl what a customer sees, check it against the program rule set, and return a report with a capture behind every finding.</p>
+
+        <div class="card form-card">
+          <div class="field">
+            <label class="flabel" for="url">Storefront URL</label>
+            <p class="fhint">Root domain is enough — we read the sitemap to find the rest.</p>
+            <input class="input" id="url" value="https://helixresearchsupply.com" spellcheck="false">
+          </div>
+
+          <div class="field">
+            <span class="flabel">Access</span>
+            <p class="fhint">Pick how we get past the login gate, if there is one.</p>
+            <div class="modes">
+              <button class="mode" aria-pressed="true" data-mode="0">
+                <span class="mode-t">Public crawl</span>
+                <span class="mode-d">No account. Gated pages come back as not evaluable.</span>
+              </button>
+              <button class="mode" aria-pressed="false" data-mode="1">
+                <span class="mode-t">Screening account</span>
+                <span class="mode-d">We sign in with the stored review credentials.</span>
+              </button>
+              <button class="mode" aria-pressed="false" data-mode="2">
+                <span class="mode-t">Assisted sign-in</span>
+                <span class="mode-d">You log in once in a live window; we take it from there.</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-foot">
+            <button class="btn btn-primary" id="run">Run check</button>
+            <span class="note">Typically 90 seconds. You can close this — we'll hold the report.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- progress -->
+      <div id="stage-prog" style="display:none">
+        <div class="eyebrow">Running</div>
+        <h1>helixresearchsupply.com</h1>
+        <div class="card prog" id="layers">
+          <div class="layer" data-cnt="4 files"><span class="dot"></span>Reading robots.txt and sitemap</div>
+          <div class="layer" data-cnt="612 URLs"><span class="dot"></span>Matching category and product slugs</div>
+          <div class="layer" data-cnt="1 page"><span class="dot"></span>Loading homepage, checking gate and footer</div>
+          <div class="layer" data-cnt="5 pages"><span class="dot"></span>Sampling product pages</div>
+          <div class="layer" data-cnt="3 pages"><span class="dot"></span>Reading policy, FAQ and terms</div>
+          <div class="layer" data-cnt="blocked"><span class="dot"></span>Probing checkout without an account</div>
+          <div class="layer" data-cnt="31 captures"><span class="dot"></span>Capturing evidence</div>
+        </div>
+      </div>
+
+      <!-- report -->
+      <div id="stage-report" style="display:none">
+        <div class="rhead">
+          <div class="grow">
+            <div class="eyebrow">Report · 20 Aug 2026, 10:42 ET</div>
+            <h1>helixresearchsupply.com</h1>
+            <p class="sub" style="margin-top:4px">Helix Research Supply LLC · Shopify · screening account</p>
+          </div>
+          <div class="acts">
+            <button class="btn btn-ghost" id="dl">Download PDF</button>
+            <button class="btn btn-primary" id="send">Send to IQwallet</button>
+          </div>
+        </div>
+
+        <div class="verdict fail">
+          <span class="v-badge">13 FAILED</span>
+          <span class="v-text">
+            Failures span gating, product content, catalog and payments. Products load without an account and checkout reaches the payment step with no session, so the account gate is not in place. Nine rules could not be checked from the site.
+          </span>
+        </div>
+
+        <div class="strip-wrap">
+          <div class="strip-top">
+            <span class="eyebrow">All 40 rules</span>
+          </div>
+          <div class="strip" id="strip"></div>
+          <div class="legend">
+            <span class="lg"><span class="sw" style="background:var(--rose)"></span><b id="n-fail">0</b> failed</span>
+            <span class="lg"><span class="sw" style="background:var(--amber)"></span><b id="n-review">0</b> need review</span>
+            <span class="lg"><span class="sw" style="background:#B7E7D2"></span><b id="n-pass">0</b> passed</span>
+            <span class="lg"><span class="sw" style="background:#DCD8E8"></span><b id="n-na">0</b> not evaluable from the site</span>
+          </div>
+        </div>
+
+        <div class="filters">
+          <button class="chip" aria-pressed="true" data-f="all">Everything</button>
+          <button class="chip" aria-pressed="false" data-f="fail">Failed</button>
+          <button class="chip" aria-pressed="false" data-f="review">Needs review</button>
+          <button class="chip" aria-pressed="false" data-f="pass">Passed</button>
+          <button class="chip" aria-pressed="false" data-f="na">Not evaluable</button>
+          <span class="coverage"><b>31 of 40</b> rules checkable from the public site</span>
+        </div>
+
+        <div id="cats"></div>
+      </div>
+    </section>
+
+    <!-- ============ DOCUMENTS ============ -->
+    <section class="pane" id="pane-docs">
+      <div class="planned">◷ Planned — not built yet</div>
+      <h1>Documents check</h1>
+      <p class="sub">Second half of the screen. Reads the application file — ID, EIN letter, bank and processing statements, voided check — and reports where they disagree with each other and where the numbers look off.</p>
+
+      <div class="drop">
+        <div class="big">Drop the application file here</div>
+        <div class="small">PDF, JPG or ZIP · not accepting uploads yet</div>
+      </div>
+
+      <div class="doc-grid">
+        <div class="card doc-card">
+          <h3>Identity consistency</h3>
+          <p class="d">Pull the same field from every document and compare. Disagreement is the finding.</p>
+          <ul class="doc-list">
+            <li><span class="m">01</span>Legal name across EIN letter, bank statement and application</li>
+            <li><span class="m">02</span>EIN digits match the IRS letter</li>
+            <li><span class="m">03</span>Address across ID, statements and site policy page</li>
+            <li><span class="m">04</span>Owner name and DOB against the ID, ID expiry in future</li>
+            <li><span class="m">05</span>DBA matches the domain registrant</li>
+            <li><span class="m">06</span>Bank account and routing on voided check vs statement</li>
+          </ul>
+        </div>
+
+        <div class="card doc-card">
+          <h3>Processing profile</h3>
+          <p class="d">Rebuild the numbers from the statements instead of trusting the application.</p>
+          <ul class="doc-list">
+            <li><span class="m">01</span>Monthly volume and count, last 3–6 months</li>
+            <li><span class="m">02</span>Average ticket, high ticket, low ticket</li>
+            <li><span class="m">03</span>Chargeback ratio by count and by dollar</li>
+            <li><span class="m">04</span>Refund rate and average days to refund</li>
+            <li><span class="m">05</span>Card-present vs card-not-present split</li>
+            <li><span class="m">06</span>Stated volume vs actual, flagged on variance</li>
+          </ul>
+        </div>
+
+        <div class="card doc-card">
+          <h3>Authenticity and risk</h3>
+          <p class="d">The things that suggest a document was edited or a story does not hold up.</p>
+          <ul class="doc-list">
+            <li><span class="m">01</span>PDF metadata, edit history, font substitution</li>
+            <li><span class="m">02</span>Statement totals that do not sum</li>
+            <li><span class="m">03</span>Gaps in statement months</li>
+            <li><span class="m">04</span>Prior processor named, and why it ended</li>
+            <li><span class="m">05</span>MATCH and OFAC screening on owner and entity</li>
+            <li><span class="m">06</span>Volume trend against what the site could plausibly do</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="sub" style="margin-top:20px">Output is the same shape as the site check: a finding, a state, and the page of the document it came from. Both halves land in one packet for IQwallet.</p>
+    </section>
+
+  </main>
+</div>
+
+<!-- send modal -->
+<div class="veil" id="veil">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Send to IQwallet">
+    <div class="modal-head">
+      <h2>Send to IQwallet</h2>
+    </div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:13px">
+        <label class="flabel" for="to">To</label>
+        <input class="input" id="to" value="underwriting@iqwallet.com">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="flabel" for="msg">Note</label>
+        <input class="input" id="msg" style="font-family:Inter,sans-serif" value="13 failed, 9 not evaluable. Captures attached.">
+      </div>
+      <div class="attach">
+        <span>▤</span>
+        <span class="fname">helixresearchsupply-2026-08-20.pdf</span>
+        <span class="fsize">2.4 MB</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="resend">Sent with Resend</span>
+      <button class="btn btn-ghost" id="cancel">Cancel</button>
+      <button class="btn btn-primary" id="confirm">Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA=[
+ {n:"Access and identity gating",f:[
+  {s:"pass",t:"Age affirmation before entry",note:"21+ interstitial blocks the homepage and sets a session flag.",url:"/",cap:"You must be <mark>21 years or older</mark> to enter this site.",rule:"Every visitor must be stopped before accessing the website, with age affirmation (21+)."},
+  {s:"fail",t:"Products hidden until an account exists",note:"47 products load with no session cookie at all.",url:"/collections/all",cap:'GET /collections/all → <mark>200 OK</mark>, no auth. 47 product cards rendered.',rule:"All visitors must set up an account before shopping for or purchasing any product."},
+  {s:"fail",t:"Guest checkout disabled",note:"Reached the payment step without signing in.",url:"/checkout",cap:'Cart → checkout with empty session → <mark>payment form reached</mark>, no login redirect.',rule:"Guest checkout must be disabled."},
+  {s:"pass",t:"Terms acknowledged at sign-up",note:"Required checkbox linked to the full terms.",url:"/account/register",cap:'<input type="checkbox" required> <mark>I Agree</mark> to the Terms and Conditions',rule:"Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation."},
+  {s:"review",t:"Research field required at sign-up",note:"Field exists but is free text, so any value passes. Program asks for a controlled list.",url:"/account/register",cap:'<input name="research_field" <mark>type="text"</mark>> Field of research',rule:"Required dropdown, checkbox, radio-button or text input that can't be bypassed."},
+  {s:"na",t:"Research field stored with each order",note:"Order records are server-side. Not visible from the storefront.",url:"—",cap:"No public surface exposes stored order fields.",rule:"Store the selected field with every order in your database."},
+  {s:"review",t:"Terms cover all required clauses",note:"Missing indemnification and the qualified-professional attestation.",url:"/policies/terms-of-service",cap:"Found: research-only, no human consumption, no diagnosis. <mark>Not found: indemnification, qualified professional.</mark>",rule:"Terms must include indemnification of the seller and acknowledgment that the buyer is a qualified professional."}]},
+
+ {n:"Site-wide disclosure",f:[
+  {s:"review",t:"Footer disclaimer wording",note:"Second sentence is missing. Program specifies exact text.",url:"/",cap:'"For research and laboratory use only." <mark>Missing: "Not for human or animal consumption."</mark>',rule:"Exact disclaimer text must appear in the footer of every page."},
+  {s:"fail",t:"Footer disclaimer is legible",note:"9px at 2.1:1 contrast. Rule requires legible and not hidden.",url:"/",cap:"font-size: <mark>9px</mark> · color #B8B8C4 on #FAFAFA · contrast <mark>2.1:1</mark>",rule:"In legible font, not hidden or collapsed."},
+  {s:"pass",t:"Disclaimer on every page",note:"Present in the footer template on all 9 sampled pages.",url:"9 pages",cap:"9 of 9 sampled pages contain the footer node.",rule:"Required on every page of the website."}]},
+
+ {n:"Product page content",f:[
+  {s:"pass",t:"CAS number listed",note:"Present on all 5 sampled product pages.",url:"5 of 5",cap:"CAS: <mark>137525-51-0</mark> · 910463-68-2 · 77591-33-4 · 2023788-19-2 · 62568-57-4",rule:"Exact Chemical Abstracts Service registry number for the compound."},
+  {s:"pass",t:"Molecular formula listed",note:"Present on all 5.",url:"5 of 5",cap:"Molecular Formula: <mark>C62H98N16O22</mark>",rule:"e.g. C62H98N16O22 for BPC-157."},
+  {s:"review",t:"Molecular weight listed",note:"Missing on 2 of 5 pages.",url:"3 of 5",cap:"Missing on /products/thymosin-beta-4-fragment and /products/wolverine-stack",rule:"Expressed in g/mol."},
+  {s:"pass",t:"Storage conditions listed",note:"Present on all 5.",url:"5 of 5",cap:"Storage: <mark>Store at -20°C, desiccated.</mark>",rule:"e.g. 'Store at -20°C, desiccated.'"},
+  {s:"fail",t:"No dosing information",note:"Mass paired with a schedule reads as a dosing instruction.",url:"/products/semaglutide-5mg",cap:"Typical research protocol: <mark>5mg twice weekly</mark>, titrate after 4 weeks.",rule:"Never include dosing information (mg, frequency, route of administration, injection schedule)."},
+  {s:"fail",t:"No pharmaceutical brand names",note:"Brand name used in the description and the page title.",url:"/products/semaglutide-5mg",cap:"The same compound found in <mark>Ozempic</mark> and <mark>Wegovy</mark>.",rule:"Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name."},
+  {s:"fail",t:"No route-of-administration labels",note:"Product labelled as a nasal spray.",url:"/products/selank-nasal",cap:"Format: <mark>Nasal Spray</mark> · 30ml",rule:"Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims."},
+  {s:"fail",t:"No disease or benefit claims",note:"Describes treatment of a condition.",url:"/products/bpc-157",cap:"Shown to <mark>accelerate healing</mark> of tendon and ligament <mark>injuries</mark>.",rule:"No references to treating, curing, preventing or diagnosing any disease or condition."},
+  {s:"review",t:"No study citations implying human benefit",note:"Four outbound links to clinical literature on human subjects.",url:"/products/bpc-157",cap:"4 links to pubmed.ncbi.nlm.nih.gov within the benefits section.",rule:"Cannot cite or link to research studies that in any way imply human benefit or consumption."},
+  {s:"review",t:"No community abbreviations",note:"'Tirz' appears in a collection description. Flagged for a human — substring matching is unreliable here.",url:"/collections/glp-1",cap:"Our <mark>Tirz</mark> and Sema compounds are third-party tested.",rule:"Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc."}]},
+
+ {n:"Naming and taxonomy",f:[
+  {s:"fail",t:"No therapeutic categories",note:"Two collections named for a therapeutic outcome.",url:"/collections",cap:"<mark>/collections/weight-loss</mark> (18 products) · <mark>/collections/anti-aging</mark> (11 products)",rule:"Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'."},
+  {s:"fail",t:"No marketing terms in product names",note:"Three products named for an effect rather than a compound.",url:"3 products",cap:"<mark>Wolverine Stack</mark> · <mark>Lean Stack Pro</mark> · <mark>Healing Blend</mark>",rule:"No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc."},
+  {s:"review",t:"Proper chemical names used",note:"BPC-157 listed by code alone, not the full pentadecapeptide name.",url:"/products/bpc-157",cap:"Title: <mark>BPC-157</mark> · expected: Body Protection Compound 157 (Pentadecapeptide)",rule:"BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'."}]},
+
+ {n:"Catalog composition",f:[
+  {s:"fail",t:"No needles or syringes",note:"Sold as an accessory in its own collection.",url:"/collections/accessories",cap:"<mark>Insulin Syringes 31G 1ml</mark> — box of 100 — $12.99",rule:"Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited."},
+  {s:"fail",t:"No alcohol wipes",note:"Same collection.",url:"/collections/accessories",cap:"<mark>Alcohol Prep Pads</mark> — 200 count — $6.99",rule:"Associated with injection site preparation. Prohibited."},
+  {s:"pass",t:"No HCG or HGH",note:"No matches across 612 indexed URLs.",url:"612 URLs",cap:"No match for HCG, HGH, chorionic gonadotropin, somatropin.",rule:"All HCG and HGH prohibited."},
+  {s:"pass",t:"No tablets or pills",note:"No oral dose forms found.",url:"612 URLs",cap:"No match for tablet, pill, oral dose form.",rule:"Tablets or pills prohibited."},
+  {s:"review",t:"Reconstitution solution labelling",note:"Sold as 'Bacteriostatic Water for Injection', which is injection language.",url:"/products/bacteriostatic-water",cap:"Bacteriostatic Water <mark>for Injection</mark>, 30ml",rule:"May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language."},
+  {s:"pass",t:"Capsule labelling",note:"Chemical name and CAS shown, no other claims.",url:"/products/nmn-capsules",cap:"Nicotinamide Mononucleotide · CAS <mark>1094-61-7</mark>",rule:"Capsules may be sold with labeled chemical names and CAS numbers only."}]},
+
+ {n:"Quality documentation",f:[
+  {s:"review",t:"COA linked on each product page",note:"Missing on 2 of 5 sampled pages.",url:"3 of 5",cap:"No COA link on /products/wolverine-stack, /products/selank-nasal",rule:"Each product page must be linked to the Certificate of Analysis for the current batch."},
+  {s:"fail",t:"COA updated within 60 days",note:"Oldest is 148 days. Two of three exceed the window.",url:"3 COAs",cap:"Test dates: <mark>2026-03-25 (148d)</mark> · <mark>2026-05-02 (110d)</mark> · 2026-07-14 (37d)",rule:"COAs must be updated at minimum every 60 days."},
+  {s:"pass",t:"Purity at or above 98%",note:"All three COAs clear the floor.",url:"3 COAs",cap:"<mark>99.2%</mark> · 98.7% · 99.4% — HPLC",rule:"98% purity for all products."},
+  {s:"review",t:"COA contains all required fields",note:"One COA has no batch or lot number.",url:"1 of 3",cap:"COA-0448: compound ✓ purity ✓ method ✓ date ✓ <mark>batch/lot ✗</mark>",rule:"COA must identify batch/lot number, testing date, compound identity, purity %, method used."},
+  {s:"na",t:"Lab is accredited and independent",note:"Cannot be confirmed from the document. Needs an independent assay.",url:"—",cap:"Accreditation cannot be verified from a PDF.",rule:"From an accredited independent third-party testing laboratory."}]},
+
+ {n:"Fulfillment and screening",f:[
+  {s:"pass",t:"Ships to USA only",note:"Stated on the shipping policy page.",url:"/policies/shipping-policy",cap:"We ship to the <mark>continental United States only</mark>.",rule:"Ship to USA only."},
+  {s:"review",t:"No PO boxes",note:"Policy is silent and the checkout accepts a PO box address.",url:"/checkout",cap:'Entered "PO Box 4471" → <mark>accepted</mark>, no validation error.',rule:"No PO boxes or international addresses."},
+  {s:"na",t:"Adult signature on first orders",note:"Carrier setting. Not visible from the storefront.",url:"—",cap:"Requires carrier account access.",rule:"All first-time customer orders must require an adult signature upon delivery."},
+  {s:"na",t:"Packing slip disclaimers",note:"Physical document.",url:"—",cap:"Requires a test order.",rule:"Include RUO disclaimer and research-professional acknowledgement in shipment."},
+  {s:"na",t:"Ban list maintained",note:"Internal record.",url:"—",cap:"Requires merchant attestation.",rule:"Maintain an active ban list."}]},
+
+ {n:"Off-site presence",f:[
+  {s:"fail",t:"No affiliate program",note:"Public sign-up page with a commission rate.",url:"/pages/affiliates",cap:"Earn <mark>15% commission</mark> on every referral. Join our affiliate program.",rule:"No affiliate or influencer marketing program."},
+  {s:"fail",t:"No testimonials or outcome stories",note:"Review widget on 4 of 5 product pages, describing outcomes.",url:"4 of 5",cap:'"Best <mark>recovery</mark> I\'ve had after a shoulder tear" — verified buyer',rule:"Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes."},
+  {s:"review",t:"Social links point to the home page only",note:"Instagram bio links to a product collection.",url:"instagram.com/helixresearch",cap:"Bio link → <mark>/collections/weight-loss</mark>",rule:"Social media should link only to your website home page."},
+  {s:"na",t:"Social post content",note:"Post-level review needs platform access or a listening tool.",url:"—",cap:"Not covered by this check.",rule:"Every social media post must follow the same rules as product pages."},
+  {s:"na",t:"Monthly social audits",note:"Internal process.",url:"—",cap:"Requires merchant attestation.",rule:"Reviews of all social media channels at minimum monthly."}]},
+
+ {n:"Payments",f:[
+  {s:"fail",t:"No peer-to-peer payment methods",note:"Two P2P rails offered at checkout.",url:"/checkout",cap:"Payment options: Visa · Mastercard · <mark>Zelle</mark> · <mark>Cash App</mark>",rule:"Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection."},
+  {s:"pass",t:"Card processing through a merchant account",note:"Shopify Payments active.",url:"/checkout",cap:"Gateway: <mark>shopify_payments</mark>",rule:"Acceptance of credit/debit cards through a legitimate merchant processor."},
+  {s:"pass",t:"Refund and chargeback policy published",note:"Dedicated policy page, linked in the footer.",url:"/policies/refund-policy",cap:"Refund policy · 1,240 words · linked from footer",rule:"Clearly documented refund/chargeback policy."},
+  {s:"na",t:"Risk monitoring plugin installed",note:"Program requirement rather than a regulatory one. Confirm at onboarding.",url:"—",cap:"Not detectable from the storefront.",rule:"All merchants are required to use our plugin for additional risk monitoring purposes."}]},
+
+ {n:"Customer communications",f:[
+  {s:"fail",t:"FAQ free of dosing or administration advice",note:"FAQ answers a reconstitution and volume question.",url:"/pages/faq",cap:"How much water do I add? <mark>Add 2ml bacteriostatic water for a 2.5mg dose per 0.1ml.</mark>",rule:"Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance."},
+  {s:"na",t:"Support channels free of human-use language",note:"Email, chat, phone and DMs are out of reach. Sampled transcript review is the only route.",url:"—",cap:"Not covered by this check.",rule:"Including email, chat, phone, and social media direct messages."},
+  {s:"na",t:"Staff do not help with protocols",note:"Internal training.",url:"—",cap:"Requires merchant attestation.",rule:"Don't have staff offer to help customers 'figure out' protocols."}]}
+];
+
+const LABEL={fail:"FAIL",review:"REVIEW",pass:"PASS",na:"N/A"};
+const all=DATA.flatMap(c=>c.f);
+let filter="all";
+
+// counts + tick strip
+const counts={fail:0,review:0,pass:0,na:0};
+all.forEach(f=>counts[f.s]++);
+["fail","review","pass","na"].forEach(k=>document.getElementById("n-"+k).textContent=counts[k]);
+document.getElementById("strip").innerHTML=all.map(f=>
+  `<span class="tick ${f.s}" title="${f.t.replace(/"/g,'')} — ${LABEL[f.s]}"></span>`).join("");
+
+function shotLines(s){
+  const rows=["w95","w60","hit","w80","w45","w80"];
+  return rows.map(r=>`<div class="ln ${r==="hit"&&s==="pass"?"w60":r}"></div>`).join("");
+}
+
+function render(){
+  document.getElementById("cats").innerHTML=DATA.map((c,ci)=>{
+    const vis=c.f.filter(f=>filter==="all"||f.s===filter);
+    if(!vis.length) return "";
+    const openCat = filter!=="all" || c.f.some(f=>f.s==="fail");
+    return `<div class="card cat ${openCat?"open":""}">
+      <button class="cat-head" data-cat="${ci}">
+        <span class="cat-idx">${String(ci+1).padStart(2,"0")}</span>
+        <span class="cat-name">${c.n}</span>
+        <span class="pips">${c.f.map(f=>`<span class="pip ${f.s}"></span>`).join("")}</span>
+        <span class="caret">▶</span>
+      </button>
+      <div class="cat-body">${vis.map((f,fi)=>`
+        <div class="find ${f.s}" data-find="${ci}-${fi}">
+          <button class="find-head">
+            <span class="state ${f.s}">${LABEL[f.s]}</span>
+            <span class="find-main">
+              <span class="find-title">${f.t}</span>
+              <span class="find-note">${f.note}</span>
+              <span class="find-ev">▸ ${f.url}</span>
+            </span>
+          </button>
+          <div class="ev">
+            <div class="slip">
+              <div class="slip-bar">
+                <span class="eyebrow">Evidence</span>
+                <span class="stamp">captured 2026-08-20 10:42:${String(11+fi*7).padStart(2,"0")} ET</span>
+              </div>
+              <div class="slip-body">
+                <div class="slip-txt">
+                  <div class="kv"><span class="k">Source</span><span class="v">${f.url}</span></div>
+                  <div class="kv"><span class="k">Method</span><span class="v">rendered DOM · headless Chromium</span></div>
+                  <div class="capture">${f.cap}</div>
+                  <div class="rule-ref"><b>Rule.</b> ${f.rule}</div>
+                </div>
+                <div class="shot">
+                  <div class="shot-frame">
+                    <div class="shot-bar"><span></span><span></span><span></span></div>
+                    <div class="shot-canvas">${shotLines(f.s)}</div>
+                  </div>
+                  <div class="shot-cap">full-page PNG</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`).join("")}</div>
+    </div>`;
+  }).join("");
+}
+render();
+
+// interactions
+document.getElementById("cats").addEventListener("click",e=>{
+  const ch=e.target.closest(".cat-head");
+  if(ch){ch.parentElement.classList.toggle("open");return}
+  const fh=e.target.closest(".find-head");
+  if(fh) fh.parentElement.classList.toggle("open");
+});
+
+document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed","true");
+  filter=b.dataset.f;render();
+}));
+
+document.querySelectorAll(".mode").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".mode").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed","true");
+}));
+
+document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".nav-item").forEach(x=>x.removeAttribute("aria-current"));
+  b.setAttribute("aria-current","true");
+  document.querySelectorAll(".pane").forEach(p=>p.classList.remove("on"));
+  document.getElementById("pane-"+b.dataset.pane).classList.add("on");
+  window.scrollTo(0,0);
+}));
+
+// run
+document.getElementById("run").addEventListener("click",()=>{
+  document.getElementById("stage-input").style.display="none";
+  document.getElementById("stage-prog").style.display="block";
+  const rows=[...document.querySelectorAll("#layers .layer")];
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const step=reduce?60:420;
+  rows.forEach((r,i)=>{
+    setTimeout(()=>{
+      rows.forEach(x=>x.classList.remove("run"));
+      r.classList.add("run");
+      if(i>0){rows[i-1].classList.add("done");rows[i-1].insertAdjacentHTML("beforeend",`<span class="cnt">${rows[i-1].dataset.cnt}</span>`)}
+    },i*step);
+  });
+  setTimeout(()=>{
+    document.getElementById("stage-prog").style.display="none";
+    document.getElementById("stage-report").style.display="block";
+  },rows.length*step+240);
+});
+
+// toast + modal
+const toast=document.getElementById("toast");
+function say(m){toast.textContent=m;toast.classList.add("on");setTimeout(()=>toast.classList.remove("on"),2400)}
+document.getElementById("dl").addEventListener("click",()=>say("Downloaded helixresearchsupply-2026-08-20.pdf"));
+const veil=document.getElementById("veil");
+document.getElementById("send").addEventListener("click",()=>veil.classList.add("on"));
+document.getElementById("cancel").addEventListener("click",()=>veil.classList.remove("on"));
+document.getElementById("confirm").addEventListener("click",()=>{
+  veil.classList.remove("on");say("Sent to underwriting@iqwallet.com");
+});
+veil.addEventListener("click",e=>{if(e.target===veil)veil.classList.remove("on")});
+addEventListener("keydown",e=>{if(e.key==="Escape")veil.classList.remove("on")});
+</script>

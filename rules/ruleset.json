@@ -1,0 +1,280 @@
+{
+  "version": "2.4.0",
+  "source_document": "Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf",
+  "effective": "2026-05-26",
+  "states": ["fail", "review", "pass", "not_evaluable"],
+  "categories": [
+    { "id": "gate",     "n": 1,  "name": "Access and identity gating" },
+    { "id": "disclose", "n": 2,  "name": "Site-wide disclosure" },
+    { "id": "product",  "n": 3,  "name": "Product page content" },
+    { "id": "naming",   "n": 4,  "name": "Naming and taxonomy" },
+    { "id": "catalog",  "n": 5,  "name": "Catalog composition" },
+    { "id": "coa",      "n": 6,  "name": "Quality documentation" },
+    { "id": "fulfil",   "n": 7,  "name": "Fulfillment and screening" },
+    { "id": "offsite",  "n": 8,  "name": "Off-site presence" },
+    { "id": "payment",  "n": 9,  "name": "Payments" },
+    { "id": "comms",    "n": 10, "name": "Customer communications" }
+  ],
+  "rules": [
+    { "id": "GATE-001", "cat": "gate", "layer": 1, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "Age affirmation before entry",
+      "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
+      "params": { "surface": "homepage", "expect": "present", "signals": ["age-gate", "age-verify", "21+", "are you 21"] } },
+
+    { "id": "GATE-002", "cat": "gate", "layer": 0, "sev": "critical", "type": "http_probe", "tier": "auto_fail",
+      "title": "Products hidden until an account exists",
+      "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+      "params": { "paths": ["/collections/all", "/products", "/shop"], "unauthenticated": true, "fail_if_status": [200] } },
+
+    { "id": "GATE-003", "cat": "gate", "layer": 3, "sev": "critical", "type": "flow_probe", "tier": "auto_fail",
+      "title": "Guest checkout disabled",
+      "clause": "Guest checkout must be disabled.",
+      "params": { "flow": "add_to_cart_then_checkout", "unauthenticated": true, "fail_if": "payment_step_reached" } },
+
+    { "id": "GATE-004", "cat": "gate", "layer": 3, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "Terms acknowledged at sign-up",
+      "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+      "params": { "surface": "register", "expect": "present", "selector": "input[type=checkbox][required]", "near_text": ["I Agree", "Terms"] } },
+
+    { "id": "GATE-005", "cat": "gate", "layer": 3, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "Research field required at sign-up",
+      "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+      "params": { "surface": "register", "expect": "present", "required": true, "prefer_types": ["select", "radio", "checkbox"], "note_if_freetext": true } },
+
+    { "id": "GATE-006", "cat": "gate", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Research field stored with each order",
+      "clause": "Store the selected field with every order in your database.",
+      "params": { "reason": "Order records are server-side. Requires merchant attestation." } },
+
+    { "id": "GATE-007", "cat": "gate", "layer": 3, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "Terms cover all required clauses",
+      "clause": "Research-only use restriction; prohibition on human consumption; not for diagnosis/treatment/prevention; indemnification of the seller; buyer is a qualified professional.",
+      "params": { "surface": "terms", "require_all": ["research use only", "human consumption", "diagnos", "indemnif", "qualified"] } },
+
+    { "id": "DISC-001", "cat": "disclose", "layer": 1, "sev": "critical", "type": "text_match", "tier": "review_only",
+      "title": "Footer disclaimer wording",
+      "clause": "For research and laboratory use only. Not for human or animal consumption.",
+      "params": { "surface": "footer", "exact": "For research and laboratory use only. Not for human or animal consumption.", "partial_is_review": true } },
+
+    { "id": "DISC-002", "cat": "disclose", "layer": 1, "sev": "critical", "type": "computed_style", "tier": "auto_fail",
+      "title": "Footer disclaimer is legible",
+      "clause": "In legible font, not hidden or collapsed.",
+      "params": { "min_font_px": 11, "min_contrast": 4.5, "reject_hidden": true, "reject_collapsed_ancestors": true } },
+
+    { "id": "DISC-003", "cat": "disclose", "layer": 2, "sev": "critical", "type": "dom_assert", "tier": "auto_fail",
+      "title": "Disclaimer on every page",
+      "clause": "Must appear in the footer of every page of the website.",
+      "params": { "surface": "all_sampled", "expect": "present", "threshold": "all" } },
+
+    { "id": "PROD-001", "cat": "product", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "CAS number listed",
+      "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+      "params": { "surface": "product", "pattern": "\\b\\d{2,7}-\\d{2}-\\d\\b", "expect": "present" } },
+
+    { "id": "PROD-002", "cat": "product", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "Molecular formula listed",
+      "clause": "e.g. C62H98N16O22 for BPC-157.",
+      "params": { "surface": "product", "pattern": "\\b(?:[A-Z][a-z]?\\d{0,3}){3,}\\b", "labels": ["molecular formula"], "expect": "present" } },
+
+    { "id": "PROD-003", "cat": "product", "layer": 2, "sev": "minor", "type": "text_match", "tier": "review_only",
+      "title": "Molecular weight listed",
+      "clause": "Expressed in g/mol.",
+      "params": { "surface": "product", "labels": ["molecular weight", "g/mol"], "expect": "present" } },
+
+    { "id": "PROD-004", "cat": "product", "layer": 2, "sev": "minor", "type": "text_match", "tier": "review_only",
+      "title": "Storage conditions listed",
+      "clause": "e.g. 'Store at -20C, desiccated.'",
+      "params": { "surface": "product", "labels": ["storage", "store at"], "expect": "present" } },
+
+    { "id": "PROD-005", "cat": "product", "layer": 2, "sev": "critical", "type": "text_cooccurrence", "tier": "review_only",
+      "title": "No dosing information",
+      "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+      "params": {
+        "surface": "product",
+        "class_a": ["mg", "mcg", "iu", "ml"],
+        "class_b": ["daily", "weekly", "twice", "per day", "cycle", "titrate", "subcutaneous", "intramuscular", "injection schedule", "dose", "dosage"],
+        "window_tokens": 12,
+        "note": "Mass alone is a legitimate quantity spec. Only co-occurrence with schedule or route is a signal. Human review required — never auto-fail."
+      } },
+
+    { "id": "PROD-006", "cat": "product", "layer": 2, "sev": "critical", "type": "text_match", "tier": "auto_fail",
+      "title": "No pharmaceutical brand names",
+      "clause": "Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name.",
+      "params": { "surface": "all_sampled", "terms": ["Ozempic", "Wegovy", "Mounjaro", "Zepbound", "Rybelsus", "Saxenda", "Victoza", "Trulicity"], "word_boundary": true, "expect": "absent" } },
+
+    { "id": "PROD-007", "cat": "product", "layer": 2, "sev": "critical", "type": "text_match", "tier": "auto_fail",
+      "title": "No route-of-administration labels",
+      "clause": "Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims.",
+      "params": { "surface": "all_sampled", "terms": ["injectable", "nasal spray", "for injection", "subcutaneous", "intramuscular"], "word_boundary": true, "expect": "absent" } },
+
+    { "id": "PROD-008", "cat": "product", "layer": 2, "sev": "critical", "type": "text_match", "tier": "review_only",
+      "title": "No disease or benefit claims",
+      "clause": "No references to treating, curing, preventing or diagnosing any disease or condition.",
+      "params": { "surface": "all_sampled", "terms": ["treat", "cure", "prevent", "heal", "recovery", "therapy", "therapeutic", "symptom", "injury", "disease", "condition"], "expect": "absent", "note": "High false-positive rate. Review only." } },
+
+    { "id": "PROD-009", "cat": "product", "layer": 2, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "No study citations implying human benefit",
+      "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+      "params": { "surface": "product", "selector": "a[href]", "href_contains": ["pubmed", "ncbi.nlm.nih.gov", "doi.org", "clinicaltrials.gov"], "expect": "absent" } },
+
+    { "id": "PROD-010", "cat": "product", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "No community abbreviations",
+      "clause": "Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc.",
+      "params": { "surface": "all_sampled", "terms": ["Sema", "Tirz", "Reta", "Cagri"], "word_boundary": true, "expect": "absent", "note": "Substring of legitimate chemical names. Word-boundary tokenization mandatory. Review only." } },
+
+    { "id": "NAME-001", "cat": "naming", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No therapeutic categories",
+      "clause": "Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'.",
+      "params": { "patterns": ["weight-loss", "weightloss", "obesity", "longevity", "anti-aging", "antiaging", "cognitive", "nootropic", "joint-healing", "fat-loss", "muscle-building"], "scope": "collections", "expect": "absent" } },
+
+    { "id": "NAME-002", "cat": "naming", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No marketing terms in product names",
+      "clause": "No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc.",
+      "params": { "patterns": ["stack", "lean", "wolverine", "pct", "blend", "mass", "shred", "bulk", "glow", "elite"], "scope": "products", "expect": "absent" } },
+
+    { "id": "NAME-003", "cat": "naming", "layer": 2, "sev": "minor", "type": "text_match", "tier": "review_only",
+      "title": "Proper chemical names used",
+      "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+      "params": { "surface": "product", "map": { "BPC-157": "Body Protection Compound 157", "TB-500": "Thymosin Beta-4 Fragment" } } },
+
+    { "id": "CATG-001", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No needles or syringes",
+      "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
+      "params": { "patterns": ["syringe", "needle", "insulin-pen", "pen-needle"], "scope": "all", "expect": "absent" } },
+
+    { "id": "CATG-002", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No alcohol wipes",
+      "clause": "Associated with injection site preparation. Prohibited.",
+      "params": { "patterns": ["alcohol-wipe", "alcohol-pad", "prep-pad", "alcohol-swab"], "scope": "all", "expect": "absent" } },
+
+    { "id": "CATG-003", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No HCG or HGH",
+      "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
+      "params": { "patterns": ["hcg", "hgh", "chorionic-gonadotropin", "somatropin", "growth-hormone"], "scope": "all", "expect": "absent" } },
+
+    { "id": "CATG-004", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No tablets or pills",
+      "clause": "Capsules may be sold if exclusively for research use and properly labeled. Otherwise prohibited.",
+      "params": { "patterns": ["tablet", "pill", "softgel", "lozenge"], "scope": "all", "expect": "absent", "note": "OPEN QUESTION: source document describes capsules in two places with differing wording. Confirm before enforcing." } },
+
+    { "id": "CATG-005", "cat": "catalog", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "Reconstitution solution labelling",
+      "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+      "params": { "surface": "product", "applies_when_title_contains": ["bacteriostatic", "sterile water"], "forbid": ["for injection", "injectable", "Pfizer", "Hospira"], "require": ["laboratory use"] } },
+
+    { "id": "CATG-006", "cat": "catalog", "layer": 2, "sev": "minor", "type": "text_match", "tier": "review_only",
+      "title": "Capsule labelling",
+      "clause": "You may sell labeled chemical names and CAS numbers only.",
+      "params": { "surface": "product", "applies_when_title_contains": ["capsule"], "require": ["cas"] } },
+
+    { "id": "COA-001", "cat": "coa", "layer": 2, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "COA linked on each product page",
+      "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+      "params": { "surface": "product", "selector": "a[href]", "text_or_href_contains": ["coa", "certificate of analysis"], "expect": "present", "threshold": "all" } },
+
+    { "id": "COA-002", "cat": "coa", "layer": 2, "sev": "critical", "type": "doc_parse", "tier": "auto_fail",
+      "title": "COA updated within 60 days",
+      "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
+      "params": { "extract": "test_date", "max_age_days": 60, "cure_days": 14 } },
+
+    { "id": "COA-003", "cat": "coa", "layer": 2, "sev": "critical", "type": "doc_parse", "tier": "auto_fail",
+      "title": "Purity at or above 98%",
+      "clause": "98% purity for all products.",
+      "params": { "extract": "purity_pct", "min": 98.0 } },
+
+    { "id": "COA-004", "cat": "coa", "layer": 2, "sev": "major", "type": "doc_parse", "tier": "review_only",
+      "title": "COA contains all required fields",
+      "clause": "COA must identify batch/lot number, testing date, compound identity, purity %, method used (HPLC preferred).",
+      "params": { "require_fields": ["batch_lot", "test_date", "compound", "purity_pct", "method"], "prefer_method": "HPLC" } },
+
+    { "id": "COA-005", "cat": "coa", "layer": null, "sev": "critical", "type": "manual", "tier": "review_only",
+      "title": "Lab is accredited and independent",
+      "clause": "From an accredited independent third-party testing laboratory.",
+      "params": { "reason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control." } },
+
+    { "id": "FULF-001", "cat": "fulfil", "layer": 3, "sev": "major", "type": "text_match", "tier": "review_only",
+      "title": "Ships to USA only",
+      "clause": "Ship to USA only. No PO boxes or international addresses.",
+      "params": { "surface": "shipping_policy", "require_any": ["united states only", "us only", "domestic only", "we do not ship internationally"] } },
+
+    { "id": "FULF-002", "cat": "fulfil", "layer": 3, "sev": "major", "type": "flow_probe", "tier": "review_only",
+      "title": "No PO boxes",
+      "clause": "No PO boxes or international addresses.",
+      "params": { "flow": "checkout_address_validation", "probe_value": "PO Box 4471", "fail_if": "accepted" } },
+
+    { "id": "FULF-003", "cat": "fulfil", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Adult signature on first orders",
+      "clause": "All first-time customer orders must require an adult signature upon delivery (21+ confirmed).",
+      "params": { "reason": "Carrier configuration. Requires merchant attestation." } },
+
+    { "id": "FULF-004", "cat": "fulfil", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Packing slip disclaimers",
+      "clause": "Include RUO disclaimer and research-professional acknowledgement in shipment.",
+      "params": { "reason": "Physical document. Requires a test order or merchant attestation." } },
+
+    { "id": "FULF-005", "cat": "fulfil", "layer": null, "sev": "critical", "type": "manual", "tier": "review_only",
+      "title": "Ban list maintained",
+      "clause": "Any customer who hints at human consumption must be permanently banned with no appeal option.",
+      "params": { "reason": "Internal record. Requires merchant attestation." } },
+
+    { "id": "OFFS-001", "cat": "offsite", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
+      "title": "No affiliate program",
+      "clause": "No affiliate or influencer marketing program.",
+      "params": { "patterns": ["affiliate", "ambassador", "referral-program", "partner-program"], "scope": "pages", "expect": "absent" } },
+
+    { "id": "OFFS-002", "cat": "offsite", "layer": 2, "sev": "critical", "type": "dom_assert", "tier": "review_only",
+      "title": "No testimonials or outcome stories",
+      "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+      "params": { "surface": "product", "selector": "[class*=review], [class*=testimonial], [data-product-reviews]", "expect": "absent" } },
+
+    { "id": "OFFS-003", "cat": "offsite", "layer": 1, "sev": "minor", "type": "dom_assert", "tier": "review_only",
+      "title": "Social links point to the home page only",
+      "clause": "Social media should link only to your website home page.",
+      "params": { "surface": "homepage", "collect": "social_handles", "note": "Bio-link inspection requires platform fetch. Best-effort." } },
+
+    { "id": "OFFS-004", "cat": "offsite", "layer": null, "sev": "critical", "type": "manual", "tier": "review_only",
+      "title": "Social post content",
+      "clause": "Every social media post must follow the same rules as product pages.",
+      "params": { "reason": "Post-level review needs platform API access or a commercial listening tool. Not covered." } },
+
+    { "id": "OFFS-005", "cat": "offsite", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Monthly social audits",
+      "clause": "Reviews of all social media channels at minimum monthly.",
+      "params": { "reason": "Internal process. Requires merchant attestation." } },
+
+    { "id": "PAY-001", "cat": "payment", "layer": 3, "sev": "critical", "type": "text_match", "tier": "auto_fail",
+      "title": "No peer-to-peer payment methods",
+      "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
+      "params": { "surface": "checkout_and_footer", "terms": ["Zelle", "Cash App", "CashApp", "Venmo", "Friends & Family", "friends and family"], "expect": "absent" } },
+
+    { "id": "PAY-002", "cat": "payment", "layer": 3, "sev": "major", "type": "dom_assert", "tier": "review_only",
+      "title": "Card processing through a merchant account",
+      "clause": "Acceptance of credit/debit cards through a legitimate merchant processor that conducts proper KYC.",
+      "params": { "surface": "checkout", "detect": "gateway", "expect": "present" } },
+
+    { "id": "PAY-003", "cat": "payment", "layer": 3, "sev": "minor", "type": "dom_assert", "tier": "review_only",
+      "title": "Refund and chargeback policy published",
+      "clause": "Clearly documented refund/chargeback policy.",
+      "params": { "surface": "footer", "link_text_contains": ["refund", "return", "chargeback"], "expect": "present" } },
+
+    { "id": "PAY-004", "cat": "payment", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Risk monitoring plugin installed",
+      "clause": "All merchants are required to use our plugin for additional risk monitoring purposes.",
+      "params": { "reason": "Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report." } },
+
+    { "id": "COMM-001", "cat": "comms", "layer": 3, "sev": "critical", "type": "text_cooccurrence", "tier": "review_only",
+      "title": "FAQ free of dosing or administration advice",
+      "clause": "Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance.",
+      "params": { "surface": "faq", "class_a": ["mg", "ml", "mcg", "iu"], "class_b": ["reconstitute", "add water", "dose", "per injection", "how much", "how often"], "window_tokens": 20 } },
+
+    { "id": "COMM-002", "cat": "comms", "layer": null, "sev": "critical", "type": "manual", "tier": "review_only",
+      "title": "Support channels free of human-use language",
+      "clause": "Including email, chat, phone, and social media direct messages.",
+      "params": { "reason": "Not reachable by crawl. Sampled transcript review or mystery shopping only." } },
+
+    { "id": "COMM-003", "cat": "comms", "layer": null, "sev": "major", "type": "manual", "tier": "review_only",
+      "title": "Staff do not help with protocols",
+      "clause": "Don't have staff offer to help customers 'figure out' protocols.",
+      "params": { "reason": "Internal training. Requires merchant attestation." } }
+  ]
+}
