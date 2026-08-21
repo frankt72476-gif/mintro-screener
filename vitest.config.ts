@@ -20,6 +20,9 @@ export default defineConfig({
   },
   test: {
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
+    // The schema suite boots Postgres in WASM; the default 5s is not enough for the first one.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     environment: 'node',
   },
 });

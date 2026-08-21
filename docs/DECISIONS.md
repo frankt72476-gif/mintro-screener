@@ -1115,3 +1115,64 @@ as having worked, and the gap between those two is exactly where this failure li
 writes into a partially written run, and that should be an explicit instruction rather than
 something a routine re-run does by itself. Without it, an incomplete run is reported and skipped
 with its problems named.
+
+---
+
+## D-032 — Test DML against a real schema, not only the DDL as text
+**2026-08-21 · business owner**
+
+Three defects reached the project through a green 438-test suite:
+
+| Defect | Layer |
+|---|---|
+| `0008`'s bucket guard passed, uploads still failed with "Bucket not found" | storage API |
+| The idempotency check tested existence, not completeness (D-031) | query-result logic |
+| `ON CONFLICT (run_id, ordinal)` could not infer a partial index | DML against the schema |
+
+`apps/worker/test/migrations.test.ts` reads the migrations **as text** and asserts the DDL is
+well-formed. Nothing executed any of it. The suite asserted the shape of the schema and nothing
+about working with it.
+
+### Three tiers, because no one tier catches all three
+
+**Tier 1 — PGlite, in `npm run check`.** Postgres compiled to WASM, in process, no Docker. It
+applies the *actual migration files*, so a migration that would fail against Postgres fails here.
+Catches `ON CONFLICT` inference, trigger firing, constraints, uniqueness scoping, resumed writes.
+
+Two of its tests exist to prove the tier has teeth: they demonstrate that a partial unique index
+**cannot** be inferred without its predicate, and that nulls are distinct in a unique index. Both
+reproduce the defect's own shape. *A suite that only passes against the fixed schema shows the fix
+works; these show the harness would have caught it.*
+
+**Tier 2 — the Supabase local stack. Needs Docker, which the development machine does not have.**
+The only tier that exercises `supabase-js → PostgREST → SQL`, which is where this bug was
+*generated*, and the only one that can test RLS as `anon` or storage `upsert: false`. Written and
+gated on `SUPABASE_TEST_URL`, pointed at test-specific variables so it can never run against the
+production project by accident. **Stated as unrunnable here rather than quietly skipped** — a tier
+nobody can run is not coverage.
+
+**Tier 3 — preflight.** `0008` asserted the bucket at *migration* time; the failure happened at
+*upload* time and nothing re-checked in between. A guard that runs once, long before the thing it
+guards, is not guarding it. The migration now probes immediately before its first write, and
+refuses to start if the bucket is unreachable or the index is not inferable.
+
+### The index: total, not partial
+
+`0009` made the index partial "so rows predating this column do not block it". There were none,
+and it cost two things:
+
+1. **PostgREST cannot target it.** Its `on_conflict` parameter accepts column names and has no
+   syntax for a predicate. A partial unique index is *unreachable* through the client this code
+   uses — not awkward, unreachable.
+2. **A nullable ordinal weakened the guarantee it existed to provide**, since Postgres treats
+   nulls as distinct in a unique index. Two findings with a null ordinal would both insert.
+
+`0010` makes the column `NOT NULL` and the index total. The fix removes the reason a predicate was
+needed rather than teaching the client a clause it cannot express.
+
+### The error message
+
+"there is no unique or exclusion constraint matching the ON CONFLICT specification" named neither
+the expected index nor the cause, and cost a round trip. It now states what was expected, the
+query to check it with, and what the answer means — the same discipline as the env-var and
+bucket-name errors.

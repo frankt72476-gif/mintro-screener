@@ -1,0 +1,180 @@
+/**
+ * A real Postgres, running the real migrations, in process.
+ *
+ * Three defects reached production through a green test suite — the bucket guard, the
+ * existence-versus-completeness check, and `ON CONFLICT` against a partial index. All three were
+ * DML failing against the actual schema, and nothing in the suite executed SQL at all. The
+ * migrations test asserted the DDL was *well-formed*; nothing asserted anything *worked* against
+ * it.
+ *
+ * PGlite is Postgres compiled to WASM, so `ON CONFLICT` inference, trigger firing, `NOT NULL` and
+ * check constraints all behave as they do in the project. It needs no Docker, which is what lets
+ * it run in `npm run check` rather than in a tier people skip.
+ *
+ * ## What this cannot catch
+ *
+ * There is no PostgREST here, so the `supabase-js → PostgREST → SQL` translation is not
+ * exercised — and that is where today's bug was *generated*. There is no storage API, so the
+ * bucket guard is not exercised either. Both need the full local stack (`supabase start`, which
+ * needs Docker); see `apps/worker/test/schema/README.md`.
+ *
+ * What this tier does catch is the SQL semantics the client relies on. A partial unique index
+ * that `ON CONFLICT (a, b)` cannot infer fails here exactly as it failed in the project.
+ */
+
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+const MIGRATIONS = 'supabase/migrations';
+
+/**
+ * Stand-ins for the objects Supabase provides.
+ *
+ * Deliberately minimal: enough for the migrations to apply, and no more. Anything richer would be
+ * modelling Supabase rather than testing our schema against it, and a rich fake is how you end up
+ * testing the fake.
+ */
+const SUPABASE_STUBS = `
+  -- Roles the migrations grant to and revoke from.
+  do $$ begin
+    if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+      create role authenticated;
+    end if;
+    if not exists (select 1 from pg_roles where rolname = 'anon') then
+      create role anon;
+    end if;
+    if not exists (select 1 from pg_roles where rolname = 'service_role') then
+      create role service_role;
+    end if;
+  end $$;
+
+  create schema if not exists auth;
+  create schema if not exists storage;
+
+  create table if not exists auth.users (
+    id    uuid primary key default gen_random_uuid(),
+    email text
+  );
+
+  -- Returns the analyst the tests are acting as. Set with \`actAs()\`.
+  create or replace function auth.uid() returns uuid language sql stable as $$
+    select nullif(current_setting('test.uid', true), '')::uuid;
+  $$;
+
+  create table if not exists storage.buckets (
+    id     text primary key,
+    name   text not null,
+    public boolean not null default false
+  );
+
+  create table if not exists storage.objects (
+    id        uuid primary key default gen_random_uuid(),
+    bucket_id text not null references storage.buckets (id),
+    name      text not null,
+    unique (bucket_id, name)
+  );
+
+  alter table storage.objects enable row level security;
+
+  -- The bucket 0008 asserts on. Private, as the migration requires.
+  insert into storage.buckets (id, name, public)
+  values ('evidence', 'evidence', false)
+  on conflict (id) do nothing;
+`;
+
+export interface SchemaFixture {
+  readonly db: PGlite;
+  /** Runs SQL, returning rows. Single statement — parameterised queries cannot be batched. */
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+  /** Runs one or more statements with no parameters. For DDL a test needs to set up. */
+  exec(sql: string): Promise<void>;
+  /** Runs SQL and returns the error message, or null when it succeeded. */
+  attempt(sql: string, params?: unknown[]): Promise<string | null>;
+  /** Acts as a given analyst id for `auth.uid()`. */
+  actAs(uid: string | null): Promise<void>;
+  close(): Promise<void>;
+}
+
+/**
+ * Applies every migration in order, exactly as the project does.
+ *
+ * Reads the files rather than a copy of them, so a migration that would fail against Postgres
+ * fails here — which is the entire point. A fixture built from hand-written DDL would drift from
+ * what ships, and drift is what this is for.
+ */
+export async function createSchema(): Promise<SchemaFixture> {
+  const db = new PGlite();
+  await db.exec(SUPABASE_STUBS);
+
+  const files = readdirSync(MIGRATIONS)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+
+  for (const file of files) {
+    const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
+    try {
+      await db.exec(sql);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`migration ${file} failed to apply: ${message}`);
+    }
+  }
+
+  return {
+    db,
+
+    async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+      const result = await db.query<T>(sql, params);
+      return result.rows;
+    },
+
+    async exec(sql: string): Promise<void> {
+      await db.exec(sql);
+    },
+
+    async attempt(sql: string, params: unknown[] = []): Promise<string | null> {
+      try {
+        await db.query(sql, params);
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
+
+    async actAs(uid: string | null): Promise<void> {
+      await db.query(`select set_config('test.uid', $1, false)`, [uid ?? '']);
+    },
+
+    close: () => db.close(),
+  };
+}
+
+/** A merchant and an open run, for tests that need something to hang findings off. */
+export async function seedRun(
+  fixture: SchemaFixture,
+  domain = 'shop.example',
+): Promise<{ merchantId: string; runId: string }> {
+  const [merchant] = await fixture.query<{ id: string }>(
+    `insert into public.merchants (domain) values ($1) returning id`,
+    [domain],
+  );
+
+  const [run] = await fixture.query<{ id: string }>(
+    `insert into public.runs (merchant_id, mode, ruleset_version, status)
+     values ($1, 'public', '2.4.0', 'running') returning id`,
+    [merchant!.id],
+  );
+
+  return { merchantId: merchant!.id, runId: run!.id };
+}
+
+/** A findings row, with only the columns a test cares about spelled out. */
+export function findingRow(runId: string, ordinal: number, ruleId = 'NAME-001'): unknown[] {
+  return [runId, ordinal, ruleId, 'pass', 'Observed.', 'document'];
+}
+
+export const INSERT_FINDING = `
+  insert into public.findings (run_id, ordinal, rule_id, state, note, evidence_kind)
+  values ($1, $2, $3, $4, $5, $6)
+`;

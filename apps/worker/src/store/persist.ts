@@ -235,7 +235,7 @@ async function insertFindings(
       .upsert(rows.slice(i, i + 200), { onConflict: 'run_id,ordinal', ignoreDuplicates: true });
 
     if (error !== null) {
-      throw new Error(`could not record findings for run ${runId}: ${error.message}`);
+      throw new Error(explainFindingsInsert(error.message, runId));
     }
   }
 }
@@ -264,6 +264,53 @@ async function finishRun(
   if (error !== null) {
     throw new Error(`could not close run ${runId}: ${error.message}`);
   }
+}
+
+/**
+ * Turns a Postgres conflict error into something actionable.
+ *
+ * "there is no unique or exclusion constraint matching the ON CONFLICT specification" says
+ * nothing about *which* constraint was expected, nor that a partial index needs its predicate
+ * repeated. Frank spent a round trip on it. Same discipline as the env-var and bucket-name
+ * errors: name what was expected and what to check.
+ */
+export function explainFindingsInsert(message: string, runId: string): string {
+  const base = `could not record findings for run ${runId}: ${message}`;
+
+  if (/no unique or exclusion constraint matching/i.test(message)) {
+    return (
+      `${base}
+
+` +
+      `  Expected: a TOTAL unique index on public.findings (run_id, ordinal), created by
+` +
+      `            supabase/migrations/0010_findings_ordinal_total.sql.
+` +
+      `  Check:    select indexdef from pg_indexes
+` +
+      `            where tablename = 'findings' and indexname = 'findings_run_ordinal_key';
+
+` +
+      `  If that returns an index ending in "WHERE (ordinal IS NOT NULL)", migration 0010 has
+` +
+      `  not been applied. A PARTIAL index cannot be inferred by ON CONFLICT (run_id, ordinal),
+` +
+      `  and PostgREST has no syntax for repeating the predicate — so 0010 makes it total.`
+    );
+  }
+
+  if (/null value in column "ordinal"/i.test(message)) {
+    return (
+      `${base}
+
+` +
+      `  Every finding must carry an ordinal. It is set by insertFindings from the report's own
+` +
+      `  order, so a null here means a row reached the insert by another path.`
+    );
+  }
+
+  return base;
 }
 
 function isDuplicate(message: string): boolean {

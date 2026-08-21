@@ -13,5 +13,8 @@
     "@mintro/ruleset": "*",
     "@supabase/supabase-js": "^2.47.0",
     "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.5"
   }
 }

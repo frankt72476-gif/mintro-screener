@@ -34,6 +34,7 @@ import type { EvidenceArtifact, ScreeningReport } from '@mintro/engine';
 import { createWorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
 import { assessRun, describeCompleteness } from '../src/store/completeness.js';
+import { preflight } from '../src/store/preflight.js';
 
 interface LocalArtifact {
   readonly key: string;
@@ -86,6 +87,19 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     return 0;
   }
+
+  // Checked immediately before the first write, against the project being written to. `0008`
+  // asserted the bucket at migration time; the failure happened at upload time, and nothing
+  // re-checked in between.
+  const checks = await preflight(supabase);
+  for (const check of checks.checks) {
+    console.log(`  ${check.ok ? 'ok  ' : 'FAIL'}  ${check.name.padEnd(48)} ${check.detail}`);
+  }
+  if (!checks.ok) {
+    console.error('\nPreflight failed. Nothing was written.');
+    return 1;
+  }
+  console.log();
 
   let ok = 0;
 
