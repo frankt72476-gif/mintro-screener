@@ -105,3 +105,36 @@ Short-circuit on a critical failure. Most merchants never reach Layer 2.
 Not in scope, and the report must say so rather than implying coverage: support channel
 content, packing slips, ban list maintenance, COA authenticity, shipping destinations,
 social post content, staff conduct.
+
+## Handler requirements carried forward
+
+Rulings made before the handler was written, recorded so they are not rediscovered by
+shipping something noisy or misleading. Each names the rule or check type it binds.
+
+### Session mode must appear in the evidence
+
+`http_probe` and `flow_probe` both take an optional `unauthenticated` param. Absence means
+**inherit the run's session mode** — it is not a synonym for "unauthenticated".
+
+Because the meaning of these probes depends on session state, **the runner must record the
+session mode actually used in each finding's evidence.** "GATE-002 returned 200 for
+/collections/all" says opposite things depending on whether the request carried a merchant
+session, and a report that does not say which is not evidence of anything.
+
+This is the same failure class as an unvalidated param key: a silent default that changes what
+a finding means. Validation refuses to let a param be silently ignored; this refuses to let
+session state be silently assumed.
+
+### PROD-002 matches only inside the labelled region
+
+PROD-002 (molecular formula) carries both a `pattern` and `labels: ["molecular formula"]`. The
+pattern `\b(?:[A-Z][a-z]?\d{0,3}){3,}\b` matches a great deal of ordinary capitalised text —
+run against free page text it will fill the review queue with headings and product names.
+
+**The handler must apply the pattern only within the region identified by `labels`, never to
+the whole page.** `labels` is a scoping instruction, not a hint. The general form: where a
+`text_match` rule carries both `labels` and a `pattern`, the labels bound where the pattern is
+allowed to match.
+
+This matters beyond one rule. Rules that reach human review are the ones whose accuracy
+decides whether analysts trust the tool; a noisy review queue is not a cosmetic problem.

@@ -32,9 +32,25 @@ should mean), stop and ask. Do not guess at business rules.
    observed from the crawled surface returns `not_evaluable` — never `pass`. Reporting an
    unobservable rule as passing is the worst bug this system can have.
 
-3. **No finding without evidence.** Every non-`pass` finding must carry: source URL,
-   matched string or computed value, full-page screenshot, DOM snapshot hash, UTC timestamp.
-   If evidence capture fails, the finding is `not_evaluable`, not a bare assertion.
+3. **No finding without evidence, appropriate to the surface.** Every finding names its
+   evidence kind explicitly, and carries the capture that kind requires. See D-012.
+
+   - **Rendered-page findings (L1+)** — full-page screenshot, DOM snapshot hash, source URL,
+     matched value, UTC timestamp.
+   - **Documentary findings (L0)** — the stored artifact body, its SHA-256, source URL, UTC
+     timestamp, matched pattern, matched URLs.
+
+   Store the artifact body, not only its hash: a hash proves a document has not changed, but
+   it does not let anyone read what the document said. Keep the SHA-256 alongside it — that is
+   what proves the stored artifact is the one fetched.
+
+   This applies to `pass` as much as to a failure. The absence of a prohibited URL is a
+   finding about the catalogue and needs the same backing as its presence.
+
+   **Never synthesize a visual capture that did not occur.** If the capture a finding's kind
+   requires could not be made, the finding is `not_evaluable`, not a bare assertion — and a
+   `not_evaluable` finding must itself evidence *why*, with the requests attempted and what
+   they returned.
 
 4. **Ambiguous checks never auto-fail.** Rules marked `tier: "review_only"` (dosing
    co-occurrence, abbreviation matching) go to a human queue regardless of confidence.

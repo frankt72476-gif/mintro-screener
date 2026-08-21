@@ -140,22 +140,22 @@
     { "id": "CATG-001", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No needles or syringes",
       "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
-      "params": { "patterns": ["syringe", "needle", "insulin-pen", "pen-needle"], "scope": "all", "expect": "absent" } },
+      "params": { "patterns": ["syringe", "needle", "insulin-pen", "pen-needle"], "scope": "products", "expect": "absent" } },
 
     { "id": "CATG-002", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No alcohol wipes",
       "clause": "Associated with injection site preparation. Prohibited.",
-      "params": { "patterns": ["alcohol-wipe", "alcohol-pad", "prep-pad", "alcohol-swab"], "scope": "all", "expect": "absent" } },
+      "params": { "patterns": ["alcohol-wipe", "alcohol-pad", "prep-pad", "alcohol-swab"], "scope": "products", "expect": "absent" } },
 
     { "id": "CATG-003", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No HCG or HGH",
       "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
-      "params": { "patterns": ["hcg", "hgh", "chorionic-gonadotropin", "somatropin", "growth-hormone"], "scope": "all", "expect": "absent" } },
+      "params": { "patterns": ["hcg", "hgh", "chorionic-gonadotropin", "somatropin", "growth-hormone"], "scope": "products", "expect": "absent", "note": "Product URLs only. These terms appear routinely in research writing; matching editorial content would auto-fail a merchant for publishing, not selling. See D-010." } },
 
     { "id": "CATG-004", "cat": "catalog", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No tablets or pills",
       "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
-      "params": { "patterns": ["tablet", "pill", "softgel", "lozenge"], "scope": "all", "expect": "absent", "note": "Covers tablets and pills only. Capsule labelling is CATG-006." } },
+      "params": { "patterns": ["tablet", "pill", "softgel", "lozenge"], "scope": "products", "expect": "absent", "note": "Covers tablets and pills only. Capsule labelling is CATG-006." } },
 
     { "id": "CATG-005", "cat": "catalog", "layer": 2, "sev": "major", "type": "text_match", "tier": "review_only",
       "title": "Reconstitution solution labelling",

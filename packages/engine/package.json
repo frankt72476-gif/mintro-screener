@@ -1,9 +1,9 @@
 {
-  "name": "@mintro/ruleset",
+  "name": "@mintro/engine",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Loader, schema and validator for rules/ruleset.json — the single source of truth for the RUO peptide program rule set.",
+  "description": "Crawl layers and check handlers. Layer 0 needs no browser.",
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
@@ -12,11 +12,7 @@
   },
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
-  "scripts": {
-    "typecheck": "tsc --build",
-    "test": "vitest run"
-  },
   "dependencies": {
-    "zod": "^3.23.8"
+    "@mintro/ruleset": "*"
   }
 }

@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --build --force",
     "validate": "tsc --build && node packages/ruleset/dist/bin/validate-ruleset.js",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

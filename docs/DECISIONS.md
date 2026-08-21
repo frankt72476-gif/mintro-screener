@@ -173,3 +173,111 @@ critical rule is the most expensive error the tool can make.
 
 Note the fourth line: a check that could not run is `not_evaluable`, never `pass`. This
 restates hard constraint 2 and is not negotiable.
+
+---
+
+## D-010 — Not used
+
+Number reserved and skipped. The catalogue-scope decision below was drafted as D-010 before
+the ruling assigned it D-011; the number is left unused rather than renumbering a decision
+that may already have been cited.
+
+---
+
+## D-011 — Catalogue rules match product URLs, not every URL
+**2026-08-20 · business owner**
+
+CATG-001 through CATG-004 change from `scope: "all"` to `scope: "products"`.
+
+**What prompted it.** The first Layer 0 run against five real storefronts auto-failed two
+merchants on CATG-003 (No HCG or HGH, `critical`, `auto_fail`). Of the 27 matching URLs across
+those two merchants, **none were product URLs** — every one was an editorial article:
+
+    /ghrp-2-and-cjc-1295-blend-growth-hormone-deficiency-and-fat-metabolism/
+    /sermorelin-ipamorelin-blend-potential-analogues-of-growth-hormone/
+
+On biotechpeptides.com this is conclusive rather than inferred: its products sit under
+`/product/`, 89 of them were classified as such, and none of the 21 matches was among them.
+
+**Reasoning.** CATG-003 prohibits *selling* HCG/HGH. An article about growth-hormone research
+is not an offer to sell. The matched strings are real, but the finding they generate —
+"prohibited product", with a blog post as its evidence — is false, and a false finding of that
+shape discredits the whole report.
+
+The observation underlying those matches is not worthless; it is filed under the wrong rule.
+Editorial content that reads as human-use promotion is a real signal, and the Layer 2 text
+checks are where it belongs.
+
+**Alternatives rejected.** Downgrading CATG-003 to `review_only` would suppress a *correct*
+critical failure — swisschems.is `/product/hcg-5000-iu/` is HCG offered for sale — in order to
+fix a miscategorised one. Teaching the engine to classify editorial content would put
+rule-adjacent knowledge into code, which is what hard constraint 1 exists to prevent.
+
+**The trade accepted.** A prohibited item listed somewhere other than a product URL is no
+longer caught at Layer 0. That is the right trade: Layer 2 samples product pages and its text
+checks go to human review, so the recall lost here is recoverable, while a wrong `fail` on a
+critical rule is not.
+
+**The general principle.** Where a clause prohibits selling something, the rule's scope is the
+selling surface. `scope: "all"` means every URL and should be used only where the clause really
+does reach the whole site.
+
+**Accepted cost.** On storefronts whose products sit at root-level permalinks —
+corepeptides.com among the five scanned — no URL classifies as a product, and the CATG rules
+now return `not_evaluable` rather than matching. That is hard constraint 2 behaving correctly:
+the catalogue was not observed, so nothing is claimed about it.
+
+It also makes **Layer 1 shop-structure discovery a priority input for M2**. A rendered homepage
+reveals the catalogue structure that a sitemap alone does not, and it is what closes this gap.
+
+---
+
+## D-012 — Evidence is appropriate to the surface, and the artifact is stored, not hashed
+**2026-08-20 · business owner**
+
+Hard constraint 3 required a full-page screenshot and DOM snapshot hash on every non-`pass`
+finding. Layer 0 has neither — there is no rendered page at that moment — so the constraint as
+written would have made every Layer 0 finding `not_evaluable` and the layer pointless. The
+constraint is amended rather than worked around.
+
+**Evidence by kind.** Every finding names its evidence kind explicitly, so the report shows what
+was actually captured instead of leaving a reader to assume:
+
+| Kind | Findings | Capture required |
+|---|---|---|
+| `rendered_page` | L1 and above | full-page screenshot, DOM snapshot hash, source URL, matched value, UTC timestamp |
+| `document` | L0 | stored artifact body, its SHA-256, source URL, UTC timestamp, matched pattern, matched URLs |
+
+**Never synthesize a visual capture that did not occur.** A finding may not claim a screenshot
+it does not have. Where the capture its kind requires could not be made, the finding is
+`not_evaluable`.
+
+### The artifact body is stored, not just its hash
+
+This overrules the earlier instruction to keep a digest alone.
+
+**Reasoning.** A hash proves a document did not change; it does not let anyone read what the
+document said. In a dispute, "we hold a SHA-256 of a sitemap we no longer have" is a receipt for
+evidence, not evidence. Storing the body makes the exact observation reproducible: this is the
+document the merchant's server served, this is the URL in it, this is the pattern that matched.
+
+The SHA-256 is kept alongside the body — that is what proves the stored artifact is the one
+fetched.
+
+**Requirements.**
+
+- Store robots.txt and **every sitemap fetched in the run**, including followed index children —
+  not only the documents that produced a match. A `pass` needs the same backing as a failure.
+- A 200 response that turns out not to be a sitemap is stored too. That document is the evidence
+  of why a rule was not evaluable.
+- Gzip on write. These are text and compress heavily; the storage cost is negligible.
+- Append-only, private bucket, keyed per run. A re-scan never overwrites an earlier run's
+  capture (D-002, hard constraint 5).
+- A `not_evaluable` finding must evidence *why* it could not be evaluated: the requests
+  attempted and what each returned. The peptidesciences.com case is the worked example — store
+  the robots.txt body served, the fact that it declared no sitemap, and each of the three
+  well-known paths tried with its status.
+
+**Where this is implemented.** `packages/engine/src/findings.ts` defines `EvidenceKind` and
+`EvidenceArtifact`; `discover.ts` retains and gzips; `packages/engine/test/evidence.test.ts`
+asserts each requirement above, including the peptidesciences shape.
