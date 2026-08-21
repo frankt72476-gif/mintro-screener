@@ -52,6 +52,14 @@ export interface PersistInput {
   readonly artifacts: readonly EvidenceArtifact[];
   /** Supplied so a re-persist of an existing run is a collision rather than a silent overwrite. */
   readonly runId: string;
+  /**
+   * Every key the run captured, when that is known separately from `artifacts`.
+   *
+   * A resume has the key list — it can read the evidence directory — but deliberately carries no
+   * artifact bodies, because reconstructing those is what the deleted migration script did and
+   * where it went wrong (D-034, D-035). Defaults to the keys of `artifacts`.
+   */
+  readonly artifactKeys?: readonly string[];
 }
 
 export interface PersistResult {
@@ -148,7 +156,12 @@ async function writeRunContents(
 
   // Verified against the report in hand, not the stored one — there is no stored one yet, and a
   // check that read the database for its own expectations would find none and pass vacuously.
-  const contents = await assessContents(supabase, runId, report, { checkObjects: true });
+  const contents = await assessContents(supabase, runId, report, {
+    checkObjects: true,
+    // The full captured set, not only what the findings cite. The writer is the only party that
+    // knows it — a reader has just the report, which names about two thirds of the artifacts.
+    artifactKeys: input.artifactKeys ?? artifacts.map((artifact) => artifact.key),
+  });
   if (contents.problems.length > 0) {
     const listed = contents.problems.map((problem) => `  ${problem}`).join(`
 `);

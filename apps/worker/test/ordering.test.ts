@@ -79,6 +79,12 @@ interface StubState {
   readonly evidence: ReadonlyArray<{ key: string; kind: string }>;
   /** Storage paths that resolve. Anything cited but not listed reads as an unreachable object. */
   readonly objects: readonly string[];
+  /** A transport failure on the evidence select, as opposed to an empty result. */
+  readonly evidenceError?: string;
+  /** A transport failure on the findings count. */
+  readonly findingsError?: string;
+  /** A storage failure that is not "object not found". */
+  readonly storageError?: string;
 }
 
 /** Just enough of the client for `assessRun` and `assessContents`, and nothing more. */
@@ -100,20 +106,37 @@ function stub(state: StubState): WorkerSupabase {
 
       if (table === 'findings') {
         return {
-          select: () => ({ eq: async () => ({ count: state.findings, data: null, error: null }) }),
+          select: () => ({
+            eq: async () => ({
+              count: state.findingsError === undefined ? state.findings : null,
+              data: null,
+              error: state.findingsError === undefined ? null : { message: state.findingsError },
+            }),
+          }),
         };
       }
 
       return {
-        select: () => ({ eq: async () => ({ data: [...state.evidence], error: null }) }),
+        select: () => ({
+          eq: async () => ({
+            // The shape a failed PostgREST call actually returns: data null, error set. The bug
+            // was reading only `data` and coalescing it to [].
+            data: state.evidenceError === undefined ? [...state.evidence] : null,
+            error: state.evidenceError === undefined ? null : { message: state.evidenceError },
+          }),
+        }),
       };
     },
     storage: {
       from: () => ({
-        createSignedUrl: async (path: string) => ({
-          data: state.objects.includes(path) ? { signedUrl: `https://signed/${path}` } : null,
-          error: null,
-        }),
+        createSignedUrl: async (path: string) => {
+          if (state.storageError !== undefined) {
+            return { data: null, error: { message: state.storageError } };
+          }
+          return state.objects.includes(path)
+            ? { data: { signedUrl: `https://signed/${path}` }, error: null }
+            : { data: null, error: { message: 'Object not found' } };
+        },
       }),
     },
   };
@@ -236,5 +259,138 @@ describe('checking a run before it is closed', () => {
     );
 
     expect(contents.problems.join(' ')).toContain(CITED_DOC);
+  });
+});
+
+/**
+ * The corepeptides failure, as a test.
+ *
+ * That run wrote all 17 artifacts, all 17 evidence rows and all 97 findings, and was refused
+ * anyway. `readContents` discarded the `error` from its own queries and coalesced the result, so a
+ * transient failure on the evidence select produced *an empty database* and the check reported
+ * every cited key as missing. The number in the output — 11 — was the count of keys the report
+ * cites, not a count of anything that was actually absent.
+ *
+ * The reader could not tell "nothing is there" from "I could not look", and answered as though it
+ * could. Same shape as the rest of the sequence, pointing the other way: a false failure rather
+ * than a false pass. Survivable, but not a check.
+ */
+describe('a read that failed is not an empty database', () => {
+  const expected = ruleset.rules.length;
+
+  it('throws when the evidence rows cannot be read, rather than reporting them missing', async () => {
+    const failing = assessContents(
+      stub({
+        run: { status: 'running', finished_at: null, report: null },
+        findings: expected,
+        evidence: ALL_EVIDENCE,
+        objects: ALL_OBJECTS,
+        evidenceError: 'fetch failed',
+      }),
+      'run-1',
+      report(),
+    );
+
+    await expect(failing).rejects.toThrow(/could not read evidence rows/i);
+    // Specifically NOT the old behaviour, which was to report every cited key as having no row.
+    await expect(failing).rejects.not.toThrow(/cited evidence key/i);
+  });
+
+  it('throws when the findings cannot be counted, rather than reporting zero', async () => {
+    // A null count coalesced to 0 reads as "no findings were written" — condemning a run that
+    // wrote all of them.
+    await expect(
+      assessContents(
+        stub({
+          run: { status: 'running', finished_at: null, report: null },
+          findings: expected,
+          evidence: ALL_EVIDENCE,
+          objects: ALL_OBJECTS,
+          findingsError: 'statement timeout',
+        }),
+        'run-1',
+        report(),
+      ),
+    ).rejects.toThrow(/could not count findings/i);
+  });
+
+  it('throws when the storage API fails, rather than calling the object missing', async () => {
+    await expect(
+      assessContents(
+        stub({
+          run: { status: 'running', finished_at: null, report: null },
+          findings: expected,
+          evidence: ALL_EVIDENCE,
+          objects: ALL_OBJECTS,
+          storageError: 'upstream connect error',
+        }),
+        'run-1',
+        report(),
+        { checkObjects: true },
+      ),
+    ).rejects.toThrow(/could not check the object/i);
+  });
+
+  it('still reports a genuinely absent object as absent', async () => {
+    // The distinction has to cut both ways, or it is just a swallowed failure with extra steps.
+    const contents = await assessContents(
+      stub({
+        run: { status: 'running', finished_at: null, report: null },
+        findings: expected,
+        evidence: ALL_EVIDENCE,
+        objects: [CITED_SHOT],
+      }),
+      'run-1',
+      report(),
+      { checkObjects: true },
+    );
+
+    expect(contents.missingObjects).toContain(CITED_DOC);
+  });
+});
+
+/**
+ * "The cited counts match" and "nothing was dropped" are different claims.
+ *
+ * A report names only the captures its findings cite — 10 or 11 of 17 for a typical run. The rest
+ * are DOM snapshots and sitemap pages nothing happened to reference, and one of those going
+ * missing would have passed every check. The writer holds the full list, so it passes it.
+ */
+describe('every captured artifact, not only the cited ones', () => {
+  const expected = ruleset.rules.length;
+
+  const UNCITED = 'run-1/layer1/ccc.html';
+
+  it('catches a captured artifact that reached no evidence row', async () => {
+    const contents = await assessContents(
+      stub({
+        run: { status: 'running', finished_at: null, report: null },
+        findings: expected,
+        evidence: ALL_EVIDENCE,
+        objects: ALL_OBJECTS,
+      }),
+      'run-1',
+      report(),
+      { artifactKeys: [CITED_DOC, CITED_SHOT, UNCITED] },
+    );
+
+    expect(contents.uncapturedArtifacts).toContain(UNCITED);
+    expect(contents.problems.join(' ')).toContain('captured artifact');
+  });
+
+  it('would not have caught it from the report alone', async () => {
+    // The check a reader gets, and the reason the writer has to supply the list.
+    const contents = await assessContents(
+      stub({
+        run: { status: 'running', finished_at: null, report: null },
+        findings: expected,
+        evidence: ALL_EVIDENCE,
+        objects: ALL_OBJECTS,
+      }),
+      'run-1',
+      report(),
+    );
+
+    expect(contents.problems).toEqual([]);
   });
 });

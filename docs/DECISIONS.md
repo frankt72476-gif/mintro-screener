@@ -1277,3 +1277,50 @@ storage layer had no equivalent discipline until now.
 
 The Tier 1/2/3 harness (D-032) addresses the SQL layer. This addresses the other half: there is
 one write path, and the way it gets exercised is by using it.
+
+---
+
+## D-036 — A failed read is not an empty database
+**2026-08-21 · found on the first real use of the write path**
+
+corepeptides wrote all 17 artifacts, all 17 evidence rows and all 97 findings, and was refused
+anyway. `readContents` destructured only `count` and `data` from its own queries, discarded both
+`error`s, and coalesced with `?? 0` and `?? []`. A transient failure on the evidence select
+therefore produced **an empty database**, and the check reported every cited key as having no row.
+
+The number in the output — 11 — was the count of keys that report *cites*. Nothing was missing.
+
+**The reader could not tell "nothing is there" from "I could not look", and answered as though it
+could.** That is the sequence's own shape pointing the other way: a false failure rather than a
+false pass. The safe direction, and still not a check. A guard that condemns on a network blip
+teaches people to ignore it, which costs exactly what a guard that passes on a blip costs.
+
+Both reads now throw, and the object check distinguishes "object not found" from "the storage API
+did not answer". A run that cannot be assessed is marked `failed` with `finished_at` null — open,
+resumable, and not asserting anything about itself.
+
+### The check was also weaker than it looked
+
+It compared **cited** keys. A report names only the captures its findings reference — 10 or 11 of
+17 for a typical run. DOM snapshots and unreferenced sitemap pages were never verified, so
+"the counts match" and "nothing was dropped" were genuinely different claims.
+
+The writer holds the full key list, so it passes it, exactly as it passes the report (D-033). A
+reader assessing a stored run has no such list and gets the weaker check honestly, rather than a
+denominator inferred from something that does not carry one.
+
+**Checked against real data before fixing:** all five new runs compared artifact-by-artifact
+between disk, evidence rows and bucket objects. 17/17, 17/17, 17/17, 17/17, 3/3, nothing dropped,
+nothing extra — including corepeptides.
+
+### `resume-run`, and what it deliberately will not do
+
+`persistRun` leaves an unverifiable run open so it can be finished later; nothing could finish one.
+`npm run resume-run` verifies and closes. It carries **no artifact bodies** and cannot re-upload a
+capture: reconstructing artifacts from disk is what the deleted migration script did and where
+D-034 came from. It reads the evidence directory for the key list only, so its check is as strong
+as the writer's.
+
+If a capture is genuinely absent it says which and stops. The answer to a genuinely incomplete run
+is a fresh scan producing a new immutable run — not a repair that guesses at what the crawler saw.
+There is still exactly one path that writes captures, and it is `scan-supabase` (D-035).

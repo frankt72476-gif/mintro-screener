@@ -79,11 +79,11 @@ The rule that came out of it, now hard constraint 9 and a standing section in
 **The operational test when adding anything:** ask what your component returns when it *cannot
 tell*. If that is the same as when the thing holds, it is wrong.
 
-### The same failure, six times, in the storage layer
+### The same failure, seven times, in the storage layer
 
 The rule engine has been disciplined about the shape above since M1. The storage layer was not,
-and getting five runs into Supabase produced six consecutive defects with **the same shape and one
-common cause**.
+and getting five runs into Supabase produced seven consecutive defects with **the same shape and
+one common cause**.
 
 | | What happened |
 |---|---|
@@ -93,12 +93,14 @@ common cause**.
 | **Close before verify** | The run was closed and then verified. Five runs froze permanently with findings citing captures that had no row (D-033). |
 | **Key vs storage path** | `evidence.key` recorded the storage path while findings cite the artifact key, so no gzipped capture could be joined to the finding citing it (D-034). |
 | **An unexercised write path** | `persistRun`'s only caller was a migration script. The path every real scan would use had never once completed (D-035). |
+| **A failed read read as empty** | `readContents` discarded the `error` from its own queries, so a transient fault produced an empty database and condemned a run that had written everything (D-036). |
 
 Every one is *a verdict resting on a surface that was never established*. Two of them — the bucket
 guard and close-before-verify — are literally the D-026 sentence: a check that ran before its own
-subject existed.
+subject existed. The seventh points the other way and is worth naming for that: it produced a
+false **failure**, not a false pass. That is the survivable direction, and it is the same defect.
 
-**All six reached Frank through a green suite**, because nothing executed SQL against the actual
+**All of them reached Frank through a green suite**, because nothing executed SQL against the actual
 schema and nothing ran the write path end to end. The suite asserted the DDL was well-formed and
 said nothing about working with it.
 
@@ -107,7 +109,12 @@ Two things close that, and neither is sufficient alone:
 - **`apps/worker/test/schema/`** — three tiers, real Postgres in Tier 1 via PGlite (D-032). This
   covers the SQL layer: `ON CONFLICT`, triggers, constraints, the resumed write.
 - **One write path, exercised by using it** (D-035). The migration script is deleted. A run
-  reaches Supabase through `npm run scan-supabase` or it does not reach Supabase.
+  reaches Supabase through `npm run scan-supabase` or it does not reach Supabase. `npm run
+  resume-run` finishes a run that was written but never closed; it verifies and closes, and
+  deliberately cannot re-upload a capture.
+
+The seventh defect is the evidence that the second point works: it surfaced on the **first real
+use** of the write path, which four milestones of testing had never once exercised.
 
 The five original runs are still in the project, closed and incomplete. They are not repairable —
 runs are immutable once finished (D-002) — and they are left in place deliberately as history.

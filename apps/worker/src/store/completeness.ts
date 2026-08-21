@@ -46,10 +46,26 @@ export interface ContentsAssessment {
   readonly evidenceKeysCited: number;
   readonly missingEvidenceKeys: readonly string[];
   readonly missingObjects: readonly string[];
+  /** Artifacts the writer captured that reached no evidence row. Empty for a reader-side check. */
+  readonly uncapturedArtifacts: readonly string[];
   readonly problems: readonly string[];
 }
 
 export interface AssessOptions {
+  /**
+   * Every artifact key the writer captured, when the caller has them.
+   *
+   * The report only names the captures its findings *cite* — for a typical run that is 10 or 11
+   * of 17. The rest are DOM snapshots and sitemap pages no finding happened to reference, and
+   * nothing would have noticed one of those going missing: "the cited counts match" and "nothing
+   * was dropped" are different claims.
+   *
+   * The writer knows the full set, so it passes it rather than leaving the checker to infer a
+   * denominator it does not have. A reader assessing a stored run has no such list, and gets the
+   * weaker check honestly.
+   */
+  readonly artifactKeys?: readonly string[];
+
   /**
    * Also confirm each cited key exists in the bucket.
    *
@@ -89,16 +105,35 @@ export async function assessContents(
       // Through the derived storage path, never the key directly: the bytes for a gzipped
       // artifact live at `<key>.gz`, and a check that looked for them at `<key>` would report
       // every text capture missing.
-      const { data: signed } = await supabase.client.storage
+      const path = storagePathForKey(key, kind);
+      const { data: signed, error } = await supabase.client.storage
         .from(supabase.bucket)
-        .createSignedUrl(storagePathForKey(key, kind), 60);
-      if (signed?.signedUrl === undefined) missingObjects.push(key);
+        .createSignedUrl(path, 60);
+
+      if (signed?.signedUrl !== undefined) continue;
+
+      // Same distinction as the reads above. "The object is not there" is an answer about the
+      // run; "the storage API did not respond" is an answer about the network, and reporting the
+      // second as the first condemns a run for someone else's outage.
+      if (error !== null && !/not.?found/i.test(error.message)) {
+        throw new Error(`could not check the object at ${path}: ${error.message}`);
+      }
+      missingObjects.push(key);
     }
   }
+
+  const uncapturedArtifacts = (options.artifactKeys ?? []).filter((key) => !storedKeys.has(key));
 
   const findingsExpected = countFindings(report);
   const problems: string[] = [];
 
+  if (uncapturedArtifacts.length > 0) {
+    problems.push(
+      `${uncapturedArtifacts.length} captured artifact(s) have no evidence row: ` +
+        uncapturedArtifacts.slice(0, 3).join(', ') +
+        (uncapturedArtifacts.length > 3 ? ` (+${uncapturedArtifacts.length - 3} more)` : ''),
+    );
+  }
   if (findingsInDb !== findingsExpected) {
     problems.push(`${findingsInDb} finding(s) stored, report expects ${findingsExpected}`);
   }
@@ -119,6 +154,7 @@ export async function assessContents(
     evidenceKeysCited: citedKeys.size,
     missingEvidenceKeys,
     missingObjects,
+    uncapturedArtifacts,
     problems,
   };
 }
@@ -194,17 +230,48 @@ async function countContentsOnly(
   return { ...emptyContents(), findingsInDb, evidenceRows: storedKeys.size };
 }
 
-/** The findings count and every stored evidence key, with the kind needed to locate its bytes. */
+/**
+ * The findings count and every stored evidence key, with the kind needed to locate its bytes.
+ *
+ * ## Both errors are checked, and both throw
+ *
+ * This function discarded the `error` from its own queries and coalesced the result with `?? 0`
+ * and `?? []`. A failed read therefore produced *an empty database* — no findings, no evidence —
+ * and the caller reported every cited key as missing.
+ *
+ * It cost a good run. corepeptides wrote all 17 artifacts, all 17 rows and all 97 findings, and
+ * was still refused, because a transient failure on the evidence select turned into "11 cited
+ * evidence key(s) have no row". Eleven is exactly how many keys that report cites.
+ *
+ * It is the same defect as everything else in this sequence, pointing the other way: **the reader
+ * could not tell "nothing is there" from "I could not look", and answered as though it could.**
+ * A false failure rather than a false pass, which is the survivable direction — but a check that
+ * cannot distinguish those two states is not a check.
+ *
+ * So an unreadable database throws. The run is then marked `failed` with `finished_at` null and
+ * stays resumable, which is what a transient fault deserves.
+ */
 async function readContents(
   supabase: WorkerSupabase,
   runId: string,
 ): Promise<{ findingsInDb: number; storedKeys: Map<string, string> }> {
-  const { count } = await supabase.client
+  const { count, error: findingsError } = await supabase.client
     .from('findings')
     .select('*', { count: 'exact', head: true })
     .eq('run_id', runId);
 
-  const { data } = await supabase.client.from('evidence').select('key, kind').eq('run_id', runId);
+  if (findingsError !== null) {
+    throw new Error(`could not count findings for run ${runId}: ${findingsError.message}`);
+  }
+
+  const { data, error: evidenceError } = await supabase.client
+    .from('evidence')
+    .select('key, kind')
+    .eq('run_id', runId);
+
+  if (evidenceError !== null) {
+    throw new Error(`could not read evidence rows for run ${runId}: ${evidenceError.message}`);
+  }
 
   const storedKeys = new Map<string, string>();
   for (const entry of data ?? []) {
@@ -249,6 +316,7 @@ function emptyContents(): ContentsAssessment {
     evidenceKeysCited: 0,
     missingEvidenceKeys: [],
     missingObjects: [],
+    uncapturedArtifacts: [],
     problems: [],
   };
 }

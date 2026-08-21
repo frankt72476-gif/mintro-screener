@@ -25,7 +25,8 @@
     "testbed": "node apps/testbed/server.mjs",
     "auth-check": "tsc --build && node apps/worker/dist/bin/auth-check.js",
     "pdf": "npm run web:build --silent && npm run link-runs --silent && tsc --build && node apps/worker/dist/bin/report-pdf.js",
-      "verify-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/verify-supabase.js",
+      "resume-run": "tsc --build && node --env-file=.env apps/worker/dist/bin/resume-run.js",
+    "verify-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/verify-supabase.js",
     "inspect-supabase": "tsc --build && node --env-file=.env apps/worker/dist/bin/inspect-supabase.js"
   },
   "devDependencies": {

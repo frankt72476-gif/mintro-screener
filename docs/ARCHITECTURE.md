@@ -272,8 +272,17 @@ should contain from the report it reads back, and before `finishRun` there is no
 so calling it before the close finds nothing, expects nothing, and passes vacuously. The check
 takes the report as an argument for exactly this reason.
 
-**The operational test extends unchanged:** ask what the guard reports when the thing it guards
-has not happened yet.
+A third instance points the other way and is worth keeping in view, because it is easy to mistake
+for a different kind of bug. `readContents` discarded the `error` from its own queries, so a
+transient read failure became *an empty database* and condemned a run that had written everything
+(D-036). Same defect, opposite sign: the reader could not tell "nothing is there" from "I could
+not look".
+
+A false failure is the survivable direction, and it is still not a check. A guard that condemns on
+a network blip gets ignored, which costs what a guard that passes on a blip costs.
+
+**The operational test extends unchanged, and runs in both directions:** ask what the guard reports
+when the thing it guards has not happened yet, and what it reports when it could not see.
 
 ## D-014 audit — checks that locate by compliant form
 
