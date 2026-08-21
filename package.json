@@ -15,10 +15,13 @@
     "typecheck": "tsc --build --force",
     "validate": "tsc --build && node packages/ruleset/dist/bin/validate-ruleset.js",
     "check": "npm run typecheck && npm run test",
-    "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js"
+    "scan": "tsc --build && node packages/engine/dist/bin/scan-layer0.js",
+    "render-check": "tsc --build && node apps/worker/dist/bin/render-check.js",
+    "scan-l1": "tsc --build && node apps/worker/dist/bin/scan-layer1.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "playwright": "^1.49.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

@@ -49,6 +49,27 @@ const SCOPE_SEGMENTS: Readonly<Record<Exclude<UrlScope, 'all'>, readonly string[
   pages: ['pages', 'page'],
 };
 
+/**
+ * Structure learned from a rendered page, extending the static segment table.
+ *
+ * Layer 1 can see what a sitemap cannot: a rendered homepage shows product cards with real
+ * links, so a storefront whose products sit at root-level permalinks becomes classifiable.
+ * Rather than Layer 1 running its own matcher, what it learns is fed in here and the one
+ * classifier is used for both layers.
+ */
+export interface ScopeOverrides {
+  /** Extra path segments that identify a scope, e.g. `shop` learned from a nav link. */
+  readonly segments?: Partial<Record<Exclude<UrlScope, 'all'>, readonly string[]>>;
+  /**
+   * URLs observed to be products or collections on a rendered page.
+   *
+   * Exact URLs, not a pattern. Inferring "products live at the root" from a handful of samples
+   * would classify every article as a product too — the failure D-011 exists to prevent — so
+   * what was actually observed is used, and nothing is extrapolated from it.
+   */
+  readonly knownUrls?: Partial<Record<Exclude<UrlScope, 'all'>, readonly string[]>>;
+}
+
 /** Splits a path into lowercase alphanumeric tokens. */
 export function tokenizePath(path: string): string[] {
   return path
@@ -58,7 +79,7 @@ export function tokenizePath(path: string): string[] {
 }
 
 /** Parses a discovered URL into the form the matcher works on. Returns null if unparseable. */
-export function toSlugUrl(url: string): SlugUrl | null {
+export function toSlugUrl(url: string, overrides: ScopeOverrides = {}): SlugUrl | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -71,18 +92,41 @@ export function toSlugUrl(url: string): SlugUrl | null {
   const tokens = tokenizePath(path);
   const segments = path.split('/').filter((segment) => segment !== '');
 
+  const normalisedUrl = parsed.toString();
   const scopes: UrlScope[] = ['all'];
+
   for (const [scope, names] of Object.entries(SCOPE_SEGMENTS) as [
     Exclude<UrlScope, 'all'>,
     readonly string[],
   ][]) {
+    const learned = overrides.segments?.[scope] ?? [];
+    const all = [...names, ...learned];
+
     // The scope segment may sit under a locale or shop prefix (`/en-us/collections/x`), so
     // any segment can carry it — but not the last one, which is the slug itself.
-    const found = segments.slice(0, -1).some((segment) => names.includes(segment));
-    if (found) scopes.push(scope);
+    const bySegment = segments.slice(0, -1).some((segment) => all.includes(segment));
+
+    // A URL observed on a rendered page to be a product is a product, whatever its shape.
+    const known = overrides.knownUrls?.[scope] ?? [];
+    const byObservation = known.some((candidate) => sameUrl(candidate, normalisedUrl));
+
+    if (bySegment || byObservation) scopes.push(scope);
   }
 
   return { url, path, tokens, scopes };
+}
+
+/** Compares two URLs ignoring trailing-slash and case differences in the host. */
+function sameUrl(a: string, b: string): boolean {
+  const strip = (value: string): string => {
+    try {
+      const url = new URL(value);
+      return `${url.origin.toLowerCase()}${url.pathname.replace(/\/+$/, '').toLowerCase()}`;
+    } catch {
+      return value.toLowerCase();
+    }
+  };
+  return strip(a) === strip(b);
 }
 
 /** Percent-decoding, tolerating a malformed escape rather than throwing. */

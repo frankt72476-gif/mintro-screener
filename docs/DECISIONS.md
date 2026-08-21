@@ -213,19 +213,38 @@ critical failure — swisschems.is `/product/hcg-5000-iu/` is HCG offered for sa
 fix a miscategorised one. Teaching the engine to classify editorial content would put
 rule-adjacent knowledge into code, which is what hard constraint 1 exists to prevent.
 
-**The trade accepted.** A prohibited item listed somewhere other than a product URL is no
-longer caught at Layer 0. That is the right trade: Layer 2 samples product pages and its text
-checks go to human review, so the recall lost here is recoverable, while a wrong `fail` on a
-critical rule is not.
-
 **The general principle.** Where a clause prohibits selling something, the rule's scope is the
 selling surface. `scope: "all"` means every URL and should be used only where the clause really
 does reach the whole site.
 
-**Accepted cost.** On storefronts whose products sit at root-level permalinks —
-corepeptides.com among the five scanned — no URL classifies as a product, and the CATG rules
-now return `not_evaluable` rather than matching. That is hard constraint 2 behaving correctly:
-the catalogue was not observed, so nothing is claimed about it.
+**What the re-scan showed: this removed false passes, not only false failures.**
+
+The change was framed as trading recall for precision. The re-scan showed that framing was
+wrong, and the correction matters more than the ruling.
+
+On corepeptides.com the counts went from `1 fail · 3 pass · 3 not_evaluable` to
+`0 fail · 0 pass · 7 not_evaluable`. Losing the false failure was expected. Losing all three
+passes was not, and those passes were the more serious defect:
+
+> CATG-001, CATG-002 and CATG-004 had reported `pass` — "no needles or syringes", "no alcohol
+> wipes", "no tablets or pills" — against a merchant whose **catalogue the crawler had never
+> identified**. Not one of its 248 URLs classified as a product. Those rules were asserting the
+> absence of prohibited items within a scope that was never established.
+
+That is a false `pass` on a `critical` / `auto_fail` rule: the worst output this system can
+produce, and precisely what hard constraint 2 exists to prevent.
+
+**The general lesson.** Both defects — the false failures and the false passes — came from the
+same root cause: **evaluating a rule against a scope that was never established.** Matching
+`scope: "all"` over an undifferentiated URL list produces confident findings in both
+directions, and neither is supported. A rule may only report on a surface the crawl actually
+identified. Where the surface was not established, the answer is `not_evaluable`, whichever
+direction the evidence appears to point.
+
+**Cost.** On storefronts whose products sit at root-level permalinks — corepeptides.com among
+the five scanned — no URL classifies as a product, and the CATG rules now return
+`not_evaluable`. That is hard constraint 2 behaving correctly: the catalogue was not observed,
+so nothing is claimed about it.
 
 It also makes **Layer 1 shop-structure discovery a priority input for M2**. A rendered homepage
 reveals the catalogue structure that a sitemap alone does not, and it is what closes this gap.
@@ -281,3 +300,35 @@ fetched.
 **Where this is implemented.** `packages/engine/src/findings.ts` defines `EvidenceKind` and
 `EvidenceArtifact`; `discover.ts` retains and gzips; `packages/engine/test/evidence.test.ts`
 asserts each requirement above, including the peptidesciences shape.
+
+---
+
+## D-013 — Crawl-delay is honoured, capped at five seconds
+**2026-08-20 · business owner**
+
+The screener honours `Crawl-delay` in robots.txt. This applies to the Playwright worker from
+M2 onward, not only to Layer 0 fetches.
+
+**Reasoning.** The merchant applied to the program. We screen at their request, under program
+terms. We are not an adversarial crawler and should not behave as one — a tool that ignores a
+site's stated crawl preferences while collecting evidence for an underwriting decision is
+holding itself to a lower standard than it is measuring the merchant against.
+
+It is also self-protective. Hammering an origin invites IP blocking, and bot detection is
+already a known M2 risk — `docs/ARCHITECTURE.md` budgets for switching to a hosted browser
+vendor with residential proxies and treats it as likely rather than hypothetical. Getting
+blocked mid-screen turns a run into a `not_evaluable` report.
+
+**The cap.** Five seconds. A merchant declaring more than that is clamped to five, and the run
+records that we clamped along with the value declared.
+
+    declared <= 5s     honour it
+    declared >  5s     wait 5s, record the clamp and the declared value
+    not declared       no delay
+
+Never silently ignore a declared delay, and never silently obey an unbounded one. A merchant
+declaring `Crawl-delay: 3600` would otherwise stall a run for an hour or, worse, have the delay
+quietly dropped — and which of those happened must be visible in the run record either way.
+
+**Retrofitting politeness after being blocked is worse than building it in**, which is why this
+lands with the first browser code rather than after the first block.

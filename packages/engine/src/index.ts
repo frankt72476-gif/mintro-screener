@@ -10,6 +10,7 @@ export { runLayer0, layer0Rules, type Layer0Run } from './layer0.js';
 
 export {
   discoverLayer0,
+  reclassify,
   DEFAULT_LIMITS,
   type FetchedDocument,
   type Layer0Limits,
@@ -41,8 +42,57 @@ export {
   tokenizePath,
   containsTokenSequence,
   inScope,
+  type ScopeOverrides,
   type SlugUrl,
 } from './slug.js';
+
+export { runLayer1, layer1Rules, disclaimerPhrases, type Layer1Run } from './layer1.js';
+
+export {
+  isRendered,
+  MISSING_REGION,
+  NO_SHOP_STRUCTURE,
+  type PageContext,
+  type PageLink,
+  type PageRegion,
+  type Rgb,
+  type ShopStructure,
+  type StyledText,
+} from './page.js';
+
+export {
+  contrastRatio,
+  relativeLuminance,
+  compositeOver,
+  parseCssColour,
+  formatRatio,
+} from './contrast.js';
+
+export {
+  resolveCrawlDelay,
+  createPacer,
+  describeCrawlDelay,
+  MAX_CRAWL_DELAY_SECONDS,
+  NO_CRAWL_DELAY,
+  type CrawlDelay,
+  type Pacer,
+  type PacerClock,
+} from './politeness.js';
+
+export {
+  similarity,
+  resembles,
+  bestResemblance,
+  distinctiveTokens,
+  splitStatements,
+  RESEMBLANCE,
+  type Similarity,
+} from './textSimilarity.js';
+
+export { checkDomAssert } from './checks/domAssert.js';
+export { checkTextMatch } from './checks/textMatch.js';
+export { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
+export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, RENDERED } from './checks/pageEvidence.js';
 
 export {
   notEvaluable,
@@ -50,8 +100,11 @@ export {
   violation,
   stateForViolation,
   tally,
+  type ArtifactKind,
   type Evidence,
   type EvidenceArtifact,
+  type EvidenceKind,
+  type FetchAttempt,
   type Finding,
 } from './findings.js';
 

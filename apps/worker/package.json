@@ -1,0 +1,14 @@
+{
+  "name": "@mintro/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright crawl worker. Runs on Fly.io — see docs/ARCHITECTURE.md.",
+  "main": "./dist/src/index.js",
+  "scripts": { "typecheck": "tsc --build" },
+  "dependencies": {
+    "@mintro/engine": "*",
+    "@mintro/ruleset": "*",
+    "playwright": "^1.49.0"
+  }
+}

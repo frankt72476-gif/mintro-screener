@@ -16,7 +16,7 @@
 import type { Fetcher, FetchResult } from './fetcher.js';
 import { EMPTY_ROBOTS, parseRobotsTxt, type RobotsTxt } from './robots.js';
 import { isParsedSitemap, parseSitemap } from './sitemap.js';
-import { toSlugUrl, type SlugUrl } from './slug.js';
+import { toSlugUrl, type ScopeOverrides, type SlugUrl } from './slug.js';
 import { gzipSync } from 'node:zlib';
 import type { EvidenceArtifact, FetchAttempt } from './findings.js';
 
@@ -40,6 +40,13 @@ export const DEFAULT_LIMITS: Layer0Limits = {
 
 export interface Layer0Options {
   readonly limits?: Layer0Limits;
+  /**
+   * Structure learned from a rendered page, applied when classifying discovered URLs.
+   *
+   * Layer 1 supplies this so a storefront whose products sit at root-level permalinks can be
+   * classified on a re-evaluation. See `reclassify`.
+   */
+  readonly scopeOverrides?: ScopeOverrides;
   /**
    * Identifies the run, so evidence keys are unique per run and a re-scan never overwrites an
    * earlier scan's capture (D-002). The runner supplies the real one; the default exists so
@@ -258,7 +265,7 @@ export async function discoverLayer0(
       if (seenUrls.has(location)) continue;
       seenUrls.add(location);
 
-      const slug = toSlugUrl(location);
+      const slug = toSlugUrl(location, options.scopeOverrides ?? {});
       if (slug !== null) urls.push(slug);
     }
   }
@@ -350,4 +357,25 @@ function unusable(
     startedAt,
     elapsedMs: Date.now() - started,
   };
+}
+
+/**
+ * Re-classifies an existing crawl with structure learned later, without re-fetching.
+ *
+ * Layer 1 renders the homepage and may discover what a sitemap could not say — which URLs are
+ * products. Applying that here turns Layer 0 findings that were `not_evaluable` for want of an
+ * identifiable catalogue into real observations, using the same classifier rather than a second
+ * matcher, and without asking the merchant's server for anything again.
+ *
+ * The evidence is unchanged and still cites the documents originally fetched: the URLs are the
+ * same URLs, read from the same stored sitemaps. Only what we know about their shape changed.
+ */
+export function reclassify(result: Layer0Result, overrides: ScopeOverrides): Layer0Result {
+  if (!result.usable) return result;
+
+  const urls = result.urls
+    .map((slug) => toSlugUrl(slug.url, overrides))
+    .filter((slug): slug is SlugUrl => slug !== null);
+
+  return { ...result, urls };
 }

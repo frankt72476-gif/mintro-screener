@@ -15,11 +15,24 @@ export interface RobotsTxt {
   readonly sitemaps: readonly string[];
   /** Disallow paths, as context for a human reading the report. Never a finding on their own. */
   readonly disallowed: readonly string[];
+  /**
+   * `Crawl-delay` in seconds as the site declared it, or null if it declared none.
+   *
+   * This is the declared value, not the value we act on — clamping happens in `politeness.ts`
+   * so that what the merchant asked for and what we did are separately visible in the run
+   * record (D-013).
+   */
+  readonly crawlDelaySeconds: number | null;
   /** True when the file was fetched and parsed. False when it was missing or unreadable. */
   readonly present: boolean;
 }
 
-export const EMPTY_ROBOTS: RobotsTxt = { sitemaps: [], disallowed: [], present: false };
+export const EMPTY_ROBOTS: RobotsTxt = {
+  sitemaps: [],
+  disallowed: [],
+  crawlDelaySeconds: null,
+  present: false,
+};
 
 /**
  * Parses robots.txt.
@@ -32,6 +45,7 @@ export function parseRobotsTxt(text: string, baseUrl: string): RobotsTxt {
   const sitemaps: string[] = [];
   const disallowed: string[] = [];
   const seen = new Set<string>();
+  let crawlDelaySeconds: number | null = null;
 
   for (const rawLine of text.split(/\r?\n/)) {
     // Comments run to end of line and may follow a directive.
@@ -53,10 +67,17 @@ export function parseRobotsTxt(text: string, baseUrl: string): RobotsTxt {
       }
     } else if (directive === 'disallow') {
       disallowed.push(value);
+    } else if (directive === 'crawl-delay') {
+      const parsed = Number(value);
+      // The largest declared value wins: if a site states different delays for different
+      // agents, the politest reading is the one it asked anyone to observe.
+      if (Number.isFinite(parsed) && parsed > 0) {
+        crawlDelaySeconds = crawlDelaySeconds === null ? parsed : Math.max(crawlDelaySeconds, parsed);
+      }
     }
   }
 
-  return { sitemaps, disallowed, present: true };
+  return { sitemaps, disallowed, crawlDelaySeconds, present: true };
 }
 
 /** Resolves a possibly-relative URL, rejecting anything that is not http(s). */

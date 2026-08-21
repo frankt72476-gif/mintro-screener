@@ -38,10 +38,16 @@ export interface FetchAttempt {
  * re-scan never overwrites what an earlier scan captured. Nothing in this package writes these
  * anywhere — the runner persists them, and application code never overwrites or deletes one.
  */
+/**
+ * What a stored artifact is. Distinct from `EvidenceKind`, which says what kind of *observation*
+ * a finding rests on; this says what the stored file is.
+ */
+export type ArtifactKind = 'robots' | 'sitemap' | 'screenshot' | 'dom';
+
 export interface EvidenceArtifact {
   /** Storage key. Run-scoped, so a second scan of the same merchant cannot collide (D-002). */
   readonly key: string;
-  readonly kind: 'robots' | 'sitemap';
+  readonly kind: ArtifactKind;
   readonly url: string;
   /** Proves the stored body is the one that was fetched. */
   readonly sha256: string;
@@ -50,9 +56,15 @@ export interface EvidenceArtifact {
   readonly contentType: string;
   /** UTC, ISO 8601. */
   readonly fetchedAt: string;
-  /** The document as fetched, verbatim. */
+  /**
+   * The document as fetched, verbatim. Empty for binary artifacts such as screenshots, whose
+   * bytes live in `gzip` alone.
+   */
   readonly body: string;
-  /** The body gzipped — what the runner writes. These are text and compress heavily. */
+  /**
+   * The bytes the runner writes. Gzipped for text artifacts (D-012); already-compressed
+   * formats such as PNG are stored as-is rather than gzipped a second time.
+   */
   readonly gzip: Uint8Array;
   readonly gzipByteLength: number;
 }

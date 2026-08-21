@@ -1,0 +1,25 @@
+# Fly configuration for the Playwright crawl worker.
+#
+# Not deployed yet — M2 builds the worker, and the queue that feeds it is not written. This
+# file settles the shape so deployment is a step rather than a design exercise.
+
+app = "mintro-screener-worker"
+primary_region = "iad"   # keep in the same region as Supabase — see docs/DEPLOY.md
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # Chromium wants more than the Fly default. Crashes under load are usually OOM, not code.
+  memory = "1gb"
+
+# No [http_service] block: the worker polls the job queue, it does not serve traffic.
+#
+# Deliberately no auto-stop. A machine that sleeps stops picking up runs, and a screening job
+# that silently never starts is worse than one that fails loudly.
+[processes]
+  worker = "node apps/worker/dist/bin/worker.js"
