@@ -605,3 +605,80 @@ mentioned it. The gap was that this decision had no number at all.
 **Reasoning.** Capsules are not tablets for this program. A rule whose clause and patterns
 described different things was a documentation defect, not a business contradiction — the
 patterns were always right.
+
+---
+
+## D-022 — Not used
+
+Number skipped when D-023 through D-025 were assigned. Left unused rather than renumbering
+decisions that may already have been cited.
+
+---
+
+## D-023 — The `content` scope, and what a negative definition obliges
+**2026-08-21 · business owner · code change approved**
+
+`content` joins `URL_SCOPES`: a URL that is not a product, not a collection, and not site
+machinery (cart, checkout, account, feed, `wp-json`, tag and author archives, policy pages).
+
+**Why it has to be defined negatively.** Editorial content shares no path segment across
+platforms. Shopify puts it under `/pages/` and `/blogs/`; WordPress storefronts serve it from the
+root beside everything else. Nothing segment-based can reach both, and the evidence was
+unambiguous — `scope: "pages"` matched **zero URLs on all five storefronts scanned**. A negative
+definition is not a shortcut here; it is the only workable one.
+
+### The dependency, stated because it does not go away
+
+**`content` is only as accurate as product classification.** Where the catalogue was not
+identified, `content` approaches "every URL". On corepeptides.com it is 141 URLs *after* Layer 1
+identifies 104 products; at Layer 0 alone it would have been all 248.
+
+This is the same family as D-011 — a scope resting on a surface that may not have been
+established — and it does not have a clean fix, because the whole point is to catch what
+classification missed.
+
+**The mitigation is required, not optional.** Any rule scoped to a negatively-defined scope
+**must state the count it examined** in its finding:
+
+    "32 of 192 content URLs have slugs indicating therapeutic-topic subject matter …"
+
+A reader can then see the denominator and judge how much of the site the scope actually
+resolved. A finding that named matches without naming the population would let a scope covering
+everything read exactly like a scope covering the right thing. This rule applies to every scope
+defined by exclusion, present and future — see `docs/ARCHITECTURE.md`.
+
+---
+
+## D-024 — OFFS-001 moves to scope `content`
+**2026-08-21 · business owner**
+
+OFFS-001 (No affiliate program) changes from `scope: "pages"` to `scope: "content"`.
+
+**Reasoning.** Identical defect to the one D-020 uncovered, in a rule that matters more: OFFS-001
+is `critical` and `auto_fail`, and it returned `not_evaluable` on **every one of the five
+storefronts scanned** because `scope: "pages"` matched nothing anywhere. A critical rule that
+cannot see any surface is not a strict rule; it is an absent one.
+
+swisschems.is carries a visible "Affiliate Program" link in its footer navigation that the rule,
+as scoped, could not see. Same defect, same fix.
+
+---
+
+## D-025 — A ruleset.json change carries a decision number in the same commit
+**2026-08-21 · business owner · process**
+
+Any change to `rules/ruleset.json` — a clause, a pattern, a tier, a scope, a new rule — is
+recorded in this file, with a number, in the commit that makes the change.
+
+**What prompted it.** CATG-004's clause was rewritten at M0 on a ruling. The change reached
+`ruleset.json` and the milestone report and never reached this file. It sat undocumented through
+M1, M2 and M3, and surfaced only when a later ruling referred to a note in D-009 that did not
+exist. Recorded eventually as D-021, five days and four milestones late.
+
+**Why it matters.** A ruling that reaches the data but not this log is unreviewable six months
+out. The rule set is the single source of truth for what is checked; this file is the single
+source of truth for *why*. A merchant disputing a finding is disputing a judgement, and a
+judgement with no recorded reasoning cannot be defended — which is the failure this log exists
+to prevent.
+
+Recorded in `CLAUDE.md` § Conventions.

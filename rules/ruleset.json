@@ -222,7 +222,8 @@
     { "id": "OFFS-001", "cat": "offsite", "layer": 0, "sev": "critical", "type": "url_pattern", "tier": "auto_fail",
       "title": "No affiliate program",
       "clause": "No affiliate or influencer marketing program.",
-      "params": { "patterns": ["affiliate", "ambassador", "referral-program", "partner-program"], "scope": "pages", "expect": "absent" } },
+      "params": { "patterns": ["affiliate", "ambassador", "referral-program", "partner-program"], "scope": "content", "expect": "absent",
+                  "note": "Scope widened from pages to content (D-024). scope pages matched zero URLs on every storefront scanned, leaving this critical auto_fail rule blind." } },
 
     { "id": "OFFS-002", "cat": "offsite", "layer": 2, "sev": "critical", "type": "dom_assert", "tier": "review_only",
       "title": "No testimonials or outcome stories",

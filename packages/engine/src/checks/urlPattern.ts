@@ -119,11 +119,12 @@ function describeViolation(
   const remainder =
     matches.length > named.length ? ` and ${matches.length - named.length} more` : '';
 
-  // D-018 / D-020: a slug indicates topic, not claim. A `content`-scoped finding says what the
-  // slug indicates and states plainly that the writing itself was not read, so nothing here can
-  // be mistaken for a finding about what the article says.
+  // A `content`-scoped finding rests on a slug, not on the page it names. It states the
+  // denominator (D-023, required for any negatively-defined scope) and says plainly that the
+  // writing itself was not read, so nothing here can be mistaken for a finding about what the
+  // page says. The wording stays rule-agnostic — what the patterns mean is the rule's business.
   if (rule.params.scope === 'content') {
-    return `${matches.length} of ${examined} content URLs have slugs indicating therapeutic-topic subject matter: ${list}${remainder}. The content of these pages was not examined.`;
+    return `${matches.length} of ${examined} content URLs have slugs matching this rule's patterns: ${list}${remainder}. The content of these pages was not examined.`;
   }
 
   return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched a prohibited pattern: ${list}${remainder}.`;
@@ -135,7 +136,7 @@ function describeSatisfied(
   expect: 'present' | 'absent',
 ): string {
   if (rule.params.scope === 'content' && expect === 'absent') {
-    return `${examined} content URLs were examined; none had a slug indicating therapeutic-topic subject matter. Page content itself was not read, and pages not identified as content were not examined.`;
+    return `${examined} content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.`;
   }
 
   return expect === 'absent'

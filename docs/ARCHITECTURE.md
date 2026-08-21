@@ -169,6 +169,23 @@ The rule that follows from all four: **a check may only report on a surface it e
 could see.** Where it could not, the answer is `not_evaluable`, whichever direction the partial
 evidence appears to point.
 
+## Negatively-defined scopes must state their denominator
+
+A scope defined by exclusion — `content` is the first, meaning "not a product, not a collection,
+not site machinery" — is only as accurate as the classifications it excludes. Where the catalogue
+was not identified, `content` approaches "every URL".
+
+**Therefore any rule scoped to one must state the population it examined in its finding:**
+
+    "32 of 192 content URLs have slugs indicating therapeutic-topic subject matter …"
+
+Without the denominator, a scope that resolved to the whole site reads exactly like a scope that
+resolved to the right part of it. With it, a reader can see how much of the site the scope
+actually distinguished and weigh the finding accordingly.
+
+This is required, not stylistic (D-023). It applies to every scope defined by exclusion, present
+and future.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by

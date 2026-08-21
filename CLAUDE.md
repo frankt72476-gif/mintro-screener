@@ -111,6 +111,9 @@ Documents Check is a later phase. Leave the nav item and route stubbed. Do not b
 
 - TypeScript everywhere. `strict: true`. No `any` in check handlers.
 - Rule IDs are stable and never reused. Format: `CATEGORY-NNN`.
+- **Any change to `rules/ruleset.json` carries a decision number in the same commit.** A clause,
+  a pattern, a tier, a scope, a new rule — all of them. A ruling that reaches the data but not
+  `docs/DECISIONS.md` is unreviewable six months out. See D-025.
 - All timestamps UTC, ISO 8601, stored as `timestamptz`.
 - Check handlers are pure where possible: given a page context and rule params, return a
   finding. Side effects (storage writes) happen in the runner, not the handler.
