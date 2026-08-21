@@ -19,7 +19,9 @@
     { "id": "GATE-001", "cat": "gate", "layer": 1, "sev": "major", "type": "dom_assert", "tier": "review_only",
       "title": "Age affirmation before entry",
       "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
-      "params": { "surface": "homepage", "expect": "present", "signals": ["age-gate", "age-verify", "21+", "are you 21"] } },
+      "params": { "surface": "homepage", "expect": "present",
+                  "signals": ["age-gate", "age-verify", "21+", "are you 21", "21 or older", "over 21",
+                              "over the age of 21", "of legal age", "21 years"] } },
 
     { "id": "GATE-002", "cat": "gate", "layer": 0, "sev": "critical", "type": "http_probe", "tier": "auto_fail",
       "title": "Products hidden until an account exists",
@@ -241,6 +243,19 @@
       "title": "Monthly social audits",
       "clause": "Reviews of all social media channels at minimum monthly.",
       "params": { "reason": "Internal process. Requires merchant attestation." } },
+
+    { "id": "OFFS-006", "cat": "offsite", "layer": 0, "sev": "major", "type": "url_pattern", "tier": "review_only",
+      "title": "Editorial content on therapeutic topics",
+      "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",
+      "params": {
+        "patterns": ["growth-hormone", "hormone-deficiency", "fat-metabolism", "weight-loss", "fat-loss",
+                     "muscle-growth", "anti-aging", "longevity", "healing", "recovery", "injury",
+                     "deficiency", "metabolism", "libido", "testosterone", "sleep-quality",
+                     "cognitive", "benefits", "side-effects", "dosage", "protocol"],
+        "scope": "content",
+        "expect": "absent",
+        "note": "A slug indicates topic, not claim. Only a human reading the article can tell rigorous chemistry from a dosing guide, so this rule surfaces candidates and never renders a verdict. Permanently review_only — see D-020."
+      } },
 
     { "id": "PAY-001", "cat": "payment", "layer": 3, "sev": "critical", "type": "text_match", "tier": "auto_fail",
       "title": "No peer-to-peer payment methods",

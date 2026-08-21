@@ -515,3 +515,93 @@ reaching further than the surface that was established. The triage axis in
 **This is a reporting rule, not a state rule.** The state is still `pass` — the check ran and
 observed nothing prohibited. What changes is that the report says how far the observation
 reaches, so a reader is never left to assume it reached further than it did.
+
+---
+
+## D-019 — GATE-001 recognises more ways of asking someone's age
+**2026-08-21 · business owner**
+
+GATE-001's `signals` gain `"21 or older"`, `"over 21"`, `"over the age of 21"`, `"of legal age"`
+and `"21 years"`.
+
+**This widens the vocabulary only.** D-016's structural requirement is untouched: the gate is
+still located as an interstitial — a dialog, a modal, a viewport-covering overlay — and the
+signal is matched *inside* it. A merchant whose homepage says "serving researchers over 21 years"
+in body copy still does not pass, because there is no interstitial to find it in.
+
+**Reasoning.** The narrowness was never in the handler. A gate reading "Please confirm you are 21
+or older" was located correctly and then judged against a four-phrase vocabulary that did not
+include the way most sites actually word it. That is rule data, so the fix is in
+`ruleset.json` — which is why it was flagged at M2 rather than patched in the engine.
+
+---
+
+## D-020 — OFFS-006, editorial content on therapeutic topics
+**2026-08-21 · business owner**
+
+A new rule. Layer 0, `url_pattern`, `major`, **`review_only`**, scope `content`.
+
+> Off-site human-use claims will be used against the seller even if the website has proper
+> disclaimers. Every social media post must follow the same rules as product pages.
+
+**What it recovers.** D-011 narrowed the CATG rules to product URLs because CATG-003 was
+auto-failing merchants on 27 editorial articles about growth-hormone research. That decision was
+right — an article is not an offer to sell, and the finding it produced was false. But the
+underlying observation was real and was left unfiled: a peptide storefront publishing
+"GHRP-2 and CJC-1295 blend: growth hormone deficiency and fat metabolism" is doing something a
+reviewer should see. D-011 declined to file it under catalog composition. This files it under
+off-site presence, where it belongs.
+
+**`review_only` is permanent.** Not a starting position pending confidence.
+
+> A slug indicates **topic**, not **claim**. Only a human reading the article can tell rigorous
+> chemistry from a dosing guide.
+
+This rule surfaces candidates. It never renders a verdict, and no amount of tuning would make a
+URL slug capable of distinguishing the two. Anyone proposing to promote it to `auto_fail` is
+proposing that the engine judge prose it has not read.
+
+**Finding wording** follows D-018: *"N of M content URLs have slugs indicating therapeutic-topic
+subject matter … The content of these pages was not examined."* Never "prohibited claims found".
+
+### The scope vocabulary change this required
+
+`scope: "pages"` matched **zero URLs** on all five storefronts scanned — it recognises only a
+`/pages/` or `/page/` path segment, and none of them use one. A `pages`-scoped OFFS-006 would
+have been `not_evaluable` everywhere, missing precisely the case it was written for.
+
+So `content` was added to `URL_SCOPES`, defined **negatively**: a URL that is not a product, not
+a collection, and not site machinery (cart, checkout, account, feed, `wp-json`, tag and author
+archives, policy pages). Editorial content has no path segment in common across platforms —
+Shopify puts it under `/pages/` and `/blogs/`, WordPress storefronts serve it from the root
+beside everything else — so a segment-matching scope cannot reach it.
+
+**The consequence to hold in mind:** `content` is only as accurate as product classification.
+Where the catalogue was not identified, `content` approaches "every URL", and the rule's finding
+says how many URLs it examined so the reach is visible.
+
+`OFFS-001` (affiliate program, scope `pages`) has the same problem and returns `not_evaluable` on
+every storefront scanned. It is **not** changed here — that is a separate ruling.
+
+---
+
+## D-021 — CATG-004 covers tablets and pills, not capsules
+**2026-08-20 · architect's reading · 2026-08-21 · confirmed by the business owner**
+
+CATG-004's clause reads "Tablets or pills prohibited. Capsules may be sold if exclusively for
+research use and properly labeled." `auto_fail` stands. CATG-006 continues to handle capsule
+labelling.
+
+**Recorded late, and that is the point of recording it.** The rule as shipped carried a clause
+quoting the source document's capsule sentence while its patterns targeted `tablet`, `pill`,
+`softgel` and `lozenge` — plus a note reading "OPEN QUESTION: source document describes capsules
+in two places with differing wording. Confirm before enforcing." The clause was rewritten on the
+architect's reading at M0, on 2026-08-20, and the change went into `ruleset.json` and the M0
+report but **never into this file**. It has now been confirmed by the business owner.
+
+There is no CATG-004 note in D-009 to amend; D-009 is the tier-and-severity ruling and never
+mentioned it. The gap was that this decision had no number at all.
+
+**Reasoning.** Capsules are not tablets for this program. A rule whose clause and patterns
+described different things was a documentation defect, not a business contradiction — the
+patterns were always right.

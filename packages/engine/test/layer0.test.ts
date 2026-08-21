@@ -48,7 +48,7 @@ describe('rule selection', () => {
     }
   });
 
-  it('covers the seven url_pattern rules in the committed rule set', () => {
+  it('covers the url_pattern rules in the committed rule set', () => {
     expect(layer0Rules(ruleset).map((rule) => rule.id)).toEqual([
       'NAME-001',
       'NAME-002',
@@ -57,6 +57,7 @@ describe('rule selection', () => {
       'CATG-003',
       'CATG-004',
       'OFFS-001',
+      'OFFS-006',
     ]);
   });
 });

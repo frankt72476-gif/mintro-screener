@@ -321,17 +321,30 @@ describe('GATE-001 — age affirmation (D-016)', () => {
     expect(checkDomAssert(gate001, p).state).toBe('review'); // review_only, never `fail`
   });
 
-  it('locates a differently-worded gate structurally, then judges it on the declared signals', () => {
-    // Hard constraint 9 is satisfied: the finder is the interstitial, not the compliant wording,
-    // so this gate IS found. The verdict then rests on GATE-001's declared `signals`, and
-    // "21 or older" is not among them — so the honest answer is `review`, not `pass`.
-    //
-    // The narrowness is in the rule's vocabulary, which is data. Broadening it is a change to
-    // `ruleset.json`, not to this handler.
+  it('recognises a differently-worded gate, since D-019 widened the vocabulary', () => {
+    // Two things have to hold together. The gate is located *structurally* (hard constraint 9),
+    // and the signal is then matched inside it against the rule's declared vocabulary. D-019
+    // widened that vocabulary in `ruleset.json` — the handler was never the narrow part.
     const finding = checkDomAssert(gate001, withGate('Please confirm you are 21 or older to continue.'));
 
-    expect(finding.state).toBe('review');
-    expect(finding.note).toContain('not found inside it');
+    expect(finding.state).toBe('pass');
+    expect(finding.note).toContain('entry interstitial');
+  });
+
+  it.each(['over 21', 'of legal age', 'over the age of 21', '21 years'])(
+    'recognises the D-019 phrase %s inside an interstitial',
+    (phrase) => {
+      expect(checkDomAssert(gate001, withGate(`You must be ${phrase} to enter.`)).state).toBe('pass');
+    },
+  );
+
+  it('still refuses to pass a widened phrase that is not inside an interstitial', () => {
+    // D-019 widened the vocabulary; it did not relax D-016's structural requirement.
+    const p = page({
+      text: 'Serving researchers over 21 years for two decades.',
+      html: '<html><body>Serving researchers over 21 years for two decades.</body></html>',
+    });
+    expect(checkDomAssert(gate001, p).state).toBe('review');
   });
 
   it('does not pass a gate whose signal only matches outside the interstitial', () => {

@@ -68,8 +68,19 @@ export const SURFACES = [
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
-/** URL scopes for Layer 0 slug matching. */
-export const URL_SCOPES = ['all', 'collections', 'products', 'pages'] as const;
+/**
+ * URL scopes for Layer 0 slug matching.
+ *
+ * `content` is defined negatively — a URL that is neither a product nor a collection nor a
+ * utility path — because editorial content has no path segment in common across platforms.
+ * Shopify puts it under `/pages/` and `/blogs/`; WordPress storefronts serve it from the root
+ * alongside everything else. A scope that only matched a segment would miss the latter entirely,
+ * which is the case OFFS-006 exists for (D-020).
+ *
+ * Its accuracy therefore depends on how well products were classified. Where the catalogue was
+ * not identified, `content` is close to "every URL" and a rule scoped to it should say so.
+ */
+export const URL_SCOPES = ['all', 'collections', 'products', 'pages', 'content'] as const;
 export type UrlScope = (typeof URL_SCOPES)[number];
 
 /** Assertion direction shared by the presence-testing check types. */

@@ -44,8 +44,46 @@ describe('toSlugUrl', () => {
   });
 
   it('does not treat a trailing segment as a scope', () => {
-    // /pages is the listing itself, not a page within it.
-    expect(toSlugUrl('https://shop.example/collections')?.scopes).toEqual(['all']);
+    // /collections is the listing itself, not a collection within it. It does fall into
+    // `content` — it is not a product, not a collection page, and not site machinery (D-020).
+    expect(toSlugUrl('https://shop.example/collections')?.scopes).not.toContain('collections');
+  });
+
+  describe('content scope (D-020)', () => {
+    it('classifies a root-level permalink as content', () => {
+      // The case OFFS-006 exists for: biotechpeptides' articles are root-level, so a scope that
+      // only matched a path segment would miss every one of them.
+      const url = toSlugUrl('https://shop.example/ghrp-2-growth-hormone-deficiency/');
+      expect(url?.scopes).toContain('content');
+    });
+
+    it('excludes a product from content', () => {
+      expect(toSlugUrl('https://shop.example/product/bpc-157')?.scopes).not.toContain('content');
+    });
+
+    it('excludes a collection from content', () => {
+      expect(toSlugUrl('https://shop.example/product-category/research')?.scopes).not.toContain(
+        'content',
+      );
+    });
+
+    it.each(['/cart/', '/my-account/', '/checkout/', '/wp-json/wp/v2/posts', '/feed/', '/tag/peptides/'])(
+      'excludes site machinery: %s',
+      (path) => {
+        // Without this, a content-scoped rule is offered every cart and feed URL on the site.
+        expect(toSlugUrl(`https://shop.example${path}`)?.scopes).not.toContain('content');
+      },
+    );
+
+    it('classifies a Shopify editorial path as content by segment', () => {
+      expect(toSlugUrl('https://shop.example/blogs/research/bpc-157-study')?.scopes).toContain(
+        'content',
+      );
+    });
+
+    it('excludes the site root', () => {
+      expect(toSlugUrl('https://shop.example/')?.scopes).not.toContain('content');
+    });
   });
 
   it('puts every URL in scope all', () => {

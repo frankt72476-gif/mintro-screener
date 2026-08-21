@@ -119,6 +119,13 @@ function describeViolation(
   const remainder =
     matches.length > named.length ? ` and ${matches.length - named.length} more` : '';
 
+  // D-018 / D-020: a slug indicates topic, not claim. A `content`-scoped finding says what the
+  // slug indicates and states plainly that the writing itself was not read, so nothing here can
+  // be mistaken for a finding about what the article says.
+  if (rule.params.scope === 'content') {
+    return `${matches.length} of ${examined} content URLs have slugs indicating therapeutic-topic subject matter: ${list}${remainder}. The content of these pages was not examined.`;
+  }
+
   return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched a prohibited pattern: ${list}${remainder}.`;
 }
 
@@ -127,6 +134,10 @@ function describeSatisfied(
   examined: number,
   expect: 'present' | 'absent',
 ): string {
+  if (rule.params.scope === 'content' && expect === 'absent') {
+    return `${examined} content URLs were examined; none had a slug indicating therapeutic-topic subject matter. Page content itself was not read, and pages not identified as content were not examined.`;
+  }
+
   return expect === 'absent'
     ? `${examined} URLs in scope '${rule.params.scope}' were examined; none matched the patterns for this rule.`
     : `${examined} URLs in scope '${rule.params.scope}' were examined; a match was found.`;

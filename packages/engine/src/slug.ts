@@ -40,7 +40,7 @@ export interface SlugUrl {
  * Platform knowledge, not rule data — the rule says "collections" and this is what that means
  * on Shopify versus WooCommerce. Adding a platform is a change here, not in `ruleset.json`.
  */
-const SCOPE_SEGMENTS: Readonly<Record<Exclude<UrlScope, 'all'>, readonly string[]>> = {
+const SCOPE_SEGMENTS: Readonly<Record<Exclude<UrlScope, 'all' | 'content'>, readonly string[]>> = {
   // Shopify `/collections/…`, WooCommerce `/product-category/…`, generic `/category/…`.
   collections: ['collections', 'collection', 'product-category', 'product_category', 'category', 'categories'],
   // Shopify `/products/…`, WooCommerce `/product/…`.
@@ -48,6 +48,23 @@ const SCOPE_SEGMENTS: Readonly<Record<Exclude<UrlScope, 'all'>, readonly string[
   // Shopify `/pages/…`, WordPress often serves these at the root.
   pages: ['pages', 'page'],
 };
+
+/**
+ * Paths that are machinery rather than content.
+ *
+ * `content` is a negative classification, so without this every cart, login and feed URL would
+ * be offered to a rule looking for editorial writing. Excluding them is what keeps a
+ * `content`-scoped finding worth reading.
+ */
+const UTILITY_SEGMENTS = new Set([
+  'cart', 'checkout', 'account', 'my-account', 'login', 'register', 'logout', 'search',
+  'wishlist', 'compare', 'feed', 'rss', 'sitemap', 'wp-json', 'wp-admin', 'wp-content',
+  'author', 'tag', 'comments', 'privacy-policy', 'terms', 'terms-and-conditions',
+  'refund_returns', 'returns', 'shipping-policy', 'contact', 'contact-us',
+]);
+
+/** Segments that positively indicate editorial content across platforms. */
+const CONTENT_SEGMENTS = ['pages', 'page', 'blog', 'blogs', 'news', 'articles', 'article', 'learn'];
 
 /**
  * Structure learned from a rendered page, extending the static segment table.
@@ -112,6 +129,16 @@ export function toSlugUrl(url: string, overrides: ScopeOverrides = {}): SlugUrl 
 
     if (bySegment || byObservation) scopes.push(scope);
   }
+
+  // `content`: editorial writing. Either a segment that positively says so, or a URL left over
+  // once products, collections and site machinery are excluded. The negative half is what
+  // reaches root-level permalinks (D-020).
+  const isUtility =
+    segments.length === 0 || segments.some((segment) => UTILITY_SEGMENTS.has(segment));
+  const positivelyContent = segments.slice(0, -1).some((segment) => CONTENT_SEGMENTS.includes(segment));
+  const leftOver = !scopes.includes('products') && !scopes.includes('collections') && !isUtility;
+
+  if (positivelyContent || leftOver) scopes.push('content');
 
   return { url, path, tokens, scopes };
 }
