@@ -1,13 +1,23 @@
 # Fly configuration for the Playwright crawl worker.
 #
-# Not deployed yet — M2 builds the worker, and the queue that feeds it is not written. This
-# file settles the shape so deployment is a step rather than a design exercise.
+# Deploy from the REPOSITORY ROOT, not from this directory:
+#
+#     fly deploy --config apps/worker/fly.toml --dockerfile apps/worker/Dockerfile
+#
+# The build context has to be the whole repo, because the worker compiles the shared packages in
+# packages/. `.dockerignore` keeps node_modules and stored evidence out of the upload.
+#
+# Secrets are set with `fly secrets set`, never written here: this file is committed
+# (hard constraint 6). See docs/DEPLOY.md.
 
 app = "mintro-screener-worker"
-primary_region = "iad"   # keep in the same region as Supabase — see docs/DEPLOY.md
+
+# Match this to the Supabase project's region. Every scan writes 17 objects and ~100 rows across
+# the Atlantic otherwise, and the object uploads are the slow part of a run.
+primary_region = "iad"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "apps/worker/Dockerfile"
 
 [env]
   NODE_ENV = "production"
@@ -21,5 +31,7 @@ primary_region = "iad"   # keep in the same region as Supabase — see docs/DEPL
 #
 # Deliberately no auto-stop. A machine that sleeps stops picking up runs, and a screening job
 # that silently never starts is worse than one that fails loudly.
+# One machine. The queue is a compare-and-swap so more than one is safe, but a demo does not need
+# it and a second machine doubles the Chromium memory bill for nothing.
 [processes]
   worker = "node apps/worker/dist/bin/worker.js"

@@ -6,7 +6,7 @@
  * Documents stay stubbed — `CLAUDE.md` says leave it, do not build it.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseRuleset, type Ruleset } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
 import rulesetJson from '../../../rules/ruleset.json';
@@ -14,6 +14,8 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
+import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
+import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
 import { DocumentsPane } from './components/DocumentsPane.js';
@@ -89,20 +91,27 @@ export function App(): JSX.Element {
 
   if (state.status !== 'signed_in') return <SignIn />;
 
-  return <Screener client={state.client} analystEmail={state.analyst.email} />;
+  return <Screener client={state.client} analyst={state.analyst} />;
 }
 
 function Screener({
   client,
-  analystEmail,
+  analyst,
 }: {
   readonly client: import('@supabase/supabase-js').SupabaseClient;
-  readonly analystEmail: string;
+  readonly analyst: { readonly id: string; readonly email: string };
 }): JSX.Element {
+  const analystEmail = analyst.email;
   const printDomain = useMemo(() => printRequest(), []);
   const [pane, setPane] = useState<Pane>('scan');
   const [stage, setStage] = useState<Stage>('input');
   const [report, setReport] = useState<ScreeningReport | null>(null);
+  // Kept beside the report rather than inside it: the report is an immutable document that said
+  // what it said, and the quarantine notice is a later statement about it (0012).
+  const [quarantine, setQuarantine] = useState<string | null>(null);
+  const [queued, setQueued] = useState<readonly ScanRequestSummary[]>([]);
+  /** Whether the last poll saw work outstanding — see the polling effect. */
+  const wasPending = useRef(false);
   const [available, setAvailable] = useState<readonly RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -110,6 +119,7 @@ function Screener({
 
   // Screenshots come from the private bucket through short-expiry signed URLs, minted per view.
   const access = useMemo(() => createEvidenceAccess(client), [client]);
+  const queue = useMemo(() => createScanQueue(client, analyst.id), [client, analyst.id]);
 
   /**
    * Where runs come from.
@@ -179,13 +189,54 @@ function Screener({
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
-      setReport(loaded);
+      setReport(loaded.report);
+      setQuarantine(loaded.quarantine);
       setStage('report');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStage('input');
     }
   }
+
+  /**
+   * Watches the queue.
+   *
+   * Polling, not a subscription: a scan takes tens of seconds, so this is a handful of requests
+   * per run. A realtime channel would be more machinery for the same answer.
+   *
+   * The pending set is held in a ref rather than read from state. An effect that depends on the
+   * state it also sets re-runs itself, and the cost of getting that subtly wrong here is a poll
+   * loop hammering the database — or, worse, a finished scan whose report never appears.
+   *
+   * When the last outstanding request finishes, the run list is refreshed so the new report shows
+   * up where every other report does rather than in a place of its own.
+   */
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const tick = async (): Promise<void> => {
+      const requests = await queue.list();
+      if (!live) return;
+
+      setQueued(requests);
+
+      const stillPending = requests.some((request) => isPending(request.status));
+      if (wasPending.current && !stillPending) {
+        void runs.list().then(setAvailable).catch(() => undefined);
+      }
+      wasPending.current = stillPending;
+
+      // Attentive while the worker owes an answer, unobtrusive otherwise.
+      timer = setTimeout(() => void tick(), stillPending ? 3000 : 15000);
+    };
+
+    void tick();
+    return () => {
+      live = false;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [queue, runs]);
 
   if (printDomain !== null) {
     return (
@@ -198,6 +249,7 @@ function Screener({
           ) : (
             <>
               <PrintHeader report={report} />
+              {quarantine !== null && <QuarantineNotice reason={quarantine} />}
               <ReportView
                 report={report}
                 access={access}
@@ -236,7 +288,21 @@ function Screener({
       <main className="main">
         <section className={`pane ${pane === 'scan' ? 'on' : ''}`}>
           {stage === 'input' && (
-            <ScanInput available={available} error={error} onRun={load} source={runs.description} />
+            <ScanInput
+              available={available}
+              error={error}
+              onRun={load}
+              source={runs.description}
+              queued={queued}
+              onRequest={async (url) => {
+                const result = await queue.request(url);
+                if (result.ok) {
+                  setToast('Scan queued — the worker will pick it up');
+                  setQueued(await queue.list());
+                }
+                return result;
+              }}
+            />
           )}
 
           {stage === 'running' && (
@@ -253,12 +319,15 @@ function Screener({
           )}
 
           {stage === 'report' && report !== null && (
-            <ReportView
+            <>
+              {quarantine !== null && <QuarantineNotice reason={quarantine} />}
+              <ReportView
               report={report}
               access={access}
-              onSend={() => setSending(true)}
-              onDownload={() => setToast(`Downloaded ${report.merchantDomain}.pdf`)}
-            />
+                onSend={() => setSending(true)}
+                onDownload={() => setToast(`Downloaded ${report.merchantDomain}.pdf`)}
+              />
+            </>
           )}
         </section>
 
@@ -299,17 +368,37 @@ function ScanInput({
   error,
   onRun,
   source,
+  queued,
+  onRequest,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
   readonly onRun: (runId: string) => void;
   readonly source: string;
+  readonly queued: readonly ScanRequestSummary[];
+  readonly onRequest: (
+    url: string,
+  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
   const [runId, setRunId] = useState(available[0]?.runId ?? '');
+  const [url, setUrl] = useState('');
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (runId === '' && available.length > 0) setRunId(available[0]?.runId ?? '');
   }, [available, runId]);
+
+  const submit = async (): Promise<void> => {
+    setRequesting(true);
+    setRequestError(null);
+    const result = await onRequest(url);
+    setRequesting(false);
+    if (result.ok) setUrl('');
+    else setRequestError(result.error);
+  };
+
+  const pending = queued.filter((request) => isPending(request.status));
 
   return (
     <div>
@@ -322,18 +411,78 @@ function ScanInput({
 
       <div className="card form-card">
         <div className="field">
-          <label className="flabel" htmlFor="url">
+          <label className="flabel" htmlFor="scan-url">
             Storefront
           </label>
           <p className="fhint">
+            The crawl runs on the worker, not in this browser. Queue it here and the report appears
+            below when it is done.
+          </p>
+          <div className="queue-row">
+            <input
+              className="input"
+              id="scan-url"
+              value={url}
+              placeholder="https://shop.example"
+              onChange={(event) => setUrl(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && url.trim() !== '' && !requesting) void submit();
+              }}
+            />
+            <button
+              className="btn btn-primary"
+              disabled={url.trim() === '' || requesting}
+              onClick={() => void submit()}
+            >
+              {requesting ? 'Queueing…' : 'Run scan'}
+            </button>
+          </div>
+          {requestError !== null && (
+            <div className="err" style={{ marginTop: 12 }}>
+              {requestError}
+            </div>
+          )}
+        </div>
+
+        {queued.length > 0 && (
+          <div className="field">
+            <span className="flabel">Recent requests</span>
+            <p className="fhint">
+              {pending.length > 0
+                ? `${pending.length} in progress. A full scan renders the homepage and samples five product pages.`
+                : 'Nothing running.'}
+            </p>
+            <ul className="queue-list">
+              {queued.map((request) => (
+                <li key={request.id} className={`queue-item ${request.status}`}>
+                  <span className={`queue-state ${request.status}`}>{request.status}</span>
+                  <span className="queue-url">{request.url}</span>
+                  <span className="queue-note">
+                    {request.status === 'failed'
+                      ? request.error ?? 'failed'
+                      : request.status === 'done'
+                        ? 'report available below'
+                        : request.progress ?? 'waiting for the worker'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="field">
+          <label className="flabel" htmlFor="run">
+            Reports
+          </label>
+          <p className="fhint">
             {available.length > 0
-              ? `${available.length} run(s) from ${source}. Live scanning is queued through the worker, not the browser.`
+              ? `${available.length} run(s) from ${source}.`
               : `No runs readable from ${source}.`}
           </p>
           {available.length > 0 ? (
             <select
               className="input"
-              id="url"
+              id="run"
               value={runId}
               onChange={(event) => setRunId(event.target.value)}
             >
@@ -341,11 +490,20 @@ function ScanInput({
                 <option key={run.runId} value={run.runId}>
                   {run.domain} — {run.counts.fail} failed, {run.counts.review} for review
                   {run.finishedAt === null ? '' : ` — ${run.finishedAt.slice(0, 10)}`}
+                  {/* Marked in the list as well as on the report: someone picking a run to open
+                      needs to know before they open it, not after. */}
+                  {run.quarantine === null ? '' : ' — EVIDENCE INCOMPLETE'}
                 </option>
               ))}
             </select>
           ) : (
-            <input className="input" id="url" value="" readOnly placeholder="no runs readable" />
+            <input className="input" id="run" value="" readOnly placeholder="no runs readable" />
+          )}
+          {available.some((run) => run.quarantine !== null) && (
+            <p className="fhint" style={{ marginTop: 8 }}>
+              Runs marked <strong>evidence incomplete</strong> have findings citing captures that
+              cannot be retrieved. They open, and the report says so at the top.
+            </p>
           )}
         </div>
 
@@ -375,11 +533,11 @@ function ScanInput({
         )}
 
         <div className="form-foot">
-          <button className="btn btn-primary" disabled={runId === ''} onClick={() => onRun(runId)}>
+          <button className="btn btn-ghost" disabled={runId === ''} onClick={() => onRun(runId)}>
             Open report
           </button>
           <span className="note">
-            Authenticated modes land in M4. This view reads runs the worker has already produced.
+            Authenticated modes land in M9. A queued scan is a public crawl.
           </span>
         </div>
       </div>

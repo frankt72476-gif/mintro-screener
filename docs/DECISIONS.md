@@ -1324,3 +1324,77 @@ as the writer's.
 If a capture is genuinely absent it says which and stops. The answer to a genuinely incomplete run
 is a fresh scan producing a new immutable run — not a repair that guesses at what the crawler saw.
 There is still exactly one path that writes captures, and it is `scan-supabase` (D-035).
+
+---
+
+## D-037 — M8: deploy, and how a scan gets triggered
+**2026-08-21 · business owner**
+
+Priority is a working demo, not completeness. Merchant credential entry, Resend domain
+verification and COA parsing are out of scope.
+
+### The queue is a table and a poller
+
+An analyst writes a row to `scan_requests`; the worker on Fly claims it, screens the storefront,
+and records the run it produced. No job service, no dashboard — the build order does not include
+one, and what a demo needs is for a scan to start from somewhere other than one laptop.
+
+**The request is not the run.** A request records that someone asked; a run records what was
+observed. They answer to different rules: a request can be retried or abandoned, and a run is
+immutable once finished (D-002). Collapsing them would turn queue bookkeeping into edits of a
+screening record.
+
+Two check constraints refuse the state every defect in the M7 sequence took — a finished request
+that says nothing about what happened. `done` requires a run; `failed` requires a reason. The
+database will not store a silent success.
+
+Claiming is a compare-and-swap, not a lock: read the oldest queued row, then update it
+*conditioned on it still being queued*. Safe for any number of machines, no advisory locks, no
+RPC. A claim older than fifteen minutes is reclaimed, because a machine can die mid-scan and a
+request stuck in `running` forever is a scan that silently never happens.
+
+### One crawl path
+
+`bin/scan.ts` and `bin/worker.ts` both call `src/screen.ts`. The queue worker does not have its
+own crawl. D-035 is three weeks old and its lesson was that a second path nobody runs is where
+defects live; a worker that crawls *slightly* differently from the command everyone tests with is
+that mistake with a job table attached.
+
+### Quarantine is a row, not a file
+
+Five runs are frozen with findings citing captures that cannot be resolved (D-033, D-034). From
+the outside they are indistinguishable from good runs: status `complete`, full report, findings
+that render. A demo viewer must not read them as ordinary results.
+
+The fact moves from `supabase/quarantined-runs.json` into `public.run_quarantine`, because the
+frontend needs it as much as the verification script does and two copies of one fact is D-034
+again. It is marked in the run list *and* at the top of the report — someone choosing a run needs
+to know before they open it.
+
+**It is an annotation, not a revision.** The run row, its findings and its report are untouched;
+what is added is a separate statement that its evidence is incomplete. D-002 forbids revising
+what a run claimed, not recording that its evidence is incomplete. The table is append-only by
+trigger, since a notice that could be quietly withdrawn would be worth nothing.
+
+The notice states the observation and stops — no instruction, no recommendation, and it does not
+say the findings are wrong (D-001). Nor does it filter: the run stays in the list and the report
+renders in full. Hiding it would be a kind of editing.
+
+### Deployment
+
+`docs/DEPLOY.md` is now a runbook rather than a shape, written for someone who has not used Fly.
+Two steps are worth naming because missing either produces a working-looking app that does
+nothing:
+
+1. **Supabase auth URL configuration.** A magic link points wherever Supabase has recorded, so a
+   link generated for `localhost` is useless in a demo.
+2. **Two steps to invite an analyst.** `auth.users` is not enough; every policy gates on a row in
+   `public.analysts`. Someone who completes the first and not the second signs in successfully and
+   sees nothing, which is correct and looks broken.
+
+The Docker build was corrected in three places found by reading rather than by running: `npm ci`
+needs every workspace manifest including the frontend's; the build must target the worker project
+rather than the root, which would pull React into a crawl container; and `.dockerignore` did not
+exist, so `fly deploy` would have uploaded `node_modules` and every stored capture. **The image
+has not been built — there is no Docker on the development machine.** Same honesty as Tier 2 in
+D-032: stated, not skipped.

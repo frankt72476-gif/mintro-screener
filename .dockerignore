@@ -1,0 +1,45 @@
+# The build context is the whole repository, because the worker compiles the shared packages.
+# Without this file `fly deploy` uploads node_modules and every stored capture — the evidence
+# directory alone is tens of megabytes per run, and none of it belongs in the image.
+#
+# Evidence in particular must never be baked into a container. It lives in the private Supabase
+# bucket; a copy inside an image would be a second, unversioned, publicly-pullable copy of a
+# merchant's captures.
+
+node_modules
+**/node_modules
+
+# Build output — the image compiles its own.
+dist
+**/dist
+out
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Local run artifacts.
+evidence
+reports
+.tmp
+
+# Never in an image.
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.vscode
+.idea
+
+# Not used by the worker.
+apps/web/src
+apps/web/public
+apps/web/index.html
+apps/web/vite.config.ts
+apps/web/dist-types
+apps/testbed
+demo
+brand
+fixtures
+docs
+*.md

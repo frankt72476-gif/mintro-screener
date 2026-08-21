@@ -201,6 +201,29 @@ in `apps/worker/test/schema/README.md`.
 Credentials hold vault references, never secrets. Evidence is private and reached through
 short-expiry signed URLs minted on demand.
 
+### M8 — Deployed · `docs/DEPLOY.md`, `apps/worker/bin/worker.ts`
+
+Netlify for the frontend, Fly for the worker, Supabase for everything else. `docs/DEPLOY.md` is a
+runbook — every command, in order, written for someone who has not used Fly.
+
+**Scans start from the UI.** An analyst writes a row to `scan_requests`; the worker claims it,
+screens the storefront, records the run. No job service and no dashboard: the smallest thing that
+lets a scan begin somewhere other than one laptop. Claiming is a compare-and-swap, so more than
+one machine is safe; a stale claim is reclaimed after fifteen minutes.
+
+**One crawl path.** `bin/scan.ts` and `bin/worker.ts` both call `src/screen.ts`. The worker does
+not have its own crawl (D-035).
+
+**Quarantined runs are marked.** `public.run_quarantine` (0012), read by the frontend, the worker
+and `verify-supabase` alike. Shown in the run list and at the top of the report, with the reason.
+It states the observation and stops — no instruction (D-001) — and it does not filter: the run
+stays in the list and renders in full.
+
+**Not verified here:** the container image has never been built. There is no Docker on the
+development machine, same gap as Tier 2 in D-032. The Dockerfile was corrected by reading —
+missing workspace manifests, a build that would have pulled React into a crawl container, and no
+`.dockerignore` at all.
+
 ---
 
 ## The five storefronts, as they stand today
@@ -244,7 +267,7 @@ Nothing below is a technical problem. Each waits on a decision.
 
 | Blocked on | What it is |
 |---|---|
-| **Credential authorization** | Whether Mintro may hold merchant screening credentials and create screening accounts. **No account exists on any real merchant site.** All of M4 was built against `apps/testbed`. |
+| **Credential authorization** | Whether Mintro may hold merchant screening credentials and create screening accounts. **No account exists on any real merchant site.** All of M4 was built against `apps/testbed`. M9 narrows this to *merchant-supplied* demo logins, which is a different question from Mintro creating its own accounts — see the M9 proposal in this file's successor discussion. |
 | **Session authorization** | Whether Mintro may hold merchant sessions established by a *person* rather than by stored credentials. This blocks **assisted sign-in**, designed in full in `apps/worker/src/auth/assisted.ts` and deliberately unimplemented. |
 | **Resend domain verification** | SPF and DKIM on the sending domain. Until then `createDryRunMailer` composes and transmits nothing — a separate implementation, not a flag, so a test send cannot be mistaken for a delivered report. |
 

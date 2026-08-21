@@ -18,16 +18,19 @@
  * path rather than artifact key (D-034). They are frozen and cannot be repaired or deleted
  * (D-002), so they would fail this script forever.
  *
- * They are listed in `supabase/quarantined-runs.json`, reported separately, and excluded from the
+ * They are recorded in `public.run_quarantine` (0012), reported separately, and excluded from the
  * verdict. Excluded, not hidden: the script prints them every time and says why. A verification
  * tool that can never pass gets ignored, and a tool that quietly drops what it cannot explain is
  * worse than one that fails.
+ *
+ * The list lives in the database rather than a JSON file because the frontend needs it too — a
+ * demo viewer must not read a quarantined run as an ordinary result. Two copies of that fact
+ * would be D-034 again.
  *
  * Nothing written since D-033 can end up here. `persistRun` verifies before it closes, so a run
  * written by `scan-supabase` is either complete or still open.
  */
 
-import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createWorkerSupabase, storagePathForKey } from '../src/store/supabase.js';
 import { assessRun, describeCompleteness } from '../src/store/completeness.js';
@@ -38,18 +41,30 @@ interface Check {
   readonly detail: string;
 }
 
-interface Quarantined {
-  readonly runs: readonly { readonly id: string; readonly domain: string; readonly problem: string }[];
+interface QuarantineRow {
+  readonly run_id: string;
+  readonly reason: string;
+  readonly runs: { readonly report: { readonly merchantDomain: string } | null } | null;
 }
 
 async function main(): Promise<number> {
   const checks: Check[] = [];
   const supabase = createWorkerSupabase();
 
-  const quarantined = JSON.parse(
-    readFileSync('supabase/quarantined-runs.json', 'utf8'),
-  ) as Quarantined;
-  const excluded = new Set(quarantined.runs.map((run) => run.id));
+  const { data: quarantineRows, error: quarantineError } = await supabase.client
+    .from('run_quarantine')
+    .select('run_id, reason, runs ( report )');
+
+  if (quarantineError !== null) {
+    // Not survivable: without knowing which runs are quarantined this script would either fail
+    // forever or silently verify the wrong set.
+    console.error(`could not read run_quarantine: ${quarantineError.message}`);
+    console.error('  Has migration 0012 been applied?');
+    return 1;
+  }
+
+  const quarantined = (quarantineRows ?? []) as unknown as QuarantineRow[];
+  const excluded = new Set(quarantined.map((row) => row.run_id));
 
   // ---- 1. runs are complete -------------------------------------------------------------
   //
@@ -185,14 +200,15 @@ async function main(): Promise<number> {
   }
 
   // Printed every run, never quietly dropped. These are excluded from the verdict, not from view.
-  if (quarantined.runs.length > 0) {
-    console.log(
-      `
-  ${quarantined.runs.length} quarantined run(s) excluded — closed before they were verified ` +
-        `(D-033), frozen and unrepairable (D-002):`,
-    );
-    for (const run of quarantined.runs) {
-      console.log(`    ${run.domain.padEnd(26)} ${run.id}  ${run.problem}`);
+  if (quarantined.length > 0) {
+    console.log(`
+  ${quarantined.length} quarantined run(s) excluded from the verdict:`);
+    for (const row of quarantined) {
+      const embedded = row.runs as unknown;
+      const run = Array.isArray(embedded) ? embedded[0] : embedded;
+      const domain = (run as { report?: { merchantDomain?: string } } | null)?.report?.merchantDomain;
+      console.log(`    ${(domain ?? 'unknown').padEnd(26)} ${row.run_id}`);
+      console.log(`      ${row.reason}`);
     }
   }
 

@@ -540,3 +540,132 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 .rail-user .btn-ghost:hover{border-color:rgba(255,255,255,.4);color:#fff}
 .rail-foot{margin-top:0}
+
+/* ── Scan queue ──────────────────────────────────────────────────────────────────────────
+   The browser never crawls. A request is a row; the worker answers it. These styles carry
+   that: a state word, the URL, and whatever the worker last said it was doing. */
+
+.queue-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.queue-row .input {
+  flex: 1 1 auto;
+}
+
+.queue-row .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-item {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  font-size: 13px;
+}
+
+.queue-state {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.queue-state.queued   { color: var(--slate); }
+.queue-state.running  { color: var(--violet); }
+.queue-state.done     { color: var(--jade); }
+.queue-state.failed   { color: var(--rose); }
+
+.queue-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-note {
+  color: var(--slate);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Quarantine ──────────────────────────────────────────────────────────────────────────
+   A run whose evidence is known to be incomplete. It renders in full and stays in the list;
+   what changes is that the reader is told first. It states the observation and stops — no
+   instruction, no recommendation (D-001). */
+
+.quarantine {
+  border: 1px solid #F6C9D1;
+  border-left: 4px solid var(--rose);
+  border-radius: 10px;
+  background: #FEF2F4;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.quarantine-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.quarantine-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #B0203A;
+}
+
+.quarantine-lede {
+  font-weight: 600;
+}
+
+.quarantine-why {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+}
+
+.quarantine-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid #F6C9D1;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #B0203A;
+}
+
+/* The notice must survive into the PDF. A printed report that dropped it would be a document
+   asserting findings whose captures cannot be produced, with nothing saying so. */
+@media print {
+  .quarantine {
+    border-color: #000;
+    background: transparent;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
