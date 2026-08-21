@@ -186,6 +186,43 @@ actually distinguished and weigh the finding accordingly.
 This is required, not stylistic (D-023). It applies to every scope defined by exclusion, present
 and future.
 
+## RLS decides reads. Triggers decide changes.
+
+Not a stylistic split. **Row-level security structurally cannot enforce hard constraint 5**, and
+the reason is worth stating rather than leaving to be rediscovered.
+
+`service_role` — the key the worker uses — carries `BYPASSRLS`. Every policy in
+`supabase/migrations/` is invisible to it. That is by design: the worker must write rows an
+analyst may never write, so it needs to be outside the policy system.
+
+But the process that writes the evidence is precisely the process constraint 5 constrains:
+
+> Evidence storage is append-only. Screenshots and DOM snapshots are never overwritten or deleted
+> by application code.
+
+An RLS policy forbidding `UPDATE` on `evidence` would be enforced against the browser, which never
+had write access anyway, and ignored by the worker, which is the only thing that could overwrite
+a capture. The guarantee would read as watertight and protect against nobody.
+
+So the split is:
+
+| Question | Enforced by | Applies to |
+|---|---|---|
+| Who may **read** this? | RLS policies gating on `public.is_analyst()` | `anon`, `authenticated` |
+| What may **change**? | `BEFORE UPDATE OR DELETE` triggers, primary keys, `upsert: false` | everyone, including `service_role` |
+
+Triggers are not bypassed by `BYPASSRLS`. Neither is a primary key. That is what makes them the
+only place an append-only guarantee can actually live in this architecture.
+
+**The general form:** when a constraint governs what a *privileged* process may do, it cannot be
+enforced by a mechanism that privileged process bypasses. Ask which principal the rule is really
+aimed at before choosing where to enforce it — and if the answer is "us", a policy is the wrong
+instrument.
+
+The one deliberate exception is `runs`, where the trigger is precise rather than blanket: a run is
+mutable while in progress, because it has to be finished, and frozen from the moment `finished_at`
+is set. That is exactly the boundary D-002 draws.
+
 ## Constraint 9 governs preconditions, not just checks
 
 **Hard constraint 9 applies to any component that establishes a precondition for findings, not

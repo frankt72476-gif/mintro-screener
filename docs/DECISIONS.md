@@ -714,6 +714,29 @@ A precondition is anything a finding silently depends on: that a session is live
 rendered, that a footer was located, that the catalogue was identified. None appears in the
 finding's text, which is precisely why getting one wrong is invisible.
 
+### The canonical example: the guard defeated by the shape it guards against
+
+At M5 a print-ready signal was written **specifically** to stop `page.pdf()` firing before
+screenshots load, because a PDF printed too early captures them as empty frames — evidence loss
+that looks like a rendering quirk. It worked: 66/66.
+
+At M7 the report began rendering synchronously, and that same signal started reporting **`1/1`** —
+the brand lockup — while 66 screenshots were still arriving. It checked once, found the images it
+could see, and declared ready. **Asked before it could tell, and answered anyway.**
+
+This is the one to remember, because it is not a subtle instance:
+
+> The check written specifically to prevent capturing empty frames was itself defeated by the
+> same shape it existed to guard against.
+
+Knowing the principle, having just applied it, and having written the guard were all insufficient.
+The defect returned through a change to *when* the code ran, not to what it did.
+
+**This is a permanent discipline, not a bug fixed once.** Every guard is itself a component that
+can be asked before it can tell. The operational test applies to guards as much as to checks: ask
+what it returns when it cannot tell, and if that is the same as when the thing holds, it is
+wrong.
+
 ### A redirect away is not the path being served — the same family
 
 `http_probe` treats a request that ended somewhere other than the path asked for as *not served*,
@@ -960,18 +983,32 @@ The run trigger is deliberately precise rather than blanket: a run is mutable wh
 it has to be, to be finished — and immutable from the moment it completes. That is exactly what
 D-002 says.
 
-### `analysts`, an addition to the documented model
+### `analysts` — a correction to the specification, not a deviation from it
 
-`docs/ARCHITECTURE.md` documents a *minimum* data model. One table is added to it.
+**The instruction specified invite-only via Supabase's dashboard signup toggle. That was
+corrected in the build, and the correction was accepted.** Recorded here as a correction rather
+than a deviation, because the distinction matters for anyone reading this later.
 
-Supabase's "disable signups" toggle is dashboard configuration: not version-controlled, not
-reviewable, not testable. Gating policies on `auth.role() = 'authenticated'` would mean that if
-that toggle were ever flipped, anyone who signed up could read every merchant's evidence.
+A dashboard toggle is a **setting**, not a **control**:
 
-Every policy therefore gates on `public.is_analyst()`, which requires an active row in
-`analysts`. Membership is granted by insert, not by signing up, and revoked by setting
-`active = false` — which keeps the account so the `sends` records naming that analyst stay
-intact.
+| | Dashboard toggle | `is_analyst()` |
+|---|---|---|
+| Version-controlled | no | yes — a migration |
+| Reviewable | no | yes — in a diff |
+| Testable | no | yes |
+| If bypassed | one click, fails **open** | requires a migration |
+
+The failure mode is what decides it. If the signup toggle is ever flipped — deliberately, or by
+someone debugging something unrelated — policies gating on `auth.role() = 'authenticated'` would
+let anyone who signed up read every merchant's evidence, silently and immediately. Gating on
+`public.is_analyst()` means bypassing access control is a migration rather than a click.
+
+`docs/ARCHITECTURE.md` documents a *minimum* data model, so adding a table to it is within what
+that document anticipates.
+
+Every policy gates on `public.is_analyst()`, which requires an active row in `analysts`.
+Membership is granted by insert, not by signing up, and revoked by setting `active = false` —
+which keeps the account so the `sends` records naming that analyst stay intact.
 
 ### No passwords anywhere
 
