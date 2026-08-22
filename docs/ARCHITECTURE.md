@@ -284,6 +284,21 @@ a network blip gets ignored, which costs what a guard that passes on a blip cost
 **The operational test extends unchanged, and runs in both directions:** ask what the guard reports
 when the thing it guards has not happened yet, and what it reports when it could not see.
 
+### And the frontend, where nobody had looked
+
+The report selector resynced only while its value was `''`, so it answered identically whether it
+held a deliberate choice or a default that had gone stale — and a finished scan left it naming the
+previous run of the same merchant (D-045). Component state answers when it cannot tell exactly as
+readily as a session check does; the constraint is about components that establish preconditions,
+and "which run is on screen" is one.
+
+It also adds a second axis. The backend instances were invisible because a precondition never
+appears in a finding's text. This one was invisible because two different runs **rendered as the
+same string** — same merchant, same counts, timestamp truncated to the day. So the test gains a
+presentation half: when a control names a record, ask whether its label can distinguish two
+records the user might plausibly hold. If it cannot, a wrong selection is not merely possible but
+unobservable.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by

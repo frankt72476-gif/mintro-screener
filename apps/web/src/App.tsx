@@ -13,8 +13,14 @@ import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
 import { useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
-import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
+import {
+  createLocalRunSource,
+  createSupabaseRunSource,
+  resolveRunSelection,
+  type RunSummary,
+} from './lib/runs.js';
 import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
+import { formatReportDate } from './lib/format.js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
 import { CredentialModal } from './components/CredentialModal.js';
@@ -25,7 +31,14 @@ import { DocumentsPane } from './components/DocumentsPane.js';
 import { Rail } from './components/Rail.js';
 
 type Pane = 'scan' | 'docs';
-type Stage = 'input' | 'running' | 'report';
+
+/**
+ * `watching` is the scan the analyst just asked for, in flight. `running` is the much shorter
+ * wait while a stored run is read. They are separate because they are different waits with
+ * different failure modes, and collapsing them would put "the crawl failed" and "the report would
+ * not load" behind the same words.
+ */
+type Stage = 'input' | 'watching' | 'running' | 'report';
 
 /**
  * Print route: `?report=<domain>&print=1`.
@@ -113,6 +126,17 @@ function Screener({
   // what it said, and the quarantine notice is a later statement about it (0012).
   const [quarantine, setQuarantine] = useState<string | null>(null);
   const [queued, setQueued] = useState<readonly ScanRequestSummary[]>([]);
+  /**
+   * The request this browser asked for and is following, by id (D-045).
+   *
+   * Set once when the insert comes back and never rewritten while it is in flight, so the effect
+   * that watches it does not re-subscribe on every poll. Its changing status lives in
+   * `watchedState` for the same reason.
+   */
+  const [watching, setWatching] = useState<{ readonly requestId: string; readonly url: string } | null>(
+    null,
+  );
+  const [watchedState, setWatchedState] = useState<ScanRequestSummary | null>(null);
   /** Whether the last poll saw work outstanding — see the polling effect. */
   const wasPending = useRef(false);
   const [available, setAvailable] = useState<readonly RunSummary[]>([]);
@@ -308,6 +332,78 @@ function Screener({
     };
   }, [queue, runs]);
 
+  /**
+   * Watches the one request this browser made, by its id (D-045).
+   *
+   * The report that opens must be the run **this request produced**. Opening whichever run is
+   * newest would have fixed the symptom that prompted this and stayed wrong: two analysts
+   * screening different merchants at once, or a re-scan finishing while an earlier one is still
+   * running, and the newest run belongs to somebody else's request.
+   *
+   * Separate from the list poll below because it asks a different question. That one asks what is
+   * in the queue; this one asks what happened to a specific row, and must not be satisfied by an
+   * answer about a different one.
+   *
+   * Every terminal path says which one it took. A request that finished without a run, which the
+   * database's `finished_requests_say_what_happened` constraint forbids, is reported rather than
+   * papered over with a fallback — a fallback here is exactly how the wrong report gets opened.
+   */
+  useEffect(() => {
+    if (watching === null) return;
+
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { requestId } = watching;
+
+    const tick = async (): Promise<void> => {
+      const request = await queue.get(requestId);
+      if (!live) return;
+
+      // Null is "could not read", not "finished" and not "gone". Keep waiting: the request is
+      // still out there and we hold its id.
+      if (request === null) {
+        timer = setTimeout(() => void tick(), 3000);
+        return;
+      }
+
+      setWatchedState(request);
+
+      if (isPending(request.status)) {
+        timer = setTimeout(() => void tick(), 3000);
+        return;
+      }
+
+      setWatching(null);
+      void runs.list().then(setAvailable).catch(() => undefined);
+
+      if (request.status === 'failed') {
+        setError(`The scan of ${request.url} failed: ${request.error ?? 'no reason was recorded'}`);
+        setStage('input');
+        return;
+      }
+
+      if (request.runId === null) {
+        setError(
+          `The scan of ${request.url} reported done but recorded no run, so there is no report to open.`,
+        );
+        setStage('input');
+        return;
+      }
+
+      void load(request.runId);
+    };
+
+    void tick();
+
+    return () => {
+      live = false;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+    // `load` is stable for the life of this component and depending on it would restart the watch
+    // on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watching, queue, runs]);
+
   if (printDomain !== null) {
     return (
       <div className="shell">
@@ -385,12 +481,22 @@ function Screener({
               onRequest={async (url) => {
                 const result = await queue.request(url);
                 if (result.ok) {
+                  setError(null);
                   setToast('Scan queued — the worker will pick it up');
+                  // Follow this request, not the queue in general. Everything after this point
+                  // keys off the id the insert returned (D-045).
+                  setWatchedState(null);
+                  setWatching({ requestId: result.id, url });
+                  setStage('watching');
                   setQueued(await queue.list());
                 }
                 return result;
               }}
             />
+          )}
+
+          {stage === 'watching' && watching !== null && (
+            <ScanProgress url={watching.url} state={watchedState} />
           )}
 
           {stage === 'running' && (
@@ -486,13 +592,31 @@ function ScanInput({
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
   const [runId, setRunId] = useState(available[0]?.runId ?? '');
+  /**
+   * Whether the analyst has chosen a run themselves.
+   *
+   * This is the fix for D-045. The selection used to be seeded from `available[0]` at mount and
+   * resynced only while it was `''`, so once a value was set it never moved: when a new run
+   * arrived the selector went on pointing at whichever run had been newest when the page loaded.
+   *
+   * The guard could not distinguish "the analyst picked this one" from "this is the default,
+   * captured before the list changed" — it returned the same value in both cases, which is the
+   * precondition shape in D-026 with the state in a component instead of a crawler. So the two
+   * cases are now separate state. Untouched, the default follows the list. Touched, the choice is
+   * theirs and nothing overrides it.
+   */
+  const [chosen, setChosen] = useState(false);
   const [url, setUrl] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (runId === '' && available.length > 0) setRunId(available[0]?.runId ?? '');
-  }, [available, runId]);
+    const next = resolveRunSelection({ available, current: runId, chosen });
+    // The effect depends on the state it sets, so the write is guarded rather than left to
+    // React's bail-out. `resolveRunSelection` is idempotent — this makes that a property of the
+    // effect too, instead of something the next reader has to re-derive.
+    if (next !== runId) setRunId(next);
+  }, [available, chosen, runId]);
 
   const submit = async (): Promise<void> => {
     setRequesting(true);
@@ -599,12 +723,21 @@ function ScanInput({
               className="input"
               id="run"
               value={runId}
-              onChange={(event) => setRunId(event.target.value)}
+              onChange={(event) => {
+                setChosen(true);
+                setRunId(event.target.value);
+              }}
             >
               {available.map((run) => (
                 <option key={run.runId} value={run.runId}>
                   {run.domain} — {run.counts.fail} failed, {run.counts.review} for review
-                  {run.finishedAt === null ? '' : ` — ${run.finishedAt.slice(0, 10)}`}
+                  {/* The time, not just the date, and this is not cosmetic (D-045). Re-scanning a
+                      merchant is a normal operation, so two runs of one domain on one day is the
+                      ordinary case — and rendered to the day they were the same string. That is
+                      what turned a stale selection into an undetectable one. */}
+                  {run.finishedAt === null
+                    ? ' — never finished'
+                    : ` — ${formatReportDate(run.finishedAt)}`}
                   {/* Marked in the list as well as on the report: someone picking a run to open
                       needs to know before they open it, not after. */}
                   {run.quarantine === null ? '' : ' — EVIDENCE INCOMPLETE'}
@@ -669,6 +802,57 @@ function ScanInput({
       </div>
     </div>
   );
+}
+
+/**
+ * The scan the analyst asked for, in flight.
+ *
+ * Shows one request — the one they made — and nothing about the queue in general. The demo's
+ * progress card listed seven crawl layers with counts; the worker writes a single free-text
+ * progress line, so this shows that line and says nothing it has not been told. Inventing the
+ * layers would be a progress display that was mostly decoration, and this project does not
+ * render what it did not observe.
+ *
+ * `state` is null until the first poll comes back, which is a real state and not an error: the
+ * row was inserted, and nothing has been read about it yet.
+ */
+function ScanProgress({
+  url,
+  state,
+}: {
+  readonly url: string;
+  readonly state: ScanRequestSummary | null;
+}): JSX.Element {
+  const status = state?.status ?? 'queued';
+
+  return (
+    <div>
+      <div className="eyebrow">{status === 'queued' ? 'Queued' : 'Running'}</div>
+      <h1>{displayHost(url)}</h1>
+      <p className="sub">
+        The crawl runs on the worker. This report opens when <strong>this scan</strong> finishes —
+        an earlier run of the same merchant is a different report and is not substituted for it.
+      </p>
+
+      <div className="card prog">
+        <div className="layer run">
+          <span className="dot" />
+          {status === 'queued'
+            ? 'Waiting for the worker to claim this request'
+            : (state?.progress ?? 'Screening the storefront')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The host, for a heading. Falls back to the raw string rather than showing nothing. */
+function displayHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
 /**

@@ -33,6 +33,39 @@ export interface RunSummary {
   readonly quarantine: string | null;
 }
 
+/**
+ * Which run the report selector should be pointing at (D-045).
+ *
+ * Pure, and separated from the component, because the defect it fixes was a state machine hiding
+ * inside a `useEffect` guard. The old rule was "resync only while the selection is `''`", which
+ * meant the selector answered the same way when it held a deliberate choice as when it held a
+ * default captured before the list changed — and so a selection made at page load went on
+ * pointing at that run after newer ones arrived, with the button beneath it opening the wrong
+ * report.
+ *
+ * The two cases are now distinct inputs, and the function says what it does with each:
+ *
+ *   - `chosen: false` — the selection is a default. It follows the head of the list, always.
+ *   - `chosen: true` — the analyst picked it. It is kept, and only replaced if that run has left
+ *     the list, because a selector pointing at nothing is worse than one pointing at the newest.
+ *
+ * This is the precondition rule from D-026 in the frontend: never return the same answer for
+ * "this is current" and "I cannot tell whether it is current".
+ */
+export function resolveRunSelection({
+  available,
+  current,
+  chosen,
+}: {
+  readonly available: readonly RunSummary[];
+  readonly current: string;
+  readonly chosen: boolean;
+}): string {
+  if (available.length === 0) return current;
+  if (chosen && available.some((run) => run.runId === current)) return current;
+  return available[0]?.runId ?? '';
+}
+
 export interface LoadedRun {
   readonly report: ScreeningReport;
   readonly quarantine: string | null;

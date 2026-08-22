@@ -748,6 +748,29 @@ compliant gating and no gating at all were indistinguishable, and the testbed �
 correctly — was auto-failed for doing the right thing. The redirect is now reported, because
 "redirected to /account/login" is the observation that the gate works.
 
+### The same family in the frontend, found much later (D-045)
+
+Every instance above is backend — a crawler, a probe, a storage guard — and that is presumably
+why nobody looked at the browser for two milestones.
+
+The report selector resynced its value only while that value was `''`. So it returned the same
+answer when it held a run the analyst had deliberately chosen as when it held a default captured
+before the list changed and now naming a superseded run. **It could not tell "this selection is
+current" from "I cannot tell whether it is current", and answered anyway.** A completed scan left
+it pointing at the previous run of the same merchant, and Open report opened that one.
+
+The operational test finds it in one question, and the question is not backend-specific: *what
+does this return when it cannot tell?* Component state is as capable of answering when it cannot
+tell as a session check is. `chosen` and `current` are now separate inputs so the two cases are
+distinguishable, in a pure function with tests.
+
+One thing this instance adds that the others do not. The backend cases were invisible because a
+precondition never appears in a finding's text. This one was invisible because **two different
+runs rendered as the same string** — same merchant, same counts, date truncated to the day. The
+state was wrong *and* the presentation could not show it, and only the second is what made
+careful looking useless. When a control names a record, ask whether its label can distinguish two
+records the user might plausibly hold.
+
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
 Both rules carry `unauthenticated: true`, so the unauthenticated probe is the finding. The
@@ -1722,3 +1745,81 @@ column is real, printed, and part of what gets sent.
 
 `demo/index.html` remains the visual language (D-004). This extends it for real data volume; the
 cards, chips, tick strip and evidence slips are unchanged.
+
+---
+
+## D-045 — The report that opens is the run that request produced
+**2026-08-22 · Frank's ruling, from a defect on the deployed site**
+
+Entering a URL and pressing Run scan showed an **existing report for that merchant** instead of
+the scan just requested.
+
+### What it actually was
+
+Neither of the two candidates raised. The form was not matching on merchant, and the UI was not
+navigating anywhere on submit. Diagnosed against the live system:
+
+    scan_requests          1 row, 21 hours old, done, worker claimed it in 1s
+    fly logs               worker polling continuously; no request seen in that window
+    reproduced live        queued a scan, worker claimed it in 0.35s, run 12 completed
+    then Open report       RUN 895056af — the *previous* swisschems run, from 20:45 the day before
+
+`ScanInput` seeded its run selection from `available[0]` at mount, and resynced only while the
+value was `''`. Once set it never moved. When the scan finished and the list refreshed with the
+new run at its head, the selector still named whichever run had been newest when the page loaded,
+and Open report loaded that one.
+
+### Watching the request id is the part that makes this correct
+
+"Open the newest run" would have fixed the observed symptom and remained wrong. Two analysts
+screening different merchants at once, or a re-scan finishing while an earlier one is still
+running, and the newest run belongs to someone else's request — the same wrong-report failure,
+now with a merchant mismatch and no reason for anyone to suspect it.
+
+So the insert returns the id of the row it created, and the UI follows **that row**:
+
+- `request()` returns `{ ok: true, id }`. An insert that reports success without an id is reported
+  as a failure, because the only thing a caller could do with it is fall back to "newest".
+- `get(id)` reads that one request. Not a page of recent ones filtered down — with two analysts
+  scanning, the request being followed may not be on the page at all.
+- A `null` from `get` is *could not read*, and the watcher keeps waiting. It is never read as
+  finished or gone.
+- `done` with no `run_id` — which `finished_requests_say_what_happened` in `0012` forbids — is
+  reported, not repaired by opening something else.
+
+The pane now moves input → queued/running for that request → the report it produced, which is the
+flow `demo/index.html` always described (D-004). The progress card shows the worker's own progress
+line and nothing more; the demo's seven crawl layers are not populated because the worker does not
+report them, and inventing them would be a progress display that was mostly decoration.
+
+### The invisibility came from the label, not the state
+
+A stale selection is a bug. A stale selection that renders identically to the fresh one is an
+undetectable bug, and that is what the label did:
+
+    swisschems.is — 5 failed, 18 for review — 2026-08-22     ← the run from 00:45
+    swisschems.is — 5 failed, 18 for review — 2026-08-22     ← the run from 22:00
+
+Rendered to the day, two runs of one merchant on one day are the same string — and re-scanning a
+merchant is a *normal* operation (D-002), so that collision is the ordinary case rather than an
+edge one. The counts match too, because a merchant that has not changed between scans produces
+the same counts; the date was the only field that could have separated them, and it was truncated.
+
+**Timestamps in the run labels are part of the fix, not cosmetic.** Nothing on screen distinguished
+the wrong report from the right one, so the defect could survive any amount of careful looking.
+
+### The default follows, the choice is kept
+
+`resolveRunSelection` in `apps/web/src/lib/runs.ts`, pure and tested:
+
+- untouched, the selection is a default and follows the head of the list;
+- once the analyst picks a run, that choice stands, and is replaced only if the run leaves the
+  list, where leaving it would point the button at nothing;
+- an empty list changes nothing, because an empty list is as often a failed read as it is no runs
+  (D-036).
+
+### Limitation, stated rather than hidden
+
+One watched request per browser. Queueing a second scan moves the watch to it; the first still
+appears in Recent requests and its report is opened from the selector. Runs are immutable and
+nothing is lost — but the automatic open follows the most recent request only.

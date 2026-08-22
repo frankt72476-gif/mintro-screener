@@ -44,10 +44,30 @@ export interface ScanRequestSummary {
 }
 
 export interface ScanQueue {
-  /** Queues a scan. Returns the error text rather than throwing, because the caller renders it. */
-  request(url: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
+  /**
+   * Queues a scan.
+   *
+   * Returns the id of the row it inserted, because that id is what makes the rest correct: the
+   * report the analyst is shown must be the run *this* request produced (D-045). Returns the
+   * error text rather than throwing, because the caller renders it.
+   */
+  request(
+    url: string,
+  ): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
   list(limit?: number): Promise<readonly ScanRequestSummary[]>;
+  /**
+   * One request, by id.
+   *
+   * Separate from `list()` on purpose. Watching a specific request means asking for that request,
+   * not scanning a page of recent ones and hoping it is still on it — with two analysts scanning
+   * concurrently it would not be.
+   *
+   * **Null means the read failed, not that the request is gone.** The caller keeps waiting on
+   * null; treating an unreadable row as a finished or missing one is the precondition defect this
+   * project keeps finding (D-026, D-036).
+   */
+  get(id: string): Promise<ScanRequestSummary | null>;
 }
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
@@ -61,38 +81,70 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
         };
       }
 
-      const { error } = await client
+      const { data, error } = await client
         .from('scan_requests')
         // Always public. The insert policy in 0014 refuses anything else, so this is the client
         // agreeing with a rule the database enforces rather than a decision made here.
-        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public' });
+        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public' })
+        .select('id')
+        .single();
 
       if (error !== null) {
         return { ok: false, error: error.message };
       }
-      return { ok: true };
+
+      // An insert that reports success but hands back no id leaves the caller with nothing to
+      // watch, and the only thing it could do then is fall back to "whichever run is newest" —
+      // the wrong report, delivered confidently. Say it failed instead.
+      const id = (data as { id: string } | null)?.id;
+      if (id === undefined) {
+        return { ok: false, error: 'The scan was queued but its id did not come back, so it cannot be followed.' };
+      }
+
+      return { ok: true, id };
     },
 
     async list(limit = 10) {
       const { data, error } = await client
         .from('scan_requests')
-        .select('id, url, status, progress, error, run_id, created_at, mode')
+        .select(REQUEST_COLUMNS)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error !== null || data === null) return [];
 
-      return (data as RequestRow[]).map((row) => ({
-        id: row.id,
-        url: row.url,
-        status: row.status as ScanStatus,
-        progress: row.progress,
-        error: row.error,
-        runId: row.run_id,
-        createdAt: row.created_at,
-        mode: row.mode as ScanMode,
-      }));
+      return (data as RequestRow[]).map(toSummary);
     },
+
+    async get(id) {
+      const { data, error } = await client
+        .from('scan_requests')
+        .select(REQUEST_COLUMNS)
+        .eq('id', id)
+        .maybeSingle();
+
+      // Both branches are "could not tell", and both keep the caller waiting. `maybeSingle`
+      // returns null data for a row RLS hides as well as for one that does not exist, and neither
+      // is a reason to stop watching a request we hold the id of.
+      if (error !== null || data === null) return null;
+
+      return toSummary(data as RequestRow);
+    },
+  };
+}
+
+const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, mode';
+
+function toSummary(row: RequestRow): ScanRequestSummary {
+  return {
+    id: row.id,
+    url: row.url,
+    status: row.status as ScanStatus,
+    progress: row.progress,
+    error: row.error,
+    runId: row.run_id,
+    createdAt: row.created_at,
+    mode: row.mode as ScanMode,
   };
 }
 
