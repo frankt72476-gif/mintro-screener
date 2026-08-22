@@ -31,6 +31,7 @@ export function checkDomAssert(
       rule,
       page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
       RENDERED,
+      'not_exposed',
       renderFailureEvidence(page),
     );
   }
@@ -43,7 +44,7 @@ export function checkDomAssert(
 
   // Unreachable: the ruleset schema requires one of the three. Kept so a future schema change
   // surfaces here as `not_evaluable` rather than as a silent `pass`.
-  return notEvaluable(rule, 'the rule asks for no assertion, collection or detection', RENDERED, pageEvidence(page));
+  return notEvaluable(rule, 'the rule asks for no assertion, collection or detection', RENDERED, 'no_check_built', pageEvidence(page));
 }
 
 /**
@@ -125,6 +126,7 @@ function declaredSubjectFinding(
       rule,
       `the rule this one takes its subject from ('${rule.params.target_phrases_from}') carries no wording to look for`,
       RENDERED,
+      'no_check_built',
       pageEvidence(page),
     );
   }
@@ -136,6 +138,7 @@ function declaredSubjectFinding(
       rule,
       'no footer region could be identified on this page',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }
@@ -302,6 +305,7 @@ function selectorFinding(
       rule,
       `the selector '${selector}' was not evaluated against this page`,
       RENDERED,
+      'no_check_built',
       pageEvidence(page),
     );
   }
@@ -390,7 +394,7 @@ function collectFinding(
   page: PageContext,
   collect: 'social_handles',
 ): Finding {
-  if (collect !== 'social_handles') return notEvaluable(rule, `nothing collects '${collect}'`, RENDERED, pageEvidence(page));
+  if (collect !== 'social_handles') return notEvaluable(rule, `nothing collects '${collect}'`, RENDERED, 'no_check_built', pageEvidence(page));
 
   const handles = socialLinks(page);
 
@@ -424,6 +428,7 @@ function detectFinding(
     rule,
     `detecting '${detect}' needs a surface this layer does not render`,
     RENDERED,
+    'no_check_built',
     pageEvidence(page),
   );
 }

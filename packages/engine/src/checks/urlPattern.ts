@@ -37,6 +37,7 @@ export function checkUrlPattern(rule: RuleOfType<'url_pattern'>, layer0: Layer0R
       rule,
       layer0.unusableReason ?? 'the URL surface could not be observed',
       LAYER0_EVIDENCE_KIND,
+      'not_exposed',
       unobservableEvidence(layer0),
     );
   }
@@ -51,6 +52,7 @@ export function checkUrlPattern(rule: RuleOfType<'url_pattern'>, layer0: Layer0R
       rule,
       `no URLs in scope '${scope}' were listed in the sitemap, so there was nothing to examine`,
       LAYER0_EVIDENCE_KIND,
+      'not_exposed',
       unobservableEvidence(layer0),
     );
   }

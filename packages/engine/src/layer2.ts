@@ -15,7 +15,7 @@ import { targetPhrases } from './layer1.js';
 import { checkTextMatch } from './checks/textMatch.js';
 import { checkTextCooccurrence } from './checks/textCooccurrence.js';
 import { RENDERED } from './checks/pageEvidence.js';
-import { notEvaluable, tally, type Finding } from './findings.js';
+import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
 import { isRendered, type PageContext } from './page.js';
 import type { ScoredUrl } from './suspicion.js';
 
@@ -56,11 +56,7 @@ export function runLayer2(sampled: readonly SampledPage[], ruleset: Ruleset): La
   for (const rule of rules) {
     if (!LAYER2_TYPES.has(rule.type)) {
       findings.push(
-        notEvaluable(
-          rule,
-          `check type '${rule.type}' has no Layer 2 handler yet, so this rule was not examined`,
-          RENDERED,
-        ),
+        notEvaluable(rule, unbuiltCheckReason(rule), RENDERED, 'no_check_built'),
       );
       continue;
     }
@@ -74,6 +70,7 @@ export function runLayer2(sampled: readonly SampledPage[], ruleset: Ruleset): La
             ? 'no product pages could be identified to sample'
             : 'none of the sampled product pages rendered',
           RENDERED,
+          'not_exposed',
         ),
       );
       continue;
@@ -139,7 +136,7 @@ function dispatch(rule: Rule, page: PageContext, ruleset: Ruleset): Finding {
     case 'text_cooccurrence':
       return checkTextCooccurrence(rule as RuleOfType<'text_cooccurrence'>, page);
     default:
-      return notEvaluable(rule, `no Layer 2 handler for check type '${rule.type}'`, RENDERED);
+      return notEvaluable(rule, unbuiltCheckReason(rule), RENDERED, 'no_check_built');
   }
 }
 

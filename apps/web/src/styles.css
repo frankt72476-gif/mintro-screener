@@ -103,7 +103,11 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 }
 .rail-foot{margin-top:auto;padding:0 10px;font-size:10.5px;color:rgba(255,255,255,.3);line-height:1.6}
 
-.main{flex:1;min-width:0;padding:26px 30px 70px;max-width:1120px}
+/* The PDF reads better than the screen did, and the difference was width and density, not
+   design (D-047) — print sets `max-width:none` and the screen was capped at 1120px with a
+   two-column requirement pair squeezed into what was left. The cap is now wide enough for the
+   pair and the capture to sit side by side as they do on paper. */
+.main{flex:1;min-width:0;padding:26px 34px 70px;max-width:1360px}
 
 /* ---------- shared bits ---------- */
 .eyebrow{
@@ -253,6 +257,9 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .find.pass .find-head{border-left-color:#B7E7D2}
 .find.na .find-head{border-left-color:#DCD8E8}
 .find-head{padding-left:12px}
+/* With the note no longer repeated below it, an open row's heading is a label rather than a
+   paragraph, so it needs less height (D-047). */
+.find.open .find-head{padding-top:9px;padding-bottom:7px}
 
 .state{
   font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.07em;
@@ -271,7 +278,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   margin-top:4px;display:flex;align-items:center;gap:5px;
 }
 
-.ev{display:none;padding:0 15px 16px 27px}
+.ev{display:none;padding:0 15px 12px 27px}
 .find.open .ev{display:block}
 
 /* signature: evidence slip */
@@ -286,8 +293,8 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .slip-bar .stamp{
   margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--slate);
 }
-.slip-body{display:flex;gap:14px;padding:13px 13px;flex-wrap:wrap}
-.slip-txt{flex:1;min-width:230px}
+.slip-body{display:flex;gap:16px;padding:12px;flex-wrap:wrap;align-items:flex-start}
+.slip-txt{flex:1 1 300px;min-width:260px}
 .kv{display:flex;gap:9px;font-size:11px;margin-bottom:5px;align-items:baseline}
 .kv .k{
   font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;
@@ -306,7 +313,10 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .rule-ref b{color:var(--ink-mid);font-weight:600}
 
 /* fake screenshot */
-.shot{flex:0 0 148px;width:148px}
+/* The capture is the point of the slip (D-047).
+   148px wide with an 180px cap made the one thing a reader actually needs to look at the
+   smallest element on the row. It is now a column, and it grows with the report. */
+.shot{flex:1 1 340px;min-width:280px;max-width:520px}
 .shot-frame{
   border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;
   box-shadow:0 2px 8px -4px rgba(42,15,99,.25);
@@ -317,7 +327,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .ln{height:5px;border-radius:2px;background:#EDEAF4}
 .ln.w80{width:80%}.ln.w60{width:60%}.ln.w45{width:45%}.ln.w95{width:95%}
 .ln.hit{background:#FBD9A2;box-shadow:0 0 0 2px #F59E42}
-.shot-cap{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--slate);margin-top:5px;text-align:center}
+.shot-cap{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--slate);margin-top:6px;text-align:center}
 
 /* ---------- modal ---------- */
 .veil{
@@ -408,8 +418,10 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .doc-artifact .gl{font-size:22px;color:#9C94BD;line-height:1}
 .doc-artifact .lbl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--slate);line-height:1.5;word-break:break-all}
 
+/* `cover` crops a full-page screenshot; the cap is what decides how much survives, so it is
+   generous. Anchored to the top because that is where a homepage finding lives. */
 .shot-img{
-  width:100%;height:auto;display:block;max-height:180px;object-fit:cover;object-position:top;
+  width:100%;height:auto;display:block;max-height:460px;object-fit:cover;object-position:top;
   background:#fff;
 }
 .shot-missing{
@@ -485,6 +497,21 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .printing .cat-body,
 .printing .ev{display:block !important}
 .printing .find-note{display:block !important;-webkit-line-clamp:none;overflow:visible}
+/* Print sizes the capture differently from the screen, and the reason is measured (D-047).
+   A page has a cost the screen does not, and there are 66 captures in a real run:
+
+       captures 148px / 180px cap, note stated three times     70 pages   (before)
+       captures 148px / 180px cap, note stated once            47 pages
+       captures 240px / 280px cap, note stated once            67 pages
+       captures 360px / 520px cap, note stated once            85 pages
+
+   Deduplication is worth 23 pages. Spending some of that on a capture 62% wider leaves the
+   export shorter than it was *and* more legible. Spending all of it makes the PDF longer than
+   the document this set out to shorten. */
+.printing .shot{flex:0 0 240px;width:240px}
+.printing .shot-img{max-height:280px}
+.printing .req{margin-bottom:8px}
+.printing .ev{padding-bottom:10px}
 .printing .cat-head{cursor:default}
 
 /* Keep a finding and its evidence on one page where the page break allows. */
@@ -750,9 +777,9 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .req {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
+  gap: 16px;
+  padding: 11px 13px;
+  margin-bottom: 8px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--card);
@@ -772,8 +799,8 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .req-t {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.55;
   color: var(--ink);
 }
 
@@ -813,6 +840,55 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   max-width: 82ch;
 }
 
+/* ── The four not-evaluable buckets (D-044) ─────────────────────────────────────────────────
+   One "Not evaluable" pile held three unrelated facts: a check Mintro has not written, a
+   question no website can answer, and something this merchant's site does not carry. They shared
+   a heading and a colour, so a reader could not tell them apart — and the first read as the
+   merchant's fault when it is ours.
+
+   They keep the muted `na` palette, because none of them is a failure. The rule down the left
+   and the label above it are what separate them. */
+
+.sect[data-bucket] {
+  border-left: 3px solid var(--line);
+  padding-left: 14px;
+}
+
+.sect[data-bucket]::before {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* Mintro's gap. Violet is the product's own colour — the section is about us, not the site. */
+.sect[data-bucket='no_check_built'] {
+  border-left-color: var(--purple);
+}
+.sect[data-bucket='no_check_built']::before {
+  content: 'Gap in Mintro, not in the merchant site';
+  color: var(--purple);
+}
+
+.sect[data-bucket='not_reachable']::before {
+  content: 'Outside what any crawl can see';
+}
+
+.sect[data-bucket='not_exposed']::before {
+  content: 'Checked against this storefront';
+}
+
+.sect[data-bucket='not_applicable']::before {
+  content: 'Rule subject absent from these pages';
+}
+
+.sect[data-bucket='unrecorded']::before {
+  content: 'Recorded before this distinction existed';
+}
+
 .cat.group .cat-head { cursor: pointer; }
 
 .group-rule {
@@ -841,3 +917,102 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   .sect, .cat.group { break-inside: auto; }
   .req { break-inside: avoid; }
 }
+
+/* ── The run library (D-047) ────────────────────────────────────────────────────────────────
+   Replaces the `<select>` that used to sit in the scan form. A dropdown shows one option at a
+   time, which is how a stale selection stayed invisible (D-045); a table shows every run at
+   once and pre-selects none. */
+
+.runs { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+.runs th {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+}
+
+.runs-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 11px 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+  font-weight: 600;
+}
+
+.runs-sort:hover { background: #FBFAFD; color: var(--ink-mid); }
+.runs-sort[aria-pressed='true'] { color: var(--purple); }
+.runs-caret { font-size: 8px; opacity: 0.7; }
+
+.runs td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+
+.runs tbody tr:last-child td { border-bottom: 0; }
+.runs tbody tr:hover { background: #FBFAFD; }
+
+.runs-domain { font-weight: 500; color: var(--ink); }
+
+/* Said in the list as well as on the report: someone choosing a run needs to know before they
+   open it, not after. */
+.runs-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #FEF1E2;
+  border: 1px solid #F6DDB8;
+  color: #7A4A05;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.runs-when {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+.runs-counts { display: flex; gap: 12px; }
+.runs-fail { color: var(--rose); font-weight: 500; }
+.runs-review { color: #A5620E; }
+.runs-act { text-align: right; white-space: nowrap; }
+
+/* ── Recent requests: five quick links (D-047) ─────────────────────────────────────────── */
+
+.queue-when {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--slate);
+  margin-top: 2px;
+}
+
+/* Opens the run this request produced, by id — never "the newest report for this merchant",
+   which is the substitution D-045 was about. */
+.queue-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--purple);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.queue-open:hover { color: var(--violet-deep); }

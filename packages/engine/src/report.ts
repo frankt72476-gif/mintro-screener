@@ -14,8 +14,8 @@
  */
 
 import type { Category, Rule, Ruleset, State } from '@mintro/ruleset';
-import type { Finding } from './findings.js';
-import { notEvaluable, tally } from './findings.js';
+import type { Finding, NotEvaluableKind } from './findings.js';
+import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
 export type ScanMode = 'public' | 'screening_account' | 'assisted';
@@ -39,14 +39,54 @@ export interface ReportCategory {
   readonly findings: readonly ReportFinding[];
 }
 
+/**
+ * What the run could and could not evaluate, in the four kinds those mean (D-044).
+ *
+ * The previous shape had two `not_evaluable` buckets and the report printed one of them, so a
+ * swisschems run read *"51 of 97 findings evaluable · 10 need a surface no crawl reaches"* and
+ * left 36 findings unaccounted for. Every number here is rendered; a bucket that exists in the
+ * data and not in the document is how the last one went unnoticed.
+ *
+ * The three that matter to a reader are different facts about different subjects:
+ * `noCheckBuilt` is about Mintro, `notReachable` is about what any website can show, and
+ * `notExposed` is about this merchant's storefront.
+ */
 export interface ReportCoverage {
   /** Findings the run could evaluate — any state other than `not_evaluable`. */
   readonly evaluable: number;
   readonly total: number;
-  /** `not_evaluable` because the rule needs a surface no crawl reaches (`manual` rules). */
+  /** Mintro has not written this check. The page is ordinary; the gap is ours. */
+  readonly noCheckBuilt: number;
+  /** No crawl of a public website could answer it (`manual` rules). */
   readonly notReachable: number;
-  /** `not_evaluable` because this particular run could not observe the surface. */
-  readonly notObserved: number;
+  /** The check ran and the merchant's site did not carry what it looks for. */
+  readonly notExposed: number;
+  /**
+   * The rule's subject is not on this page at all — a **resolved** outcome, not a shortfall.
+   *
+   * A capsule-labelling rule against a product that is not a capsule has been answered as fully
+   * as a pass has: it does not apply here. Counting it among the things the crawl could not
+   * establish understates the tool, and makes the real gaps look smaller beside it (D-044).
+   */
+  readonly notApplicable: number;
+  /**
+   * `not_evaluable` findings from runs recorded before D-044, which carry no kind.
+   *
+   * Counted separately and never folded into another bucket. Those runs are immutable (D-002),
+   * so the honest thing a reader can be told is that the distinction was not recorded — not a
+   * guess at which of the four it would have been.
+   */
+  readonly kindNotRecorded: number;
+  /**
+   * Rules this crawl could speak to: evaluated, plus those it established do not apply.
+   *
+   * The question the coverage line answers is *how much of the rule set could this crawl speak
+   * to*, and both of these are answers. `resolved + outstanding === total`, asserted in
+   * `coverage.test.ts`.
+   */
+  readonly resolved: number;
+  /** Rules still open: no check built, not reachable by crawl, or not exposed by the site. */
+  readonly outstanding: number;
 }
 
 export interface ScreeningReport {
@@ -156,7 +196,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
   for (const rule of ruleset.rules) {
     if (covered.has(rule.id)) continue;
     enriched.push({
-      ...notEvaluable(rule, reasonForUnrun(rule), 'document'),
+      ...notEvaluable(rule, reasonForUnrun(rule), 'document', kindForUnrun(rule)),
       title: rule.title,
       clause: rule.clause,
       severity: rule.sev,
@@ -205,26 +245,57 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
  */
 function reasonForUnrun(rule: Rule): string {
   if (rule.type === 'manual') return rule.params.reason;
-  return `no layer ${rule.layer ?? '?'} runner has been built for check type '${rule.type}', so this rule was not examined`;
+  return unbuiltCheckReason(rule);
 }
+
+/**
+ * Which bucket an unrun rule falls in (D-044).
+ *
+ * A `manual` rule is unanswerable from any crawl of a public website. Everything else here is a
+ * check Mintro has not written, against a page a browser loads perfectly well — and the report
+ * used to present the two identically, which read as a limitation of the merchant when it was a
+ * limitation of the tool.
+ */
+function kindForUnrun(rule: Rule): NotEvaluableKind {
+  return rule.type === 'manual' ? 'not_reachable' : 'no_check_built';
+}
+
 
 /**
  * Coverage, computed from the findings themselves.
  *
- * Splits `not_evaluable` two ways, because they mean different things to a reader. A `manual`
- * rule was never going to be answerable from a website, and its absence from coverage is not a
- * shortfall in this run. A rule that could not be observed *this time* is.
+ * Each `not_evaluable` finding is counted under the kind **it declared** when it was created. No
+ * inspection of its wording, and no fallback that folds an unclassified finding into a bucket it
+ * might not belong to — that is the conflation D-044 exists to end, and re-introducing it here
+ * would put it back one layer down.
  */
 export function computeCoverage(findings: readonly ReportFinding[]): ReportCoverage {
   const total = findings.length;
-  const notEvaluable = findings.filter((finding) => finding.state === 'not_evaluable');
-  const notReachable = notEvaluable.filter((finding) => finding.checkType === 'manual').length;
+  const unevaluated = findings.filter((finding) => finding.state === 'not_evaluable');
+
+  const of = (kind: NotEvaluableKind): number =>
+    unevaluated.filter((finding) => finding.notEvaluableKind === kind).length;
+
+  const evaluable = total - unevaluated.length;
+  const notApplicable = of('not_applicable');
+  const noCheckBuilt = of('no_check_built');
+  const notReachable = of('not_reachable');
+  const notExposed = of('not_exposed');
+  const kindNotRecorded = unevaluated.filter((finding) => finding.notEvaluableKind === undefined).length;
 
   return {
-    evaluable: total - notEvaluable.length,
+    evaluable,
     total,
+    noCheckBuilt,
     notReachable,
-    notObserved: notEvaluable.length - notReachable,
+    notExposed,
+    notApplicable,
+    kindNotRecorded,
+    // Resolved and outstanding are derived here rather than in the renderer, for the same reason
+    // coverage itself is: a renderer that computed them could get the split wrong quietly, and
+    // the PDF and the screen would then disagree about how much was screened.
+    resolved: evaluable + notApplicable,
+    outstanding: noCheckBuilt + notReachable + notExposed + kindNotRecorded,
   };
 }
 

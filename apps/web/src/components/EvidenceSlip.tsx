@@ -40,9 +40,19 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
               This finding carries no stored evidence. It was produced before any surface was
               reached.
             </div>
-            <div className="rule-ref">
-              <b>Rule.</b> {finding.clause}
-            </div>
+            {/*
+              The clause, only where nothing else carries it (D-047).
+
+              Every non-pass finding shows it verbatim in the Program requirement column above,
+              so repeating it here is the second of two identical quotations. A `pass` has no
+              requirement pair — D-041 leaves it out, since a satisfied rule quoted back at the
+              reader is noise — so for those this is the only place it appears and it stays.
+            */}
+            {finding.state === 'pass' && (
+              <div className="rule-ref">
+                <b>Rule.</b> {finding.clause}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -61,9 +71,14 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
 
       <div className="slip-body">
         <div className="slip-txt">
-          {/* The full observation. The row above clamps it to two lines; nothing is dropped. */}
-          <div className="slip-note">{finding.note}</div>
+          {/*
+            The observation is not repeated here (D-047).
 
+            It is stated once, in the Observed column of the requirement pair directly above. It
+            used to appear three times per finding — row heading, Observed column, and here — and
+            the clause twice. Nothing is lost by removing the repeats: the pairing D-041 requires
+            is intact, and this slip carries what only it has, which is the capture.
+          */}
           <div className="kv">
             <span className="k">Source</span>
             <span className="v">{primary.sourceUrl}</span>
@@ -99,26 +114,26 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
             </div>
           )}
 
-          {/* Why a rule could not be evaluated, from the stored reason — never inferred here. */}
-          {finding.notEvaluableReason !== undefined && (
+          {/*
+            The requests attempted, and what they returned.
+
+            The *reason* a rule could not be evaluated is stated in the Not assessed column above
+            and is not repeated (D-047). This is the part hard constraint 3 requires and only the
+            slip has: a `not_evaluable` finding must evidence why, with the requests attempted.
+          */}
+          {primary.attempts !== undefined && primary.attempts.length > 0 && (
             <div className="why">
-              <b>Not evaluable because</b>
-              {finding.notEvaluableReason}
-              {primary.attempts !== undefined && primary.attempts.length > 0 && (
-                <ul className="matched-urls">
-                  {primary.attempts.map((attempt) => (
-                    <li key={`${attempt.url}-${attempt.status}`}>
-                      {attempt.url} → {attempt.status === 0 ? (attempt.error ?? 'no response') : attempt.status}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <b>Requests attempted</b>
+              <ul className="matched-urls">
+                {primary.attempts.map((attempt) => (
+                  <li key={`${attempt.url}-${attempt.status}`}>
+                    {attempt.url} → {attempt.status === 0 ? (attempt.error ?? 'no response') : attempt.status}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
-          <div className="rule-ref">
-            <b>Rule.</b> {finding.clause}
-          </div>
         </div>
 
         <CapturePane evidence={primary} access={access} />

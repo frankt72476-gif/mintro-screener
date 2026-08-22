@@ -47,7 +47,7 @@ export function checkHttpProbe(
   const { results, session } = input;
 
   if (results.length === 0) {
-    return notEvaluable(rule, 'no paths were probed', DOCUMENT, [sessionEvidence(session, results)]);
+    return notEvaluable(rule, 'no paths were probed', DOCUMENT, 'no_check_built', [sessionEvidence(session, results)]);
   }
 
   // A probe that never completed observed nothing. Reporting the paths that did complete as the
@@ -58,6 +58,7 @@ export function checkHttpProbe(
       rule,
       `none of the ${results.length} probed path(s) could be reached`,
       DOCUMENT,
+      'not_exposed',
       [sessionEvidence(session, results)],
     );
   }

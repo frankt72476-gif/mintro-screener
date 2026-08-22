@@ -170,7 +170,11 @@ describe('runLayer2', () => {
     for (const rule of layer2Rules(ruleset).filter((r) => r.type === 'doc_parse')) {
       const finding = run.findings.find((f) => f.ruleId === rule.id);
       expect(finding?.state, rule.id).toBe('not_evaluable');
-      expect(finding?.notEvaluableReason, rule.id).toContain('doc_parse');
+      // The kind is asserted, not the wording. `doc_parse` is Mintro's internal name for the
+      // check type and D-044 keeps it out of reader-facing text, so a test that demanded it in
+      // the reason would pin the report to the vocabulary it is supposed to have dropped.
+      expect(finding?.notEvaluableKind, rule.id).toBe('no_check_built');
+      expect(finding?.notEvaluableReason, rule.id).toContain('certificate of analysis');
     }
   });
 

@@ -12,7 +12,9 @@
 
 export {
   DIRECTIVE_TERMS,
+  INTERNAL_TERMS,
   auditCopy,
+  auditInternalVocabulary,
   auditRequirement,
   REQUIREMENT_HEADINGS,
   auditAnalystNote,
@@ -28,6 +30,7 @@ export type {
   FetchAttempt,
   Finding,
   ArtifactKind,
+  NotEvaluableKind,
 } from './findings.js';
 
 export type {

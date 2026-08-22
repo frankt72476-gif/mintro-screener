@@ -24,13 +24,14 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
       rule,
       page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
       RENDERED,
+      'not_exposed',
       renderFailureEvidence(page),
     );
   }
 
   const { surface } = rule.params;
   if (!RENDERED_SURFACES.has(surface)) {
-    return notEvaluable(rule, `surface '${surface}' is not rendered at this layer`, RENDERED, pageEvidence(page));
+    return notEvaluable(rule, `surface '${surface}' is not rendered at this layer`, RENDERED, 'no_check_built', pageEvidence(page));
   }
 
   const region: PageRegion =
@@ -43,6 +44,7 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
       rule,
       'no footer region could be identified on the rendered page',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }
@@ -61,6 +63,7 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
           appliesWhen.map((t) => "'" + t + "'").join(' or ') +
           '; this page is not one',
         RENDERED,
+        'not_applicable',
         pageEvidence(page),
       );
     }
@@ -94,6 +97,7 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
     rule,
     'this matcher shape is not implemented at this layer',
     RENDERED,
+    'no_check_built',
     pageEvidence(page),
   );
 }
@@ -157,6 +161,7 @@ function patternFinding(
         rule,
         'no region labelled ' + quote(labels) + ' was observed, so there was nothing to examine',
         RENDERED,
+        'not_exposed',
         pageEvidence(page),
       );
     }
@@ -228,6 +233,7 @@ function mapFinding(
       rule,
       'none of the compounds this rule names were observed on the page',
       RENDERED,
+      'not_applicable',
       pageEvidence(page),
     );
   }

@@ -15,7 +15,7 @@ import type { Rule, Ruleset, RuleOfType } from '@mintro/ruleset';
 import { checkDomAssert } from './checks/domAssert.js';
 import { checkTextMatch } from './checks/textMatch.js';
 import { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
-import { notEvaluable, tally, type Finding } from './findings.js';
+import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
 import { RENDERED } from './checks/pageEvidence.js';
 import type { PageContext } from './page.js';
 
@@ -98,7 +98,7 @@ export function runLayer1(page: PageContext, ruleset: Ruleset): Layer1Run {
       default:
         // Selected by LAYER1_TYPES above, so unreachable. `not_evaluable` rather than a throw:
         // a rule set that outgrows this switch should degrade to "not observed", never vanish.
-        return notEvaluable(rule, `no Layer 1 handler for check type '${rule.type}'`, RENDERED);
+        return notEvaluable(rule, unbuiltCheckReason(rule), RENDERED, 'no_check_built');
     }
   });
 

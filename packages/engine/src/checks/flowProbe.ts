@@ -64,6 +64,7 @@ export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeI
       rule,
       observation.error ?? `the '${observation.flow}' flow could not be started on this storefront`,
       RENDERED,
+      'not_exposed',
       [flowEvidence(observation, session)],
     );
   }

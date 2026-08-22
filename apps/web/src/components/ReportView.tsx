@@ -140,7 +140,7 @@ export function ReportView({
           {groupReport(report)
             .filter((section) => filter === 'all' || section.state === filter)
             .map((section) => (
-              <StateSection key={section.state} section={section} access={access} />
+              <StateSection key={section.key} section={section} access={access} />
             ))}
         </div>
       )}
@@ -230,8 +230,6 @@ function Filters({
     { value: 'not_evaluable', label: 'Not evaluable' },
   ];
 
-  const { evaluable, total, notReachable } = report.coverage;
-
   return (
     <div className="filters">
       {chips.map((chip) => (
@@ -245,11 +243,7 @@ function Filters({
         </button>
       ))}
       <span className="coverage">
-        <b>
-          {evaluable} of {total}
-        </b>{' '}
-        findings evaluable from this crawl
-        {notReachable > 0 && ` · ${notReachable} need a surface no crawl reaches`}
+        <CoverageLine report={report} />
       </span>
     </div>
   );
@@ -261,17 +255,123 @@ function Filters({
  * Computed in the report, never a constant — the demo's "31 of 40" was placeholder copy.
  */
 function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element {
-  const { evaluable, total, notReachable } = report.coverage;
   return (
     <div className="filters">
       <span className="coverage" style={{ marginLeft: 0 }}>
-        <b>
-          {evaluable} of {total}
-        </b>{' '}
-        findings evaluable from this crawl
-        {notReachable > 0 && ` · ${notReachable} need a surface no crawl reaches`}
+        <CoverageLine report={report} />
       </span>
     </div>
+  );
+}
+
+/**
+ * What the crawl could speak to, and what is still open (D-044).
+ *
+ * One question — *how much of the rule set could this crawl speak to* — answered in two halves.
+ * **Resolved** is what it settled: rules it evaluated, plus rules it established do not apply
+ * here. A capsule-labelling rule against a product that is not a capsule is answered as fully as
+ * a pass is, and listing it among shortfalls understates the tool while making the real gaps look
+ * smaller beside it. **Outstanding** is what is still open, itemised by whose limitation it is.
+ *
+ * The old line printed two numbers out of 97 and left 36 findings in no stated category. Every
+ * bucket now appears and the parts sum to the total — a coverage line whose numbers do not add up
+ * is worse than none, because it looks complete.
+ *
+ * One component, used by both the screen and the print route, so the PDF and the report cannot
+ * state different coverage.
+ */
+function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Element {
+  const coverage = report.coverage;
+
+  /*
+    A run recorded before D-044 stored only `evaluable`, `total`, `notReachable` and
+    `notObserved`. Its report is immutable (D-002), so those fields will never appear — and the
+    first draft of this component rendered `{resolved} of {total}` as a blank number followed by
+    "of 97 resolved", which is the shape of defect this whole decision is about.
+
+    The type says these are present because every report assembled from now on has them. What
+    arrives here is JSONB written in the past, so the check is on the value.
+  */
+  if (typeof coverage.resolved !== 'number' || typeof coverage.outstanding !== 'number') {
+    return <LegacyCoverageLine coverage={coverage} />;
+  }
+
+  const {
+    total,
+    resolved,
+    outstanding,
+    evaluable,
+    notApplicable,
+    noCheckBuilt,
+    notReachable,
+    notExposed,
+    kindNotRecorded,
+  } = coverage;
+
+  const itemise = (parts: readonly (readonly [number, string])[]): string =>
+    parts
+      .filter(([n]) => n > 0)
+      .map(([n, text]) => `${n} ${text}`)
+      .join(', ');
+
+  const resolvedParts = itemise([
+    [evaluable, 'evaluated'],
+    [notApplicable, 'do not apply here'],
+  ]);
+
+  const outstandingParts = itemise([
+    [noCheckBuilt, 'not checked — Mintro has not built these yet'],
+    [notReachable, 'need a surface no crawl reaches'],
+    [notExposed, 'looked for and not found on the site'],
+    [kindNotRecorded, 'recorded before this distinction existed'],
+  ]);
+
+  return (
+    <>
+      <b>
+        {resolved} of {total}
+      </b>{' '}
+      resolved ({resolvedParts})
+      {outstanding > 0 && (
+        <>
+          {' · '}
+          <b>{outstanding}</b> outstanding ({outstandingParts})
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * Coverage for a run recorded before the four-way split (D-044).
+ *
+ * States exactly what that run recorded and says plainly that the rest was not written down.
+ * It does **not** reconstruct the split from the finding text — the wording is all that survives
+ * and classifying by wording is the thing D-044 forbids. A number the run never recorded is not
+ * one this report gets to infer.
+ */
+function LegacyCoverageLine({
+  coverage,
+}: {
+  readonly coverage: ScreeningReport['coverage'];
+}): JSX.Element {
+  const { evaluable, total } = coverage;
+  const unevaluated = total - evaluable;
+
+  return (
+    <>
+      <b>
+        {evaluable} of {total}
+      </b>{' '}
+      evaluated
+      {unevaluated > 0 && (
+        <>
+          {' · '}
+          {unevaluated} not evaluated — this run was screened before Mintro separated the reasons,
+          so which applies was not recorded
+        </>
+      )}
+    </>
   );
 }
 
@@ -343,7 +443,20 @@ function FindingRow({
           <span className="find-title">
             {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{finding.ruleId}</span>
           </span>
-          <span className={`find-note${print ? ' full' : ''}`}>{finding.note}</span>
+          {/*
+            The row's summary line, shown only while the row is closed (D-047).
+
+            Open — and in the PDF, where everything is open — the Observed column of the
+            requirement pair states it in full a few lines below, so repeating it here is the
+            same sentence twice on screen and twice on paper.
+
+            A `pass` carries no requirement pair (D-041: a satisfied rule quoted back at the
+            reader is noise), so for those the row is the only place the note appears and it
+            stays.
+          */}
+          {(!isOpen || finding.state === 'pass') && (
+            <span className={`find-note${isOpen ? ' full' : ''}`}>{finding.note}</span>
+          )}
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
         </span>
       </button>
@@ -415,8 +528,16 @@ function StateSection({
   readonly section: import('../lib/grouping.js').ReportSection;
   readonly access: EvidenceAccess;
 }): JSX.Element {
+  /*
+    The bucket is an attribute, not folded into the state class (D-044).
+
+    All four not-evaluable sections keep the muted `na` palette, because none of them is a
+    failure. What separates them is a left rule and a label, so a reader scanning the report sees
+    that "Mintro has not built this yet" is a different kind of statement from "the site did not
+    carry it". Rendering them identically is the thing this fixes.
+  */
   return (
-    <section className={`sect ${stateClass(section.state)}`}>
+    <section className={`sect ${stateClass(section.state)}`} data-bucket={section.bucket ?? undefined}>
       <div className="sect-head">
         <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
         <span className="sect-count">

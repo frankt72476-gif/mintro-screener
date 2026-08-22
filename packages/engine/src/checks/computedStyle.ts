@@ -76,6 +76,7 @@ export function checkComputedStyle(
       rule,
       page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
       RENDERED,
+      'not_exposed',
       renderFailureEvidence(page),
     );
   }
@@ -85,6 +86,7 @@ export function checkComputedStyle(
       rule,
       'no footer region could be identified on the rendered page',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }
@@ -94,6 +96,7 @@ export function checkComputedStyle(
       rule,
       'the footer was rendered but no disclaimer element could be located within it, so nothing was measured',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }

@@ -13,12 +13,7 @@ import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
 import { useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
-import {
-  createLocalRunSource,
-  createSupabaseRunSource,
-  resolveRunSelection,
-  type RunSummary,
-} from './lib/runs.js';
+import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
 import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
 import { formatReportDate } from './lib/format.js';
 import { createCredentialDeposit } from './lib/credentials.js';
@@ -29,8 +24,9 @@ import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
 import { DocumentsPane } from './components/DocumentsPane.js';
 import { Rail } from './components/Rail.js';
+import { PastReports } from './components/PastReports.js';
 
-type Pane = 'scan' | 'docs';
+import type { Pane } from './components/Rail.js';
 
 /**
  * `watching` is the scan the analyst just asked for, in flight. `running` is the much shorter
@@ -468,6 +464,27 @@ function Screener({
       />
 
       <main className="main">
+        {/*
+          The run library (D-047).
+
+          It replaces the dropdown that used to sit inside the scan form — which is where the
+          D-045 bug hid, because a `<select>` shows one option at a time and a stale selection
+          looked exactly like a current one. Opening a run here switches to the pane the report
+          renders in; nothing is pre-selected, so nothing can go stale.
+        */}
+        <section className={`pane ${pane === 'reports' ? 'on' : ''}`}>
+          {pane === 'reports' && (
+            <PastReports
+              runs={available}
+              source={runs.description}
+              onOpen={(runId) => {
+                setPane('scan');
+                void load(runId);
+              }}
+            />
+          )}
+        </section>
+
         <section className={`pane ${pane === 'scan' ? 'on' : ''}`}>
           {stage === 'input' && (
             <ScanInput
@@ -591,32 +608,18 @@ function ScanInput({
     url: string,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
-  const [runId, setRunId] = useState(available[0]?.runId ?? '');
-  /**
-   * Whether the analyst has chosen a run themselves.
-   *
-   * This is the fix for D-045. The selection used to be seeded from `available[0]` at mount and
-   * resynced only while it was `''`, so once a value was set it never moved: when a new run
-   * arrived the selector went on pointing at whichever run had been newest when the page loaded.
-   *
-   * The guard could not distinguish "the analyst picked this one" from "this is the default,
-   * captured before the list changed" — it returned the same value in both cases, which is the
-   * precondition shape in D-026 with the state in a component instead of a crawler. So the two
-   * cases are now separate state. Untouched, the default follows the list. Touched, the choice is
-   * theirs and nothing overrides it.
-   */
-  const [chosen, setChosen] = useState(false);
   const [url, setUrl] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const next = resolveRunSelection({ available, current: runId, chosen });
-    // The effect depends on the state it sets, so the write is guarded rather than left to
-    // React's bail-out. `resolveRunSelection` is idempotent — this makes that a property of the
-    // effect too, instead of something the next reader has to re-derive.
-    if (next !== runId) setRunId(next);
-  }, [available, chosen, runId]);
+  /*
+    No run selection is held here any more (D-047).
+
+    D-045 fixed a selector that could not tell a deliberate choice from a default that had gone
+    stale. Removing the dropdown removes the state that could go stale at all — the run library
+    shows every run at once and pre-selects none. `resolveRunSelection` went with it rather than
+    being left behind as dead code implying a control that is gone.
+  */
 
   const submit = async (): Promise<void> => {
     setRequesting(true);
@@ -628,6 +631,14 @@ function ScanInput({
   };
 
   const pending = queued.filter((request) => isPending(request.status));
+  /*
+    Five quick links, not the whole queue (D-047).
+
+    `queue.list()` already asks for ten and the older ones are reachable from the run library.
+    This is a "what did I just do" strip, and a scan form that grows a scrolling history stops
+    being a form.
+  */
+  const recent = queued.slice(0, 5);
 
   return (
     <div>
@@ -682,7 +693,7 @@ function ScanInput({
                 : 'Nothing running.'}
             </p>
             <ul className="queue-list">
-              {queued.map((request) => (
+              {recent.map((request) => (
                 <li key={request.id} className={`queue-item ${request.status}`}>
                   <span className={`queue-state ${request.status}`}>{request.status}</span>
                   <span className="queue-url">
@@ -695,13 +706,24 @@ function ScanInput({
                         used merchant login
                       </span>
                     )}
+                    <span className="queue-when">{formatReportDate(request.createdAt)}</span>
                   </span>
                   <span className="queue-note">
-                    {request.status === 'failed'
-                      ? request.error ?? 'failed'
-                      : request.status === 'done'
-                        ? 'report available below'
-                        : request.progress ?? 'waiting for the worker'}
+                    {request.status === 'failed' ? (
+                      (request.error ?? 'failed')
+                    ) : request.status === 'done' && request.runId !== null ? (
+                      /*
+                        A quick link to the run this request produced (D-047).
+
+                        By run id, never "the newest report for this merchant" — that substitution
+                        is exactly D-045, and a shortcut is the easiest place to reintroduce it.
+                      */
+                      <button className="queue-open" onClick={() => onRun(request.runId as string)}>
+                        Open report
+                      </button>
+                    ) : (
+                      (request.progress ?? 'waiting for the worker')
+                    )}
                   </span>
                 </li>
               ))}
@@ -709,51 +731,14 @@ function ScanInput({
           </div>
         )}
 
-        <div className="field">
-          <label className="flabel" htmlFor="run">
-            Reports
-          </label>
-          <p className="fhint">
-            {available.length > 0
-              ? `${available.length} run(s) from ${source}.`
-              : `No runs readable from ${source}.`}
-          </p>
-          {available.length > 0 ? (
-            <select
-              className="input"
-              id="run"
-              value={runId}
-              onChange={(event) => {
-                setChosen(true);
-                setRunId(event.target.value);
-              }}
-            >
-              {available.map((run) => (
-                <option key={run.runId} value={run.runId}>
-                  {run.domain} — {run.counts.fail} failed, {run.counts.review} for review
-                  {/* The time, not just the date, and this is not cosmetic (D-045). Re-scanning a
-                      merchant is a normal operation, so two runs of one domain on one day is the
-                      ordinary case — and rendered to the day they were the same string. That is
-                      what turned a stale selection into an undetectable one. */}
-                  {run.finishedAt === null
-                    ? ' — never finished'
-                    : ` — ${formatReportDate(run.finishedAt)}`}
-                  {/* Marked in the list as well as on the report: someone picking a run to open
-                      needs to know before they open it, not after. */}
-                  {run.quarantine === null ? '' : ' — EVIDENCE INCOMPLETE'}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input className="input" id="run" value="" readOnly placeholder="no runs readable" />
-          )}
-          {available.some((run) => run.quarantine !== null) && (
-            <p className="fhint" style={{ marginTop: 8 }}>
-              Runs marked <strong>evidence incomplete</strong> have findings citing captures that
-              cannot be retrieved. They open, and the report says so at the top.
-            </p>
-          )}
-        </div>
+        {/*
+          No run picker here (D-047).
+
+          A `<select>` of past runs used to sit in this form, and it is where the D-045 bug hid:
+          it shows one option at a time, so a selection that had quietly gone stale looked
+          identical to a current one. Choosing an old report is the run library's job, where every
+          run is visible at once and nothing is selected on the reader's behalf.
+        */}
 
         {/*
           No access picker (D-040).
@@ -792,9 +777,6 @@ function ScanInput({
         )}
 
         <div className="form-foot">
-          <button className="btn btn-ghost" disabled={runId === ''} onClick={() => onRun(runId)}>
-            Open report
-          </button>
           <span className="note">
             Every scan starts signed out. Coverage is reported as it was actually reached.
           </span>

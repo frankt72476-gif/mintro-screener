@@ -24,7 +24,18 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import type { ReportFinding, ScreeningReport } from '@mintro/engine';
+import type { NotEvaluableKind, ReportFinding, ScreeningReport } from '@mintro/engine';
+
+/**
+ * The bucket a `not_evaluable` finding belongs to for reading (D-044).
+ *
+ * `unrecorded` is not a kind the engine produces. It is what a run recorded before the four-way
+ * split looks like from here, and it gets its own bucket rather than being folded into one of
+ * the real four — a guess at which it would have been is exactly the conflation this fixes.
+ */
+export type Bucket = NotEvaluableKind | 'unrecorded';
+
+export const bucketOf = (finding: ReportFinding): Bucket => finding.notEvaluableKind ?? 'unrecorded';
 
 export interface FindingGroup {
   readonly ruleId: string;
@@ -42,7 +53,11 @@ export interface FindingGroup {
 }
 
 export interface ReportSection {
+  /** Stable across the not-evaluable split, so one section per state is no longer a valid key. */
+  readonly key: string;
   readonly state: State;
+  /** Set on `not_evaluable` sections: which of the four kinds this one holds. */
+  readonly bucket?: Bucket;
   readonly heading: string;
   /** One line saying what this section is. Descriptive; never an instruction (D-001). */
   readonly lede: string;
@@ -76,10 +91,44 @@ const ORDER: readonly { state: State; heading: string; lede: string }[] = [
     heading: 'Passed',
     lede: 'Rules the run observed and found satisfied. Grouped by rule.',
   },
+];
+
+/**
+ * The four reasons a rule went unevaluated, as four sections (D-044).
+ *
+ * One section headed "Not evaluable" put three unrelated facts in one pile: a check Mintro has
+ * not written, a question no website can answer, and a thing this merchant's site does not carry.
+ * A reader could not tell them apart, and the first of the three reads as the merchant's fault
+ * when it is ours.
+ *
+ * Ordered by what a reader most needs to separate: our gap first, because it is the one that
+ * says nothing about the merchant and the one nobody would otherwise guess.
+ */
+const NOT_EVALUABLE_ORDER: readonly { bucket: Bucket; heading: string; lede: string }[] = [
   {
-    state: 'not_evaluable',
-    heading: 'Not evaluable',
-    lede: 'Rules the run could not observe from the crawled surface, each with the reason it could not.',
+    bucket: 'no_check_built',
+    heading: 'Not checked — Mintro has not built this yet',
+    lede: "These are ordinary pages on the merchant's site. They were not examined because the check does not exist yet. Nothing in this section is an observation about the merchant.",
+  },
+  {
+    bucket: 'not_reachable',
+    heading: 'Cannot be answered from a website',
+    lede: 'No crawl of a public storefront could establish these, whoever ran it. They rest on a record, a document or a person.',
+  },
+  {
+    bucket: 'not_exposed',
+    heading: 'Looked for, not found on the site',
+    lede: "The check ran against the merchant's pages and what it looks for was not there to measure. Each states what was sought and where.",
+  },
+  {
+    bucket: 'not_applicable',
+    heading: 'Does not apply to these pages',
+    lede: "The rule's subject is not on the page at all — a capsule labelling rule against a product that is not a capsule. Not a gap in the crawl or the site.",
+  },
+  {
+    bucket: 'unrecorded',
+    heading: 'Reason not recorded',
+    lede: 'This run was screened before Mintro separated these reasons, so which one applies was never written down. A completed run is never edited, so it stays as recorded.',
   },
 ];
 
@@ -92,12 +141,27 @@ const ORDER: readonly { state: State; heading: string; lede: string }[] = [
 export function groupReport(report: ScreeningReport): readonly ReportSection[] {
   const all = report.categories.flatMap((category) => category.findings);
 
-  return ORDER.map(({ state, heading, lede }) => {
+  const evaluated: ReportSection[] = ORDER.map(({ state, heading, lede }) => {
     const ofState = all.filter((finding) => finding.state === state);
-    const groups = groupByRule(ofState, state);
+    return { key: state, state, heading, lede, groups: groupByRule(ofState, state), count: ofState.length };
+  });
 
-    return { state, heading, lede, groups, count: ofState.length };
-  }).filter((section) => section.count > 0);
+  // `not_evaluable` splits four ways rather than being one pile (D-044).
+  const unevaluated = all.filter((finding) => finding.state === 'not_evaluable');
+  const buckets: ReportSection[] = NOT_EVALUABLE_ORDER.map(({ bucket, heading, lede }) => {
+    const ofBucket = unevaluated.filter((finding) => bucketOf(finding) === bucket);
+    return {
+      key: `not_evaluable:${bucket}`,
+      state: 'not_evaluable' as const,
+      bucket,
+      heading,
+      lede,
+      groups: groupByRule(ofBucket, 'not_evaluable'),
+      count: ofBucket.length,
+    };
+  });
+
+  return [...evaluated, ...buckets].filter((section) => section.count > 0);
 }
 
 function groupByRule(findings: readonly ReportFinding[], state: State): FindingGroup[] {

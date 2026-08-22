@@ -1,24 +1,25 @@
 /**
- * Following the scan you asked for (D-045).
+ * Following the scan you asked for (D-045), and the library that replaced the selector (D-047).
  *
  * The defect: pressing Run scan queued a scan correctly, and then the report the analyst opened
- * was the *previous* run of that merchant. Two halves, and each is covered here.
+ * was the *previous* run of that merchant. Two halves.
  *
  *   1. The selector captured the newest run at mount and never advanced, because its resync
  *      guard — `runId === ''` — could not tell a deliberate choice from a default that had gone
- *      stale. It answered the same way in both cases.
+ *      stale. **That control is gone.** D-047 replaced it with a list that shows every run at
+ *      once and pre-selects none, so there is no selection left to go stale; what remains under
+ *      test here is the sorting, and the labels that made the staleness invisible.
  *   2. The queue client had no way to name the request it had just made, so nothing downstream
- *      could ask about that request rather than about the queue in general.
- *
- * The second is the one that makes this correct rather than merely fixed. "Open the newest run"
- * would have cured the observed symptom and stayed wrong: two analysts screening different
- * merchants at once, or a re-scan finishing while an earlier one is still running, and the newest
- * run belongs to someone else's request.
+ *      could ask about that request rather than about the queue in general. **This is the half
+ *      that makes it correct.** "Open the newest run" would have cured the symptom and stayed
+ *      wrong: two analysts screening different merchants at once, or a re-scan finishing while an
+ *      earlier one is still running, and the newest run belongs to someone else's request.
  */
 
 import { describe, expect, it } from 'vitest';
 import { createScanQueue, isPending, normaliseUrl } from '../src/lib/scanQueue.js';
-import { resolveRunSelection, type RunSummary } from '../src/lib/runs.js';
+import { sortRuns } from '../src/components/PastReports.js';
+import type { RunSummary } from '../src/lib/runs.js';
 
 function run(runId: string, domain: string, finishedAt: string): RunSummary {
   return {
@@ -33,46 +34,6 @@ function run(runId: string, domain: string, finishedAt: string): RunSummary {
 /** The exact list from the live database when the bug was reproduced, newest first. */
 const OLDER = run('895056af', 'swisschems.is', '2026-08-22T00:45:34.432Z');
 const NEWER = run('c0ffee00', 'swisschems.is', '2026-08-22T22:00:41.000Z');
-
-describe('resolveRunSelection', () => {
-  it('follows the newest run while the selection is only a default', () => {
-    const seeded = resolveRunSelection({ available: [OLDER], current: '', chosen: false });
-    expect(seeded).toBe('895056af');
-
-    // The scan completes and the list refreshes. This is the exact step that used to do nothing.
-    const after = resolveRunSelection({
-      available: [NEWER, OLDER],
-      current: seeded,
-      chosen: false,
-    });
-    expect(after).toBe('c0ffee00');
-  });
-
-  it('keeps a run the analyst chose, even when a newer one arrives', () => {
-    const kept = resolveRunSelection({
-      available: [NEWER, OLDER],
-      current: '895056af',
-      chosen: true,
-    });
-    expect(kept).toBe('895056af');
-  });
-
-  it('replaces a chosen run only once it has left the list', () => {
-    const replaced = resolveRunSelection({
-      available: [NEWER],
-      current: 'no-longer-listed',
-      chosen: true,
-    });
-    expect(replaced).toBe('c0ffee00');
-  });
-
-  it('leaves the selection alone when there is nothing to select from', () => {
-    // An empty list is "could not read" as often as it is "no runs" — D-036. Clearing the
-    // selection on it would discard a valid choice because one fetch failed.
-    expect(resolveRunSelection({ available: [], current: '895056af', chosen: true })).toBe('895056af');
-    expect(resolveRunSelection({ available: [], current: '895056af', chosen: false })).toBe('895056af');
-  });
-});
 
 /**
  * Two runs of one merchant on one day is the ordinary case — re-scanning is normal (D-002) — and
@@ -91,6 +52,54 @@ describe('run labels', () => {
     expect(toTheDay(OLDER)).toBe(toTheDay(NEWER));
     // What it renders now: not.
     expect(label(OLDER)).not.toBe(label(NEWER));
+  });
+});
+
+describe('sortRuns', () => {
+  const other = run('aaaa1111', 'biotechpeptides.com', '2026-08-20T09:00:00.000Z');
+
+  it('puts the newest run first by default', () => {
+    const sorted = sortRuns([OLDER, other, NEWER], 'date', 'desc');
+    expect(sorted.map((r) => r.runId)).toEqual(['c0ffee00', '895056af', 'aaaa1111']);
+  });
+
+  it('groups a merchant together when sorting by merchant', () => {
+    const sorted = sortRuns([NEWER, other, OLDER], 'merchant', 'asc');
+    expect(sorted.map((r) => r.domain)).toEqual([
+      'biotechpeptides.com',
+      'swisschems.is',
+      'swisschems.is',
+    ]);
+  });
+
+  it('sorts by failures, then by reviews', () => {
+    const worse: RunSummary = { ...other, runId: 'bbbb2222', counts: { fail: 9, review: 1 } };
+    const sorted = sortRuns([OLDER, worse], 'outcome', 'desc');
+    expect(sorted[0]?.runId).toBe('bbbb2222');
+  });
+
+  it('sorts a run that never finished last under newest-first, not first', () => {
+    const unfinished: RunSummary = { ...other, runId: 'cccc3333', finishedAt: null };
+    const sorted = sortRuns([unfinished, NEWER, OLDER], 'date', 'desc');
+    // Treating "no date" as the oldest would be right; treating it as the newest would bury the
+    // real runs beneath a run that produced nothing.
+    expect(sorted[sorted.length - 1]?.runId).toBe('cccc3333');
+  });
+
+  it('is a total order, so rows do not reshuffle between renders', () => {
+    const twins: RunSummary[] = [
+      { ...OLDER, runId: 'bbbb', finishedAt: '2026-08-22T00:00:00.000Z' },
+      { ...OLDER, runId: 'aaaa', finishedAt: '2026-08-22T00:00:00.000Z' },
+    ];
+    expect(sortRuns(twins, 'date', 'desc').map((r) => r.runId)).toEqual(
+      sortRuns([...twins].reverse(), 'date', 'desc').map((r) => r.runId),
+    );
+  });
+
+  it('does not mutate what it is given', () => {
+    const input = [OLDER, NEWER];
+    sortRuns(input, 'merchant', 'asc');
+    expect(input.map((r) => r.runId)).toEqual(['895056af', 'c0ffee00']);
   });
 });
 

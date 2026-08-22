@@ -49,6 +49,47 @@ export const DIRECTIVE_TERMS: readonly string[] = [
   'take action',
 ];
 
+/**
+ * Mintro's internal vocabulary, which must not reach a reader (D-044).
+ *
+ * An underwriter opening a report was told *"no layer 3 runner has been built for check type
+ * 'dom_assert'"*. Check-type names, layer numbers and handler vocabulary are how this codebase
+ * talks to itself. In a document someone outside Mintro uses to make a decision they are noise
+ * at best, and at worst they read as a defect in the merchant's site.
+ *
+ * **Plain does not mean vaguer.** Nothing here asks for less detail — the replacement wording
+ * names exactly what was not done. It asks for the detail in the reader's terms.
+ *
+ * `manual` is deliberately absent: it is an ordinary English word as well as a check type, and
+ * banning it would fire on honest sentences. The check types that are *only* jargon are listed.
+ */
+export const INTERNAL_TERMS: readonly string[] = [
+  // Check-type identifiers.
+  'dom_assert',
+  'text_match',
+  'text_cooccurrence',
+  'flow_probe',
+  'http_probe',
+  'url_pattern',
+  'computed_style',
+  'doc_parse',
+  // Layer vocabulary. Matched case-insensitively, so `Layer 2` is caught with `layer 2`.
+  'layer 0',
+  'layer 1',
+  'layer 2',
+  'layer 3',
+  'layer0',
+  'layer1',
+  'layer2',
+  'layer3',
+  // Implementation vocabulary.
+  'check type',
+  'runner',
+  'handler',
+  'not implemented',
+  'matcher shape',
+];
+
 export interface CopyAudit {
   /** Terms found, in the order they appear in the list. Empty when the text is clean. */
   readonly flagged: readonly string[];
@@ -165,3 +206,15 @@ export const REQUIREMENT_HEADINGS = {
   /** For not_evaluable: the requirement stands, and why it could not be assessed is stated. */
   notAssessed: 'Not assessed',
 } as const;
+
+/**
+ * Finds Mintro's internal vocabulary in reader-facing text (D-044).
+ *
+ * Separate from `auditCopy` because the two failures are different: directive language breaks
+ * D-001 and hard constraint 7 by telling the reader what to do, while this breaks the report's
+ * usefulness by describing Mintro's implementation to someone who has no reason to know it.
+ * Both are build failures; keeping them apart keeps the diagnostic honest about which one fired.
+ */
+export function auditInternalVocabulary(text: string): CopyAudit {
+  return auditCopy(text, INTERNAL_TERMS);
+}

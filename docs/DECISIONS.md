@@ -771,6 +771,39 @@ state was wrong *and* the presentation could not show it, and only the second is
 careful looking useless. When a control names a record, ask whether its label can distinguish two
 records the user might plausibly hold.
 
+### An immutable record cannot grow a field, and a new display must say so (D-047)
+
+Found by rendering a stored run, and it is the sharpest instance in this list: **D-044's own
+failure reappeared inside the fix for D-044.**
+
+D-044 split coverage four ways and added `resolved` and `outstanding`. The new coverage line
+destructured them and rendered them. Against a run recorded the day before, it printed:
+
+    " of 97 resolved (50 evaluated)"
+
+A blank where the number goes. That run's `coverage` was serialised by the previous code and the
+report is immutable (D-002), so the field is absent and always will be. The renderer asked a
+record a question it was never able to answer, and printed the non-answer as though it were one.
+
+> **A record written in the past cannot acquire a field added later. Any derived display must
+> state what those records actually hold, rather than computing from data that is absent.**
+
+This will recur every time the report gains a field, which is why it is stated as a rule rather
+than as a bug that was fixed. The operational test is the familiar one pointed at storage: *what
+does this render when the record predates the field?* If the answer is a blank, a zero, or a
+plausible-looking number derived from `undefined`, it is wrong — and a zero is the dangerous one,
+because a zero reads as a measurement.
+
+The fix does **not** reconstruct the missing split from the finding text. The wording is all that
+survives, and classifying by wording is what D-044 forbids; a number the run never recorded is not
+one the report gets to infer. It renders what the run did record and says the rest was not written
+down. The same reasoning gives `not_evaluable` findings from those runs a fifth bucket of their
+own, *"Reason not recorded"*, rather than a guess at which of the four they would have been.
+
+Note the shape it shares with the print-ready guard above: a component written *specifically* to
+separate three conflated cases produced a fourth conflation — "the field is absent" rendered as
+"the value is empty" — the first time it met data it had not been written against.
+
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
 Both rules carry `unauthenticated: true`, so the unauthenticated probe is the finding. The
@@ -1823,3 +1856,296 @@ the wrong report from the right one, so the defect could survive any amount of c
 One watched request per browser. Queueing a second scan moves the watch to it; the first still
 appears in Recent requests and its report is opened from the selector. Runs are immutable and
 nothing is lost — but the automatic open follows the most recent request only.
+
+---
+
+## D-044 — Three reasons a rule went unevaluated, not one
+**2026-08-22 · Frank's ruling, corrected in discussion**
+
+The report had one `not_evaluable` state and rendered every use of it identically. Three
+unrelated facts were arriving in one pile, and the reader had no way to separate them:
+
+| | What it means | Whose limitation |
+|---|---|---|
+| **No check built** | Mintro has not written this check | **Ours** |
+| **Not reachable** | No crawl of a public website could answer it | Nobody's — it is the nature of the question |
+| **Not exposed** | The check ran; the site did not carry what it looks for | The merchant's storefront |
+
+### The correction that produced this
+
+The sign-up and checkout findings were being read as uncrawlable. They are not. Those are
+ordinary pages a browser loads. They are unevaluated because **the Layer 3 runner was never
+built** — and the report presented that identically to "order records are server-side", which is
+genuinely unanswerable from any website.
+
+Reporting our own unbuilt work in the same words as a merchant's inherent invisibility overstates
+what was screened and understates what Mintro owes. On the swisschems run it was 12 findings
+described as though the site had withheld something.
+
+### The numbers that were missing
+
+    51 of 97 findings evaluable from this crawl · 10 need a surface no crawl reaches
+
+Two numbers, 97 findings. **36 were unaccounted for** — present in the data, counted nowhere the
+reader could see. `computeCoverage` had a `notObserved` field and no renderer printed it. Every
+bucket is now printed, and `coverage.test.ts` asserts the parts sum to the total: a coverage line
+whose numbers do not add up is worse than none, because it looks complete.
+
+### A fourth bucket, found in the data
+
+Classifying the 46 real `not_evaluable` findings turned up a fourth kind that is not a coverage
+shortfall at all:
+
+    12  no check built        Mintro's gap
+    10  not reachable         the ten manual rules
+    14  not exposed           looked for, not found on this storefront
+    10  not applicable        the rule's subject is not on the page
+
+"Capsule labelling" against a product that is not a capsule, or "proper chemical names" on a page
+carrying none of the compounds the rule names. Nothing was missed and nothing is owed. Folding
+these into "the site did not expose it" would have overstated the shortfall by ten — the same
+error this decision exists to fix, one bucket further down.
+
+It is recorded as its own kind and rendered as its own section.
+
+### Resolved and outstanding, not one flat shortfall — Frank's ruling
+
+**`not_applicable` is excluded from the shortfall and stays visible.**
+
+The coverage line answers one question: *how much of the rule set could this crawl speak to?* A
+rule whose subject is not present **has been fully resolved** — the honest answer is "does not
+apply here", not "we could not tell". Leaving it among the shortfalls understates the tool and,
+worse, makes the real gaps look smaller by comparison.
+
+So the line is two halves, and the swisschems run reads:
+
+    61 of 97 resolved (51 evaluated, 10 do not apply here)
+     · 36 outstanding (12 not checked — Mintro has not built these yet,
+                       10 need a surface no crawl reaches,
+                       14 looked for and not found on the site)
+
+All five buckets stay itemised, `unrecorded` included. `resolved + outstanding === total` is
+asserted, as is the older bucket-by-bucket sum: two independent statements of the same closure,
+because this is the line that looked complete while omitting 36 findings.
+
+`resolved` and `outstanding` are computed in the engine beside the rest of coverage, not in the
+renderer. A renderer that derived the split could get it wrong quietly, and the PDF and the screen
+would then disagree about how much of the merchant was screened.
+
+An unrecorded reason counts as **outstanding**: a run that never wrote down which kind applied
+cannot be said to have resolved anything.
+
+### The kind is declared, never inferred
+
+`notEvaluable()` takes a required `kind`. No default: a default would be a guess made on behalf
+of 29 call sites by whoever wrote the function, which is how the three got conflated in the first
+place. Nothing pattern-matches the reason text to classify it — that would be locating the
+subject by its wording (hard constraint 9), and every finding would silently reclassify the next
+time someone rephrased a sentence.
+
+Runs recorded before this carry no kind. They get a fifth bucket, *"Reason not recorded"*, and are
+never guessed into one of the four. Those runs are immutable (D-002); the honest thing to tell a
+reader is that the distinction was not recorded.
+
+### Plain English, and it is not a separate concern
+
+An underwriter was reading:
+
+> no layer 3 runner has been built for check type 'dom_assert', so this rule was not examined
+
+Every word of that is internal vocabulary. It now reads:
+
+> Mintro has not built this check yet. It needs examining the page's fields, labels and controls,
+> and nothing does that today — the merchant's site was not asked for it and withheld nothing.
+
+**Plain does not mean vaguer.** The replacement names the work more specifically than the original
+did, in terms of the merchant's website rather than this codebase's module layout. The last clause
+is load-bearing: without it a reader who is told only that a rule "could not be evaluated" will
+reasonably assume the site withheld something.
+
+`INTERNAL_TERMS` and `auditInternalVocabulary` make this a build failure — check-type names, layer
+numbers, and handler vocabulary. Kept as a separate list from `DIRECTIVE_TERMS` and asserted
+disjoint, so a failure names the right constraint. `manual` is deliberately absent: it is an
+ordinary English word as well as a check type.
+
+The audit runs against a report assembled from the live rule set with no findings, so every rule
+falls through the unrun path and the test cannot pass vacuously. Stored reports are audited too,
+skipping findings with no kind — a pre-D-044 run has the old wording in an immutable record and
+must not fail the build forever.
+
+### Open question for Frank
+
+Should `not_applicable` count against coverage at all? The line currently reads *"… · 10 do not
+apply to these pages"*, which is honest but sits in a list of shortfalls. The alternative is to
+exclude them from the total, so coverage reads against the rules that could have applied. That
+changes what the headline number means and is a business decision.
+
+---
+
+## D-046 — Merchant explanation: a per-run link, and what it may never do
+**2026-08-22 · Frank's ruling**
+
+A free-text field per finding where a merchant, or their agent, responds to something **no crawl
+can reach**. Called *Merchant explanation* — not "attestation", which is too legal, and not
+"verification", which implies Mintro checked it.
+
+### Bucket (b) only, enforced server-side
+
+Offered on `not_reachable` findings and nowhere else. Asking a merchant to explain a check
+**Mintro has not written** is indefensible, and until D-044 the system could not have told the two
+apart. It can now: the kind is declared on the finding, so the restriction is a property of the
+data rather than a rule someone remembers.
+
+**The restriction is enforced where the response is accepted, not by which fields the form
+renders.** A form that simply omits the other findings is a UI convention; a server that refuses
+them is a guarantee. This is the same reasoning as the insert policy in `0014`.
+
+### It never changes a finding's state
+
+`not_evaluable` stays `not_evaluable`. The explanation appears beside the gap, visually distinct
+from observed evidence, attributed as the merchant's own words with a timestamp.
+
+This is what keeps D-001 intact. **We record what they said. We do not endorse it, and we do not
+let it move a state.** A merchant explanation that could turn a gap into a pass would make Mintro
+the party accepting the claim, which is IQwallet's decision to make.
+
+### Delivery: a tokenised per-run link
+
+A signed token, emailed to the merchant, scoped to one run and to that run's bucket-(b) findings.
+It expires. No account, no password.
+
+The two rejected options and why:
+
+- **Analyst relays it.** Fails on attribution. The report would carry the merchant's words in the
+  analyst's hand, and *"the merchant told us X"* through an intermediary is a materially weaker
+  record than the merchant writing it.
+- **Merchant accounts.** Makes Mintro a system merchants log into — a different product and a far
+  larger surface than this needs.
+
+### The three questions, answered
+
+**Who is the merchant.** Whoever holds the link. Identity is not modelled beyond the token, and
+the record says exactly what it can honestly claim: *received via the link issued for this run*.
+Anything stronger would be an identity assertion the mechanism does not support — the same defect
+as a session validated by the absence of a login form (D-026).
+
+**Ownership.** It belongs to the **run**, and is frozen with it. A packing-slip explanation given
+in August is not evidence about a January re-scan. Carrying it forward would make a stale
+statement look current, which is the shape of nearly everything this project has had to fix.
+
+**Revision.** Append-only, every version kept and visible with its timestamp (D-002). A merchant
+may add; nothing is overwritten. If IQwallet has read version one, version one stays readable.
+
+### Not built yet
+
+Sequenced after the report presentation work and after Layer 3. It depends on bucket (b) being
+structurally identifiable, which D-044 has now made true.
+
+---
+
+## D-047 — The report reads as a document, and the run library replaces the picker
+**2026-08-22 · Frank's ruling**
+
+Four changes to how the report presents itself. They are one decision because they trade against
+each other, and the trade was measured rather than guessed.
+
+### Each finding stated its observation three times
+
+The note appeared in the row heading, in the Observed column of the requirement pair, and again
+in the evidence slip. The clause appeared twice — quoted in Program requirement, then repeated as
+*"Rule."* in the slip. A run with three real findings ran to 33 pages.
+
+It is now stated **once**:
+
+- **Observation** — the Observed column of the requirement pair. The row heading keeps it only
+  while the row is closed, where it is a summary of something hidden. A `pass` has no requirement
+  pair (D-041: a satisfied rule quoted back at the reader is noise), so for passes the row keeps it.
+- **Clause** — the Program requirement column. The slip keeps it only for passes, for the same reason.
+- **Not-evaluable reason** — the Not assessed column. The slip keeps the **requests attempted**,
+  which nothing else carries and which hard constraint 3 requires of a `not_evaluable` finding.
+
+The D-041 pairing is untouched. What was removed is repetition, not either half of the pair.
+
+Verified against the real print path rather than asserted — the swisschems run, rendered:
+
+    findings in the DOM      97      every finding, individually
+    collapsed findings        0      nothing hidden in the export
+    requirement blocks       69      = the non-pass findings
+    row notes                28      = the passes, exactly
+    slip notes                0      was one per finding
+    rule refs                 0      was one per finding
+    observation stated once per finding: 97 of 97
+
+69 + 28 = 97. Every finding states its observation exactly once, and none states it twice.
+
+### Capture size costs pages, and the cost is measured — do not re-litigate it blind
+
+Both were asked for, and in the PDF they are in direct tension: there are 66 captures in a real
+run, and a page has a cost the screen does not. Measured on the swisschems run:
+
+    capture 148px / 180px cap, note stated three times     70 pages   (before)
+    capture 148px / 180px cap, note stated once            47 pages
+    capture 240px / 280px cap, note stated once            67 pages
+    capture 360px / 520px cap, note stated once            85 pages
+
+**Deduplication is worth 23 pages.** Spending part of it on a capture 62% wider leaves the export
+at 67 pages — shorter than it was *and* more legible. Spending all of it would have made the PDF
+longer than the document this set out to shorten.
+
+The screen has no pagination cost, so it takes the larger capture: a column that grows to 520px
+against a 460px cap, where the 148px thumbnail had made the one thing a reader needs to look at
+the smallest element on the row.
+
+**Anyone changing the print capture size should re-run the measurement, not estimate it.** The
+numbers above came from `node apps/worker/dist/bin/report-pdf.js swisschems.is --out out`, which
+prints the page count and the resolved-capture ratio for a real 97-finding run. The relationship
+is not linear in the obvious way — 66 captures each gaining a little height crosses a great many
+page boundaries at once.
+
+### The screen matches the PDF because it was never a design difference
+
+The PDF read better, and the cause was width and density, not styling — print sets
+`max-width: none` while the screen was capped at 1120px, squeezing a two-column requirement pair
+into what was left. The cap is now 1360px, and the requirement pair and capture sit side by side
+as they do on paper. Same component throughout; no second rendering stack (ARCHITECTURE.md).
+
+### The run picker is gone
+
+The `<select>` of past runs is removed from the scan form. **That control is where the D-045 bug
+lived**, and not incidentally: a dropdown shows one option at a time, so a selection that had
+silently gone stale was indistinguishable from a current one and could not be compared against
+the alternatives without opening it.
+
+**Past reports** is now a real view — every run at once, sortable by merchant, by date and by
+outcome, with nothing pre-selected. There is no selection state left to go stale.
+
+`resolveRunSelection` went with it. It was a correct fix, tested, and it guarded a control that no
+longer exists; leaving it would be dead code implying a picker that is gone. The half of D-045
+that makes the behaviour correct — watching the request id — is untouched, and its tests remain.
+
+Sorting is pure and tested. Ties break on domain then run id so the order is total: an unstable
+sort would reshuffle rows between renders and make two runs of one merchant swap places under the
+reader. A run that never finished sorts **last** under newest-first rather than first, since
+treating "no date" as newest would bury the real runs beneath one that produced nothing.
+
+**Recent requests** keeps five, each with a timestamp, each linking to the run it produced **by run
+id** — never "the newest report for this merchant", which is the substitution D-045 was about and
+which a convenience shortcut is the easiest place to reintroduce.
+
+### A pre-D-044 report renders its own coverage honestly
+
+Found by rendering a stored run rather than by review. The new coverage line read:
+
+    " of 97 resolved (50 evaluated)"
+
+A run recorded before D-044 has no `resolved` in its stored `coverage`, and never will — the
+report is immutable (D-002). The blank was the D-044 defect reappearing in the fix for it.
+
+Those reports now render what they actually recorded, and say the rest was not written down:
+
+    50 of 97 evaluated · 47 not evaluated — this run was screened before Mintro separated
+    the reasons, so which applies was not recorded
+
+It does not reconstruct the split from the finding text. The wording is all that survives, and
+classifying by wording is precisely what D-044 forbids. **A number the run never recorded is not
+one this report gets to infer.**

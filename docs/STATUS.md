@@ -349,6 +349,35 @@ an analyst uses, and whether a hosted browser vendor is acceptable for a live ha
 
 ---
 
+## Not built — Layer 3, and the COA reader
+
+**This is the largest gap in what the tool checks, and until 2026-08-22 it appeared in no list
+here.** It is not blocked and not deferred; it was simply never written down, and the report
+described it in the same words it used for genuinely uncrawlable surfaces (D-044).
+
+Thirteen rules — a quarter of the rule set — produce `not_evaluable` for this reason alone. Every
+one of them is an ordinary page a browser loads.
+
+| Surface | Rules | What is needed |
+|---|---|---|
+| Sign-up form | GATE-004, GATE-005 | Render the account-creation form; assert the terms checkbox and research-use field exist |
+| Terms page | GATE-007 | Read the linked terms and check the required clauses appear |
+| Checkout | GATE-003, FULF-002 | Step through add-to-cart → checkout as a guest; observe where it stops and whether a PO box is accepted |
+| Shipping policy | FULF-001 | Read the shipping page for destination restrictions |
+| Payment page | PAY-001, PAY-002, PAY-003 | Observe payment methods offered, the processor in use, and whether a refund policy is published |
+| FAQ | COMM-001 | Read the FAQ for dosing and administration advice appearing together |
+| COA documents | COA-002, COA-003, COA-004 | Fetch the linked certificate, parse date, purity and required fields |
+
+GATE-003 is the exception that proves the cost: it *does* run today, through the Layer 2
+flow probe, which is why the swisschems report carries a real `pass` for guest checkout. The rest
+of the Layer 3 set has no runner at all.
+
+`doc_parse` is scoped separately from the rest. It is not a page check — it fetches a PDF and
+reads its contents, and D-026 already records that a forged COA is a known failure mode, so what
+it can honestly conclude is narrower than the other three surfaces.
+
+---
+
 ## Known coverage limits
 
 These are **non-goals**, and the report states them rather than implying coverage. Ten `manual`

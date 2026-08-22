@@ -11,9 +11,12 @@
 import type { Ruleset } from '@mintro/ruleset';
 import { SignOutButton } from './SignIn.js';
 
+/** Panes the rail can reach. `reports` is the run library the dropdown used to stand in for. */
+export type Pane = 'scan' | 'docs' | 'reports';
+
 interface Props {
-  readonly pane: 'scan' | 'docs';
-  readonly onPane: (pane: 'scan' | 'docs') => void;
+  readonly pane: Pane;
+  readonly onPane: (pane: Pane) => void;
   readonly ruleset: Ruleset;
   readonly analystEmail: string;
 }
@@ -49,9 +52,17 @@ export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Elemen
 
       <div>
         <div className="nav-label">Library</div>
-        <button className="nav-item" onClick={() => onPane('scan')}>
+        {/* Was a dead link that returned to the scan pane. It is the run library now (D-047),
+            and the only way to reach an old report — the dropdown it duplicated is gone. */}
+        <button
+          className="nav-item"
+          aria-current={pane === 'reports' ? 'true' : undefined}
+          onClick={() => onPane('reports')}
+        >
           <span className="ic">⛁</span>Past reports
         </button>
+        {/* Still dead. Left as it was rather than wired to something that is not built —
+            a nav item that goes somewhere unfinished is worse than one that is honestly inert. */}
         <button className="nav-item" onClick={() => onPane('scan')}>
           <span className="ic">⚙</span>Rule set
         </button>

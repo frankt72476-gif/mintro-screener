@@ -119,6 +119,14 @@ export interface Finding {
   readonly evidence: readonly Evidence[];
   /** Present for `not_evaluable`: why the rule could not be observed. */
   readonly notEvaluableReason?: string;
+  /**
+   * Present for `not_evaluable`: which *kind* of "could not" this is (D-044).
+   *
+   * Optional on the type because runs recorded before D-044 do not carry it, and those reports
+   * are immutable (D-002). A reader that finds it absent must say so rather than assume a kind —
+   * see `bucketOf` in `report.ts`.
+   */
+  readonly notEvaluableKind?: NotEvaluableKind;
 }
 
 /**
@@ -157,16 +165,43 @@ export function satisfied(
 }
 
 /**
+ * Why a rule could not be observed (D-044).
+ *
+ * Four different facts used to render as one word. They are not interchangeable, and the
+ * difference is the difference between a limitation of the merchant's site and a limitation of
+ * this tool:
+ *
+ *   - `no_check_built` — **Mintro has not written this check.** The surface is an ordinary web
+ *     page a browser loads; nobody has built the runner for it. Nothing about the merchant.
+ *   - `not_reachable` — no crawl of a public website could answer this, whoever wrote it. Order
+ *     records, carrier configuration, staff training.
+ *   - `not_exposed` — the check ran, and the merchant's site did not carry the thing it looks
+ *     for. A fact about this storefront.
+ *   - `not_applicable` — the rule's subject is not on this page at all. Capsule labelling on a
+ *     product that is not a capsule. Not a shortfall in anything.
+ *
+ * **Declared where the finding is made, never derived from the reason text.** A classifier that
+ * pattern-matched the wording would be locating the subject by its compliant form — hard
+ * constraint 9 — and would silently reclassify every finding whose phrasing was reworded.
+ */
+export type NotEvaluableKind = 'no_check_built' | 'not_reachable' | 'not_exposed' | 'not_applicable';
+
+/**
  * A rule that could not be observed.
  *
  * Hard constraint 2. Reached whenever the crawl could not see what the rule asks about — a
  * missing sitemap, an unreachable document, a surface this layer does not cover. Never used
  * to mean "looked and found nothing"; that is `satisfied`.
+ *
+ * `kind` has no default. Every caller states which of the four it is, because a default would be
+ * a guess made by whoever wrote this function on behalf of code they never saw — and the whole
+ * point of D-044 is that these four were being conflated.
  */
 export function notEvaluable(
   rule: Rule,
   reason: string,
   evidenceKind: EvidenceKind,
+  kind: NotEvaluableKind,
   evidence: readonly Evidence[] = [],
 ): Finding {
   return {
@@ -176,6 +211,7 @@ export function notEvaluable(
     evidenceKind,
     evidence,
     notEvaluableReason: reason,
+    notEvaluableKind: kind,
   };
 }
 
@@ -184,4 +220,39 @@ export function tally(findings: readonly Finding[]): Record<State, number> {
   const counts: Record<State, number> = { fail: 0, review: 0, pass: 0, not_evaluable: 0 };
   for (const finding of findings) counts[finding.state] += 1;
   return counts;
+}
+
+/**
+ * What a check of this kind would have had to do, in words a reader outside Mintro can use.
+ *
+ * Keyed by check type because that is what determines the work — a rule set can grow without
+ * touching this, and a *new check type* already requires engine changes, so nothing here weakens
+ * hard constraint 1.
+ *
+ * The wording an underwriter used to get was *"no layer 3 runner has been built for check type
+ * 'dom_assert'"*. Every word of that is Mintro's internal vocabulary (D-044). Plain is not
+ * vaguer: this says exactly what was not done, in terms of the merchant's website.
+ */
+const UNBUILT_WORK: Readonly<Record<string, string>> = {
+  dom_assert: "examining the page's fields, labels and controls",
+  text_match: 'reading the page text for the wording this rule requires or prohibits',
+  text_cooccurrence: 'reading the page text for two things that appear close together',
+  flow_probe: 'stepping through the purchase flow as a customer would',
+  http_probe: 'requesting the pages this rule names and recording what came back',
+  doc_parse: 'opening the linked certificate of analysis and reading what it says',
+  url_pattern: "listing the site's catalogue URLs and matching them against this rule",
+  computed_style: 'measuring the rendered text against its background',
+};
+
+/**
+ * Why an unbuilt check produced nothing, in plain English.
+ *
+ * Says whose limitation it is, because that is the whole point of the bucket. A reader who is
+ * told a rule "could not be evaluated" and nothing else will reasonably read it as something the
+ * merchant's site withheld, and for these rules it is not.
+ */
+export function unbuiltCheckReason(rule: Rule): string {
+  const work = UNBUILT_WORK[rule.type];
+  const needs = work === undefined ? 'a kind of examination Mintro has not built' : work;
+  return `Mintro has not built this check yet. It needs ${needs}, and nothing does that today — the merchant's site was not asked for it and withheld nothing.`;
 }

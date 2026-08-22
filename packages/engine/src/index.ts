@@ -116,7 +116,9 @@ export {
 } from './checks/flowProbe.js';
 export {
   DIRECTIVE_TERMS,
+  INTERNAL_TERMS,
   auditCopy,
+  auditInternalVocabulary,
   auditRequirement,
   REQUIREMENT_HEADINGS,
   auditAnalystNote,
@@ -154,12 +156,14 @@ export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, RENDERED } fr
 
 export {
   notEvaluable,
+  unbuiltCheckReason,
   satisfied,
   violation,
   stateForViolation,
   tally,
   type ArtifactKind,
   type Evidence,
+  type NotEvaluableKind,
   type EvidenceArtifact,
   type EvidenceKind,
   type FetchAttempt,

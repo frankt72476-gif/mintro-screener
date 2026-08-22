@@ -158,11 +158,26 @@ describe('nothing is lost', () => {
     expect(ids(grouped)).toEqual(ids(ungrouped(built)));
   });
 
+  /**
+   * Since D-044 `not_evaluable` renders as up to four sections, so one section no longer equals
+   * one state. What must hold — and what proves the split drops nothing — is that the sections
+   * for a state still sum to the count the report states.
+   */
   it('keeps the counts the report already states', () => {
     const built = report([...perPage('NAME-002', 'fail', 3), ...perPage('CATG-005', 'review', 4)]);
 
+    const summed = new Map<string, number>();
     for (const section of groupReport(built)) {
-      expect(section.count).toBe(built.counts[section.state]);
+      summed.set(section.state, (summed.get(section.state) ?? 0) + section.count);
+    }
+
+    for (const [state, count] of summed) {
+      expect(count, state).toBe(built.counts[state as keyof typeof built.counts]);
+    }
+
+    // Every state the report counts is represented, so the loop above is not vacuous.
+    for (const [state, count] of Object.entries(built.counts)) {
+      if (count > 0) expect(summed.get(state), state).toBe(count);
     }
   });
 });

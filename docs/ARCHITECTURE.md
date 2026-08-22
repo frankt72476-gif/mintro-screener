@@ -292,6 +292,18 @@ previous run of the same merchant (D-045). Component state answers when it canno
 readily as a session check does; the constraint is about components that establish preconditions,
 and "which run is on screen" is one.
 
+A third instance arrived with the fix for the first, and is the one to carry forward. The
+coverage line rewritten by D-044 destructured fields D-044 had just added, and rendered a **blank
+number** against a run recorded the day before — an immutable report (D-002) whose stored coverage
+could not contain them (D-047).
+
+> A record written in the past cannot acquire a field added later. Any derived display must state
+> what those records actually hold, rather than computing from data that is absent.
+
+Ask what a display renders when the record predates the field. A blank, a zero, or a plausible
+number derived from `undefined` are all wrong, and the zero is the dangerous one — a zero reads as
+a measurement. This recurs every time the report gains a field.
+
 It also adds a second axis. The backend instances were invisible because a precondition never
 appears in a finding's text. This one was invisible because two different runs **rendered as the
 same string** — same merchant, same counts, timestamp truncated to the day. So the test gains a

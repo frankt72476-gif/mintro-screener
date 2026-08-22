@@ -38,6 +38,7 @@ export function checkTextCooccurrence(
       rule,
       page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
       RENDERED,
+      'not_exposed',
       renderFailureEvidence(page),
     );
   }
@@ -48,6 +49,7 @@ export function checkTextCooccurrence(
       rule,
       'the page rendered no visible text, so there was nothing to examine',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }

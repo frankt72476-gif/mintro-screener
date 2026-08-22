@@ -15,7 +15,15 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
-import { DIRECTIVE_TERMS, assembleReport, auditCopy, type Finding, type ScreeningReport } from '@mintro/engine';
+import {
+  DIRECTIVE_TERMS,
+  INTERNAL_TERMS,
+  assembleReport,
+  auditCopy,
+  auditInternalVocabulary,
+  type Finding,
+  type ScreeningReport,
+} from '@mintro/engine';
 import { bodyFor, subjectFor, attachmentName } from '../src/send.js';
 
 /**
@@ -115,6 +123,113 @@ describe('generated report copy', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * Mintro's internal vocabulary never reaches the reader (D-044).
+ *
+ * The report is read by an underwriter deciding on a merchant. "no layer 3 runner has been built
+ * for check type 'dom_assert'" tells them nothing they can use and, worse, reads as something
+ * wrong with the merchant's site when it is a gap in this tool.
+ *
+ * Clauses are exempt for the same reason they are exempt from the directive audit: they quote the
+ * program document and are source material rather than our words.
+ */
+describe('internal vocabulary stays internal', () => {
+  const reports = storedReports();
+
+  it('catches the wording this rule exists to remove', () => {
+    const audit = auditInternalVocabulary(
+      "no layer 3 runner has been built for check type 'dom_assert', so this rule was not examined",
+    );
+    expect(audit.clean).toBe(false);
+    expect(audit.flagged).toContain('dom_assert');
+    expect(audit.flagged).toContain('layer 3');
+    expect(audit.flagged).toContain('check type');
+    expect(audit.flagged).toContain('runner');
+  });
+
+  it('leaves ordinary report sentences alone', () => {
+    expect(auditInternalVocabulary('The footer disclaimer was contrast ratio 2.94:1.').clean).toBe(true);
+    // `manual` is an English word as well as a check type, so it is not on the list.
+    expect(auditInternalVocabulary('Requires a manual review of the signed agreement.').clean).toBe(true);
+  });
+
+  /**
+   * Assembled from the real rule set with no findings, so every rule falls through to the
+   * unrun path — which is precisely the copy this rule is about, and there is no way for this
+   * to pass vacuously.
+   */
+  it('finds none of it in a report assembled from the current rule set', () => {
+    const ruleset = loadRulesetFile('rules/ruleset.json');
+    const report = assembleReport(
+      {
+        runId: 'run-1',
+        merchantDomain: 'shop.example',
+        mode: 'public',
+        startedAt: '2026-08-21T00:00:00.000Z',
+        finishedAt: '2026-08-21T00:01:00.000Z',
+        findings: [],
+        politeness: 'no Crawl-delay declared',
+      },
+      ruleset,
+    );
+
+    const problems: string[] = [];
+    for (const category of report.categories) {
+      for (const finding of category.findings) {
+        for (const text of [finding.title, finding.note, finding.notEvaluableReason ?? '']) {
+          const audit = auditInternalVocabulary(text);
+          if (!audit.clean) problems.push(`${finding.ruleId} · ${audit.flagged.join(', ')} · ${text}`);
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
+    // Every rule reached the report, so the sweep above covered all of them.
+    expect(report.categories.flatMap((c) => c.findings)).toHaveLength(ruleset.rules.length);
+  });
+
+  /**
+   * Stored reports are audited too, but only the findings that carry a kind.
+   *
+   * A run recorded before D-044 has the old wording baked into an immutable record (D-002). It
+   * cannot be corrected and must not fail the build forever; what matters is that nothing
+   * generated *now* carries it, which the assembled-report case above proves without exception.
+   */
+  it('finds none of it anywhere a reader looks in current runs', () => {
+    const problems: string[] = [];
+
+    for (const report of reports) {
+      for (const text of [report.verdict, report.politeness, ...report.truncations]) {
+        const audit = auditInternalVocabulary(text);
+        if (!audit.clean) problems.push(`${report.merchantDomain} · ${audit.flagged.join(', ')} · ${text}`);
+      }
+
+      for (const category of report.categories) {
+        for (const finding of category.findings) {
+          // Pre-D-044 run: the distinction was not recorded, and the record is immutable.
+          if (finding.state === 'not_evaluable' && finding.notEvaluableKind === undefined) continue;
+          // `clause` is excluded: it quotes the program document verbatim.
+          for (const text of [finding.title, finding.note, finding.notEvaluableReason ?? '']) {
+            const audit = auditInternalVocabulary(text);
+            if (!audit.clean) {
+              problems.push(`${report.merchantDomain} ${finding.ruleId} · ${audit.flagged.join(', ')} · ${text}`);
+            }
+          }
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  it('audits the two lists separately, so a failure says which rule broke', () => {
+    // Overlapping lists would report a directive-language failure for a vocabulary problem and
+    // send the next reader to the wrong constraint.
+    const overlap = INTERNAL_TERMS.filter((term) => DIRECTIVE_TERMS.includes(term));
+    expect(overlap).toEqual([]);
   });
 });
 
