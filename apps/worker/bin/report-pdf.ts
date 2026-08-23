@@ -18,9 +18,8 @@ import { startReportServer } from '../src/reportServer.js';
 import { createWorkerSupabase, signEvidenceUrl } from '../src/store/supabase.js';
 import { renderReportPdf } from '../src/pdf.js';
 import {
-  createDryRunMailer,
   createMemorySendLog,
-  createResendMailer,
+  mailersFor,
   sendReport,
   attachmentName,
   subjectFor,
@@ -74,8 +73,8 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log(`  written     ${path}`);
 
     if (recipient !== null) {
-      const apiKey = process.env['RESEND_API_KEY'];
-      const mailer = apiKey === undefined ? createDryRunMailer() : createResendMailer(apiKey);
+      // One selector for both sends, so verifying the domain turns both on together (D-063).
+      const { mailer } = mailersFor();
       const log = createMemorySendLog();
 
       console.log(`\n  mailer      ${mailer.description}`);

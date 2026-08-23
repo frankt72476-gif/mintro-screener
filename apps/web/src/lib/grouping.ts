@@ -126,6 +126,11 @@ const NOT_EVALUABLE_ORDER: readonly { bucket: Bucket; heading: string; lede: str
     lede: "The rule's subject is not on the page at all — a capsule labelling rule against a product that is not a capsule. Not a gap in the crawl or the site.",
   },
   {
+    bucket: 'not_retrieved',
+    heading: 'Not retrieved on this run',
+    lede: "The request for these did not complete — a timeout or a connection failure. Nothing was established either way, and in particular nothing about the merchant. A re-run may resolve them.",
+  },
+  {
     bucket: 'unrecorded',
     heading: 'Reason not recorded',
     lede: 'This run was screened before Mintro separated these reasons, so which one applies was never written down. A completed run is never edited, so it stays as recorded.',

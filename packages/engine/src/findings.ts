@@ -42,8 +42,13 @@ export interface FetchAttempt {
 /**
  * What a stored artifact is. Distinct from `EvidenceKind`, which says what kind of *observation*
  * a finding rests on; this says what the stored file is.
+ *
+ * `coa` joined at stage 4 (D-057). Like a screenshot it is already-compressed binary, so it is
+ * stored as fetched rather than gzipped a second time — and like every artifact its body is kept,
+ * not only its digest, because a hash proves a document has not changed without letting anyone
+ * read what it said (hard constraint 3).
  */
-export type ArtifactKind = 'robots' | 'sitemap' | 'screenshot' | 'dom';
+export type ArtifactKind = 'robots' | 'sitemap' | 'screenshot' | 'dom' | 'coa';
 
 export interface EvidenceArtifact {
   /** Storage key. Run-scoped, so a second scan of the same merchant cannot collide (D-002). */
@@ -179,12 +184,26 @@ export function satisfied(
  *     for. A fact about this storefront.
  *   - `not_applicable` — the rule's subject is not on this page at all. Capsule labelling on a
  *     product that is not a capsule. Not a shortfall in anything.
+ *   - `not_retrieved` — **this run could not fetch it.** A timeout, a connection failure, a
+ *     request that never completed. Nothing was established either way, and in particular nothing
+ *     was established about the merchant (D-058).
+ *
+ * The fifth arrived with the certificate fetch and is not a refinement of the other four. A COA
+ * link returning 404 is a fact about the merchant; a COA link that times out is a fact about this
+ * run. Filing the second under `not_exposed` would say a merchant published nothing because our
+ * request failed — the conflation D-044 exists to end, one check further down. Re-running may
+ * resolve it, which is true of no other kind here.
  *
  * **Declared where the finding is made, never derived from the reason text.** A classifier that
  * pattern-matched the wording would be locating the subject by its compliant form — hard
  * constraint 9 — and would silently reclassify every finding whose phrasing was reworded.
  */
-export type NotEvaluableKind = 'no_check_built' | 'not_reachable' | 'not_exposed' | 'not_applicable';
+export type NotEvaluableKind =
+  | 'no_check_built'
+  | 'not_reachable'
+  | 'not_exposed'
+  | 'not_applicable'
+  | 'not_retrieved';
 
 /**
  * A rule that could not be observed.

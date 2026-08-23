@@ -41,3 +41,20 @@ export function supabase(config: SupabaseConfig): SupabaseClient {
   });
   return client;
 }
+
+/**
+ * A client for a caller with no account (D-063).
+ *
+ * The merchant comment route. Same anon key as everywhere else — RLS and the two `security
+ * definer` functions decide what it reaches, and neither accepts a run id, so holding this client
+ * without a token reaches nothing. Session persistence is off: a merchant is not signing in, and a
+ * stored session on a shared machine would outlive their visit.
+ */
+export function anonymousClient(): SupabaseClient | null {
+  const config = readConfig();
+  if ('missing' in config) return null;
+
+  return createClient(config.url, config.anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}

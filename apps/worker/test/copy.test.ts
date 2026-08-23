@@ -15,12 +15,14 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
+import { composeInvitation } from '../src/invite.js';
 import {
   DIRECTIVE_TERMS,
   INTERNAL_TERMS,
   assembleReport,
   auditCopy,
   auditInternalVocabulary,
+  quotedFromEvidence,
   type Finding,
   type ScreeningReport,
 } from '@mintro/engine';
@@ -179,8 +181,9 @@ describe('internal vocabulary stays internal', () => {
     const problems: string[] = [];
     for (const category of report.categories) {
       for (const finding of category.findings) {
+        const quoted = quotedFromEvidence(finding.evidence);
         for (const text of [finding.title, finding.note, finding.notEvaluableReason ?? '']) {
-          const audit = auditInternalVocabulary(text);
+          const audit = auditInternalVocabulary(text, quoted);
           if (!audit.clean) problems.push(`${finding.ruleId} · ${audit.flagged.join(', ')} · ${text}`);
         }
       }
@@ -211,9 +214,11 @@ describe('internal vocabulary stays internal', () => {
         for (const finding of category.findings) {
           // Pre-D-044 run: the distinction was not recorded, and the record is immutable.
           if (finding.state === 'not_evaluable' && finding.notEvaluableKind === undefined) continue;
-          // `clause` is excluded: it quotes the program document verbatim.
+          // `clause` is excluded: it quotes the program document verbatim. The merchant's own
+          // markup is exempt too — a CSS selector *is* the evidence (D-060 amended).
+          const quoted = quotedFromEvidence(finding.evidence);
           for (const text of [finding.title, finding.note, finding.notEvaluableReason ?? '']) {
-            const audit = auditInternalVocabulary(text);
+            const audit = auditInternalVocabulary(text, quoted);
             if (!audit.clean) {
               problems.push(`${report.merchantDomain} ${finding.ruleId} · ${audit.flagged.join(', ')} · ${text}`);
             }
@@ -225,11 +230,145 @@ describe('internal vocabulary stays internal', () => {
     expect(problems).toEqual([]);
   });
 
+  /**
+   * A CSS selector is the evidence, and must survive the audit intact (D-060 amended).
+   *
+   * DISC-002 quotes where it found the disclaimer. On two of the five storefronts that is a Divi
+   * theme path — `div.et_pb_column > div.et_pb_module > div.et_pb_text_inner`. Those are the
+   * merchant's class names, and a guard that flagged them would either force the selector out of
+   * the finding or teach whoever saw the failure to suppress it.
+   */
+  it("exempts the merchant's own markup, quoted as evidence", () => {
+    const note =
+      'The footer disclaimer at div.et_pb_column > div.et_pb_module > div.et_pb_text_inner > p ' +
+      'rendered at 14px with a contrast ratio of 21:1.';
+    const quoted = ['selector=div.et_pb_column > div.et_pb_module > div.et_pb_text_inner > p'];
+
+    expect(auditInternalVocabulary(note, quoted).clean).toBe(true);
+    // Without the provenance, the same string is flagged — which is what the first version did.
+    expect(auditInternalVocabulary(note).clean).toBe(false);
+  });
+
+  it('still catches our own identifiers when a finding quotes nothing like them', () => {
+    const note = "1 of 5 required items were not found: test_date. Found: batch_lot.";
+    expect(auditInternalVocabulary(note, ['https://shop.example/coa.pdf']).flagged).toEqual([
+      'test_date',
+      'batch_lot',
+    ]);
+  });
+
+  it("reads provenance only from fields the evidence type defines as the merchant's", () => {
+    const quoted = quotedFromEvidence([
+      {
+        matchedValue: 'div.et_pb_column',
+        sourceUrl: 'https://shop.example/',
+        matchedUrls: ['https://shop.example/a_b'],
+        attempts: [{ url: 'https://shop.example/c_d' }],
+      },
+    ]);
+
+    expect(quoted).toContain('div.et_pb_column');
+    expect(quoted).toContain('https://shop.example/a_b');
+    expect(quoted).toContain('https://shop.example/c_d');
+  });
+
   it('audits the two lists separately, so a failure says which rule broke', () => {
     // Overlapping lists would report a directive-language failure for a vocabulary problem and
     // send the next reader to the wrong constraint.
     const overlap = INTERNAL_TERMS.filter((term) => DIRECTIVE_TERMS.includes(term));
     expect(overlap).toEqual([]);
+  });
+});
+
+/**
+ * The invitation that carries a comment link (D-063).
+ *
+ * Reader-facing text, written for a merchant being told a bank's processor screened their
+ * storefront. It describes what Mintro could not observe and invites their account of it; it never
+ * tells them what to do about a finding, and it never characterises the observations.
+ */
+describe('the merchant invitation', () => {
+  const invitation = composeInvitation({
+    merchantDomain: 'shop.example',
+    link: 'https://mintro-screener.netlify.app/comment/TOKEN',
+    expiresAt: new Date('2026-09-22T00:00:00.000Z'),
+    openForComment: 12,
+    contact: { name: 'Frank Tsen', email: 'frank@gomintro.com' },
+  });
+
+  it('instructs nobody', () => {
+    // "Please publish your payment methods" would be remediation advice, which would make Mintro
+    // a party to the determination (D-001, D-041).
+    expect(offending(invitation.subject)).toEqual([]);
+    expect(offending(invitation.body)).toEqual([]);
+  });
+
+  it("carries none of Mintro's internal vocabulary", () => {
+    expect(auditInternalVocabulary(invitation.subject).clean).toBe(true);
+    expect(auditInternalVocabulary(invitation.body).clean).toBe(true);
+  });
+
+  it('does not characterise the observations', () => {
+    // A count is a fact; "issues", "problems" and "concerns" are readings, and IQwallet makes them.
+    expect(invitation.body).not.toMatch(/(issues?|problems?|concerns?|violations?|failures?)/i);
+  });
+
+  it('says plainly what happens to what they write', () => {
+    expect(invitation.body).toContain('recorded exactly as you write it');
+    expect(invitation.body).toContain('Mintro does not edit it, shorten it, or reply to it');
+    // Nothing they write changes a finding (D-063).
+    expect(invitation.body).toContain('Nothing you write changes what was observed');
+  });
+
+  it('explains the findings with no box, as ours rather than theirs', () => {
+    expect(invitation.body).toContain('they are our gaps, not yours');
+  });
+
+  it('names the expiry and says a new link keeps what was written', () => {
+    expect(invitation.body).toContain('works until 2026-09-22');
+    expect(invitation.body).toContain('anything you have already written is kept');
+  });
+
+  it('says the link may be forwarded and how attribution works', () => {
+    // One link per report, forwardable — Mintro generally has no direct channel to the merchant,
+    // so the agent may forward it or answer on their behalf (D-063).
+    expect(invitation.body).toContain('You can forward this link');
+    expect(invitation.body).toContain('gives an email address first');
+    expect(invitation.body).toContain('Mintro does not check the address');
+  });
+
+  /**
+   * The requirement that replaced the no-reply guard (D-064).
+   *
+   * Frank overruled a check that refused `no-reply@` in a reply-to and kept the reasoning: an
+   * agent receiving this from a company they may not recognise will want to verify it is real. A
+   * no-reply address answers that with silence, the invitation goes unanswered, and the report
+   * then renders it as **merchant silence** — the misattribution `comment_invites.delivery` exists
+   * to prevent, arriving through the email instead of through the database.
+   *
+   * So it fails here instead. The build already refuses a `composeInvitation` call with no
+   * contact; these assert the line survives into the body a merchant actually reads.
+   */
+  it('names a human contact and how to reach them', () => {
+    expect(invitation.body).toContain('Questions about this request? Contact Frank Tsen at frank@gomintro.com.');
+  });
+
+  it('refuses to compose without a contact, rather than dropping the line', () => {
+    // A blank renders `Contact  at frank@…`, which reads as a template someone forgot to fill in
+    // — worse than no line, in front of a reader already deciding whether to trust the sender.
+    const base = {
+      merchantDomain: 'shop.example',
+      link: 'https://mintro-screener.netlify.app/comment/TOKEN',
+      expiresAt: new Date('2026-09-22T00:00:00.000Z'),
+      openForComment: 12,
+    };
+
+    expect(() => composeInvitation({ ...base, contact: { name: '', email: 'f@gomintro.com' } })).toThrow(
+      /named contact/,
+    );
+    expect(() => composeInvitation({ ...base, contact: { name: 'Frank Tsen', email: '  ' } })).toThrow(
+      /named contact/,
+    );
   });
 });
 

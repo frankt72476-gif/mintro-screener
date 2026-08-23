@@ -1,0 +1,132 @@
+/**
+ * Locating a surface, so that a check cannot be handed a page nobody established (D-054).
+ *
+ * ## Why this is a type and not a rule
+ *
+ * One defect has now been found six times, in three mechanisms:
+ *
+ *   1. a WooCommerce sign-in form read as the sign-up form, because both carry a password field
+ *   2. a redirect to `/` accepted as the terms document — 200, and plenty of text
+ *   3. a redirect to `/shop/` accepted as the refund policy, after the fix for (2) rejected only
+ *      the site root — a **special case of the rule, not the rule**
+ *   4. a "Return to shop" cart link accepted as the refund policy, on link text alone
+ *   5. `/shop/` accepted as the checkout surface, because the flow landed there
+ *   6. `/shop/` reported by the checkout flow as "stopped at checkout, no payment field observed",
+ *      which made GATE-003 — `critical`, `auto_fail` — **pass** a merchant whose guest checkout
+ *      reaches a card field, on roughly nine runs in ten
+ *
+ * After (2) the rule was written into `ARCHITECTURE.md`. (3) happened anyway, because each check
+ * located its own surface and the fix landed in one call site. Guidance failed; a special case
+ * failed. What is left is making the wrong thing unrepresentable.
+ *
+ * ## The guarantee
+ *
+ * `Located<T>` has **no variant carrying a value without the evidence that it is the right one**.
+ * A handler receiving one cannot reach a page that was not established, because there is no
+ * field to put it in. `unreachable` carries its attempts, so hard constraint 3 is satisfied by
+ * the shape of the type rather than by each caller remembering.
+ *
+ * Every guard runs inside the locator — the redirect rule, the candidate-path rule, the
+ * themed-404 floor, the required positive signal — so adding a surface cannot skip one. There is
+ * no code path from a candidate to a handler that does not pass through them.
+ */
+
+import type { FetchAttempt } from './findings.js';
+
+/**
+ * A surface that was established, or a reason it was not.
+ *
+ * `how` is not decoration. It is the record of *what established this*, and a locator that could
+ * not name one has not established anything — which is why the field is required rather than
+ * optional.
+ */
+export type Located<T> =
+  | {
+      readonly located: true;
+      readonly value: T;
+      /** Where it was found, after redirects. */
+      readonly url: string;
+      /** The positive signal that identified it. Never "nothing contradicted it". */
+      readonly how: string;
+    }
+  | {
+      readonly located: false;
+      /** Why nothing was established, in words a finding can use. */
+      readonly reason: string;
+      /** Every request made looking for it, and what each returned. */
+      readonly attempts: readonly FetchAttempt[];
+    };
+
+/** A located surface, for a caller that has already checked. */
+export const located = <T>(value: T, url: string, how: string): Located<T> => ({
+  located: true,
+  value,
+  url,
+  how,
+});
+
+/** A surface that was not established, with the record of what was tried. */
+export const unreachable = <T>(reason: string, attempts: readonly FetchAttempt[]): Located<T> => ({
+  located: false,
+  reason,
+  attempts,
+});
+
+/**
+ * What a surface must satisfy to count as itself.
+ *
+ * Declared per surface and applied by the locator, so the guards live in one place. Each field
+ * exists because omitting it produced one of the six defects above.
+ */
+export interface SurfaceSpec {
+  /** For the reason text and progress lines: "terms document", "sign-up form". */
+  readonly label: string;
+  /**
+   * Path fragments that name this surface.
+   *
+   * The candidate's **own path** must contain one. Link text is prose written for a person
+   * navigating — "Return to shop" matched the hint `return` and made `/shop/` a refund policy.
+   */
+  readonly pathNames: readonly string[];
+  /**
+   * Minimum rendered characters before the page counts as served.
+   *
+   * A themed 404 returns 200 with a layout and no content. This is a floor, never a measure of
+   * completeness — the storefronts that publish terms return 9,500-13,900 characters.
+   */
+  readonly minChars?: number;
+}
+
+/**
+ * Whether the request ended at what it asked for.
+ *
+ * The general rule, not the special case: `/terms` landing on `/terms-and-conditions/` is the
+ * same document under a longer name; `/returns` landing on `/shop/` is not, and neither is
+ * anything landing on the site root.
+ */
+export function endedAtWhatWasAsked(requestedUrl: string, finalUrl: string): boolean {
+  const asked = normalisePath(requestedUrl);
+  const landed = normalisePath(finalUrl);
+  if (landed === '') return false;
+  return landed === asked || landed.startsWith(asked) || asked.startsWith(landed);
+}
+
+/** Whether a URL's own path names the surface being looked for. */
+export function pathNamesSurface(url: string, spec: SurfaceSpec): boolean {
+  let path: string;
+  try {
+    path = new URL(url).pathname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return spec.pathNames.some((name) => path.includes(name));
+}
+
+/** Path, lowercased, without leading or trailing slashes. */
+export function normalisePath(url: string): string {
+  try {
+    return new URL(url).pathname.toLowerCase().replace(/^\/+/, '').replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}

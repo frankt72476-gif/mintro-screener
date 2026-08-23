@@ -21,8 +21,18 @@ export interface SendRecord {
   readonly resendId: string | null;
   /** UTC, ISO 8601. */
   readonly sentAt: string;
-  /** Who triggered the send. */
+  /** Who triggered the send, as an address. */
   readonly sentBy: string;
+  /** Their analyst id, when the send came from the queue rather than a script. */
+  readonly sentById?: string;
+  /**
+   * The mailer implementation that handled this attempt.
+   *
+   * Real and dry-run are separate implementations rather than one behind a flag, so a test send
+   * cannot be mistaken for a delivered report (M5). That distinction is worth nothing if the
+   * record does not carry it — this is where it is carried.
+   */
+  readonly mailer: string;
   readonly merchantDomain: string;
   /** Whether the provider accepted it, and why not when it did not. */
   readonly outcome: 'accepted' | 'rejected';
@@ -65,8 +75,18 @@ export interface SendRequest {
   readonly pdf: Buffer;
   readonly to: string;
   readonly from: string;
+  /**
+   * Where a reply lands. Never a no-reply address — `addressesFor` refuses one.
+   *
+   * An underwriter reading a finding may reasonably reply asking what a capture shows or how a
+   * rule was scoped. A report that arrives from an address which discards replies invites them to
+   * guess instead, which is the opposite of what an evidence-backed document is for.
+   */
+  readonly replyTo?: string;
   readonly note: string;
   readonly sentBy: string;
+  /** The analyst id behind `sentBy`, when there is one. */
+  readonly sentById?: string;
   /**
    * Set when the analyst was shown a directive-language warning and sent anyway (D-029).
    *
@@ -116,6 +136,7 @@ export function createResendMailer(apiKey: string): Mailer {
                 content: request.pdf.toString('base64'),
               },
             ],
+            ...(request.replyTo === undefined ? {} : { reply_to: [request.replyTo] }),
           }),
         });
 
@@ -183,6 +204,8 @@ export async function sendReport(
     resendId: outcome.resendId,
     sentAt: new Date().toISOString(),
     sentBy: request.sentBy,
+    ...(request.sentById === undefined ? {} : { sentById: request.sentById }),
+    mailer: mailer.description,
     merchantDomain: request.report.merchantDomain,
     outcome: outcome.accepted ? 'accepted' : 'rejected',
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
@@ -234,4 +257,97 @@ export function bodyFor(report: ScreeningReport, note: string): string {
 
 export function attachmentName(report: ScreeningReport): string {
   return `${report.merchantDomain}-${report.finishedAt.slice(0, 10)}.pdf`;
+}
+
+/* -------------------------------------------------------------------------------------------
+ * Plain messages
+ *
+ * The report send carries a PDF and is shaped around a `ScreeningReport`. The merchant invitation
+ * (D-063) is a plain message with a link in it, and it must reach Resend through the **same gate**:
+ * the moment `RESEND_API_KEY` is set, both sends work with no further code.
+ * ----------------------------------------------------------------------------------------- */
+
+export interface Message {
+  readonly from: string;
+  readonly to: string;
+  readonly replyTo?: string;
+  readonly subject: string;
+  readonly text: string;
+}
+
+export interface Messenger {
+  send(message: Message): Promise<SendOutcome>;
+  /** What this messenger is. Goes into the record, so a dry run is never mistaken for a delivery. */
+  readonly description: string;
+}
+
+export function createResendMessenger(apiKey: string): Messenger {
+  return {
+    description: 'Resend',
+    async send(message) {
+      try {
+        const response = await fetch(RESEND_ENDPOINT, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            from: message.from,
+            to: [message.to],
+            subject: message.subject,
+            text: message.text,
+            ...(message.replyTo === undefined ? {} : { reply_to: [message.replyTo] }),
+          }),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          return { resendId: null, accepted: false, error: `${response.status} ${detail.slice(0, 200)}` };
+        }
+
+        const payload = (await response.json()) as { id?: string };
+        return { resendId: payload.id ?? null, accepted: true };
+      } catch (error) {
+        return {
+          resendId: null,
+          accepted: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  };
+}
+
+/** Composes and posts nothing. A distinct implementation, for the reason `createDryRunMailer` is. */
+export function createDryRunMessenger(): Messenger & { readonly outbox: readonly Message[] } {
+  const outbox: Message[] = [];
+  return {
+    description: 'dry run — composed but not transmitted (no verified sending domain yet)',
+    outbox,
+    async send(message) {
+      outbox.push(message);
+      return { resendId: null, accepted: true };
+    },
+  };
+}
+
+/**
+ * The one place either sender is chosen (D-063).
+ *
+ * Both the report send and the merchant invitation route through this, so verifying the domain and
+ * setting `RESEND_API_KEY` turns both on together. Two call sites each reading the environment is
+ * how one of them ends up still dry-running after the gate lifts — the same argument D-034 makes
+ * about a rule expressed in two places.
+ */
+export function mailersFor(env: NodeJS.ProcessEnv = process.env): {
+  readonly mailer: Mailer;
+  readonly messenger: Messenger;
+  readonly live: boolean;
+} {
+  const apiKey = env['RESEND_API_KEY'];
+  const live = apiKey !== undefined && apiKey !== '';
+
+  return {
+    mailer: live ? createResendMailer(apiKey) : createDryRunMailer(),
+    messenger: live ? createResendMessenger(apiKey) : createDryRunMessenger(),
+    live,
+  };
 }

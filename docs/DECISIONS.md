@@ -771,6 +771,33 @@ state was wrong *and* the presentation could not show it, and only the second is
 careful looking useless. When a control names a record, ask whether its label can distinguish two
 records the user might plausibly hold.
 
+### Fetching markup is not seeing a page — found inside the fix for the last one (D-056)
+
+The seventh instance, and it happened **inside the fix for the sixth**, which is what makes it
+worth recording rather than noting in passing.
+
+The sixth was the checkout flow proceeding on an unverified cart. The fix established the cart by
+asking the store — and the first version of that fix fetched the cart page's HTML with
+`page.request.get` and looked for the product's slug. It reported the cart **empty** on a store
+whose checkout demonstrably worked, ten runs out of ten.
+
+Modern WooCommerce serves the cart as a **block that fills itself from the Store API after load**.
+The markup a plain request returns is an empty shell. The check asked a page that had not yet
+become itself.
+
+> **Fetching markup is not the same as seeing a page.** A request returns what the server sent; a
+> render returns what a visitor sees. For anything a script assembles, those are different
+> documents, and a check written against the first will report the absence of everything the
+> second would have shown.
+
+Note what it shares with the print-ready guard above, and with D-047: a component written
+*specifically* to establish something positively did so against a source that could not yet answer.
+Knowing the principle and having just applied it were, once again, not sufficient — the defect
+moved from *what* was asked to *what was asked of*.
+
+It was caught only by re-running against the real storefront. A fixture of a cart page would have
+been written with the item in it.
+
 ### An immutable record cannot grow a field, and a new display must say so (D-047)
 
 Found by rendering a stored run, and it is the sharpest instance in this list: **D-044's own
@@ -803,6 +830,196 @@ own, *"Reason not recorded"*, rather than a guess at which of the four they woul
 Note the shape it shares with the print-ready guard above: a component written *specifically* to
 separate three conflated cases produced a fourth conflation — "the field is absent" rendered as
 "the value is empty" — the first time it met data it had not been written against.
+
+### Bytes coming out is not text coming out — the eighth (D-058)
+
+`extractPdfText` decoded 25 of 27 content streams from biotechpeptides.com's certificate and
+returned 2,944 characters:
+
+    !"#  $% # '    +#', - 7   .  7   )    ( $#' $=$9"$ 9# ,#>75$ +##
+
+The fonts are subsets carrying their own encoding, and without their ToUnicode maps those byte
+values are not the characters a reader sees. The extractor reported it as text, with no
+`emptyReason`, so every field reader searched noise — and **COA-004 reported "5 of 5 required
+fields were not found" about a merchant whose certificate is probably fine.**
+
+> **"Did the extraction produce output" and "did it produce readable text" are different
+> questions, and the first cannot answer the second.**
+
+The measurement that separates them, taken from the two real certificates rather than chosen:
+
+    biotechpeptides   letters/total 0.002   letter-runs of 3+:   0   (2,944 characters)
+    corepeptides      letters/total 0.718   letter-runs of 3+: 227   (2,232 characters)
+
+Zero runs of three letters anywhere in a 2,944-character document. The threshold sits far below
+anything a real certificate produces, because this is not a close call being adjudicated — it is a
+floor under an obvious difference. A document with no words in it has not been read.
+
+Note where this sits: `extractPdfText` was written *for* D-057's discipline that unreadable text
+must be `not_evaluable` rather than an absent value, and it correctly handled a scanned
+certificate, no content streams, and undecodable filters. It had a fourth case it did not know
+about, and defaulted that case to "success".
+
+### Found by reading stored evidence, which no test did (D-058)
+
+The same certificate was stored as `<key>.pdf.gz` and **was not gzipped**. `storagePathForKey`
+appended `.gz` to every kind except `screenshot`, written when PNG was the only already-compressed
+artifact; a PDF is already compressed too.
+
+Anything decompressing by extension would have failed on it — on the artifacts kept specifically
+so a finding can be defended. No test caught it, and no test would have: the persistence tests
+assert that bytes round-trip through the path the writer used, which is self-consistent whatever
+the name says. It surfaced only when a stored artifact was read back for an unrelated reason.
+
+`ALREADY_COMPRESSED` is now a set rather than a comparison, so the next such kind is one line here
+instead of a second place expressing the same rule.
+
+### A pattern matching is not the thing being there — the ninth (D-060)
+
+`findDate` was changed so an evidence slip would quote the date rather than a 24-character window
+around it. The fix took **the first date-shaped pattern that matched** — and on
+`Report Date: July 15, 2026 Batch 44` the numeric shape matched `26 Batch 44`, which does not
+parse, so a date plainly present in the document was reported as absent.
+
+> **A pattern matching is not the same as the thing being there.** The arbiter is whether the
+> candidate parses, not whether it matched — so every date-shaped token is offered and the first
+> that *parses* is returned.
+
+### Three fixes have now contained the defect they were fixing
+
+This is the third time, and the pattern is worth stating rather than noticing again:
+
+    the print-ready guard   written to stop `page.pdf()` firing before screenshots loaded,
+                            then reported 1/1 while 66 were still arriving
+    the cart check          written to stop the flow proceeding on an unverified cart,
+                            then read an unrendered cart page and reported it empty
+    `findDate`              written to stop a finding quoting a window instead of a value,
+                            then returned a match that was not a value
+
+> **A fix for a find-by-nothing defect is unusually likely to contain one.** The author is
+> reasoning about the same ambiguity that produced the original — *what does it mean to have found
+> this?* — and has just convinced themselves they understand it. That conviction is the risk.
+
+The practical consequence: **the fix for one of these gets the same scrutiny as the defect**, and
+in particular gets run against the same real input that exposed the original. All three were
+caught that way and none by a fixture.
+
+### A guard that trusts a field is only as good as what goes in it — the tenth (D-060)
+
+The sharpest one in this list, because the defect was **already present when the guard was
+written**.
+
+D-060's amendment made `auditInternalVocabulary` exempt anything appearing in the finding's
+merchant-provenance fields — `matchedValue`, `sourceUrl`, `matchedUrls`. That is correct: a CSS
+selector is the evidence and must survive the audit intact.
+
+It also created a field the audit trusts. And our own identifier was already sitting in it:
+
+    GATE-003 evidence:  matchedValue: "reached payment_step_reached"
+
+**`payment_step_reached` would have exempted itself.** The vocabulary D-060 exists to catch,
+hidden by D-060's own mechanism, on the rule where a wrong reading matters most. Nobody added it
+to defeat the guard — it was written months earlier, when `matchedValue` was just a convenient
+place to record what happened.
+
+Note the shape, which is new to this list: the previous nine were checks that could not tell
+whether they had found something. This is a check that **could** tell, resting on a field whose
+contents nobody had constrained.
+
+> **Any field an audit treats as merchant-provenance must contain only what was observed. A writer
+> putting generated text there defeats the guard silently** — no failure, no warning, and the
+> exemption looks exactly like a correct one.
+
+Silently is the operative word. A merchant-provenance field holding our text produces no symptom
+at all: the audit passes, the finding renders, and the only trace is vocabulary that should have
+been caught and was not.
+
+### The reporting layer has it too, and it costs the most there (D-062)
+
+Not a check, not a procedure — a **sentence in a progress summary**.
+
+Five "evidence key already exists, refusing to overwrite" lines appeared in a run log. What was
+written in the summary was:
+
+> five sampled product pages produced an identical screenshot digest
+
+What had actually been observed was *five overwrite refusals were logged*. The rest — that they
+were sampled product pages, that the sample had collapsed — was inference, stated as observation,
+in a line someone else then acted on. It was false. The duplicated capture was a Layer 3
+**discovery** render (candidate paths returning the same themed 404), cited by no finding; all five
+runs carry one distinct capture per URL and nothing misattributes.
+
+> **A summary line is where a wrong premise costs the most.** It is the input to someone else's
+> decision and it carries none of the evidence that would let them check it. A finding at least
+> travels with its capture.
+
+The project enforces this on report text and finding wording — state what was observed, never what
+was concluded — and had not extended it to progress notes, run summaries, or the sentences written
+back to whoever is reading. It applies there too, and more sharply:
+
+- *"five overwrite refusals were logged"* — observed
+- *"the sample collapsed"* — concluded, and needs the check that would establish it
+
+The check that would have established it did not exist, which is the second half. **The only reason
+this was looked at was a storage guard tripping by accident.** Nothing was watching for a collapsed
+sample, so `assessSampleDistinctness` now does — reported in the run and in the report's coverage
+limits, worded as an observation, since a templated storefront can legitimately render identical
+pages.
+
+### The operating procedure is a component too, and it had the same defect (D-057)
+
+Not a check this time — a habit. `tsc --build --force` was run to verify the build **while a
+five-storefront scan was executing from `dist`**, and the intended safeguard was "if the results
+look wrong, re-run".
+
+That safeguard is the shape this whole list is about. A module swapped underneath a running
+process does not reliably produce results that look wrong; it produces results that look fine and
+are wrong. "Re-run if something looks off" returns the same answer when it cannot tell as when the
+thing holds.
+
+> **Results from a run whose `dist` changed mid-flight are discarded, not inspected.** The trigger
+> is the rebuild having happened, which is a fact about the file system, not the output having
+> looked suspicious, which is a judgement made from the thing under suspicion.
+
+Established the same way every other instance here was fixed — by a check that cannot be fooled:
+`dist/src/coa.js` was written at 22:41 and the scan started at 22:36:53. A timestamp settles it
+without anyone reading a finding.
+
+The stakes are why it is a ruling rather than a note. The five-storefront runs are cited in
+decision entries and shown to IQwallet; a finding later traced to a mid-run rebuild makes the whole
+table unciteable. Re-running costs one scan.
+
+### Two files each correct alone, disagreeing at a boundary neither owned — the eleventh (D-064)
+
+**Frank's ruling: this belongs in D-026.**
+
+Found while wiring the live mailer, before anything was sent. The worker composed the invitation
+link as `/comment/<token>`; the merchant-facing page read `?comment=<token>` from the query string.
+
+**Neither file was wrong.** Read on its own, each is a reasonable, internally consistent decision
+about a URL. There was no incorrect line to find, which is why nothing caught it: every test in
+both packages passed, because every test in both packages asked its own side whether it agreed
+with itself.
+
+That is what makes this a new shape rather than a repeat. The other ten instances are a *check*
+concluding something from an absence. This is two components each establishing their half by
+positive evidence and **nobody establishing that the halves meet**. The unowned thing was not a
+fact about a merchant; it was a fact about the seam.
+
+The cost would have been the sharpest on this list. The first real invitation would have delivered
+a merchant to an analyst sign-in page while holding the **only token that report will ever have** —
+and the report would then have recorded them as not having opened it. A link is issued once; there
+is no second chance to get the URL right.
+
+The fix is the same shape as every other fix here: make the unowned thing owned. `commentLinkFor`
+and `commentTokenFrom` live together in `packages/engine/src/commentLink.ts`, neither side states
+the shape, and a round-trip test asserts that a URL this code builds is a URL this code reads.
+Restoring the old split fails five tests.
+
+**What to take from it.** Where two components exchange a value across a package boundary, the
+value's shape needs an owner, and the test that matters is the round trip rather than either half.
+A boundary is exactly where "each side is correct" stops implying "the system is correct" — and it
+is invisible to the per-side tests that make everyone feel covered.
 
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
@@ -928,6 +1145,61 @@ indistinguishable from a correct one.
 The PDF header uses `mintro-lockup-full.png`. D-007 reserves the glyph for the deep violet rail,
 where the lockup's own violet tile reads as a mismatched rectangle. This is the other context
 that ruling names.
+
+### Delivery
+
+**Issuance is recorded.** `comment_links` carries who issued it, when, to what address, and when it
+expires. That record is what makes *"the merchant was invited"* a fact rather than a recollection,
+and it is precisely what separates `not_invited` from `unopened` in the report — without it the
+distinction would rest on someone remembering whether an email went out.
+
+**The token is generated where it can be handed to the mailer and never persisted.** 32 bytes of
+`randomBytes`, base64url; the digest goes to the database and the token goes into the email.
+
+**Thirty days.** Long enough that a merchant with other priorities is not shut out — a storefront
+operator asked to review a compliance document will not always do it this week, and a link that
+expires before they reach it produces `unopened`, which reads as a silence they chose. Short enough
+that it is not a standing credential: a bearer token opening a merchant's screening report should
+not sit in an inbox for a year.
+
+**Re-issue adds a link; it never extends one.** Extending would erase when the first was sent, to
+whom, and whether it was opened — the record the `not_invited` / `unopened` distinction rests on.
+Comments reference the link they arrived through, so **re-issuing disturbs nothing already
+submitted**, and a schema test asserts it: after a second link is issued, the comment count is
+unchanged and both links open the report. "Did they ever open it" is the earliest opening across a
+run's links.
+
+The cost of being wrong in the short direction is therefore one email, not lost commentary.
+
+### The merchant's page shows the evidence
+
+It renders `ReportView` — the same component the analyst sees and the PDF prints. Screenshots,
+matched text, the requirement column, the coverage breakdown.
+
+That is the reason a web page was chosen over a marked-up PDF, so a page reduced to a list of
+findings with boxes beneath them would be **the PDF with extra steps**: it would invite a response
+to a sentence rather than to the screenshot the sentence describes. `commentBox` is the only thing
+the merchant's view adds to the report.
+
+The box has no placeholder. A placeholder is a suggestion about content, and this box suggests
+nothing.
+
+### The invitation
+
+Reader-facing text, audited by `copy.test.ts` for directive language and internal vocabulary like
+any other report copy. It describes what Mintro could not observe and invites their account of it;
+it never tells them what to do about a finding.
+
+    "The crawl could not reach a page listing your accepted payment methods."   description
+    "Please publish your payment methods."                                      advice
+
+It also never characterises the observations — no "issues", "problems" or "concerns", which are
+readings IQwallet makes. A test asserts their absence.
+
+Four things it states plainly, because a merchant receiving this has no context for any of them:
+what happens to what they write (recorded exactly, shown as theirs, passed on unedited), that
+nothing they write changes what was observed, that findings with no box are **Mintro's gaps rather
+than theirs**, and that a fresh link keeps anything already written.
 
 ### Sending is never blocked, so the log carries the weight
 
@@ -1983,7 +2255,13 @@ changes what the headline number means and is a business decision.
 ---
 
 ## D-046 — Merchant explanation: a per-run link, and what it may never do
-**2026-08-22 · Frank's ruling**
+**2026-08-22 · Frank's ruling · scoping superseded by D-063**
+
+> **Superseded in part.** D-063 widens commentary from bucket (b) to any finding. The link
+> mechanism, the never-changes-a-state rule and the attribution requirement below all stand;
+> only the bucket-(b)-only scoping is replaced. The reason for that scoping — that a merchant
+> must not be asked to explain a check Mintro has not written — survives in D-063 as an
+> exception rather than as the scope.
 
 A free-text field per finding where a merchant, or their agent, responds to something **no crawl
 can reach**. Called *Merchant explanation* — not "attestation", which is too legal, and not
@@ -2149,3 +2427,1194 @@ Those reports now render what they actually recorded, and say the rest was not w
 It does not reconstruct the split from the finding text. The wording is all that survives, and
 classifying by wording is precisely what D-044 forbids. **A number the run never recorded is not
 one this report gets to infer.**
+
+---
+
+## D-048 — Layer 3, stage 1: the sign-up form and the terms document
+**2026-08-22 · built and validated against the five storefronts**
+
+The first stage of the layer STATUS.md had never listed. Three rules move out of "Mintro has not
+built this check" (D-044): GATE-004, GATE-005, GATE-007.
+
+### Results, all five storefronts
+
+    storefront                 GATE-004          GATE-005          GATE-007          unbuilt  resolved
+    swisschems.is              n/a not_exposed   n/a not_exposed   REVIEW                  9     64/97
+    peptidesciences.com        n/a not_exposed   n/a not_exposed   n/a not_exposed         9      4/53
+    biotechpeptides.com        n/a not_exposed   n/a not_exposed   REVIEW                  9     69/97
+    corepeptides.com           n/a not_exposed   n/a not_exposed   REVIEW                  9     71/97
+    sportstechnologylabs.com   REVIEW            REVIEW            PASS                    9     73/97
+
+GATE-002 `fail` and GATE-003 `pass` are unchanged on every storefront. Layer 3 runs before the
+gate block, takes no part in it, and `layer3Rules` selects on surface — neither gate rule declares
+one (D-039).
+
+### Locating the form: by its password field, and only if it creates an account
+
+A sign-up form is located by containing a password input. Every alternative — a heading, a URL, a
+class name, the submit button's text — is prose the merchant chose, and a form found by matching
+"Create account" is missed on a site that says "Join the lab" (hard constraint 9).
+
+**That was not sufficient, and the real storefronts proved it.** The first draft took the largest
+form carrying a password field. On a WooCommerce `/my-account/` page that is the **sign-in** form,
+because "Remember me" makes it three controls to the register form's two. swisschems.is duly
+reported:
+
+> The sign-up form at https://swisschems.is/my-account/ carried 1 checkbox(es), none of them
+> required: "Remember me"
+
+An observation about a page nobody had looked at. The fix establishes account creation
+**positively** (D-026), never by the absence of a sign-in marker:
+
+- `autocomplete="new-password"` — the standard token for a password being created; sign-in fields
+  carry `current-password`.
+- two or more password fields — a password-and-confirm pair, which only account creation asks for.
+
+Neither is merchant prose. A form matching neither is **not** assumed to be a registration form:
+the finding is `not_evaluable`, naming the page that came closest and what was wrong with it.
+
+Four of the five storefronts land there, and it is the correct answer —
+`biotechpeptides.com/my-account/` serves exactly one `current-password` field and no
+account-creation form at all.
+
+### GATE-005 never returns `pass`, deliberately
+
+It can establish structurally that a field exists and that it is required. It cannot establish
+that a field *asks about research status* without reading its label — and a check that read labels
+would miss every merchant who worded it differently, which is the population the rule exists to
+find.
+
+So it reports the form and a person decides. The finding distinguishes the cases that matter — a
+required field beyond the account set, such a field present but optional (which is exactly what
+the clause prohibits), or only account fields — and **names every field either way**, so a reader
+sees what the form asked for rather than what this code recognised. Same posture as OFFS-006
+(D-020).
+
+The account-field baseline is deliberately **generous**, including `organization`. GATE-005
+expects presence, so a narrow baseline would read an ordinary "Company" box as the research field
+and produce a false `pass`; a generous one produces a review with the whole form quoted, which is
+the safe direction for a rule a person resolves.
+
+GATE-004 can pass, and the split is the point: **the structure decides whether a required checkbox
+exists**, and wording only decides whether the finding passes or goes to a person. A merchant whose
+required checkbox reads "I confirm I have read the conditions of sale" is surfaced with their own
+wording, not missed.
+
+### A redirect to the site root is not a terms document
+
+Found on peptidesciences.com, which answers its terms candidates with a redirect to `/`. The first
+draft accepted it — 200, and more than a few hundred characters — and GATE-007 reported:
+
+> 5 of 5 required phrases were not observed: 'research use only', 'human consumption', 'diagnos',
+> 'indemnif', 'qualified'
+
+about the **homepage**. A review finding against a document nobody looked at is worse than no
+finding, because it reads as a fact about the merchant's terms. A request that ended at the root
+did not reach a terms document, whatever status it returned — `http_probe`'s redirect rule (D-026)
+applied to a document fetch.
+
+`terms` also had to join `RENDERED_SURFACES` in `checkTextMatch`; without it GATE-007 reported
+`no_check_built` while the document sat fetched and unread. The four storefronts that do publish
+terms return 9,500–13,900 characters, so the 400-character floor is a themed-404 guard and not a
+measure of completeness.
+
+### Discovery is not the same problem as location
+
+Hard constraint 9 governs locating the *subject of a check*. Finding the sign-up *page* is a
+different problem with no structural answer — a registration page is reached by a link or a
+conventional path, and both are prose. So the worker tries a list of candidates and **records
+every attempt and what it returned**; when none yields an account-creation form the result is
+`not_evaluable` evidencing the attempts, never "the merchant has no sign-up form". That is hard
+constraint 3 applied to a negative.
+
+### Politeness
+
+Every Layer 3 navigation goes through the same `Pacer` as the rest of the crawl, so a declared
+`Crawl-delay` is honoured across the whole run rather than per layer (D-013). This stage adds up
+to eight register candidates and seven terms candidates to an origin already being crawled, and
+stops at the first that answers.
+
+### What remains unbuilt
+
+Nine rules, down from twelve:
+
+    PAY-001, PAY-002, PAY-003    payment page          stage 2
+    FULF-001                     shipping policy       stage 2
+    COMM-001                     FAQ                   stage 2
+    FULF-002                     checkout flow         stage 3
+    COA-002, COA-003, COA-004    COA documents         stage 4
+
+`not_exposed` on GATE-004 and GATE-005 for four storefronts is **not** a gap in Mintro. Those
+sites do not publish an account-creation form the crawl can reach, and the finding says which page
+came closest and what was on it.
+
+---
+
+## D-049 — Layer 3, stage 2: payment, shipping and FAQ
+**2026-08-22 · built and validated against the five storefronts**
+
+Five more rules leave the unbuilt bucket: PAY-001, PAY-002, PAY-003, FULF-001, COMM-001. Unbuilt
+falls from nine to four.
+
+### Results, all five storefronts
+
+    storefront                 PAY-001           PAY-002           PAY-003   FULF-001          COMM-001
+    swisschems.is              n/a not_exposed   n/a not_exposed   PASS      PASS              PASS
+    peptidesciences.com        n/a not_exposed   n/a not_exposed   REVIEW    n/a not_exposed   n/a not_exposed
+    biotechpeptides.com        n/a not_exposed   n/a not_exposed   PASS      REVIEW            n/a not_exposed
+    corepeptides.com           n/a not_exposed   n/a not_exposed   PASS      REVIEW            n/a not_exposed
+    sportstechnologylabs.com   n/a not_exposed   n/a not_exposed   REVIEW    n/a not_exposed   PASS
+
+    storefront                 unbuilt  unreachable  not-exposed  n/a-applies  resolved
+    swisschems.is                    4           10           16           12     67/97
+    peptidesciences.com              4           10           34            0      5/53
+    biotechpeptides.com              4           10           12           13     71/97
+    corepeptides.com                 4           10           10           13     73/97
+    sportstechnologylabs.com         4           10            8           14     75/97
+
+GATE-002 and GATE-003 are unchanged on every storefront.
+
+### Landing somewhere is not reaching checkout
+
+The third instance of the same defect in two stages, and the one that would have done the most
+damage.
+
+swisschems.is answers `/checkout` with a redirect to `/shop/`; corepeptides.com's checkout control
+goes to `/cart/`. The first draft reported both as "the checkout surface was read", and **PAY-001
+then measured a product listing page for peer-to-peer payment terms** — an absence observed on a
+page that was never the surface the rule names, on a `critical` `auto_fail` rule.
+
+Established positively: the page is a checkout surface when its path names checkout, or when it
+collects what checkout collects — `cc-number`, `cc-exp`, `street-address`, `postal-code`, a
+payment container. Neither is merchant prose.
+
+A compliant merchant gates checkout, so this returns "not reached" for them, and that is the
+honest answer: you cannot observe which processor is used on a payment surface an anonymous
+visitor is never shown. sportstechnologylabs.com is exactly this case — its checkout redirects to
+`/my-account/`, which is the behaviour GATE-003 rewards.
+
+### PAY-001: absence across half a surface is not absence
+
+The rule declares `checkout_and_footer` — both — and is `critical`, `auto_fail`, `expect: absent`.
+A `pass` states that these payment methods are not offered.
+
+So a term observed on **either** surface fails the rule immediately; a positive observation stands
+on its own and is not weakened by the other half being unread. Absence is the opposite: with
+checkout unreached, this reports `not_evaluable`, naming the half that was read and why the other
+was not. All five storefronts land there.
+
+### PAY-002 never says no processor exists
+
+Processors are recognised by the host their SDK loads from — `js.stripe.com`, `braintreegateway.com`
+— which is structural, where a footer reading "Visa · Mastercard" is prose that can sit behind no
+processor at all.
+
+The list is necessarily partial, so "none recognised" is a statement about **this code's list**.
+The finding names every third-party host the checkout page loaded from, so a processor not on the
+list stays visible to the reader instead of being reported as absent (hard constraint 9, D-018).
+
+### PAY-003 reads the footer, because that is what it declares
+
+`linkTextFinding` scanned the whole page. PAY-003 declares `surface: footer` and expects presence,
+so a "Returns" link in the header would have satisfied a rule about the footer — a wider search
+producing a `pass` the declared surface does not support. Scope now follows the rule's declared
+surface, and the finding names which was examined. OFFS-007 declares `homepage` and is unchanged.
+
+### The gate rules keep their own flow
+
+Layer 3 reads checkout with a **second, separate** run of the same shallow probe. Sharing one
+observation would make a Layer 3 concern an input to GATE-003, which D-039 forbids. The cost is
+one extra add-to-cart per scan, paced like every other request (D-013).
+
+### Open question: PAY-001 may be unanswerable as specified
+
+Checkout was unreachable anonymously on **all five** storefronts, and on a compliant merchant it
+always will be — gating checkout is what GATE-002 and GATE-003 ask for. A rule whose surface
+includes checkout therefore cannot resolve for precisely the merchants who comply.
+
+That is a rule-set question, not an engine one. The options are to rescope PAY-001 to the footer
+and any pre-login payment page, or to accept that it resolves only for merchants who do not gate.
+Either is a business ruling and neither is taken here.
+
+### What remains unbuilt
+
+    FULF-002                     checkout flow, PO boxes    stage 3
+    COA-002, COA-003, COA-004    COA documents              stage 4
+
+---
+
+## D-049 amendment — PAY-001 rescoped, and it immediately caught something
+**2026-08-22 · Frank's ruling**
+
+PAY-001's surface changes from `checkout_and_footer` to `footer_and_public_pages`: the footer
+plus any payment or policy page reachable without an account. Rule set to 2.5.0.
+
+**The rule was inverted, not merely unimplementable.** As written it resolved only for merchants
+who *fail* GATE-002 and GATE-003 — a merchant who gates checkout, which is exactly what those
+rules require, has no checkout an anonymous crawl can read. All five storefronts returned
+`not_evaluable`. A rule that can only speak about non-compliant merchants cannot do its job.
+
+**Peer-to-peer payment rails are advertised, not hidden.** A merchant taking Zelle says so where
+customers can see it; the footer and the public policy pages are where that appears. A gated
+checkout is not where it hides.
+
+The finding names the surfaces examined and states that a checkout behind a sign-in was not among
+them (D-018).
+
+### It found one on the first run
+
+    FAIL PAY-001: Observed on the payment or refund policy (https://swisschems.is/payments/):
+    Zelle. 5 public surface(s) were read: the homepage footer, the terms document, the shipping
+    policy, the FAQ, the payment or refund policy.
+
+swisschems.is publishes a `/payments/` page offering Zelle. Under the old surface this was
+`not_evaluable` on every run and would have stayed invisible. PAY-001 now resolves on four of the
+five storefronts, having resolved on none.
+
+**PAY-002 is left alone.** Detecting a processor genuinely needs the checkout page, and reporting
+`not_exposed` for a merchant who correctly gates it is honest. Flagged for the N/A review as a
+rule that may need the same treatment.
+
+---
+
+## D-050 — Findings that describe the same observation
+**2026-08-22 · Frank's ruling**
+
+GATE-002 failing while GATE-004 and GATE-005 find no reachable sign-up form is not two findings.
+It is one fact seen from both ends: products served to anonymous visitors, **and** no reachable
+way to create the account the program requires. A reader had to notice that unaided.
+
+### The report shows the pair and says nothing about it
+
+Two findings side by side under **"Findings that describe the same observation"**, each quoting
+what it observed. No connector, no arrow, no summary line.
+
+An earlier draft ended each entry with a sentence naming what the two had in common — *"both
+concern whether an account is required"*. That is a small step and it is still Mintro saying what
+the pair means. The whole posture is that we show and IQwallet concludes (D-001), and adjacency
+conveys it without us saying it. The `SameObservationPair` type has nowhere to put a
+characterisation, and a test asserts its field list so adding one has to confront this.
+
+The heading is deliberately not "corroborating", which would assert that the findings support
+each other. Whether they do is IQwallet's call.
+
+### Declared in the rule set, never inferred
+
+A `corroborates` field on the rule, listing rule ids. An engine that noticed findings "going
+together" would start finding coincidences; each pair is a ruling with a decision number behind
+it. `invariants.ts` requires that every named rule exists and that **the relation is declared on
+both** — the report renders the pair on both findings, and which one a reader opens first is not
+something the rule set gets to decide.
+
+### Which findings may take part, and a correction to the ruling
+
+`pass` never takes part: a satisfied rule needs no second angle.
+
+The ruling as given was "both findings must be non-pass and **both actually evaluated**". Taken
+literally that would have excluded the case this was built for — GATE-004 and GATE-005 are
+`not_evaluable` on four of the five storefronts, because those merchants publish no reachable
+account-creation form. The feature would never have fired on the pair that motivated it.
+
+D-044's kinds draw the line the ruling intended:
+
+- **`not_exposed` takes part.** The check ran, the site did not carry what it looks for, and the
+  attempts are on the record. That is an observation about the merchant.
+- **`no_check_built` never does.** A fact about Mintro. Pairing it would present our own unwritten
+  check as corroborating something about their storefront.
+- **`not_reachable` never does.** Nobody looked, so nothing was observed — the "significance from
+  a double absence" the ruling was guarding against.
+- **`not_applicable` never does.** The rule was resolved, not observed.
+
+### Observed on the five storefronts
+
+Pairs fire on swisschems.is and sportstechnologylabs.com — the two where GATE-002 fails — and on
+neither of the three where it passes. Both cases are exactly the shape described: products public,
+and either no reachable sign-up form (swisschems) or one lacking the acknowledgement and research
+field (sportstechnologylabs).
+
+---
+
+## D-051 — Merchant screening accounts are authorized, with one condition
+**2026-08-22 · Frank's ruling**
+
+Merchants will either supply a screening account or permit Mintro to create one. **This supersedes
+the blocked credential-authorization item in STATUS.md** — the question D-026 recorded as the
+blocking one for assisted sign-in is answered.
+
+### The condition, and why it is not a detail
+
+"Permit us to create one" requires the **program terms to say so explicitly**, because creating an
+account is not a passive act. Every merchant sign-up form this project has read asks the applicant
+to affirm something — the terms checkbox GATE-004 looks for, the research-status field GATE-005
+looks for. Creating an account means **Mintro affirming qualified-researcher status to the
+merchant's own terms**, on Mintro's behalf, as a condition of screening them.
+
+Blanket permission at onboarding does not cover that unless it says so. Frank is adding the
+language.
+
+**Until it exists, build against merchant-supplied credentials only. Do not create accounts.**
+
+That is the state D-038 and D-039 already built for: a merchant deposits credentials, the worker
+seals them, and an anonymous crawl escalates only where the sampled product pages come back
+unserved. Nothing in that path creates anything.
+
+---
+
+## D-052 — A rule that resolves by lowering what it asks
+**2026-08-22 · Frank's ruling, restated around the operative test**
+
+PAY-002 becomes merchant-explanation-only. The reasoning generalises, and the generalisation is
+the part worth keeping.
+
+### The test
+
+> **A rule that resolves by lowering what it asks is worse than one that reports it could not
+> look.** PAY-001 was the opposite case — the surface was wrong, not the question. The test is
+> whether a different surface answers *the same question*.
+
+**Corollary:** some program requirements are not observable from a public surface, and the honest
+response is to report the gap and collect the merchant's account of it — never to weaken the
+check until it resolves.
+
+### Applying it to PAY-002
+
+Detecting a payment processor requires reaching checkout. A merchant who **correctly gates
+checkout** — which is what GATE-002 and GATE-003 require — never shows one to an anonymous
+visitor, so the rule could only ever speak about merchants non-compliant in some other way. All
+five storefronts returned `not_exposed` at stage 2, and sportstechnologylabs.com is the clean
+illustration: its checkout redirects to `/my-account/`, the behaviour GATE-003 rewards, and that
+redirect is exactly what stops PAY-002 seeing anything.
+
+The tempting alternative was to let PAY-002 read payment-method logos in the footer. That would
+have made the rule resolve everywhere while answering a different question: a footer showing a
+Visa mark says nothing about which processor sits behind it, or whether that processor conducts
+KYC. The surface is reachable; it does not answer what the rule asks.
+
+### Applying it to PAY-001, which went the other way
+
+PAY-001 (D-049) failed the same test in the opposite direction and passed on rescoping.
+`checkout_and_footer` made it resolvable only for merchants who *fail* GATE-002 and GATE-003.
+Moving it to the footer and the public policy pages did **not** lower what it asks — peer-to-peer
+rails are advertised, and asking where they are advertised is the same question asked of a surface
+that can answer it. It caught Zelle on swisschems.is the first time it ran.
+
+**FULF-002 (D-055) is this ruling one rule over**: answering it requires transacting against a
+live business, and no reachable surface answers the question instead.
+
+PAY-002 joins the merchant-explanation set. COA-005 has been there since the beginning for the
+same reason, and COA-005 is also the reminder that this is not a counsel of despair — a rule can
+sit in that set permanently and still be doing work, by keeping the gap visible instead of absent.
+
+## D-053 — The merchant explanation workflow
+**2026-08-22 · Frank's ruling · extends D-046**
+
+Mintro sends the request to the agent or merchant, they complete and return it, Mintro forwards
+the report to IQwallet.
+
+    Mintro  ──request──▶  merchant / agent
+    Mintro  ◀──response──  merchant / agent
+    Mintro  ──report with explanations included──▶  IQwallet
+
+### Mintro is both sender and recipient
+
+The tokenised link (D-046) goes out from Mintro and responses land back in Mintro. **IQwallet is
+not a party to the exchange.** They receive a report with explanations already in it.
+
+That has a consequence worth stating: Mintro holds the merchant's words before IQwallet sees them,
+and must pass them through unaltered. The explanation is recorded verbatim, attributed, and
+timestamped — D-046 already forbids it changing a finding's state, and this adds that it must not
+be summarised or excerpted on the way through either.
+
+### A report may be sent with explanations outstanding
+
+Sending is never blocked (D-001), and waiting for a merchant to reply is a blocking condition in
+everything but name. So a report can go with requests unanswered.
+
+**The report must therefore distinguish three states, not two:**
+
+    requested and answered     the merchant's words, attributed and timestamped
+    requested and unanswered   asked on <date>, no response at the time of sending
+    never requested            no request was made
+
+Collapsing the last two would let "we did not ask" read as "they did not answer", which is a
+statement about the merchant derived from Mintro's own inaction. It is the same shape as D-044:
+a gap of ours presented as a gap of theirs.
+
+**This reason is a correction to the ruling, not a restatement of it.** The three states were
+specified without it, and without it the third looks like bookkeeping — a nicety about request
+tracking. It is not: it is D-044's distinction appearing in a new place, and the same argument
+that separated "Mintro has not built this check" from "the site did not carry it" separates
+"we did not ask" from "they did not answer".
+
+### The request describes; it never instructs
+
+The request tells the merchant **what Mintro could not observe**. It does not tell them what to do
+about it, what to change, or what IQwallet expects — the same constraint the report itself is
+under (hard constraint 7, D-001). "The crawl could not reach a page listing your accepted payment
+methods" is a description. "Please publish your payment methods" is advice, and Mintro does not
+give it.
+
+### Not built
+
+Sequenced after Layer 3. D-046 records the mechanism; this records the flow around it.
+
+---
+
+## D-054 — A surface must be established, not arrived at
+**2026-08-22 · Frank's ruling**
+
+One defect, found six times, in three mechanisms. Guidance was tried after the second and a
+special case after the third; both failed. What remains is making the wrong thing
+unrepresentable.
+
+    1  a WooCommerce sign-in form read as the sign-up form — both carry a password field
+    2  a redirect to `/` accepted as the terms document — 200, and plenty of text
+    3  a redirect to `/shop/` accepted as the refund policy, after the fix for (2) rejected
+       only the site root — a special case of the rule, not the rule
+    4  a "Return to shop" cart link accepted as the refund policy, on link text alone
+    5  `/shop/` accepted as the checkout surface, because the flow landed there
+    6  `/shop/` reported by the checkout flow as "stopped at checkout, no payment field
+       observed" — which made GATE-003 pass a merchant offering guest checkout
+
+**(3) is the reason this is a type.** After (2) the general rule went into `ARCHITECTURE.md`; the
+code got a narrow guard rejecting the site root. Each check located its own surface, so the fix
+landed in one call site and the next surface began again from nothing.
+
+### `Located<T>` has no variant carrying an unverified page
+
+    type Located<T> =
+      | { located: true;  value: T; url: string; how: string }
+      | { located: false; reason: string; attempts: readonly FetchAttempt[] }
+
+`how` is required, not optional. It records **what established this**, and a locator that cannot
+name one has established nothing. A handler physically cannot receive a page nobody verified,
+because there is no field to put it in.
+
+`unreachable` carries its attempts, so hard constraint 3 holds by the shape of the type rather
+than by each caller remembering to attach them.
+
+### Every guard runs in the locator
+
+`apps/worker/src/locate.ts` is the only place a surface is established, and it applies all four
+guards together:
+
+- the request ended at what it asked for — the general rule, not "not the root"
+- the candidate's own path names the surface, so link text alone cannot select it
+- the page rendered more than a themed 404's worth of content
+- the surface's required positive signal is present
+
+There is no code path from a candidate to a handler that skips one. Adding a surface means adding
+a `SurfaceSpec`, not adding guards.
+
+### Sequenced before stage 4 on purpose
+
+`doc_parse` is where this is worst: a PDF fetch that accepts an HTML 404 would report an empty
+certificate as fact, and a certificate is the document an underwriter is least able to check.
+
+---
+
+## D-055 — FULF-002 is not observable from a public surface
+**2026-08-22 · Frank's ruling**
+
+FULF-002 — "No PO boxes" — moves from `flow_probe` to `manual`, joining the ten rules the report
+already reports as needing a surface no crawl reaches.
+
+Answering it requires entering a PO box address at checkout and seeing whether the merchant
+accepts it. That means **submitting data to a live business**, which the flow probe refuses on
+principle: it fills nothing and submits nothing, because going further would be transacting
+against a real store.
+
+What a crawl *can* see is whether the checkout address form constrains destinations. That is a
+fact about a form, not about fulfilment practice — a merchant may accept free-text addresses and
+catch PO boxes in manual review, and a constrained form may still be bypassed. Reporting it as
+FULF-002 would answer an easier question while appearing to answer the rule's.
+
+It joins the merchant-explanation set, for the same reason the other ten are in it: the honest
+response to a requirement no public surface exposes is to report the gap and record the
+merchant's account of it.
+
+**The adjacent observation is not built.** "The checkout address form constrains destinations" is
+a different question and needs its own rule id and its own ruling — after the N/A picture has been
+looked at whole.
+
+---
+
+## D-056 — The flow probe concluded from absence, and passed merchants who offer guest checkout
+**2026-08-22 · the most consequential defect found in this project**
+
+GATE-003 reported `fail` on one swisschems.is run and `pass` on the three either side. Two
+immutable runs of one merchant would disagree and, under D-002, neither could be corrected.
+
+### It was not flakiness, and it was not caused by stage 2
+
+The gate flow alone, with no Layer 3 code in the path, over 12 runs:
+
+    checkout               10        <- pass
+    payment_step_reached    1        <- fail
+    not_started             1
+
+### The mechanism
+
+WooCommerce adds to cart over **AJAX**. `clickFirst` returns when the click lands, and
+`waitForLoadState('domcontentloaded')` resolves immediately afterwards because no navigation
+happens. The flow reached `/checkout` with an empty cart; swisschems.is answers that with a
+redirect to `/shop/`; no payment field on a product listing.
+
+And then the part that made it a verdict: `runCheckoutFlow` returned `checkout` **from wherever
+it was standing**. So a product listing was reported as *"it stopped at 'checkout'"*. GATE-003 is
+`fail_if: payment_step_reached`, so that read as a **pass**.
+
+> A `critical`, `auto_fail` rule — the rule asking whether anyone can buy without an account —
+> passing roughly nine runs in ten on a merchant whose guest checkout reaches a card field.
+
+The truth, with the cart confirmed populated: `/checkout/` serves `input[autocomplete="cc-number"]`
+on **8 runs out of 8**. swisschems.is fails GATE-003.
+
+### Two fixes, and the second is the general one
+
+**The cart is established by asking the store.** Shopify's `/cart.js`, WooCommerce Blocks'
+`/wp-json/wc/store/v1/cart`, or the *rendered* cart page linking to the product. Never inferred
+from a click having landed.
+
+The first attempt at this fetched the cart page's HTML and looked for the product slug — and
+reported "empty" on a store whose checkout demonstrably worked, because modern WooCommerce serves
+the cart as a block that fills itself after load. **Fetching the markup is not the same as seeing
+the page**, which is the same lesson one layer down.
+
+**The flow reports a stage only when it can establish where it stands.** A new stage,
+`unestablished`, exists because the old code had no way to say it: a flow that navigated somewhere
+it cannot identify has observed nothing about checkout, and `checkFlowProbe` turns it into
+`not_evaluable` naming what was reached instead.
+
+Frank's original instinct was to detect instability by repetition. That would have caught this one
+incidentally; positive establishment catches the class, including the next race nobody has found.
+
+After the fix, 8 runs of 8 report `payment_step_reached`. Stable, and correct.
+
+### Quarantine: the first for a wrong conclusion, not unretrievable evidence
+
+D-033 and D-034 quarantined runs whose **evidence could not be retrieved**. This quarantines runs
+whose evidence was retrievable and whose **conclusion was wrong**. The distinction matters for
+anyone reading `run_quarantine`: those runs are not incomplete, they are misleading.
+
+The test is how the finding reasoned, not what it concluded:
+
+- a `pass` reasoning from *"redirected to a sign-in page"* **stands** — a positive observation of
+  where the flow ended
+- a `pass` reasoning from *"it stopped at 'checkout'"* **does not** — a conclusion drawn from the
+  absence of a payment field on a page that was never established as checkout
+
+The annotation says what is actually known: the flow may not have reached checkout, so the finding
+may not describe what it appears to describe. **It does not assert those merchants fail
+GATE-003.** swisschems.is is known to, because it was verified directly; about the others nothing
+is known, and the annotation says so.
+
+---
+
+## D-057 — Layer 3, stage 4: reading a certificate of analysis
+**2026-08-22 · built and validated against the five storefronts**
+
+COA-002, COA-003 and COA-004 leave the unbuilt bucket. Nothing remains in it.
+
+### What these findings may claim
+
+**They report what a certificate states. They never report that it is genuine.**
+
+COA-005 is `manual` because accreditation and authenticity cannot be established from a PDF and
+forged COAs are a known failure mode. No finding here may quietly answer the question COA-005
+exists to leave open, so the wording is always *"the certificate states 99.2% purity"* and never
+*"purity is 99.2%"*. Every passing finding carries the limit explicitly — "the assay was not
+repeated", "not a verification that the test occurred".
+
+### No PDF library, and that is a new decision rather than an old one
+
+`ARCHITECTURE.md` rules out a PDF library for **producing** the report: the worker already has a
+browser and `page.pdf()` is the whole mechanism. That ruling is about generation and says nothing
+about reading, so extraction is decided here: Node's own `zlib`, and nothing else.
+
+The trade is deliberate and its limit is the point. `extractPdfText` reads a **digitally
+generated** PDF — uncompressed or Flate-compressed content streams, which is what a lab's
+reporting software emits. It reads nothing from a **scanned** certificate, which is an image of a
+page with no text objects in it.
+
+### The limit is safe in the only direction that matters
+
+COA-002 and COA-003 are `critical` and `auto_fail`. An extractor that quietly returned "no purity
+found" for a scan would fail a merchant whose certificate states 99.2%.
+
+So **text that could not be extracted is `not_evaluable`, never an absent value**, and
+`extractPdfText` distinguishes the cases rather than returning an empty string for all of them:
+no content streams, none decodable, or decoded streams carrying no text objects — the last being
+what a scan looks like.
+
+The same discipline runs through the field readers:
+
+- A **date** is read next to a date label, not taken as the first date in the document. A COA
+  carries an issue date, an expiry, a print date and often a batch date, and picking the first
+  would report one of those as the test date.
+- An **ambiguous numeric date is refused.** `03/04/2026` is March 4th to a US lab and April 3rd to
+  a European one; on an `auto_fail` rule a month's error either way could fail a compliant
+  merchant, so it is `not_evaluable` rather than a guess.
+- A **purity** figure is read near a purity or assay label. A moisture or impurity percentage read
+  as purity would fail a compliant certificate.
+- A **field COA-004 names that this reader has no pattern for** is reported as unimplemented, not
+  counted as absent — our gap presented as the merchant's is exactly D-044.
+
+### Establishing that a certificate is a certificate
+
+Sequenced after D-054 because this is where that defect would have been worst. A storefront
+serving its themed 404 with `Content-Type: text/html` to a `.pdf` request has not served a
+certificate, and a parser handed that HTML finds no purity and no date.
+
+**A content type is a claim the server makes; the `%PDF` magic number is the document itself**, and
+that is what is checked. A themed 404 declared `application/pdf` is still not a PDF, and a
+certificate served as `application/octet-stream` still is.
+
+### The body is stored, not only the hash
+
+Hard constraint 3. The bytes go to the evidence store under a new `coa` artifact kind, with the
+SHA-256 beside them — stored as fetched, since a PDF is already compressed and gzipping it again
+buys nothing. A hash proves a document has not changed; only the document shows what it said.
+
+### One finding per rule, not one per page
+
+A `doc_parse` rule is about the certificate, not about a page. Running it through the per-page
+path would report the same document five times and make one observation look like five.
+
+---
+
+## D-058 — COA-002 asks when the certificate was issued
+**2026-08-22 · Frank's ruling · a reading of the program document**
+
+### The ruling
+
+The clause says COAs must be *"updated at minimum every 60 days"*. **Updated means the certificate
+was issued, not when the sample was drawn.** A merchant publishing a certificate reported 22 July
+has updated their documentation as of 22 July.
+
+> **Note for whoever owns the program document: this is an interpretation of it.** If "updated" is
+> read as the assay date rather than the report date, this reverses.
+
+### The param is renamed, and that is not bookkeeping
+
+`extract: test_date` became `extract: report_date`, and `DOC_EXTRACTS` with it. Leaving the param
+named `test_date` while the reader accepted a report date would be **the reader quietly answering a
+different question from the one the rule names** — the failure D-052 is about, and the failure the
+reader's original refusal correctly avoided.
+
+`COA_FIELDS` keeps `test_date` and is deliberately not renamed alongside it. COA-004 asks what a
+certificate *identifies*, and the program document names a testing date among those; COA-002 asks
+how recently the document was updated. Two questions, and now two names.
+
+The label set follows: `Date Reported`, `Date of Issue`, `Report Date`. `Date Received` and
+`Sampled` are excluded — accepting those would answer an easier question while appearing to answer
+this one.
+
+One detail worth keeping, because it cost a debugging cycle: the first label pattern used
+`report\b`, and `\b` does not fall between "report" and "ed", so it failed on the exact label the
+ruling is about. `report(?:ed)?`.
+
+### Numeric dates, disambiguated by their own value
+
+`7/22/2026` is parsed. `03/04/2026` is still refused.
+
+The distinction is not a preference about lab conventions: **22 cannot be a month**, so the field
+order is determined by the number itself. Where both components are 12 or under, no disambiguation
+is defensible on a document whose originating lab is unknown, and COA-002 is `critical` `auto_fail`
+— a month's error either way fails a compliant merchant.
+
+This passes the D-052 test: the same question, read from the same document, with nothing lowered.
+It is **not** a widening of the reader to whatever format one certificate happened to use, which
+is why year-first and both day/month orderings are handled by the same rule rather than by cases.
+
+---
+
+## D-059 — One vocabulary for what a certificate link looks like
+**2026-08-22 · Frank's ruling**
+
+COA-001 read `text_or_href_contains` from the rule set; the certificate fetch carried its own
+wider list. Two lists answering one question is D-034's shape, and they diverged exactly as that
+predicts.
+
+On swisschems.is, in a single run:
+
+    COA-001  REVIEW  "Nothing matching any of 'coa', 'certificate of analysis' was observed"
+                     — on all five sampled product pages
+    the fetch         requested two certificate links it had found on those same pages
+
+Both accurate to their own vocabulary. A reader could reconcile neither, and COA-001's finding is
+misleading in the direction that matters: *"no certificate link observed"* reads as *"this merchant
+publishes no COAs"*, when what is true is that they publish them under a label COA-001 did not
+recognise.
+
+**One list, declared where COA-001 already declares it**, read by both through
+`coaLinkVocabulary`. Widening it is now a rule-set change carrying a decision number (D-025), and
+it changes both answers together.
+
+The list widens to include `lab report`, `test results` and `independent test` —
+`docs/ARCHITECTURE.md` has recorded since M2 that swisschems links its certificates as
+"Independent Test Results", and the narrower list is what made that a known gap rather than a
+fixed one.
+
+### Earlier runs asked a narrower question
+
+Rule set to 2.9.0. **A merchant reported under 2.8.0 or earlier as linking no certificate may link
+one the earlier vocabulary did not recognise.** Those runs are immutable (D-002) and say what they
+said; the version stamped on each is what tells a reader which question was asked.
+
+### The disagreement feature is not built, and the reason is recorded
+
+This was a candidate for D-050's inverse — a report surfacing two findings that appear to
+contradict each other, without Mintro resolving which is right. It is not built, and this case
+disqualifies itself:
+
+> COA-001 and the certificate fetch are **not two rules**. The fetch is machinery serving
+> COA-002/003/004. Surfacing their disagreement as a finding would dress up an internal
+> inconsistency as an observation about the merchant — the feature's first use would have
+> laundered our own bug.
+
+**A report that surfaces our own bugs as merchant findings is worse than one that surfaces
+neither.** Build the mechanism only if a genuine rule-versus-rule contradiction survives the
+shared vocabulary.
+
+---
+
+## D-060 — Internal vocabulary is caught by shape, not by a list
+**2026-08-22 · Frank's ruling**
+
+D-044 added `auditInternalVocabulary` to keep Mintro's vocabulary out of reader-facing text. It
+was a **list**: check-type names, layer numbers, handler words. It missed `batch_lot` in COA-004's
+note, because a rule's own field names are not check types.
+
+> **A guard that catches check-type names and misses snake_case identifiers will keep letting
+> internal vocabulary through in whatever form it next takes. The shape is the tell, not the
+> specific list.**
+
+`auditInternalVocabulary` now flags any lowercase snake_case token as well as the named terms.
+URLs are stripped first — a merchant's `/wp-content/uploads/COA_BPC-157.pdf` is their text quoted
+back, not our vocabulary leaking, and failures nobody can act on are how a guard gets weakened.
+The pattern is lowercase-only for the same reason.
+
+### It caught something on the first run that the list never would have
+
+    GATE-003: "The 'add_to_cart_then_checkout' flow reached 'payment_step_reached',
+               which this rule treats as a violation."
+
+A flow name and a stage name, verbatim, in a document an underwriter reads to decide on a
+merchant. Not check-type names, not layer numbers — the list had been extended once for D-044 and
+did not cover them. **The same failure in a new spelling, which is the whole argument for matching
+shape.**
+
+It now reads:
+
+    "Adding a product to the cart and going to checkout reached a payment form, which this
+     rule treats as a violation."
+
+COA-004 likewise names *"a batch or lot number"* rather than `batch_lot`, and a field the reader
+has no pattern for is reported as **Mintro's** gap — *"Mintro does not yet look for a testing
+date"* — never counted among what the merchant failed to provide (D-044).
+
+### Amendment — the tell is provenance, not shape
+
+Shape was wrong too, and on its second run it proved it. `auditInternalVocabulary` flagged
+`et_pb_column`, `et_pb_module` and `et_pb_text_inner` in DISC-002's finding on two storefronts.
+
+Those are **Divi theme class names — the merchant's markup**, quoted as the evidence for where the
+disclaimer was found. **A CSS selector is the evidence.** Rewriting it would destroy the finding's
+backing, and a guard that fires on legitimate evidence is one people learn to suppress.
+
+> The same lesson one level up from the ruling itself: **a guard matching form rather than origin
+> keeps catching the wrong things.** `snake_case` is a shape our identifiers happen to share with
+> a WordPress theme's. What distinguishes them is not how they look but where they came from.
+
+So the audit takes what the finding recorded as the merchant's — `matchedValue`, `sourceUrl`,
+`matchedUrls`, the URLs of attempts — and exempts any identifier appearing there.
+`quotedFromEvidence` reads only fields the `Evidence` type defines as theirs: `matchedValue` is
+documented as *"what was matched, verbatim"*.
+
+### The exemption surfaced a defect in what we put in that field
+
+GATE-003's violation evidence carried `matchedValue: "reached payment_step_reached"` — **our own
+identifier, in the field the audit now trusts to be the merchant's.** It would have exempted
+itself.
+
+That is a defect in the finding, not a reason to distrust the field, and the fix runs both ways: it
+misstated what `matchedValue` is *and* it would have hidden the very vocabulary D-060 exists to
+catch. It now carries what was observed on the merchant's page — the last step of the flow, naming
+the payment selector that was seen.
+
+Anywhere our text ends up in a merchant-provenance field, this audit will stop catching whatever it
+contains. That is the shape to watch for next.
+
+### What this does not do
+
+It does not make the copy plain by itself. A sentence can be free of snake_case and still be
+written for the person who built the check. The audit is a floor: it fails the build on a shape
+that is definitely wrong **and cannot be traced to the merchant**, and leaves the rest to whoever
+writes the sentence.
+
+---
+
+## D-063 — Merchant commentary, on any finding
+**2026-08-23 · Frank's ruling · supersedes D-046's bucket-(b)-only scoping**
+
+Mintro's report goes to the agent or merchant **before** IQwallet. The merchant may comment on any
+finding — to close a not-evaluable, to add context, or to dispute it outright. The combined
+document reaches IQwallet.
+
+### The posture
+
+> **Mintro is a news reporter, not a talking head with opinions.** Two sources, one document.
+> IQwallet and the bank decide.
+
+Liability for the merchant's claims sits with the merchant. That is *why* their words are recorded
+verbatim, attributed, and never edited, summarised or answered on the way through — a paraphrase
+would make the claim partly Mintro's.
+
+This supersedes D-046, which offered commentary only on bucket (b). The reason for that narrowing
+— that a merchant should not be asked to explain a check Mintro has not written — survives as an
+exception rather than as the scope. See below.
+
+### A web page, not a marked-up PDF
+
+**A PDF is cheaper to build and more expensive to run.** Someone at Mintro would transcribe the
+comments by hand on every screening, which reintroduces the attribution problem this whole
+arrangement exists to solve: a merchant's words retyped by Mintro are no longer plainly theirs.
+
+The web page also means the merchant comments **while looking at the evidence** — the capture, the
+matched value, the requests attempted — rather than at a flattened document that has lost them.
+
+### Scope, deliberately small
+
+One tokenised link, one report, a free-form box per finding, submit. **No merchant accounts, no
+dashboard, no history across runs.** Widening any of those is a new decision.
+
+The interface is exactly a text box: **zero validation, zero moderation, no character limits, no
+structure, and no Mintro commentary on their commentary.** A merchant writes whatever they want or
+nothing. `body` has no length constraint and is stored exactly as typed, including whitespace and
+line breaks.
+
+### Four things behind the box
+
+**1. Attribution, carried by four signals rather than one.** If a reader cannot tell Mintro's
+observation from the merchant's response, both parties lose the protection this gives — Mintro
+appears to endorse a claim it never made, and the merchant's account appears to be a finding.
+
+    a separate container, after the evidence slip and never inside it
+    a named source on every block — "Merchant response", never implied by position
+    a visible quotation, set off the way a newspaper sets a source apart from its reporting
+    a timestamp and a plain line: recorded as received, not verified by Mintro
+
+The typeface differs too — serif against the report's sans — because colour alone fails a reader
+who cannot see it, and in a printed PDF a coloured border reads as a table rule. Amber, not violet:
+violet is Mintro's colour throughout, and the one thing this block must never look like is
+something Mintro said.
+
+**2. Append-only and timestamped (D-002).** A revision is another row; both stay readable with
+their times. If IQwallet has read version one, version one stays readable. Enforced by a trigger,
+because `service_role` bypasses RLS.
+
+**3. Empty is not unanswered — and there are four states, not two.**
+
+    not_invited   commentary was not offered on this finding
+    unopened      a link was issued and the merchant never opened the report
+    no_comment    they opened it and wrote nothing here
+    commented     their words, with their times
+
+Collapsing `unopened` into `no_comment` lets *"we asked and they never looked"* read as *"we asked
+and they declined"* — a statement about the merchant derived from a fact about delivery.
+Collapsing either into `not_invited` lets Mintro's own inaction read as theirs. Both are D-044's
+shape in a new place, and all four render distinctly.
+
+**4. A disputed finding does not change.** Their statement sits beside it. A genuine remediation is
+answered by a re-scan producing a new run, never an edit to an old one — and nothing in
+`0016_merchant_commentary.sql` can reach `runs` or `findings`, which a schema test asserts by
+comparing the stored report before and after a dispute.
+
+### Which findings are offered — with one pushback
+
+Fail, review and not_evaluable. **Not clean passes**, as ruled: a merchant has nothing to gain by
+disputing a rule they satisfied, and a box under every pass invites noise for no gain. Agreed.
+
+**Excluded, on a pushback Frank accepted: a `not_evaluable` whose kind is `no_check_built` or
+`not_retrieved`.** The original ruling — fail, review and not_evaluable — was too coarse, and the
+reason is not a rule but an argument:
+
+> **Offering the box is the asking.** D-046 ruled that a merchant must not be asked to explain a
+> check Mintro has not written. D-063 widens *which findings* may be commented on; it does not
+> touch *whose limitation a finding describes*, and those are independent questions. A comment box
+> beneath our own unbuilt check asks a merchant to account for our gap, and its presence says we
+> think they have something to answer for.
+
+The report already names both as ours (D-044). A box beneath them would contradict that in the
+same document — the reader is told in one line that Mintro has not built this, and invited in the
+next to hear the merchant's explanation of it.
+
+Neither is about the merchant:
+
+- `no_check_built` — Mintro has not written this check. D-046 ruled that asking a merchant to
+  explain a check we have not written is indefensible, and D-063 widening *which* findings may be
+  commented on does not touch that reasoning. **Offering the box is the asking.**
+- `not_retrieved` — our request failed. Inviting a merchant to account for our timeout invites them
+  to answer for our infrastructure.
+
+Both are already visible in the report as ours (D-044), and a box beneath them would imply
+otherwise. `not_reachable`, `not_exposed` and `not_applicable` are offered: those are the ones a
+merchant can actually close.
+
+### The token
+
+Stored only as a SHA-256, so a leaked database yields no working links — hard constraint 6's
+property applied to a bearer token that opens a merchant's screening report. An unknown token and
+an expired one return the same answer, so a bad token learns nothing about which it was.
+
+The merchant is not a user of this system: no account, no password, no session. Two `security
+definer` functions are the whole of what the link can do, and **neither accepts a run id** — a
+caller without a token cannot name a run to read or write.
+
+### Sending is never blocked
+
+Outstanding commentary does not hold a report (D-001). The report shows which findings were open
+for comment and unanswered, distinctly from a merchant who never opened it at all — which is what
+the five states are for.
+
+### The model change — one link, self-declared identity
+
+**2026-08-23 · Frank's ruling · folded into D-063**
+
+The first build assumed the recipient was the respondent. That is wrong about how these accounts
+actually work, and six points replace it.
+
+**1. One forwardable link per report.** Not per recipient. Mintro generally has no direct channel to
+the merchant: the link goes to the agent, who either forwards it or answers on the merchant's
+behalf. Both are legitimate, and per-recipient tokens would model a distinction that does not
+survive contact with the first forwarded email.
+
+So `comment_links.sent_to` records **where Mintro sent it, not who may use it**. That is still worth
+recording — it is Mintro's own action, and it is what makes *"the merchant was invited"* a fact
+rather than a recollection.
+
+**2. Identify before commenting.** Whoever opens the link gives an email address before the box
+becomes writable. One field, asked once.
+
+**3. The visit is recorded either way.** Someone who identifies themselves and writes nothing is a
+different fact from a report nobody opened, and both are different from a report opened by someone
+who never said who they were. That last case is why `CommentaryState` has a fifth member,
+`unidentified`: an anonymous opening supports neither *"they participated"* nor *"nobody looked"*,
+and a state system that forces it into one of those is asserting something it does not know.
+
+**4. Self-declared and unverified, said in those words.** No confirmation mail, no code, no check
+that the address exists. Every rendering says **"identified themselves as"**, never "from", and the
+report carries *Mintro has verified neither the response nor the address it was given under.*
+
+Verification is **deliberately absent rather than missing**. Adding it would make Mintro the party
+that established who spoke; this is a supporting document, not a legal instrument.
+
+**5. Attribution is per comment, not per report.** The agent may answer the fulfilment findings and
+the merchant the catalogue ones, through the same link. Each entry carries the address identified
+when *it* was written, so a reader can tell which came from whom — and a later entry is an addition
+rather than a correction that replaced anything (D-002).
+
+**6. The PDF to IQwallet carries all of it.** Who identified themselves, when the report was opened,
+when each response was written, and which invited findings were left unanswered. A screen that
+shows a merchant's account and an export that drops it are two documents, and the export is the one
+that decides anything. One reader — `readRunCommentary` — feeds both, because two queries written
+months apart is how they come to disagree.
+
+### The invitation is sent from the tool
+
+**2026-08-23 · Frank's ruling**
+
+> The link is sent from the tool, not copied by an analyst into their own email. Mintro holds the
+> record of what was sent, to whom, and when, without reconstructing it later.
+
+Implemented as a queue with the same shape as `scan_requests` and `pdf_requests` (D-035): the
+analyst inserts an intent into `comment_invites` carrying **one field, the address**, and the worker
+mints the token, stores the digest, composes, and sends.
+
+The queue is not a convenience. **A browser that could write a `comment_links` row would have
+computed the digest, which means the plaintext token existed in a browser** — and the property that
+made storing only a digest worth doing is that the token lives in exactly two places, the email and
+the merchant's address bar. So `comment_links` has *no* insert policy for `authenticated`, and
+`apps/worker/test/schema/commentary.test.ts` pins that against real Postgres.
+
+The analyst never sees the token either. They cannot send the link some other way, which is what
+makes Mintro's record of the invitation complete rather than partial.
+
+### An untransmitted invitation invited nobody
+
+**2026-08-23 · amended the same day the gate lifted · Frank's ruling: it survives verification**
+
+> The delivery field holds after verification, because a genuine send failure produces the same
+> situation as an unsent one, and both must render as ours rather than as merchant silence.
+
+This is the important half, and it is why the field is not scaffolding to remove now that
+`gomintro.com` is verified and `RESEND_API_KEY` is set. **The dry run was never the only way to
+end up with a link nobody received.** A provider rejection, a bounced domain, a suspended API key,
+a mailbox that refused the message — each leaves exactly the same artifact: a `comment_links` row
+whose token reached nobody.
+
+If *"a link exists"* meant *"the merchant was invited"*, every one of those would render as **"the
+merchant has not opened the report"** in front of the underwriter deciding their application. The
+question the report has to answer is not *was the domain verified* but *did this reach them*, and
+only the send's own outcome answers it.
+
+So `comment_invites.delivery` is permanent, and `readRunCommentary` keeps requiring a job that says
+a link went. The dry run was the first case, not the reason.
+
+The original reasoning, which stands unchanged:
+
+Resend had no verified sending domain, so a send was composed and not transmitted. This is the
+D-044 defect waiting in the least visible place available: if the existence of a link row meant
+*invited*, every finding in every report would render as **"the merchant has not opened the
+report"** — Mintro's own gap presented as the merchant's silence.
+
+So delivery is recorded as an outcome on the job row, `comment_invites.delivery`, and a finished job
+is refused by the database unless it says which. `readRunCommentary` reports `issued: false` for a
+run whose links were never transmitted, and the report states at the top that nothing reached them
+and the blanks below are therefore not their silence.
+
+Two related refusals, both the positive-evidence rule (D-026):
+
+- A link with **no job row** is not assumed delivered. "No record says it failed" is not "a record
+  says it went."
+- A **failed commentary read** returns `null` and renders as *"these could not be read"* — never as
+  an empty comment list. The obvious implementation, returning `not_invited` for every finding,
+  renders nothing at all and would have made the failure invisible in the one document where a
+  merchant's account matters most.
+
+`mailersFor()` is the single place either sender is chosen, so verifying the domain and setting
+`RESEND_API_KEY` turns the report send and the merchant invitation on **together** — two call sites
+each reading the environment is how one of them stays dry-running after the gate lifts (D-034).
+
+### Not settled here
+
+Whether IQwallet wants the merchant-reviewed version or the raw findings sooner is their workflow,
+and Frank owes them that conversation. **Built for the reviewed version.**
+
+---
+
+## D-064 — The Resend gate is lifted, and the send is wired
+**2026-08-23 · Frank's ruling**
+
+`gomintro.com` is verified in Resend and `RESEND_API_KEY` is set on Fly. Both sends go live.
+
+### Sending was never a flag away
+
+The "Send to IQwallet" button said *not connected* and that was accurate — nothing reached a
+mailer. The email carries the rendered PDF, and the PDF is Playwright printing the report route,
+which a browser cannot do. So lifting the gate meant **building the send path**, not enabling one:
+`send_requests`, a worker handler, and the `sends` row it writes.
+
+That makes four queues with one shape (D-035): scan, PDF, invitation, send.
+
+### Real and dry-run stay separate implementations
+
+Reaffirmed from M5. **Not a flag on one mailer.** A boolean that changes what a `send()` does is a
+boolean someone reads the wrong way round once, and the cost of reading it wrong is a test message
+recorded as a delivered report.
+
+Selection is on `RESEND_API_KEY` being present, in `mailersFor()` — the single place either sender
+is chosen, so the report send and the merchant invitation went live together rather than one of
+them staying dry (D-034).
+
+The distinction is only worth having if the record carries it, so **`sends.mailer` names the
+implementation that handled each attempt**. Not nullable and with no default: every row from here
+states what transmitted it. Existing rows read `unrecorded`, which is the truth about them —
+backfilling `Resend` would be inventing a fact about mail that may never have been sent.
+
+### Addresses are configuration
+
+`MAIL_FROM` / `MAIL_REPLY_TO` for the IQwallet report, `INVITE_MAIL_FROM` / `INVITE_REPLY_TO` for
+the merchant invitation, each falling back to the report's. Frank may want a different sender for
+merchants than for underwriters — different audiences, one of whom has never heard of Mintro — and
+that split now costs an environment variable rather than a commit.
+
+`reports@gomintro.com` is the default, on the verified domain.
+
+### A reply-to may be no-reply. The requirement moved into the copy
+
+**2026-08-23 · Frank's ruling · overrides the guard proposed the same day**
+
+I built a check refusing `no-reply@` in a reply-to. Frank overruled it and **kept the reasoning**,
+which is the part that matters:
+
+> An agent receiving this from a company they may not recognise will want to verify it is real. A
+> no-reply address answers that with silence, the invitation goes unanswered, and the report
+> renders it as merchant silence — the misattribution the delivery field exists to prevent,
+> arriving through the email instead of the database. A named contact answers it without anyone
+> maintaining a new inbox.
+
+That is a better statement of the problem than the guard was. The guard protected the *channel*;
+the risk is to the *answer*, and an unanswered invitation is indistinguishable in the database from
+a merchant who chose not to reply. The email is simply a second route to the same misattribution
+`comment_invites.delivery` was built to stop — which is why closing it matters as much.
+
+`MAIL_REPLY_TO` and `INVITE_REPLY_TO` are now `no-reply@gomintro.com`. In exchange the invitation
+carries:
+
+> Questions about this request? Contact &lt;name&gt; at &lt;address&gt;.
+
+**The requirement moved; it did not disappear**, and it fails the build the same way:
+
+- `InvitationInput.contact` is **required**, so a call site without one does not compile. Making it
+  required rather than optional is the whole point — an optional contact is a contact that is
+  absent the first time someone adds a call site.
+- `composeInvitation` throws on a blank name or address. A blank renders `Contact  at frank@…`,
+  which reads as a template nobody filled in — worse than no line, in front of a reader already
+  deciding whether to trust the sender.
+- `copy.test.ts` asserts the line reaches the body a merchant actually reads.
+- `addresses.test.ts` asserts **both ends**: that a no-reply address is now accepted, *and* that
+  `composeInvitation` still refuses a missing contact. Deleting the guard without adding the
+  replacement would otherwise leave every file green and the reasoning gone.
+
+`INVITE_CONTACT_NAME` and `INVITE_CONTACT_EMAIL` have **no default** — a default would be a name
+nobody agreed to put in front of merchants. Unset fails the invitation job and not the worker:
+scans and report sends have nothing to do with it, and taking them down would be the wrong blast
+radius.
+
+What no check can establish is whether the named person actually answers. That stays Frank's.
+
+### Still open: the covering email to IQwallet
+
+The ruling was about the invitation, and it is implemented there. The report send now also has a
+no-reply reply-to, and an underwriter with a question about a capture meets the same silence.
+
+Not changed, because it is a different case — IQwallet knows who Mintro is, so the "verify this is
+real" reasoning does not carry — and because widening a ruling on my own initiative is how scope
+drifts. **Flagged for Frank rather than decided.**
+
+### A rejection is a recorded outcome, not a failure
+
+A provider refusal finishes the job as **`done` with `outcome: 'rejected'`**, and writes its
+`sends` row. `failed` is reserved for a job that never reached a mailer — a render that broke, a
+run with no report.
+
+Collapsing them would bury a provider refusal among infrastructure errors, and a refusal is
+precisely what a dispute turns on. It is also the only half of the question a success-only log
+could answer, which is why D-001 makes the log load-bearing rather than the email.
+
+### The link shape had two owners, and they disagreed
+
+Found while wiring this, before anything was sent. **Recorded as the eleventh D-026 instance** on
+Frank's ruling — see D-026, where the reasoning about boundaries belongs.
+
+In brief: the worker composed `/comment/<token>`, the page read `?comment=<token>`, neither file
+was wrong alone, and the first invitation would have delivered a merchant to the analyst sign-in
+screen holding the only token that report will ever have. The shape now lives in
+`packages/engine/src/commentLink.ts` with a round-trip test.
+
+The path form was kept over the query form. The token is a bearer credential and has to be in the
+URL — that is what a link of this kind is — and a query string is the part of a URL that reaches
+`Referer` headers, analytics and access logs by default.
+
+### D-001 is untouched, and now enforced by the schema
+
+Send is never blocked. The `send_requests` insert policy has **no condition on any outcome** —
+not on fail counts, not on review counts, not on run status — and a schema test asserts that the
+`with check` clause stays free of them. A database that refused to queue a send for a merchant with
+failures would be making the determination this product exists not to make, and would leave a
+record of Mintro having decided what IQwallet gets to see.
+
+The dialog does wait on the worker's account of the attempt before saying "Sent". That is not a
+gate on an outcome; it is a refusal to report a delivery that has not happened.

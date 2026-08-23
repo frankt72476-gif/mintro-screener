@@ -164,17 +164,22 @@ describe('runLayer2', () => {
   });
 
   /** A COA rule silently passing because nobody wrote the parser is a false pass. */
-  it('reports doc_parse rules as not_evaluable, never pass', () => {
+  it('reports doc_parse rules as not_evaluable when no certificate was reached, never pass', () => {
     const run = runLayer2(sample([productPage()]), ruleset);
 
     for (const rule of layer2Rules(ruleset).filter((r) => r.type === 'doc_parse')) {
-      const finding = run.findings.find((f) => f.ruleId === rule.id);
+      const findings = run.findings.filter((f) => f.ruleId === rule.id);
+      // One finding per rule, not one per sampled page: it is about the certificate, not a page.
+      expect(findings, rule.id).toHaveLength(1);
+      const finding = findings[0];
       expect(finding?.state, rule.id).toBe('not_evaluable');
-      // The kind is asserted, not the wording. `doc_parse` is Mintro's internal name for the
-      // check type and D-044 keeps it out of reader-facing text, so a test that demanded it in
-      // the reason would pin the report to the vocabulary it is supposed to have dropped.
-      expect(finding?.notEvaluableKind, rule.id).toBe('no_check_built');
-      expect(finding?.notEvaluableReason, rule.id).toContain('certificate of analysis');
+      // Built since D-057, and `runLayer2` was given no certificate here — so the reason is that
+      // none was reached, which is a fact about the merchant rather than about Mintro (D-044).
+      // Never `pass`: an absent certificate says nothing about what a certificate would state.
+      expect(finding?.notEvaluableKind, rule.id).toBe('not_exposed');
+      expect(finding?.notEvaluableReason, rule.id).toContain(
+        'no sampled product page linked to a certificate',
+      );
     }
   });
 

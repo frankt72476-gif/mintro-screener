@@ -311,6 +311,95 @@ presentation half: when a control names a record, ask whether its label can dist
 records the user might plausibly hold. If it cannot, a wrong selection is not merely possible but
 unobservable.
 
+### A destination's status says nothing about whether what you asked for exists
+
+Stated generally because **every fetch-a-document check inherits it**, and `doc_parse` inherits it
+next.
+
+`http_probe` already treats a request that ended somewhere other than the path asked for as *not
+served*, whatever status the destination returned (D-026). The same rule governs fetching a
+document, and it had to be learned twice: peptidesciences.com answers every terms-page candidate
+with a redirect to `/`, the first draft of the terms fetch accepted it — HTTP 200, plenty of text
+— and GATE-007 reported *"5 of 5 required phrases were not observed"* about the **homepage**
+(D-048).
+
+> **A request that did not end at the document you asked for did not reach that document. Status,
+> length, and content type say nothing about it. Establish what came back positively, or report
+> that nothing did.**
+
+The failure is worse than an ordinary wrong answer, because the finding it produces is *plausible*:
+a terms document genuinely missing all five required clauses looks exactly like a homepage
+measured against them. Nothing in the report distinguishes them unless the fetch does.
+
+What "positively" means depends on the document:
+
+- **A page fetch** — the final URL still names a path, not the site root. A themed 404 is caught
+  by the same question asked of its content, not by its status.
+- **A PDF or a COA** (stage 4) — the response is actually that content type and parses as it.
+  A storefront serving its 404 page with `Content-Type: text/html` to a `.pdf` request has not
+  served a certificate, and a parser handed HTML must say so rather than reporting an empty
+  certificate.
+
+The operational test is the constraint-9 one pointed at fetching: ask what the check reports when
+the document was never reached. If that is the same as what it reports for a document that was
+reached and found wanting, it is wrong.
+
+## Evidence fields carry what was observed, and nothing else
+
+A constraint, not a convention, because a guard now depends on it.
+
+`auditInternalVocabulary` exempts anything appearing in a finding's merchant-provenance fields —
+`matchedValue`, `sourceUrl`, `matchedUrls`, the URLs of attempts — so that a Divi theme's
+`et_pb_column`, quoted as the evidence for where a disclaimer was found, survives the audit intact
+(D-060). A CSS selector is the evidence.
+
+That makes those fields load-bearing:
+
+> **Any field the audit treats as merchant-provenance must contain only what was observed. A
+> writer putting generated text there defeats the guard silently** — the audit passes, the finding
+> renders, and nothing marks the exemption as wrong.
+
+It had already been broken before the guard existed. GATE-003 recorded
+`matchedValue: "reached payment_step_reached"` — our stage identifier in a field documented as
+*"what was matched, verbatim"* — which would have exempted itself from the audit built to catch it.
+
+### Deferred: a `Captured` type, and the design question that defers it
+
+The same question the locator answered for surfaces (D-054) — make the wrong value
+unrepresentable. `matchedValue: string` accepts any string, so nothing distinguishes a captured one
+from a composed one. A `Captured` type, producible only by the code that reads a page, a document
+or a response, would mean a handler cannot put generated prose there because it has no way to make
+one.
+
+**It is deferred, and the reason is not cost.**
+
+    // today: any string, provenance by convention
+    readonly matchedValue?: string;
+
+    // proposed: only what a reader produced
+    readonly matchedValue?: Captured;
+
+**Some composition is legitimate, and a type that forbade it would forbid legitimate evidence.**
+DISC-002's matched value is `selector=… font-size=… color=… background=… contrast=…`, assembled by
+us from values read off the page. That is the finding's whole backing. A `Captured` that only
+accepted a single verbatim string would make DISC-002 unable to record what it measured, and the
+handler would route around the type — which is worse than the convention, because it looks
+enforced.
+
+So the design question, stated rather than left implicit:
+
+> **What API lets a captured value be composed from other captured values, refuses free text, and
+> is pleasant enough that nobody works around it?**
+
+A tagged template whose literal parts are rejected and whose interpolations must be `Captured` is
+the obvious shape, and it is not obviously usable — every handler that builds a matched value today
+would have to be rewritten against it, and an API people dislike gets bypassed with a cast.
+
+**Until that API is designed, the honest position is a written constraint plus review**, which is
+what the section above is. This is deferred with a question outstanding, not a gap left open:
+the constraint is real and enforced by reading, and the enforcement is a design problem nobody has
+solved here yet.
+
 ## D-014 audit — checks that locate by compliant form
 
 Every implemented and pending handler, reviewed against hard constraint 9. Ordered by

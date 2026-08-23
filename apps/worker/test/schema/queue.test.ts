@@ -291,3 +291,96 @@ describe('the PDF queue', () => {
     expect(error).toMatch(/foreign key/i);
   });
 });
+
+/**
+ * The report send queue (0017).
+ *
+ * Two guarantees, and the second is the one the gate lifting made urgent.
+ *
+ * **Send is never blocked** (D-001) — the insert policy has no condition on any outcome, and a
+ * database that refused to queue a send for a merchant with failures would be making the
+ * determination this product exists not to make.
+ *
+ * **A rejection is recorded, not swallowed.** The provider refusing a message is exactly the fact
+ * a dispute turns on, and it is a different fact from a job that never reached a mailer.
+ */
+describe('the report send queue', () => {
+  it('refuses a finished job that does not name its record and outcome', async () => {
+    const { runId } = await seedRun(schema, 'sendq.example');
+    const [job] = await schema.query<{ id: string }>(
+      `insert into public.send_requests (run_id, requested_by, to_email)
+       values ($1, $2, 'underwriting@iqwallet.com') returning id`,
+      [runId, analystId],
+    );
+
+    // "Done" with nothing to point at is the shape every defect in this project has taken.
+    await expect(
+      schema.query(`update public.send_requests set status = 'done' where id = $1`, [job!.id]),
+    ).rejects.toThrow(/finished_send_requests_have_a_record/);
+  });
+
+  it('finishes a provider rejection as done, with the sends row that records it', async () => {
+    const { runId } = await seedRun(schema, 'rejectq.example');
+    const [job] = await schema.query<{ id: string }>(
+      `insert into public.send_requests (run_id, requested_by, to_email)
+       values ($1, $2, 'underwriting@iqwallet.com') returning id`,
+      [runId, analystId],
+    );
+
+    // A rejected send has no provider id, and the sends table allows exactly that.
+    const [record] = await schema.query<{ id: string }>(
+      `insert into public.sends (run_id, to_email, sent_by_email, outcome, error, mailer)
+       values ($1, 'underwriting@iqwallet.com', 'analyst@example.com', 'rejected', '422 domain not verified', 'Resend')
+       returning id`,
+      [runId],
+    );
+
+    /*
+      `done`, not `failed`.
+
+      The job's work was to attempt a send and record the attempt, and it did both. `failed` is for
+      a job that could not get that far — a render that broke, a run with no report. Collapsing the
+      two would bury a provider refusal among infrastructure errors.
+    */
+    await schema.query(
+      `update public.send_requests set status = 'done', send_id = $2, outcome = 'rejected' where id = $1`,
+      [job!.id, record!.id],
+    );
+
+    const [done] = await schema.query<{ outcome: string; send_id: string }>(
+      `select outcome, send_id from public.send_requests where id = $1`,
+      [job!.id],
+    );
+    expect(done!.outcome).toBe('rejected');
+    expect(done!.send_id).toBe(record!.id);
+  });
+
+  it('places no condition on the run outcome when queueing a send', async () => {
+    /*
+      D-001 as a schema property. If a `with check` clause here ever grows a condition on findings,
+      counts, or run status, this fails — and it should, because that clause would be Mintro
+      deciding what IQwallet gets to see, and leaving a record of having decided it.
+    */
+    const [policy] = await schema.query<{ with_check: string | null }>(
+      `select with_check from pg_policies
+        where schemaname = 'public' and tablename = 'send_requests' and cmd = 'INSERT'`,
+    );
+
+    expect(policy).toBeDefined();
+    expect(policy!.with_check ?? '').not.toMatch(/fail|review|count|finding|status = 'complete'/i);
+  });
+
+  it('names which mailer handled every new send', async () => {
+    const { runId } = await seedRun(schema, 'mailer.example');
+
+    // Real and dry-run are separate implementations so a test send is never mistakable for a
+    // delivered report — worth nothing if the record does not carry which one ran.
+    await expect(
+      schema.query(
+        `insert into public.sends (run_id, to_email, sent_by_email, outcome, resend_id)
+         values ($1, 'underwriting@iqwallet.com', 'analyst@example.com', 'accepted', 're_123')`,
+        [runId],
+      ),
+    ).rejects.toThrow(/mailer/);
+  });
+});

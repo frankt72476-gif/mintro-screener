@@ -48,7 +48,13 @@ const build = (findings: readonly Finding[]) =>
 
 /** The sum of every bucket plus the evaluable count. */
 const accountedFor = (c: ReturnType<typeof computeCoverage>): number =>
-  c.evaluable + c.noCheckBuilt + c.notReachable + c.notExposed + c.notApplicable + c.kindNotRecorded;
+  c.evaluable +
+  c.noCheckBuilt +
+  c.notReachable +
+  c.notExposed +
+  c.notApplicable +
+  c.notRetrieved +
+  c.kindNotRecorded;
 
 /**
  * The split the coverage line actually renders (D-044).
@@ -79,7 +85,11 @@ describe('every finding is accounted for', () => {
     expect(coverage.resolved).toBe(coverage.evaluable + 1);
     // The one thing that must not happen: an answered rule sitting among the open ones.
     expect(coverage.outstanding).toBe(
-      coverage.noCheckBuilt + coverage.notReachable + coverage.notExposed + coverage.kindNotRecorded,
+      coverage.noCheckBuilt +
+        coverage.notReachable +
+        coverage.notExposed +
+        coverage.notRetrieved +
+        coverage.kindNotRecorded,
     );
     expect(resolvedPlusOutstanding(coverage)).toBe(coverage.total);
   });
@@ -107,9 +117,11 @@ describe('every finding is accounted for', () => {
 
     // Every unrun non-manual rule is a check Mintro has not written.
     expect(coverage.noCheckBuilt).toBe(ruleset.rules.filter((r) => r.type !== 'manual').length);
-    // The ten manual rules, and only those.
+    // The manual rules, and only those. Twelve since FULF-002 (D-055) and PAY-002 (D-052) joined
+    // them: neither is observable from a public surface without transacting or being let past a
+    // gate the program requires.
     expect(coverage.notReachable).toBe(ruleset.rules.filter((r) => r.type === 'manual').length);
-    expect(coverage.notReachable).toBe(10);
+    expect(coverage.notReachable).toBe(12);
     // Nothing is left in the pre-D-044 bucket for a report assembled now.
     expect(coverage.kindNotRecorded).toBe(0);
   });
@@ -121,6 +133,7 @@ describe('the kind is what the finding declared', () => {
     ['not_reachable'],
     ['not_exposed'],
     ['not_applicable'],
+    ['not_retrieved'],
   ])('counts a %s finding under that kind and no other', (kind) => {
     const finding = notEvaluable(ruleFor('PROD-002'), 'a reason', 'rendered_page', kind);
     const enriched: ReportFinding[] = [
@@ -141,6 +154,7 @@ describe('the kind is what the finding declared', () => {
       not_reachable: coverage.notReachable,
       not_exposed: coverage.notExposed,
       not_applicable: coverage.notApplicable,
+      not_retrieved: coverage.notRetrieved,
     };
 
     expect(counts[kind]).toBe(1);
@@ -173,7 +187,13 @@ describe('the kind is what the finding declared', () => {
 
     const coverage = computeCoverage(enriched);
     expect(coverage.kindNotRecorded).toBe(1);
-    expect(coverage.noCheckBuilt + coverage.notReachable + coverage.notExposed + coverage.notApplicable).toBe(0);
+    expect(
+      coverage.noCheckBuilt +
+        coverage.notReachable +
+        coverage.notExposed +
+        coverage.notApplicable +
+        coverage.notRetrieved,
+    ).toBe(0);
     expect(accountedFor(coverage)).toBe(coverage.total);
     // An unrecorded reason is outstanding: we cannot say it was resolved.
     expect(coverage.outstanding).toBe(1);

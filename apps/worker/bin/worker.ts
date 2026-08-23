@@ -44,6 +44,10 @@ import { collectDeposits } from '../src/auth/deposits.js';
 import { establishSession } from '../src/auth/login.js';
 import { createHttpFetcher } from '@mintro/engine';
 import { renderRunPdf } from '../src/pdfJob.js';
+import { issueInvitation } from '../src/inviteJob.js';
+import { sendRunReport } from '../src/sendJob.js';
+import { mailersFor } from '../src/send.js';
+import { addressesFor, contactFor, type MailAddresses } from '../src/addresses.js';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
@@ -59,6 +63,24 @@ const STALE_CLAIM_MS = 15 * 60 * 1000;
  * container therefore has to carry `apps/web/dist`; the Dockerfile builds it.
  */
 const WEB_ROOT = process.env['WEB_ROOT'] ?? 'apps/web/dist';
+
+/**
+ * Where the merchant-facing comment page lives.
+ *
+ * **No default.** Every other setting here has one because a wrong guess costs a retry; a wrong
+ * guess here puts a dead link in a merchant's inbox, under Mintro's name, carrying the only token
+ * that will ever open that report. A job that cannot name the origin fails and says so.
+ */
+const WEB_ORIGIN = process.env['WEB_ORIGIN'];
+
+/*
+  Who Mintro's mail comes from is resolved in `main`, not here.
+
+  `addressesFor` throws on a malformed address or a `no-reply@` reply-to, and a throw at module
+  load produces a stack trace before the preflight banner — the worst place to put a configuration
+  error, because it looks like a crash rather than a setting. Resolved with the other preflight
+  checks and passed to the handlers that need it.
+*/
 
 interface ScanRequest {
   readonly id: string;
@@ -112,6 +134,37 @@ async function main(argv: readonly string[]): Promise<number> {
     });
   }
 
+  /*
+    What the mailer is, said once and plainly.
+
+    Both sends select through `mailersFor`, so this line is the truth for the report send and the
+    merchant invitation together — verifying the domain turns them on together (D-034's argument
+    about a rule expressed in two places).
+  */
+  const { live, mailer } = mailersFor();
+  console.log(`  ${live ? 'ok  ' : '--  '}  mail                                             ${mailer.description}`);
+
+  let addresses: MailAddresses;
+  try {
+    addresses = addressesFor();
+  } catch (error) {
+    console.error(`  FAIL  mail addresses`);
+    console.error(`        ${error instanceof Error ? error.message : String(error)}`);
+    console.error('The worker will not start against a mail configuration it cannot send from.');
+    return 1;
+  }
+  console.log(`        report   from ${addresses.reportFrom}, replies to ${addresses.reportReplyTo}`);
+  console.log(`        invite   from ${addresses.inviteFrom}, replies to ${addresses.inviteReplyTo}`);
+  if (WEB_ORIGIN === undefined) {
+    console.log('  --    WEB_ORIGIN                                      unset — invitations will fail');
+  }
+  try {
+    const contact = contactFor();
+    console.log(`  ok    invitation contact                             ${contact.name} <${contact.email}>`);
+  } catch {
+    console.log('  --    invitation contact                             unset — invitations will fail');
+  }
+
   console.log(once ? 'draining the queue' : 'polling for scan requests');
 
   try {
@@ -129,6 +182,21 @@ async function main(argv: readonly string[]): Promise<number> {
       const pdf = await claimNextPdf(supabase);
       if (pdf !== null) {
         await handlePdf(supabase, browser, pdf);
+        continue;
+      }
+
+      // A send is a render plus a transmission, so it sits with the PDF rather than ahead of it.
+      const send = await claimNextSend(supabase);
+      if (send !== null) {
+        await handleSend(supabase, browser, send, addresses);
+        continue;
+      }
+
+      // Invitations last. They need no browser and take a second; putting them behind the jobs
+      // that hold Chromium keeps an analyst pressing Send from delaying a queued scan.
+      const invite = await claimNextInvite(supabase);
+      if (invite !== null) {
+        await handleInvite(supabase, invite, addresses);
         continue;
       }
 
@@ -485,7 +553,7 @@ pdf  request ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}`);
     }
 
     console.log(
-      `  ${result.pages} page(s), ${(result.bytes / 1024 / 1024).toFixed(2)} MB in ` +
+      `  ${result.pages} page(s), ${(result.pdf.byteLength / 1024 / 1024).toFixed(2)} MB in ` +
         `${Math.round((Date.now() - started) / 1000)}s`,
     );
   } catch (error) {
@@ -494,6 +562,247 @@ pdf  request ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}`);
 
     await supabase.client
       .from('pdf_requests')
+      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
+  }
+}
+
+interface InviteRequest {
+  readonly id: string;
+  readonly run_id: string;
+  readonly send_to: string;
+  readonly requested_by: string;
+  readonly status: string;
+}
+
+/** Same compare-and-swap as the other two queues, for the same reasons. */
+async function claimNextInvite(supabase: WorkerSupabase): Promise<InviteRequest | null> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+
+  const { data, error } = await supabase.client
+    .from('comment_invites')
+    .select('id, run_id, send_to, requested_by, status')
+    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error !== null) {
+    const hint = /comment_invites/i.test(error.message)
+      ? `
+  The invitation queue is created by supabase/migrations/0016_merchant_commentary.sql. Apply it.`
+      : '';
+    throw new Error(`could not read the invitation queue: ${error.message}${hint}`);
+  }
+
+  const candidate = (data ?? [])[0] as InviteRequest | undefined;
+  if (candidate === undefined) return null;
+
+  const { data: claimed, error: claimError } = await supabase.client
+    .from('comment_invites')
+    .update({ status: 'running', claimed_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', candidate.status)
+    .select('id, run_id, send_to, requested_by, status');
+
+  if (claimError !== null) {
+    throw new Error(`could not claim invitation ${candidate.id}: ${claimError.message}`);
+  }
+
+  return ((claimed ?? [])[0] as InviteRequest | undefined) ?? null;
+}
+
+/**
+ * Issues one invitation and records what happened. Never throws: the queue row carries the outcome.
+ *
+ * A reclaimed stale invitation issues a *second* link rather than resuming the first, which is
+ * correct — links are additive by design (D-063) and the alternative is a claim that a token was
+ * sent when the machine died before the mailer was called.
+ */
+async function handleInvite(
+  supabase: WorkerSupabase,
+  request: InviteRequest,
+  addresses: MailAddresses,
+): Promise<void> {
+  console.log(`\ninvite  ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}  → ${request.send_to}`);
+
+  try {
+    if (WEB_ORIGIN === undefined) {
+      throw new Error(
+        'WEB_ORIGIN is not set, so the link in the invitation would not resolve. ' +
+          'Set it to the origin the merchant-facing report is served from.',
+      );
+    }
+
+    // Fails this job, never the worker: scans and report sends have nothing to do with the
+    // invitation contact, and taking them down for it would be the wrong blast radius.
+    const contact = contactFor();
+
+    const result = await issueInvitation(supabase, {
+      runId: request.run_id,
+      sendTo: request.send_to,
+      issuedBy: request.requested_by,
+      webOrigin: WEB_ORIGIN,
+      replyTo: addresses.inviteReplyTo,
+      from: addresses.inviteFrom,
+      contact,
+    });
+
+    const { error } = await supabase.client
+      .from('comment_invites')
+      .update({
+        status: 'done',
+        link_id: result.linkId,
+        delivery: result.delivery,
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', request.id);
+
+    if (error !== null) {
+      // The link exists and the mail went. Only the bookkeeping failed — and a reclaim would issue
+      // a second link, so this is reported rather than retried silently.
+      console.error(`  could not record the invitation outcome: ${error.message}`);
+      return;
+    }
+
+    console.log(
+      `  ${result.openForComment} finding(s) open for comment · expires ${result.expiresAt.slice(0, 10)} · ` +
+        (result.delivery === 'resend' ? 'transmitted' : 'composed only, NOT transmitted'),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`  FAILED: ${message}`);
+
+    await supabase.client
+      .from('comment_invites')
+      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
+  }
+}
+
+interface SendRequestRow {
+  readonly id: string;
+  readonly run_id: string;
+  readonly to_email: string;
+  readonly note: string;
+  readonly note_warning_acknowledged: boolean;
+  readonly requested_by: string;
+  readonly status: string;
+}
+
+/** Same compare-and-swap as the other queues, for the same reasons. */
+async function claimNextSend(supabase: WorkerSupabase): Promise<SendRequestRow | null> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const columns = 'id, run_id, to_email, note, note_warning_acknowledged, requested_by, status';
+
+  const { data, error } = await supabase.client
+    .from('send_requests')
+    .select(columns)
+    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error !== null) {
+    const hint = /send_requests/i.test(error.message)
+      ? `
+  The send queue is created by supabase/migrations/0017_send_requests.sql. Apply it.`
+      : '';
+    throw new Error(`could not read the send queue: ${error.message}${hint}`);
+  }
+
+  const candidate = (data ?? [])[0] as SendRequestRow | undefined;
+  if (candidate === undefined) return null;
+
+  const { data: claimed, error: claimError } = await supabase.client
+    .from('send_requests')
+    .update({ status: 'running', claimed_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', candidate.status)
+    .select(columns);
+
+  if (claimError !== null) {
+    throw new Error(`could not claim send request ${candidate.id}: ${claimError.message}`);
+  }
+
+  return ((claimed ?? [])[0] as SendRequestRow | undefined) ?? null;
+}
+
+/**
+ * Renders, sends, records. Never throws: the queue row carries the outcome.
+ *
+ * A **provider rejection finishes the job as `done`** with `outcome: 'rejected'`. The job's work
+ * was to attempt a send and record the attempt, and it did both — the `sends` row is written
+ * either way (D-001). `failed` is reserved for a job that could not get that far. Collapsing the
+ * two would bury a provider refusal among infrastructure errors, and a refusal is precisely what a
+ * dispute turns on.
+ */
+async function handleSend(
+  supabase: WorkerSupabase,
+  browser: Browser,
+  request: SendRequestRow,
+  addresses: MailAddresses,
+): Promise<void> {
+  console.log(
+    `\nsend  request ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}  → ${request.to_email}`,
+  );
+  const started = Date.now();
+
+  try {
+    const { mailer } = mailersFor();
+
+    const result = await sendRunReport(supabase, browser, mailer, {
+      runId: request.run_id,
+      requestId: request.id,
+      toEmail: request.to_email,
+      note: request.note,
+      noteWarningAcknowledged: request.note_warning_acknowledged,
+      requestedBy: request.requested_by,
+      from: addresses.reportFrom,
+      replyTo: addresses.reportReplyTo,
+      webRoot: WEB_ROOT,
+    });
+
+    const { error } = await supabase.client
+      .from('send_requests')
+      .update({
+        status: 'done',
+        send_id: result.sendId,
+        outcome: result.record.outcome,
+        storage_key: result.storageKey,
+        // A rejection carries its reason onto the queue row too, so the analyst watching this row
+        // sees why without a second query.
+        ...(result.record.error === undefined ? {} : { error: result.record.error.slice(0, 2000) }),
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', request.id);
+
+    if (error !== null) {
+      // The mail has gone and the `sends` row exists. Only the queue bookkeeping failed — and a
+      // stale reclaim would send it a second time, so this is reported loudly rather than retried.
+      console.error(
+        `  the report was sent and recorded, but the queue row could not be updated: ${error.message}\n` +
+          `  DO NOT re-queue this send: sends row ${result.sendId} already exists for run ${request.run_id}.`,
+      );
+      return;
+    }
+
+    console.log(
+      `  ${result.record.outcome} · ${mailer.description} · provider id ${result.record.resendId ?? 'none'} · ` +
+        `${result.pages} page(s), ${(result.record.attachmentBytes / 1024 / 1024).toFixed(2)} MB in ` +
+        `${Math.round((Date.now() - started) / 1000)}s`,
+    );
+    if (result.record.error !== undefined) console.error(`  provider said: ${result.record.error}`);
+    if (result.record.noteFlagged.length > 0) {
+      // Surfaced, never gated (D-029 and D-001 together). It went; the log says it was flagged.
+      console.log(`  note flagged: ${result.record.noteFlagged.join(', ')} — sent as written`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`  FAILED: ${message}`);
+
+    await supabase.client
+      .from('send_requests')
       .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
       .eq('id', request.id)
       .then(() => undefined, () => undefined);

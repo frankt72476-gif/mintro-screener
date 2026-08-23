@@ -16,7 +16,17 @@ import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js
 import { bestResemblance, splitStatements } from '../textSimilarity.js';
 
 /** Surfaces this handler can locate on a rendered page. */
-const RENDERED_SURFACES = new Set(['homepage', 'footer', 'product', 'all_sampled']);
+// `terms` joined this list when Layer 3 learned to fetch the document (D-048). A surface is in
+// here once *some* runner renders a page for it; the runner decides which page, and this handler
+// reads whatever it is given.
+const RENDERED_SURFACES = new Set([
+  'homepage',
+  'footer',
+  'product',
+  'all_sampled',
+  'terms',
+  'shipping_policy',
+]);
 
 export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext): Finding {
   if (!isRendered(page)) {

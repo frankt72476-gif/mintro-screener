@@ -65,6 +65,18 @@ export const SURFACES = [
   'shipping_policy',
   'checkout',
   'checkout_and_footer',
+  /**
+   * The footer plus any payment or policy page a visitor reaches without an account (D-049).
+   *
+   * Replaces `checkout_and_footer` for PAY-001. That surface made the rule resolvable only for
+   * merchants who *fail* GATE-002 and GATE-003, because a merchant who gates checkout — which is
+   * what those rules require — has no checkout an anonymous crawl can read. A rule that can only
+   * speak about non-compliant merchants is inverted.
+   *
+   * Peer-to-peer payment rails are advertised, not hidden: a merchant taking Zelle says so where
+   * customers can see it. The footer and the public policy pages are where that appears.
+   */
+  'footer_and_public_pages',
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
@@ -103,10 +115,29 @@ export const DOM_DETECTS = ['gateway'] as const;
 export type DomDetect = (typeof DOM_DETECTS)[number];
 
 /** Values a `doc_parse` rule can pull out of a COA. Each needs an extractor in the parser. */
-export const DOC_EXTRACTS = ['test_date', 'purity_pct'] as const;
+/**
+ * Values a `doc_parse` rule can pull from a certificate.
+ *
+ * `report_date` replaced `test_date` in D-058. The rule asks whether a COA has been "updated at
+ * minimum every 60 days", and updated means the certificate was **issued**, not when the sample
+ * was drawn — a merchant publishing a certificate reported 22 July has updated their documentation
+ * as of 22 July.
+ *
+ * The rename is the point. Leaving the param named `test_date` while the reader accepts a report
+ * date would be the reader quietly answering a different question from the one the rule names,
+ * which is the failure D-052 is about.
+ */
+export const DOC_EXTRACTS = ['report_date', 'purity_pct'] as const;
 export type DocExtract = (typeof DOC_EXTRACTS)[number];
 
 /** Fields a COA can be required to contain. */
+/**
+ * Fields COA-004 requires a certificate to carry.
+ *
+ * `test_date` stays here and is **not** renamed alongside `DOC_EXTRACTS`. COA-004 asks what the
+ * certificate identifies, and the program document names a testing date among them; COA-002 asks
+ * how recently the document was updated. They are different questions and the names now say so.
+ */
 export const COA_FIELDS = ['batch_lot', 'test_date', 'compound', 'purity_pct', 'method'] as const;
 export type CoaField = (typeof COA_FIELDS)[number];
 

@@ -112,6 +112,105 @@ export interface GateContext {
 export const NO_GATE: GateContext = { found: false, locatedBy: '', text: '', blocksEntry: false };
 
 /**
+ * One field in a form, as rendered.
+ *
+ * `label` is whatever the merchant actually wrote — it is reported, never matched against to
+ * decide whether the field exists. Constraint 9 bites hardest here: a research-status check that
+ * located its field by a compliant label would miss every merchant who worded it differently,
+ * which is exactly the population GATE-005 exists to surface.
+ */
+export interface FormField {
+  /** `name`, or `id`, or the empty string. Reported so a reader can find it in the DOM snapshot. */
+  readonly name: string;
+  /** `text`, `email`, `password`, `checkbox`, `radio`, `select`, `textarea`, … */
+  readonly type: string;
+  /** `required` attribute or `aria-required="true"`. */
+  readonly required: boolean;
+  /** The visible label, or the text sitting beside the control. Verbatim. */
+  readonly label: string;
+  /** The `autocomplete` token, which is a standard vocabulary rather than merchant prose. */
+  readonly autocomplete: string;
+  /** Choices, for a select or radio group. */
+  readonly options: readonly string[];
+  readonly selector: string;
+}
+
+/**
+ * A sign-up form, located structurally (D-048).
+ *
+ * **Located by its password field**, not by a heading, a URL or a class name: you cannot create
+ * an account without one, and every alternative locator is merchant prose. `locatedBy` records
+ * which structure was used so the inference is checkable.
+ *
+ * `found: false` matters as much as the content, exactly as with `PageRegion`. A rule about the
+ * sign-up form, run where no form was located, is `not_evaluable` — never "the merchant has no
+ * terms checkbox".
+ */
+export interface SignupForm {
+  readonly found: boolean;
+  readonly locatedBy: string;
+  /** The page the form was found on, after redirects. */
+  readonly url: string;
+  /** Every field in the form, in document order. Nothing is filtered out here. */
+  readonly fields: readonly FormField[];
+  /** How many forms on the page carried a password field, when more than one did. */
+  readonly candidateForms: number;
+}
+
+export const NO_SIGNUP_FORM: SignupForm = {
+  found: false,
+  locatedBy: '',
+  url: '',
+  fields: [],
+  candidateForms: 0,
+};
+
+/**
+ * The checkout surface, as far as an anonymous visitor reaches it (D-049).
+ *
+ * Produced by the same shallow flow GATE-003 uses — add one product to a cart, go to checkout,
+ * look — and it submits nothing, fills nothing and creates no order.
+ *
+ * **It is not the input to GATE-003.** That rule is decided by `runGateRules` from its own
+ * anonymous probe, and nothing here reaches it (D-039). This is a separate observation of the
+ * same page for the payment rules.
+ *
+ * `reached: false` is the case that matters. A checkout that was never reached supports no
+ * observation about what it offers — and PAY-001 expects *absence*, where failing to reach the
+ * surface reads as absence and produces a false `pass` on a critical auto-fail rule.
+ */
+export interface CheckoutSurface {
+  readonly reached: boolean;
+  /** Where the flow stopped. */
+  readonly url: string;
+  /** Rendered text of the page the flow stopped on. Empty when it was never reached. */
+  readonly text: string;
+  /**
+   * Payment processors recognised from script, iframe and form-action hosts.
+   *
+   * Structural: a processor is identified by the host its SDK loads from, never by a word in the
+   * page copy. An empty list means "none this code recognises", which is not the same as "no
+   * processor", and the finding is worded that way (D-018).
+   */
+  readonly gateways: readonly string[];
+  /** Every third-party host the page loaded from, so an unrecognised processor is still visible. */
+  readonly thirdPartyHosts: readonly string[];
+  /** The flow stage reached, in words, for the finding text. */
+  readonly stoppedAt: string;
+  readonly capturedAt: string;
+}
+
+export const NO_CHECKOUT: CheckoutSurface = {
+  reached: false,
+  url: '',
+  text: '',
+  gateways: [],
+  thirdPartyHosts: [],
+  stoppedAt: '',
+  capturedAt: '',
+};
+
+/**
  * A rendered page.
  *
  * `screenshotKey` and `domKey` point at artifacts in the evidence store. They are set by the

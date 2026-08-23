@@ -247,8 +247,8 @@ describe('constraints that encode a rule', () => {
     const { runId } = await seedRun(schema, 'send.example');
 
     const error = await schema.attempt(
-      `insert into public.sends (run_id, to_email, sent_by_email, outcome)
-       values ($1, 'underwriting@iqwallet.com', 'analyst@mintro.com', 'accepted')`,
+      `insert into public.sends (run_id, to_email, sent_by_email, outcome, mailer)
+       values ($1, 'underwriting@iqwallet.com', 'analyst@mintro.com', 'accepted', 'Resend')`,
       [runId],
     );
     expect(error).toMatch(/accepted_sends_have_a_provider_id/i);
@@ -258,8 +258,8 @@ describe('constraints that encode a rule', () => {
     const { runId } = await seedRun(schema, 'rejected.example');
 
     const error = await schema.attempt(
-      `insert into public.sends (run_id, to_email, sent_by_email, outcome, error)
-       values ($1, 'underwriting@iqwallet.com', 'analyst@mintro.com', 'rejected', '422 domain not verified')`,
+      `insert into public.sends (run_id, to_email, sent_by_email, outcome, error, mailer)
+       values ($1, 'underwriting@iqwallet.com', 'analyst@mintro.com', 'rejected', '422 domain not verified', 'Resend')`,
       [runId],
     );
     expect(error).toBeNull();

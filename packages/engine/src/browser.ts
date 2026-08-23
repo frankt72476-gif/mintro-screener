@@ -15,6 +15,7 @@ export {
   INTERNAL_TERMS,
   auditCopy,
   auditInternalVocabulary,
+  quotedFromEvidence,
   auditRequirement,
   REQUIREMENT_HEADINGS,
   auditAnalystNote,
@@ -39,10 +40,35 @@ export type {
   ReportCategory,
   ReportCoverage,
   ReportFinding,
+  SameObservationPair,
   ScanMode,
   ScreeningReport,
 } from './report.js';
 
+export {
+  invitesComment,
+  commentaryFor,
+  describeCommentary,
+  type MerchantComment,
+  type CommentInvitation,
+  type CommentVisit,
+  type CommentaryState,
+  type FindingCommentary,
+} from './commentary.js';
+
+export {
+  readRunCommentary,
+  type CommentaryReader,
+  type RunCommentary,
+} from './commentaryStore.js';
+
+export {
+  COMMENT_PATH,
+  commentLinkFor,
+  commentTokenFrom,
+} from './commentLink.js';
+
+export type { FormField, SignupForm } from './page.js';
 export type { SessionDescriptor, SessionMode, SessionOrigin } from './session.js';
 export type { GateContext, PageContext, PageLink, PageRegion, StyledText } from './page.js';
 

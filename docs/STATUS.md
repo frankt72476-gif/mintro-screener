@@ -329,10 +329,31 @@ Nothing below is a technical problem. Each waits on a decision.
 |---|---|
 | **Mintro creating merchant accounts** | Whether Mintro may create its own accounts on merchant sites — agreeing to terms under an identity we chose, without the merchant's knowledge. Still blocked. **Merchant-supplied logins are authorized and built** (D-039); the two are deliberately separate rulings. |
 | **Session authorization** | Whether Mintro may hold merchant sessions established by a *person* rather than by stored credentials. This blocks **assisted sign-in**, designed in full in `apps/worker/src/auth/assisted.ts` and deliberately unimplemented. |
-| **Resend domain verification** | SPF and DKIM on the sending domain. Until then `createDryRunMailer` composes and transmits nothing — a separate implementation, not a flag, so a test send cannot be mistaken for a delivered report. |
+| **Resend domain verification** | SPF and DKIM on the sending domain. **This is now the single gate on two features**: the report send to IQwallet, and the merchant invitation (D-063). Both route through `mailersFor()`, so setting `RESEND_API_KEY` turns them on together with no further code. Until then a dry-run implementation composes and transmits nothing — a separate implementation, not a flag, so a test send cannot be mistaken for a delivered report. |
 
 Assisted sign-in additionally needs two smaller decisions recorded in its own file: which machine
 an analyst uses, and whether a hosted browser vendor is acceptable for a live handoff.
+
+### An untransmitted invitation must never read as merchant silence
+
+Worth stating separately, because it is the one place the dry run could do real harm. A merchant
+invitation that is composed and not transmitted **invited nobody**. If the tool treated the
+existence of a link as an invitation, every finding would render as *"the merchant has not opened
+the report"* — Mintro's unverified sending domain presented as the merchant's silence, in front of
+the underwriter deciding their application.
+
+So delivery is an outcome on the job row (`comment_invites.delivery`), the database refuses a
+finished job that does not say which, and a run whose links were never transmitted reports
+`issued: false` with a note at the top of the report saying so. **This holds after the gate lifts**
+— it is not scaffolding to remove when Resend is verified, since a genuine send failure produces
+the same situation.
+
+### The token never reaches a browser
+
+The analyst-side control queues an intent (`comment_invites`, one field: the address) and the worker
+mints the token. `comment_links` has no insert policy for `authenticated` and a schema test pins
+that. If this is ever loosened, the digest stops being worth storing — a browser that can write the
+digest computed it, so the plaintext was in a browser.
 
 ---
 
@@ -349,32 +370,198 @@ an analyst uses, and whether a hosted browser vendor is acceptable for a live ha
 
 ---
 
-## Not built — Layer 3, and the COA reader
+## Layer 3 — being built, one stage at a time
 
-**This is the largest gap in what the tool checks, and until 2026-08-22 it appeared in no list
-here.** It is not blocked and not deferred; it was simply never written down, and the report
-described it in the same words it used for genuinely uncrawlable surfaces (D-044).
+**Until 2026-08-22 this appeared in no list here.** It was not blocked and not deferred; it was
+never written down, and the report described it in the same words it used for genuinely
+uncrawlable surfaces (D-044). Thirteen rules — a quarter of the rule set — produced
+`not_evaluable` for this reason alone, and every one of them is an ordinary page a browser loads.
 
-Thirteen rules — a quarter of the rule set — produce `not_evaluable` for this reason alone. Every
-one of them is an ordinary page a browser loads.
+| Stage | Surface | Rules | Status |
+|---|---|---|---|
+| 1 | Sign-up form | GATE-004, GATE-005 | built, D-048 |
+| 1 | Terms page | GATE-007 | built, D-048 |
+| 2 | Payment page | PAY-001, PAY-003 | built, D-049 · PAY-002 now `manual` (D-052) |
+| 2 | Shipping policy | FULF-001 | built, D-049 |
+| 2 | FAQ | COMM-001 | built, D-049 |
+| 3 | Checkout | FULF-002 | not built — `manual` (D-055) |
+| 4 | COA documents | COA-002, COA-003, COA-004 | built, D-057 |
 
-| Surface | Rules | What is needed |
+Each stage is validated against all five storefronts before the next begins, and the results table
+goes in its decision entry.
+
+GATE-003 never needed this layer: it runs through the Layer 2 flow probe, which is why every
+report carries a real verdict for guest checkout. It is also decided by `runGateRules` from
+requests carrying no session, and Layer 3 takes no part in that (D-039).
+
+`doc_parse` is scoped separately and sequenced last. It is not a page check — it fetches a
+document and reads it — and **what it can honestly conclude is narrower**: it may report what a
+certificate states, never that the certificate is genuine. D-026 already records that a forged
+COA is a known failure mode, and COA-005 stays `manual` regardless.
+
+### Never rebuild while a scan is running
+
+`tsc --build --force` rewrites the `dist` files a running scan is executing from. Node loads a
+module once, so what is already loaded is unaffected — but anything loaded lazily afterwards comes
+from the new build, and a run can end up spanning two versions of the code.
+
+**Results from a run whose `dist` changed mid-flight are discarded, not inspected.**
+
+The reason that rule is absolute rather than a judgement call: a swapped module does not reliably
+produce results that look wrong. It produces results that look fine and are wrong. "Re-run if
+something looks off" is a check that returns the same answer when it cannot tell as when the thing
+holds — the D-026 shape, applied to our own operating procedure rather than to a handler.
+
+The five-storefront runs are the ones cited in decision entries and shown to IQwallet. A finding
+later traced to a mid-run rebuild makes the whole table unciteable, and re-running costs one
+scan's time.
+
+    while a scan is running:  no `npm run typecheck`, no `npm run build`, no `tsc --build`
+    after any of those:       re-run the scan; do not read the results of the interrupted one
+
+### This rule was broken by its own author, two hours after writing it
+
+Worth recording precisely, because the circumstances are the argument.
+
+It was broken during a **fix** — the vocabulary audit was failing, each attempt needed a rebuild to
+test, and a five-storefront regeneration was running in the background. It was broken on the run
+whose output Frank reads. And it was broken by the person who had written the rule that same
+evening, having just recorded that "re-run if something looks off" is not a control.
+
+Those are exactly the conditions the rule exists for. Nobody rebuilds mid-scan when nothing is
+urgent.
+
+> **A rule that only holds when nothing is urgent is not a control.**
+
+The break was caught by checking file timestamps rather than by noticing anything wrong with the
+output — which is the only way it *could* have been caught, since a run spanning two builds
+produces results that look ordinary.
+
+### Enforcing it instead of remembering it
+
+Three options, cheapest first. **None is built**; the ruling on which is worth the machinery has
+not been made.
+
+**1. The scan refuses to start if it cannot pin its own build.** At startup the worker records the
+newest mtime under `dist`; before writing each report it re-reads it, and aborts if it changed.
+Cheap, needs no new files, and fails loudly at the moment the damage occurs rather than after.
+Does not prevent the rebuild — it prevents the *result* from being kept, which is the thing that
+matters.
+
+**2. A lock file.** The scan writes `.scan-running` and the build refuses while it exists. Prevents
+the rebuild outright, and blocks the build rather than the scan — which is the right way round,
+since a scan takes ten minutes and a build takes ten seconds. Costs a stale-lock problem: a killed
+scan leaves the lock behind and the next build fails for a reason that has nothing to do with it.
+
+**3. Copy `dist` at scan start and run from the copy.** Makes the run genuinely immune. Most
+robust, most machinery, and it changes how the worker is invoked everywhere including on Fly.
+
+Option 1 is the closest fit to how everything else here works: it does not stop the mistake, it
+stops the mistake producing a citable result — the same posture as reporting `not_evaluable`
+rather than guessing.
+
+
+
+### Validation against the five storefronts is not a nicety
+
+**Six instances of one defect have been found by running against real sites. Zero were found by
+the fixture suite.** The sixth had been silently passing merchants for the entire life of the flow
+probe: GATE-003, `critical` and `auto_fail`, reporting a product listing as "stopped at checkout,
+no payment field observed" and calling that a pass (D-056).
+
+The reason is structural, not a gap in how the fixtures were written.
+
+> A fixture proves a handler does what it says **on input we constructed**. Only a real site
+> reveals that the input was never what we thought.
+
+Every one of the six had the same shape: a real page that superficially matched. A sign-in form
+carrying a password field. A redirect target returning 200 with thousands of characters of text.
+A cart widget's "Return to shop" link. A product listing the checkout flow happened to land on.
+None is malformed, none is adversarial, and each satisfies a check's stated condition while not
+being the thing the check is about. A fixture author writing that page would write it as the
+document they had in mind — encoding the same assumption the check makes, and confirming it.
+
+**So a new check is not finished when its fixtures pass.** It is finished when it has run against
+all five storefronts and its output has been read line by line. Fixtures stop a check regressing;
+only real pages establish that it was right to begin with.
+
+### The fixture suite cannot find this class of defect
+
+Both defects stage 1 produced were found by running against the five real storefronts, and
+**neither could have been caught by a fixture**. The shape is always the same: *a real page that
+superficially matches*.
+
+- A WooCommerce `/my-account/` page carries a sign-in form with a password field and a "Remember
+  me" checkbox. It matched "a form containing a password input" perfectly, and was reported as the
+  sign-up form.
+- A terms-page request answered with a redirect to `/` returns HTTP 200 and several thousand
+  characters of real text. It matched "a page that loaded and has content", and was measured for
+  the five clauses GATE-007 requires.
+
+A fixture is written from what the author expects the page to look like, so it encodes the same
+assumption the check does and confirms it. Neither of these pages is malformed or adversarial —
+each is an ordinary page that satisfies a check's stated condition while not being the thing the
+check is about.
+
+**So a new check is not finished when its fixtures pass.** It is finished when it has been run
+against all five storefronts and its output read line by line. Fixtures keep a check from
+regressing; only real pages establish that it was right to begin with. Both stage-1 defects were
+`not_evaluable` vs. a confident wrong answer, and both produced findings that read as facts about
+the merchant.
+
+### What stage 1 established that is worth carrying forward
+
+A sign-up form is located by its password field, and is only treated as a sign-up form on
+**positive** evidence that it creates an account — `autocomplete="new-password"`, or a second
+password field to confirm one. Four of the five storefronts serve a sign-in form at
+`/my-account/` and no account-creation form at all; before that check, the sign-in form was being
+read and reported as the sign-up form.
+
+---
+
+## A certificate link that resolves and serves something else
+
+**Three of the five storefronts publish COA links that return 200 and serve something that is not
+a certificate.** This is the substantive result of Layer 3 and the clearest example of what this
+tool exists to surface.
+
+    swisschems.is             /independent-test-results/   200   130,126 bytes   text/html
+    sportstechnologylabs.com  /coas/                       200   574,294 bytes   text/html
+                              4 further links              200   ~52-74 KB each  image/webp
+
+sportstechnologylabs publishes its certificates as **`.webp` images served from a CDN**. A customer
+clicking through sees something that looks like a certificate. Nothing machine-readable is served
+and nothing in it can be checked.
+
+> **A 404 is visibly broken to anyone who clicks it. A 200 serving an image looks live** — to a
+> customer, to the merchant checking their own site, and until D-058 to us.
+
+That is a better observation than "no COA published", and it was invisible while both were reported
+in the same sentence. Every attempt is now on the finding with its status, byte count and content
+type, and the three cases land in different buckets: a missing link and a broken link are the
+merchant's, a failed request is ours.
+
+A fourth state exists and is not a failure of the merchant's: biotechpeptides publishes a real PDF
+whose fonts carry their own encoding with no character map. It is fetched, stored and hashed, and
+the report says we could not read it — not that it lacks fields.
+
+---
+
+## Questions for whoever owns the program document
+
+Readings of the program text, not engineering choices. Each changes what a rule asks, and each
+reverses if the document's owner reads it the other way.
+
+| Question | Current reading | Where |
 |---|---|---|
-| Sign-up form | GATE-004, GATE-005 | Render the account-creation form; assert the terms checkbox and research-use field exist |
-| Terms page | GATE-007 | Read the linked terms and check the required clauses appear |
-| Checkout | GATE-003, FULF-002 | Step through add-to-cart → checkout as a guest; observe where it stops and whether a PO box is accepted |
-| Shipping policy | FULF-001 | Read the shipping page for destination restrictions |
-| Payment page | PAY-001, PAY-002, PAY-003 | Observe payment methods offered, the processor in use, and whether a refund policy is published |
-| FAQ | COMM-001 | Read the FAQ for dosing and administration advice appearing together |
-| COA documents | COA-002, COA-003, COA-004 | Fetch the linked certificate, parse date, purity and required fields |
+| "COAs must be updated at minimum every 60 days" — updated when? | The certificate was **issued**, not when the sample was drawn. A merchant publishing a certificate reported 22 July has updated their documentation as of 22 July. | D-058 |
+| Capsule and reconstitution labelling on products that are neither | Settled: the rule does not apply, and that is a resolved outcome rather than a coverage gap. | D-044 |
 
-GATE-003 is the exception that proves the cost: it *does* run today, through the Layer 2
-flow probe, which is why the swisschems report carries a real `pass` for guest checkout. The rest
-of the Layer 3 set has no runner at all.
-
-`doc_parse` is scoped separately from the rest. It is not a page check — it fetches a PDF and
-reads its contents, and D-026 already records that a forged COA is a known failure mode, so what
-it can honestly conclude is narrower than the other three surfaces.
+On the first: COA-002 extracts `report_date`, and the param was renamed from `test_date` so the
+rule names what it reads. The same certificate can carry a sampling date, a testing date, a report
+date and an expiry, days or weeks apart. **If "updated" means the assay rather than the report, the
+reading reverses and the reader must change with it** — the rename exists so that change is one
+place, not a search through finding copy.
 
 ---
 

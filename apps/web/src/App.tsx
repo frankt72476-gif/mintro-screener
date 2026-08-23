@@ -18,12 +18,24 @@ import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQ
 import { formatReportDate } from './lib/format.js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
+import { createInviteQueue, describeInvite } from './lib/inviteQueue.js';
+import { createSendQueue, describeSend } from './lib/sendQueue.js';
+import {
+  commentaryFor,
+  readRunCommentary,
+  type FindingCommentary,
+  type ReportFinding,
+  type RunCommentary,
+} from '@mintro/engine';
 import { CredentialModal } from './components/CredentialModal.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
+import { InviteModal } from './components/InviteModal.js';
 import { DocumentsPane } from './components/DocumentsPane.js';
 import { Rail } from './components/Rail.js';
+import { CommentPane, commentToken } from './components/CommentPane.js';
+import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
 
 import type { Pane } from './components/Rail.js';
@@ -64,6 +76,15 @@ interface InjectedPrint {
   readonly report: ScreeningReport;
   /** Evidence key → signed URL, pre-minted by the worker. */
   readonly evidence: Readonly<Record<string, string>>;
+  /**
+   * What the merchant said, and where the invitation stands (D-063).
+   *
+   * The PDF is what reaches IQwallet, so it carries all of it: who identified themselves, when
+   * they opened it, when each response was written, and which invited findings were left
+   * unanswered. A screen that shows a merchant's account and an export that drops it are two
+   * documents, and the export is the one that decides anything.
+   */
+  readonly commentary?: RunCommentary | null;
 }
 
 function injectedPrint(): InjectedPrint | null {
@@ -86,10 +107,32 @@ function injectedPrint(): InjectedPrint | null {
 export function App(): JSX.Element {
   const { state } = useAuth();
 
+  /*
+    The merchant's route, before the sign-in gate (D-063).
+
+    A merchant has no account and never will. Their credential is the token in the link, and the
+    two database functions it can call are the whole of what it reaches — so this returns before
+    `useAuth` decides anything.
+  */
+  const token = useMemo(() => commentToken(), []);
+
   // The worker's print path: everything the page needs was handed to it, so there is no session
   // to establish and nothing to fetch.
   const injected = useMemo(() => injectedPrint(), []);
   if (injected !== null) return <PrintOnly injected={injected} />;
+
+  if (token !== null) {
+    const client = anonymousClient();
+    return client === null ? (
+      <div className="shell">
+        <main className="main">
+          <div className="empty">This report cannot be loaded: the site is not configured.</div>
+        </main>
+      </div>
+    ) : (
+      <CommentPane client={client} token={token} />
+    );
+  }
 
   if (state.status === 'loading') {
     return (
@@ -150,6 +193,18 @@ function Screener({
   const [credentialFor, setCredentialFor] = useState<string | null>(null);
   const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
+  const invites = useMemo(() => createInviteQueue(client, analyst.id), [client, analyst.id]);
+  const [inviting, setInviting] = useState(false);
+
+  /*
+    What the merchant said about the open run (D-063).
+
+    `undefined` means not read yet and `null` means the read failed. Those are different, and the
+    report says which: a failed read rendered as "no comments" would drop a merchant's account out
+    of the document silently, which is exactly the substitution D-036 is about.
+  */
+  const [commentary, setCommentary] = useState<RunCommentary | null | undefined>(undefined);
 
   /**
    * Where runs come from.
@@ -276,12 +331,17 @@ function Screener({
   async function load(runId: string): Promise<void> {
     setStage('running');
     setError(null);
+    setCommentary(undefined);
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
       setReport(loaded.report);
       setQuarantine(loaded.quarantine);
       setStage('report');
+
+      // Read after the report is on screen rather than gating it. A commentary read that is slow
+      // or fails should not withhold the findings; the commentary section says which it was.
+      setCommentary(await readRunCommentary(client, runId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStage('input');
@@ -537,7 +597,9 @@ function Screener({
               access={access}
                 onSend={() => setSending(true)}
                 onDownload={() => void downloadPdf(report)}
+                onInvite={() => setInviting(true)}
                 downloading={pdfBusy}
+                {...commentaryProps(commentary)}
               />
             </>
           )}
@@ -551,14 +613,31 @@ function Screener({
       {sending && report !== null && (
         <SendModal
           report={report}
+          queue={sends}
           onCancel={() => setSending(false)}
-          onSent={(to, acknowledgedWarning) => {
+          onSent={(send) => {
             setSending(false);
-            setToast(
-              acknowledgedWarning
-                ? `Sent to ${to} — the note was flagged and recorded as sent`
-                : `Sent to ${to}`,
-            );
+            // The worker's own account of what happened. A toast composed from what was requested
+            // rather than from what the provider said is the false-success shape this project
+            // keeps removing — the dialog holds a rejection rather than reaching here.
+            setToast(describeSend(send));
+          }}
+        />
+      )}
+
+      {inviting && report !== null && (
+        <InviteModal
+          report={report}
+          runId={report.runId}
+          queue={invites}
+          onCancel={() => setInviting(false)}
+          onIssued={(invite) => {
+            setInviting(false);
+            void readRunCommentary(client, invite.runId).then(setCommentary);
+            // The toast repeats what actually happened, dry run included. An analyst who reads
+            // "Invitation sent" over a composed-but-untransmitted mail has been told something
+            // false about their own action (D-063).
+            setToast(describeInvite(invite));
           }}
         />
       )}
@@ -888,6 +967,7 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
           print
           onSend={() => undefined}
           onDownload={() => undefined}
+          {...commentaryProps(injected.commentary)}
         />
       </main>
     </div>
@@ -955,4 +1035,53 @@ function usePrintReady(report: ScreeningReport | null): void {
       cancelled = true;
     };
   }, [report]);
+}
+
+/**
+ * The commentary props for `ReportView`, from a read that may not have happened (D-063).
+ *
+ * Three inputs, three outcomes, and the two that produce nothing are not the same:
+ *
+ *   `undefined`  not read yet — render no commentary section at all
+ *   `null`       the read failed — the caller must not render "no comments"
+ *   a value      render it, including the blanks and what they mean
+ *
+ * The middle case is why this is a function rather than a ternary at the call site. A failed read
+ * silently rendering as "the merchant said nothing" would drop their account out of the document
+ * that decides their application, and it would look identical to their having said nothing.
+ *
+ * One helper for both surfaces on purpose: the screen and the PDF must agree about what a blank
+ * space means, and the surest way to get two answers is two expressions.
+ */
+function commentaryProps(commentary: RunCommentary | null | undefined): {
+  commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  commentaryNote?: string;
+} {
+  if (commentary === undefined) return {};
+
+  if (commentary === null) {
+    /*
+      The read failed, and this branch has to be *visible*.
+
+      Returning `not_invited` for every finding would have been the obvious move and it renders
+      nothing at all — identical to a report where commentary was never in use. The failure would
+      have been invisible in exactly the document it matters in. So no per-finding state is
+      supplied and the note carries it instead.
+    */
+    return {
+      commentaryNote:
+        'The merchant responses for this run could not be read, so none are shown below. ' +
+        'This is a failure to read them, not an absence of them.',
+    };
+  }
+
+  const props = {
+    commentaryOf: (finding: ReportFinding, ordinal?: number): FindingCommentary =>
+      commentaryFor(finding, ordinal, commentary.invitation, commentary.comments),
+  };
+
+  // A link was made and nothing was transmitted. Said once, at the top, because it changes what
+  // every blank below it means.
+  if (commentary.undelivered !== null) return { ...props, commentaryNote: commentary.undelivered };
+  return props;
 }

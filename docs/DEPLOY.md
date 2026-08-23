@@ -39,12 +39,20 @@ that reason.
 If a migration has already been applied, running it again will error on the object it creates.
 That is fine and means you can stop — you are up to date.
 
+There is now a faster route than the dashboard, once the CLI is linked:
+
+    npx supabase link --project-ref <ref>
+    npx supabase db query --linked --file supabase/migrations/00NN_name.sql
+
 The ones added since the last deploy:
 
     0011_evidence_key_is_artifact_key.sql
     0012_scan_requests.sql
     0013_credential_deposits.sql
     0014_pdf_requests.sql
+    0015_flow_probe_quarantine.sql
+    0016_merchant_commentary.sql
+    0017_send_requests.sql
 
 `0012` creates the scan queue and the quarantine record. **Nothing in the UI works without it** —
 the worker exits at startup saying so, and the run list cannot mark the five bad runs.
@@ -54,6 +62,15 @@ is nowhere to store a merchant's account.
 
 `0014` adds the PDF queue and pins every scan to start anonymous. **Download PDF does nothing
 without it.**
+
+`0016` adds merchant commentary (D-063): the comment link, visits, comments, and the invitation
+queue. Note that it **revokes `insert` on `comment_links` from `authenticated`** — Supabase grants
+that by default, and a browser able to write a link row would have computed the token digest,
+meaning the plaintext token existed in a browser. Invitations are issued worker-side or not at all.
+
+`0017` wires the report send: the `send_requests` queue, and `sends.mailer` naming which mailer
+handled each attempt. `mailer` is not-null with no default — existing rows read `unrecorded`, which
+is the truth about them. **Send to IQwallet does nothing without it.**
 
 ### 1.2 Confirm it took
 
@@ -346,15 +363,38 @@ If the request sits at `queued` forever, the worker is not running: `fly logs`.
 
 ---
 
-## 5. Resend — not in this milestone
+## 5. Resend — live (D-064)
 
-Domain verification first — SPF and DKIM on the sending domain. Until `RESEND_API_KEY` is set the
-dry-run mailer is selected, which composes a message and transmits nothing. That is a separate
-implementation rather than a flag, so a test send cannot be mistaken for a delivered report.
+`gomintro.com` is verified (SPF + DKIM) and `RESEND_API_KEY` is set on Fly. Two sends go through it,
+selected in one place (`mailersFor`), so the key turns both on together:
 
-Log every send: run id, recipient, Resend message id, timestamp, who triggered it. The `sends`
-table models this. Sending is never blocked by a report outcome (D-001), which makes the send log
-the only record of what went out and when.
+- the report to IQwallet, with the rendered PDF attached
+- the merchant invitation (D-063)
+
+Unset selects the dry-run mailer, which composes and transmits nothing — a separate implementation
+rather than a flag, so a test send cannot be mistaken for a delivered report. **Which one ran is
+written to `sends.mailer`**, so the distinction survives into the record.
+
+Every send is logged: run id, recipient, Resend message id, timestamp, who triggered it, and the
+mailer. Sending is never blocked by a report outcome (D-001) — the `send_requests` insert policy
+carries no condition on findings or counts, and a schema test asserts it stays that way — which
+makes the send log the only record of what went out and when.
+
+### Secrets and settings this needs on Fly
+
+    fly secrets set       WEB_ORIGIN="https://mintro-screener.netlify.app"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       INVITE_CONTACT_NAME="<name>"       INVITE_CONTACT_EMAIL="<address>"       --app mintro-screener-worker
+
+`WEB_ORIGIN` has **no default**. Everything else here does, because a wrong guess costs a retry; a
+wrong guess in `WEB_ORIGIN` puts a dead link in a merchant's inbox under Mintro's name, carrying the
+only token that report will ever have. An invitation job with it unset fails and says so.
+
+`INVITE_CONTACT_NAME` and `INVITE_CONTACT_EMAIL` also have no default, and both are required. The
+invitation carries *"Questions about this request? Contact &lt;name&gt; at &lt;address&gt;."* and
+cannot be composed without one — that named contact is what makes a `no-reply@` reply-to acceptable
+(D-064). Unset fails the invitation job, not the worker: scans and report sends are unaffected.
+
+The worker prints all of this at startup, so `fly logs` after a deploy shows what it will actually
+send as.
 
 ---
 
@@ -393,7 +433,14 @@ repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as writ
 | `SUPABASE_SERVICE_KEY` | **never** | ✅ | **never** | ✅ |
 | `CREDENTIAL_PRIVATE_KEY` | **never** | ✅ | **never** | ✅ |
 | `SUPABASE_EVIDENCE_BUCKET` | — | optional | — | optional |
-| `RESEND_API_KEY` | — | later | **never** | optional |
+| `RESEND_API_KEY` | — | ✅ | **never** | optional |
+| `WEB_ORIGIN` | — | ✅ | — | for local invites |
+| `MAIL_FROM` | — | optional | — | optional |
+| `MAIL_REPLY_TO` | — | optional | — | optional |
+| `INVITE_MAIL_FROM` | — | optional | — | optional |
+| `INVITE_REPLY_TO` | — | optional | — | optional |
+| `INVITE_CONTACT_NAME` | — | ✅ | — | for local invites |
+| `INVITE_CONTACT_EMAIL` | — | ✅ | — | for local invites |
 
 Two `.env` files, and they are not interchangeable. **`apps/web/.env` is Vite's** and may hold
 only `VITE_`-prefixed values, all of which are public. **The root `.env`** is the worker's and

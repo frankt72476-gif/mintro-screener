@@ -10,10 +10,17 @@
 
 import { useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
-import { REQUIREMENT_HEADINGS, type ReportCategory, type ReportFinding, type ScreeningReport } from '@mintro/engine';
+import {
+  REQUIREMENT_HEADINGS,
+  type FindingCommentary,
+  type ReportCategory,
+  type ReportFinding,
+  type ScreeningReport,
+} from '@mintro/engine';
 import { describeGroup, groupReport, type FindingGroup } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
+import { MerchantResponse } from './MerchantResponse.js';
 import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
 
 type Filter = State | 'all';
@@ -23,6 +30,8 @@ interface Props {
   readonly access: EvidenceAccess;
   readonly onSend: () => void;
   readonly onDownload: () => void;
+  /** Opens the merchant-invitation dialog (D-063). Absent where inviting does not apply. */
+  readonly onInvite?: () => void;
   /** True while the worker is rendering. The button says so rather than appearing inert. */
   readonly downloading?: boolean;
   /**
@@ -34,6 +43,24 @@ interface Props {
    * one on screen while claiming to be the same.
    */
   readonly print?: boolean;
+  /**
+   * What the merchant said about a finding, or why the space is blank (D-063).
+   *
+   * A function rather than a map so the caller decides how a finding is identified — the analyst's
+   * report reads it from stored comments, the merchant's view from what they have just written.
+   */
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  /**
+   * A run-level statement about commentary, when there is one to make (D-063).
+   *
+   * Two things need saying at the top of a report and cannot be said beneath a finding, because
+   * both are reasons the per-finding spaces are blank: **the responses could not be read**, and
+   * **the invitation was never transmitted**. Left to the finding rows, either would render as an
+   * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
+   */
+  readonly commentaryNote?: string;
+  /** The merchant's own view supplies a box; nothing else does. */
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }
 
 export function ReportView({
@@ -41,8 +68,12 @@ export function ReportView({
   access,
   onSend,
   onDownload,
+  onInvite,
   downloading = false,
   print = false,
+  commentaryOf,
+  commentaryNote,
+  commentBox,
 }: Props): JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -82,31 +113,45 @@ export function ReportView({
               {downloading ? 'Rendering…' : 'Download PDF'}
             </button>
             {/*
-              Disabled, and the reason is on the button rather than in a tooltip.
+              Enabled, unlike Send — and the difference is not an oversight.
 
-              Send is never blocked by an *outcome* — D-001 — and this is not that. Nothing here
-              reaches the mailer: the send path runs in the worker and is not wired, and the
-              sending domain is not verified. An analyst who clicked Send and saw a success toast
-              would have been told a report went out when nothing was transmitted, which is the
-              exact false-success shape this project has spent its time eliminating.
-
-              When sending is wired it becomes a queued job like the PDF, and this re-enables on
-              what the worker reports rather than on a flag someone remembered to set.
+              Sending to IQwallet is not wired at all: nothing reaches a mailer, so the button
+              would report a success that did not happen. Inviting *is* wired end to end. Its
+              weaker state is that the mail may be composed rather than transmitted, and that is
+              reported as what happened rather than hidden behind a disabled control (D-063).
             */}
-            <button
-              className="btn btn-primary"
-              onClick={onSend}
-              disabled
-              title="Sending is not connected yet"
-            >
-              Send to IQwallet — not connected
+            {onInvite !== undefined && (
+              <button className="btn btn-ghost" onClick={onInvite}>
+                Invite merchant response
+              </button>
+            )}
+            {/*
+              Connected, as of the Resend gate lifting.
+
+              It was disabled because nothing reached a mailer — not because of any outcome. D-001
+              is unchanged and unchangeable: **send is never blocked**, and nothing here or in the
+              queue policy consults the fail count. What the dialog does gate on is the worker's
+              own account of the attempt, so an analyst is never shown "Sent" for a message a
+              provider refused.
+            */}
+            <button className="btn btn-primary" onClick={onSend}>
+              Send to IQwallet
             </button>
           </div>
         )}
       </div>
 
+      {commentaryNote !== undefined && (
+        <div className="card cnote">
+          <span className="cnote-head">Merchant response</span>
+          <p>{commentaryNote}</p>
+        </div>
+      )}
+
       <VerdictBanner report={report} />
       <TickStrip report={report} />
+      <CoverageBreakdown report={report} />
+      <SameObservation report={report} />
 
       {print ? <Coverage report={report} /> : <Filters filter={filter} onChange={setFilter} report={report} />}
 
@@ -140,7 +185,13 @@ export function ReportView({
           {groupReport(report)
             .filter((section) => filter === 'all' || section.state === filter)
             .map((section) => (
-              <StateSection key={section.key} section={section} access={access} />
+              <StateSection
+              key={section.key}
+              section={section}
+              access={access}
+              {...(commentaryOf === undefined ? {} : { commentaryOf })}
+              {...(commentBox === undefined ? {} : { commentBox })}
+            />
             ))}
         </div>
       )}
@@ -265,6 +316,107 @@ function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element
 }
 
 /**
+ * Findings that describe the same observation (D-050).
+ *
+ * Two findings, side by side, each quoting what it observed. **Nothing here says what the pair
+ * means.** An earlier draft ended each entry with a sentence naming what the two had in common —
+ * "both concern whether an account is required" — and that is Mintro drawing a conclusion from a
+ * pair. Adjacency conveys it without us saying it (D-001).
+ *
+ * The heading is deliberately not "corroborating", which would assert that the findings support
+ * each other. They are shown together because the rule set says they look at one thing; whether
+ * that strengthens anything is IQwallet's call.
+ *
+ * Pairs come from the report, which reads them from `corroborates` in the rule set. Nothing is
+ * inferred here.
+ */
+function SameObservation({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  const pairs = report.sameObservation;
+  if (pairs === undefined || pairs.length === 0) return null;
+
+  return (
+    <div className="same-obs">
+      <div className="eyebrow">Findings that describe the same observation</div>
+      {pairs.map((pair) => (
+        <div className="same-obs-pair" key={pair.ruleIds.join('|')}>
+          {pair.findings.map((finding, index) => (
+            <div className={`same-obs-item ${stateClass(finding.state)}`} key={`${finding.ruleId}-${index}`}>
+              <span className="same-obs-head">
+                <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
+                <span className="same-obs-title">
+                  {finding.title} <span className="mono same-obs-id">{finding.ruleId}</span>
+                </span>
+              </span>
+              <p className="same-obs-note">
+                {finding.state === 'not_evaluable'
+                  ? (finding.notEvaluableReason ?? finding.note)
+                  : finding.note}
+              </p>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Whose limitation each gap is, said directly (D-049).
+ *
+ * The coverage line states the numbers; this states what they mean. A reader had to work out for
+ * themselves that "not checked" is Mintro's shortfall while "not exposed" is the merchant's, and
+ * the two were adjacent in one sentence. They are the difference between a report that overstates
+ * what was screened and one that does not.
+ *
+ * Descriptive throughout, and it draws no conclusion from the split (D-001). It says who could
+ * have answered each rule, not what anyone should do about it.
+ *
+ * Absent on a run recorded before the kinds existed: those reports cannot say which bucket
+ * applies and must not appear to (D-047).
+ */
+function CoverageBreakdown({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  const c = report.coverage;
+  if (typeof c.resolved !== 'number') return null;
+
+  const columns: readonly {
+    readonly n: number;
+    readonly head: string;
+    readonly whose: string;
+    readonly tone: string;
+  }[] = [
+    { n: c.evaluable, head: 'Evaluated', whose: 'observed from the crawled surface', tone: 'done' },
+    { n: c.notApplicable, head: 'Does not apply', whose: "the rule's subject is not on these pages", tone: 'done' },
+    { n: c.noCheckBuilt, head: 'Not checked', whose: 'Mintro has not built these yet', tone: 'ours' },
+    { n: c.notReachable, head: 'Not reachable', whose: 'no crawl of a website could answer these', tone: 'nobody' },
+    { n: c.notExposed, head: 'Not exposed', whose: 'this storefront did not carry them', tone: 'merchant' },
+    { n: c.notRetrieved ?? 0, head: 'Not retrieved', whose: 'this run could not fetch them', tone: 'run' },
+    { n: c.kindNotRecorded, head: 'Not recorded', whose: 'screened before Mintro separated these', tone: 'legacy' },
+  ];
+
+  const shown = columns.filter((column) => column.n > 0);
+
+  return (
+    <div className="cov-break">
+      <div className="cov-head">
+        <span className="eyebrow">Coverage</span>
+        <span className="cov-split">
+          <b>{c.resolved}</b> resolved · <b>{c.outstanding}</b> outstanding · {c.total} rules
+        </span>
+      </div>
+      <div className="cov-cols">
+        {shown.map((column) => (
+          <div className={`cov-col ${column.tone}`} key={column.head}>
+            <span className="cov-n">{column.n}</span>
+            <span className="cov-t">{column.head}</span>
+            <span className="cov-w">{column.whose}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * What the crawl could speak to, and what is still open (D-044).
  *
  * One question — *how much of the rule set could this crawl speak to* — answered in two halves.
@@ -305,6 +457,7 @@ function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Ele
     noCheckBuilt,
     notReachable,
     notExposed,
+    notRetrieved,
     kindNotRecorded,
   } = coverage;
 
@@ -323,6 +476,7 @@ function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Ele
     [noCheckBuilt, 'not checked — Mintro has not built these yet'],
     [notReachable, 'need a surface no crawl reaches'],
     [notExposed, 'looked for and not found on the site'],
+    [notRetrieved ?? 0, 'this run could not fetch'],
     [kindNotRecorded, 'recorded before this distinction existed'],
   ]);
 
@@ -421,13 +575,30 @@ function CategoryCard({
   );
 }
 
+/**
+ * Which finding of a rule this is, for rules that produce one per sampled page.
+ *
+ * `undefined` for a rule with a single finding, so a comment on it is not filed against an
+ * ordinal that will shift if the sample size changes. Matches what `merchant_comments.ordinal`
+ * stores (D-063).
+ */
+function ordinalOf(group: FindingGroup, index: number): number | undefined {
+  return group.findings.length > 1 ? index : undefined;
+}
+
 function FindingRow({
   finding,
   access,
+  commentary,
+  commentBox,
   print = false,
 }: {
   readonly finding: ReportFinding;
   readonly access: EvidenceAccess;
+  /** What the merchant said, or why the space is blank. Absent when commentary is not in use. */
+  readonly commentary?: FindingCommentary;
+  /** The merchant's own view supplies a box; the analyst's and the PDF do not. */
+  readonly commentBox?: JSX.Element;
   readonly print?: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -463,6 +634,13 @@ function FindingRow({
       <div className="ev">
         <Requirement finding={finding} />
         <EvidenceSlip finding={finding} access={access} />
+        {/*
+          After the evidence, never inside it (D-063). The slip holds what Mintro captured; a
+          merchant's words placed in it would read as evidence we gathered rather than an account
+          they gave.
+        */}
+        {commentary !== undefined && <MerchantResponse commentary={commentary} />}
+        {commentBox}
       </div>
     </div>
   );
@@ -524,9 +702,22 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
 function StateSection({
   section,
   access,
+  commentaryOf,
+  commentBox,
 }: {
   readonly section: import('../lib/grouping.js').ReportSection;
   readonly access: EvidenceAccess;
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  /**
+   * A run-level statement about commentary, when there is one to make (D-063).
+   *
+   * Two things need saying at the top of a report and cannot be said beneath a finding, because
+   * both are reasons the per-finding spaces are blank: **the responses could not be read**, and
+   * **the invitation was never transmitted**. Left to the finding rows, either would render as an
+   * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
+   */
+  readonly commentaryNote?: string;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   /*
     The bucket is an attribute, not folded into the state class (D-044).
@@ -547,7 +738,13 @@ function StateSection({
       <p className="sect-lede">{section.lede}</p>
 
       {section.groups.map((group) => (
-        <GroupCard key={`${group.ruleId}-${group.state}`} group={group} access={access} />
+        <GroupCard
+          key={`${group.ruleId}-${group.state}`}
+          group={group}
+          access={access}
+          {...(commentaryOf === undefined ? {} : { commentaryOf })}
+          {...(commentBox === undefined ? {} : { commentBox })}
+        />
       ))}
     </section>
   );
@@ -563,9 +760,22 @@ function StateSection({
 function GroupCard({
   group,
   access,
+  commentaryOf,
+  commentBox,
 }: {
   readonly group: FindingGroup;
   readonly access: EvidenceAccess;
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  /**
+   * A run-level statement about commentary, when there is one to make (D-063).
+   *
+   * Two things need saying at the top of a report and cannot be said beneath a finding, because
+   * both are reasons the per-finding spaces are blank: **the responses could not be read**, and
+   * **the invitation was never transmitted**. Left to the finding rows, either would render as an
+   * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
+   */
+  readonly commentaryNote?: string;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
 
@@ -574,7 +784,13 @@ function GroupCard({
       <div className="card cat open">
         <div className="cat-body">
           {group.findings.map((finding, i) => (
-            <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} />
+            <FindingRow
+              key={`${finding.ruleId}-${i}`}
+              finding={finding}
+              access={access}
+              {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinalOf(group, i)) })}
+              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinalOf(group, i)) })}
+            />
           ))}
         </div>
       </div>
@@ -595,7 +811,13 @@ function GroupCard({
       <div className="cat-body">
         <p className="group-lede">{describeGroup(group)}</p>
         {group.findings.map((finding, i) => (
-          <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} />
+          <FindingRow
+            key={`${finding.ruleId}-${i}`}
+            finding={finding}
+            access={access}
+            {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinalOf(group, i)) })}
+            {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinalOf(group, i)) })}
+          />
         ))}
       </div>
     </div>

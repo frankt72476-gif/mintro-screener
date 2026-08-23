@@ -462,3 +462,227 @@ export function extractPage(args: ExtractArgs): RawExtraction {
     productTitle,
   };
 }
+
+/**
+ * A sign-up form read out of a rendered page (D-048).
+ *
+ * Mirrors `SignupForm` in `@mintro/engine`, minus anything that cannot cross the `evaluate`
+ * boundary. Like `extractPage`, this is serialised into the browser and may close over nothing.
+ */
+export interface RawFormField {
+  name: string;
+  type: string;
+  required: boolean;
+  label: string;
+  autocomplete: string;
+  options: string[];
+  selector: string;
+}
+
+export interface RawSignupForm {
+  found: boolean;
+  locatedBy: string;
+  fields: RawFormField[];
+  candidateForms: number;
+}
+
+/**
+ * Finds the sign-up form and reads every field in it.
+ *
+ * **The form is located by its password field.** You cannot create an account without one, and
+ * every other candidate locator — a heading, a URL, a class name, a submit button's text — is
+ * prose the merchant chose. Hard constraint 9 applies to the form as much as to the fields
+ * inside it: a form found by matching "Create account" would be missed on a site that says
+ * "Join the lab", and that merchant's checkbox and research field would be reported as absent.
+ *
+ * Where more than one form on the page carries a password field, the one with the most fields is
+ * taken — a registration form asks for more than a login form does — and `candidateForms` records
+ * that there was a choice, so the inference is visible rather than silent.
+ *
+ * Every field is returned, including ones this code cannot classify. Deciding which fields matter
+ * is the checks' job, and a filter here would hide the merchant's own wording from the report.
+ */
+export function extractSignupForm(): RawSignupForm {
+  const cssPath = (element: Element): string => {
+    const parts: string[] = [];
+    let node: Element | null = element;
+    while (node !== null && node !== document.body && parts.length < 6) {
+      const tag = node.tagName.toLowerCase();
+      const id = node.id === '' ? '' : `#${node.id}`;
+      const cls = typeof node.className === 'string' && node.className.trim() !== ''
+        ? `.${node.className.trim().split(/\s+/).slice(0, 2).join('.')}`
+        : '';
+      parts.unshift(`${tag}${id}${cls}`);
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  };
+
+  const clean = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+  /**
+   * The visible text that labels a control.
+   *
+   * Tried in the order a person reads: an explicit `<label for>`, a wrapping `<label>`, then the
+   * accessible-name attributes, then — for a checkbox, whose text usually sits beside it rather
+   * than in a label — the text of the nearest containing block. Whatever comes back is reported
+   * verbatim; nothing here matches it against anything.
+   */
+  const labelFor = (element: Element): string => {
+    const id = element.getAttribute('id');
+    if (id !== null && id !== '') {
+      const explicit = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+      if (explicit !== null) return clean(explicit.textContent ?? '');
+    }
+
+    const wrapping = element.closest('label');
+    if (wrapping !== null) return clean(wrapping.textContent ?? '');
+
+    const aria = element.getAttribute('aria-label');
+    if (aria !== null && aria.trim() !== '') return clean(aria);
+
+    const labelledBy = element.getAttribute('aria-labelledby');
+    if (labelledBy !== null && labelledBy.trim() !== '') {
+      const target = document.getElementById(labelledBy.trim().split(/\s+/)[0] ?? '');
+      if (target !== null) return clean(target.textContent ?? '');
+    }
+
+    const placeholder = element.getAttribute('placeholder');
+    if (placeholder !== null && placeholder.trim() !== '') return clean(placeholder);
+
+    // A checkbox's wording is usually its sibling text, not a label element.
+    const block = element.closest('div, p, li, fieldset');
+    if (block !== null) {
+      const text = clean(block.textContent ?? '');
+      if (text !== '' && text.length < 400) return text;
+    }
+
+    return '';
+  };
+
+  const isRequired = (element: Element): boolean =>
+    element.hasAttribute('required') || element.getAttribute('aria-required') === 'true';
+
+  const forms = Array.from(document.querySelectorAll('form'));
+  const withPassword = forms.filter((f) => f.querySelector('input[type=password]') !== null);
+
+  if (withPassword.length === 0) {
+    return {
+      found: false,
+      locatedBy: 'no form on the page carried a password field',
+      fields: [],
+      candidateForms: 0,
+    };
+  }
+
+  /**
+   * Is this form for *creating* an account, or for signing in to one?
+   *
+   * Both carry a password field, so "has a password field" does not distinguish them — and the
+   * first draft of this code took the largest such form, which on a WooCommerce `/my-account/`
+   * page is the sign-in form, because "Remember me" makes it three controls to the register
+   * form's two. It then reported a sign-in form's fields as the sign-up form's, which is an
+   * observation about a page nobody looked at.
+   *
+   * **Established by positive evidence** (D-026), never by the absence of a sign-in marker:
+   *
+   *   - `autocomplete="new-password"` is the standard token for a password being created. A
+   *     sign-in field is `current-password`.
+   *   - Two or more password fields is a password-and-confirm pair, which only account creation
+   *     asks for.
+   *
+   * Neither is merchant prose. A form matching neither is *not* assumed to be a registration
+   * form — the caller reports that it could not tell, which is the honest answer.
+   */
+  const createsAccount = (f: Element): boolean => {
+    const passwords = Array.from(f.querySelectorAll('input[type=password]'));
+    if (passwords.length > 1) return true;
+    return passwords.some(
+      (input) => (input.getAttribute('autocomplete') ?? '').toLowerCase() === 'new-password',
+    );
+  };
+
+  const registration = withPassword.filter(createsAccount);
+
+  if (registration.length === 0) {
+    return {
+      found: false,
+      locatedBy:
+        `${withPassword.length} form(s) on the page carried a password field, and none could be ` +
+        `established as an account-creation form: no field declared autocomplete="new-password" ` +
+        `and none carried a second password field to confirm one`,
+      fields: [],
+      candidateForms: withPassword.length,
+    };
+  }
+
+  const controls = (f: Element): Element[] =>
+    Array.from(f.querySelectorAll('input, select, textarea')).filter((element) => {
+      const type = (element.getAttribute('type') ?? '').toLowerCase();
+      return type !== 'hidden' && type !== 'submit' && type !== 'button' && type !== 'image';
+    });
+
+  // Among forms that positively create an account, the largest is the registration form.
+  // `candidateForms` records how many carried a password field at all, so a reader can see that
+  // a choice was made and on what basis.
+  const chosen = registration.reduce((best, candidate) =>
+    controls(candidate).length > controls(best).length ? candidate : best,
+  );
+
+  const seenRadioGroups = new Set<string>();
+  const fields: RawFormField[] = [];
+
+  for (const element of controls(chosen)) {
+    const tag = element.tagName.toLowerCase();
+    const type = tag === 'input' ? (element.getAttribute('type') ?? 'text').toLowerCase() : tag;
+    const name = element.getAttribute('name') ?? element.getAttribute('id') ?? '';
+
+    // A radio group is one question, not one field per option. Collapsed so the report says
+    // "one required choice with four options" rather than listing four fields.
+    if (type === 'radio' && name !== '') {
+      if (seenRadioGroups.has(name)) continue;
+      seenRadioGroups.add(name);
+
+      const group = Array.from(chosen.querySelectorAll(`input[type=radio][name="${CSS.escape(name)}"]`));
+      fields.push({
+        name,
+        type: 'radio',
+        required: group.some(isRequired),
+        label: labelFor(element),
+        autocomplete: element.getAttribute('autocomplete') ?? '',
+        options: group.map((option) => labelFor(option) || option.getAttribute('value') || ''),
+        selector: cssPath(element),
+      });
+      continue;
+    }
+
+    const options =
+      tag === 'select'
+        ? Array.from(element.querySelectorAll('option'))
+            .map((option) => clean(option.textContent ?? ''))
+            .filter((text) => text !== '')
+        : [];
+
+    fields.push({
+      name,
+      type,
+      required: isRequired(element),
+      label: labelFor(element),
+      autocomplete: element.getAttribute('autocomplete') ?? '',
+      options,
+      selector: cssPath(element),
+    });
+  }
+
+  return {
+    found: true,
+    locatedBy:
+      registration.length > 1
+        ? `the largest of ${registration.length} forms that create an account, of ` +
+          `${withPassword.length} carrying a password field`
+        : `the one form on the page that creates an account, of ${withPassword.length} carrying a ` +
+          `password field`,
+    fields,
+    candidateForms: withPassword.length,
+  };
+}

@@ -36,7 +36,9 @@ import {
   checkUrlPattern,
   inScope,
   layer2Rules,
+  describeSampleCollapse,
   runLayer2,
+  runLayer3,
   scoreProductUrls,
   selectSample,
   tally,
@@ -54,6 +56,8 @@ import {
 } from '@mintro/engine';
 import { renderPage } from './render.js';
 import { runGateRules, type AnonymousAccess } from './gate.js';
+import { discoverLayer3 } from './signup.js';
+import { coaLinkVocabulary, fetchCertificate } from './coa.js';
 import { probePaths } from './probe.js';
 import { runCheckoutFlow } from './flow.js';
 
@@ -176,6 +180,16 @@ export async function screenStorefront(
 
   say(wall.reason);
 
+  /*
+    Did the sample actually cover five pages (D-062)?
+
+    Five distinct URLs cannot legitimately render byte-identical captures by accident, and a login
+    wall sending every product URL to one sign-in page would make every product-surface finding
+    describe that page while reporting on five. Nothing was watching for it until now.
+  */
+  const collapse = describeSampleCollapse(sampled);
+  if (collapse !== null) say(`  ${collapse}`);
+
   // ---- escalate only on an observed refusal ------------------------------------------------
   //
   // The condition is what was *observed*, not what anyone selected. A credential is applied when
@@ -206,7 +220,63 @@ export async function screenStorefront(
     }
   }
 
-  const layer2 = runLayer2(sampled, ruleset);
+  /*
+    The certificate of analysis, for the COA rules (D-057).
+
+    Fetched from the sampled product pages' own links, established as a PDF by its magic number
+    rather than by the server's content type, and stored in full. Skipped when nothing linked to
+    one — the COA rules then report that, and never read `pass` from an absent certificate.
+  */
+  const coaContext = await browser.newContext();
+  let coa;
+  try {
+    const coaPage = await coaContext.newPage();
+    coa = await fetchCertificate(coaPage, sampled.map((entry) => entry.page), {
+      runId,
+      pacer,
+      // One vocabulary, read from the rule set, shared with COA-001 (D-059).
+      vocabulary: coaLinkVocabulary(ruleset),
+      onProgress: say,
+    });
+  } finally {
+    await coaContext.close().catch(() => undefined);
+  }
+  artifacts.push(...coa.artifacts);
+
+  const layer2 = runLayer2(sampled, ruleset, coa?.outcome);
+
+  // ---- Layer 3: the surfaces reached by doing something ----------------------------------
+  //
+  // The sign-up form and the terms document (D-048). Anonymous, and through the same pacer as
+  // everything else: this adds page loads to an origin already being crawled, which is the case
+  // `Crawl-delay` exists for (D-013).
+  //
+  // Placed before the gate block and taking no part in it. GATE-002 and GATE-003 are decided by
+  // `runGateRules` from requests carrying no session, and nothing here touches that (D-039).
+  const discovered = await discoverLayer3(browser, layer0.origin, {
+    runId,
+    pacer,
+    homepageLinks: rendered.page.links.map((link) => ({ href: link.href, text: link.text })),
+    onProgress: say,
+  });
+  artifacts.push(...discovered.artifacts);
+
+  const layer3 = runLayer3(
+    {
+      signup: discovered.signup,
+      homepage: rendered.page,
+      ...(discovered.terms === undefined ? {} : { terms: discovered.terms }),
+      ...(discovered.shipping === undefined ? {} : { shipping: discovered.shipping }),
+      ...(discovered.faq === undefined ? {} : { faq: discovered.faq }),
+      ...(discovered.payment === undefined ? {} : { payment: discovered.payment }),
+    },
+    ruleset,
+  );
+
+  say(
+    `layer 3: ${layer3.counts.fail} fail · ${layer3.counts.review} review · ${layer3.counts.pass} pass ` +
+      `· ${layer3.counts.not_evaluable} not evaluable`,
+  );
 
   // ---- the gate rules, always without a session -----------------------------------------
   //
@@ -236,7 +306,19 @@ export async function screenStorefront(
 
   say(`gate rules evaluated without a session: ${gate.map((f) => `${f.ruleId} ${f.state}`).join(', ')}`);
 
-  const findings: Finding[] = [...layer1.findings, ...after, ...layer2.findings, ...gate];
+  // Order matters for readability only — `assembleReport` sorts by the rule set. What matters is
+  // that the gate findings are the ones `runGateRules` produced: no Layer 3 rule is selected on a
+  // surface either of them declares, so neither can be displaced here (D-039).
+  const gateIds = new Set(gate.map((finding) => finding.ruleId));
+  const layer3Findings = layer3.findings.filter((finding) => !gateIds.has(finding.ruleId));
+
+  const findings: Finding[] = [
+    ...layer1.findings,
+    ...after,
+    ...layer2.findings,
+    ...layer3Findings,
+    ...gate,
+  ];
 
   const counts = tally(findings);
   say(
@@ -255,7 +337,7 @@ export async function screenStorefront(
       startedAt,
       finishedAt: new Date().toISOString(),
       findings,
-      truncations: layer0.truncations,
+      truncations: [...layer0.truncations, ...(collapse === null ? [] : [collapse])],
       politeness: describeCrawlDelay(delay),
     },
     ruleset,

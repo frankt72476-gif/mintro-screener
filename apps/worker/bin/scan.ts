@@ -14,6 +14,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser } from 'playwright';
 import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
@@ -21,6 +22,7 @@ import { tally, type EvidenceArtifact, type Finding } from '@mintro/engine';
 import { screenStorefront } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
+import { assertBuildUnchanged, pinBuild, type BuildPin } from '../src/buildPin.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun, describeCompleteness } from '../src/store/completeness.js';
 
@@ -60,13 +62,24 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log();
   }
 
+  /*
+    Pin the build this run started with (D-061).
+
+    `tsc --build` rewrites the files this process is executing from, and a run that spans two
+    builds produces results that look entirely ordinary. Nothing is written unless the tree is
+    still the one the run began on.
+  */
+  const pin = pinBuild(dirname(fileURLToPath(import.meta.url)).replace(/[\/]bin$/, ''));
+  console.log(`  build      pinned to ${pin.newestFile}`);
+  console.log();
+
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   let failures = 0;
 
   try {
     for (const target of targets) {
       try {
-        await scan(browser, target, ruleset, evidenceDir, reportDir, supabase);
+        await scan(browser, target, ruleset, evidenceDir, reportDir, supabase, pin);
       } catch (error) {
         // One storefront failing must not abandon the rest. It is reported and counted, and the
         // exit code carries it — a scan that half-worked and exited 0 is how this all started.
@@ -88,6 +101,7 @@ async function scan(
   evidenceDir: string | undefined,
   reportDir: string | undefined,
   supabase: WorkerSupabase | undefined,
+  pin: BuildPin,
 ): Promise<void> {
   const runId = randomUUID();
 
@@ -110,6 +124,15 @@ async function scan(
     `\n  combined   ${counts.fail} fail · ${counts.review} review · ${counts.pass} pass · ${counts.not_evaluable} not evaluable`,
   );
   console.log(`  evidence   ${artifacts.length} artifacts, ${formatBytes(storedBytes(artifacts))} stored`);
+
+  /*
+    Checked before anything is written, never after (D-061).
+
+    Aborting here loses this storefront's run, which is the point: a run that cannot vouch for the
+    code it executed has produced nothing worth keeping. The outer loop reports it as a failure and
+    the exit code carries it.
+  */
+  assertBuildUnchanged(pin);
 
   if (evidenceDir !== undefined) writeEvidence(artifacts, evidenceDir);
 

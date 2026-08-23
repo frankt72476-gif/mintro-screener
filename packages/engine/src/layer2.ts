@@ -16,11 +16,22 @@ import { checkTextMatch } from './checks/textMatch.js';
 import { checkTextCooccurrence } from './checks/textCooccurrence.js';
 import { RENDERED } from './checks/pageEvidence.js';
 import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
+import {
+  checkCoaDate,
+  checkCoaFields,
+  checkCoaPurity,
+  type CertificateOutcome,
+} from './checks/docParse.js';
 import { isRendered, type PageContext } from './page.js';
 import type { ScoredUrl } from './suspicion.js';
 
-/** Check types this layer has handlers for. `doc_parse` is not among them — see below. */
-const LAYER2_TYPES = new Set<Rule['type']>(['dom_assert', 'text_match', 'text_cooccurrence']);
+/** Check types this layer has handlers for. `doc_parse` joined at stage 4 (D-057). */
+const LAYER2_TYPES = new Set<Rule['type']>([
+  'dom_assert',
+  'text_match',
+  'text_cooccurrence',
+  'doc_parse',
+]);
 
 export interface SampledPage {
   readonly selection: ScoredUrl;
@@ -48,7 +59,18 @@ export function layer2Rules(ruleset: Ruleset): Rule[] {
  * rule silently passing because nobody implemented the parser is exactly the failure hard
  * constraint 2 describes.
  */
-export function runLayer2(sampled: readonly SampledPage[], ruleset: Ruleset): Layer2Run {
+export function runLayer2(
+  sampled: readonly SampledPage[],
+  ruleset: Ruleset,
+  /**
+   * The certificate of analysis the worker fetched, when one was reached (D-057).
+   *
+   * Optional so that a caller which has not fetched one — the fixture tests, and any path that
+   * does not do document work — gets `not_evaluable` naming the absence rather than a crash. The
+   * COA rules never read `pass` from a missing certificate.
+   */
+  certificate?: CertificateOutcome,
+): Layer2Run {
   const rules = layer2Rules(ruleset);
   const rendered = sampled.filter((entry) => isRendered(entry.page));
   const findings: Finding[] = [];
@@ -76,6 +98,18 @@ export function runLayer2(sampled: readonly SampledPage[], ruleset: Ruleset): La
       continue;
     }
 
+    /*
+      A `doc_parse` rule is about the certificate, not about a page (D-057).
+
+      It produces exactly one finding per rule, whatever the sample size. Running it per sampled
+      page would report the same certificate five times and make one document look like five
+      observations.
+    */
+    if (rule.type === 'doc_parse') {
+      findings.push(certificateFinding(rule as RuleOfType<'doc_parse'>, certificate));
+      continue;
+    }
+
     findings.push(...evaluate(rule, rendered, ruleset));
   }
 
@@ -85,6 +119,37 @@ export function runLayer2(sampled: readonly SampledPage[], ruleset: Ruleset): La
     findings,
     counts: tally(findings),
   };
+}
+
+/**
+ * Which COA check a `doc_parse` rule is, read from what it declares.
+ *
+ * `extract` names the value the rule wants and `require_fields` names the inventory check, so the
+ * dispatch reads the rule's own params rather than its id — the engine stays free of rule ids
+ * (hard constraint 1).
+ */
+function certificateFinding(
+  rule: RuleOfType<'doc_parse'>,
+  certificate: CertificateOutcome | undefined,
+): Finding {
+  /*
+    No certificate was even looked for — a caller that does no document work, such as a
+    fixture test. Reported as "none was published", with no attempts, because none were made.
+    Never `pass`: an absent certificate says nothing about what a certificate would state.
+  */
+  const outcome: CertificateOutcome =
+    certificate ?? { found: false, why: 'not_published', attempts: [] };
+
+  if (rule.params.require_fields !== undefined) return checkCoaFields(rule, outcome);
+  if (rule.params.extract === 'report_date') return checkCoaDate(rule, outcome, new Date());
+  if (rule.params.extract === 'purity_pct') return checkCoaPurity(rule, outcome);
+
+  return notEvaluable(
+    rule,
+    `this rule asks for '${rule.params.extract ?? 'nothing'}', which this reader does not extract yet`,
+    'document',
+    'no_check_built',
+  );
 }
 
 /**
@@ -152,4 +217,61 @@ function severityOf(state: Finding['state']): number {
     case 'pass':
       return 1;
   }
+}
+
+/**
+ * Sampled pages whose captures are byte-identical (D-062).
+ *
+ * Five distinct product URLs cannot legitimately render byte-identical pages by accident. The
+ * scenario this exists for: a login wall redirecting every product URL to one sign-in page, after
+ * which every product-surface finding describes that page while reporting on five. Nothing was
+ * watching for it — the only reason it was ever looked at was a storage guard tripping by accident
+ * on an unrelated capture.
+ *
+ * **Observational, not a verdict.** A templated storefront can legitimately serve renderings that
+ * differ in nothing a screenshot records, so this reports what was seen and leaves the reading to
+ * a person. It is a coverage limit, not a finding about the merchant.
+ *
+ * Pages that failed to render carry no capture and are excluded: an absent screenshot is not a
+ * shared one.
+ */
+export function assessSampleDistinctness(
+  sampled: readonly SampledPage[],
+): readonly { readonly key: string; readonly urls: readonly string[] }[] {
+  const byKey = new Map<string, string[]>();
+
+  for (const entry of sampled) {
+    const key = entry.page.screenshotKey;
+    if (key === undefined || key === '') continue;
+
+    const urls = byKey.get(key);
+    if (urls === undefined) byKey.set(key, [entry.page.finalUrl]);
+    else if (!urls.includes(entry.page.finalUrl)) urls.push(entry.page.finalUrl);
+  }
+
+  return [...byKey.entries()]
+    .filter(([, urls]) => urls.length > 1)
+    .map(([key, urls]) => ({ key, urls }));
+}
+
+/**
+ * The coverage limit a collapsed sample produces, in words, or null when the sample is distinct.
+ *
+ * Says what was observed and what it does *not* establish. A reader deciding how much weight a
+ * product-surface finding carries needs to know that several of them rest on the same rendering.
+ */
+export function describeSampleCollapse(
+  sampled: readonly SampledPage[],
+): string | null {
+  const groups = assessSampleDistinctness(sampled);
+  if (groups.length === 0) return null;
+
+  const affected = groups.reduce((total, group) => total + group.urls.length, 0);
+
+  return (
+    `${affected} of ${sampled.length} sampled product page(s) returned byte-identical captures, in ` +
+    `${groups.length} group(s): ${groups.map((group) => group.urls.join(' , ')).join(' ; ')}. ` +
+    `Each URL was requested separately. Findings on these pages rest on the same rendering, which a ` +
+    `templated storefront can produce legitimately and a redirect to a shared page can also produce.`
+  );
 }

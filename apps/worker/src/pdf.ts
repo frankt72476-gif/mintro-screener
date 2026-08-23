@@ -11,7 +11,7 @@
  */
 
 import type { Browser } from 'playwright';
-import type { ScreeningReport } from '@mintro/engine';
+import type { RunCommentary, ScreeningReport } from '@mintro/engine';
 
 export interface PdfOptions {
   /** Origin serving the report route. */
@@ -32,6 +32,14 @@ export interface PdfOptions {
   readonly inject?: {
     readonly report: ScreeningReport;
     readonly evidence: Readonly<Record<string, string>>;
+    /**
+     * What the merchant said, and where the invitation stands (D-063).
+     *
+     * `null` means the read failed, and it is passed rather than omitted: omitting it renders as
+     * a report that never used commentary, so a merchant's account could vanish from the document
+     * that decides their application without anything on the page saying so.
+     */
+    readonly commentary?: RunCommentary | null;
   };
 }
 

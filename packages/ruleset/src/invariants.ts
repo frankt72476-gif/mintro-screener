@@ -106,6 +106,7 @@ function checkRule(
   index: number,
   categoriesById: Map<string, Category>,
   knownRuleIds: ReadonlySet<string>,
+  allRules: ReadonlyMap<string, Rule>,
 ): RulesetDefect[] {
   const defects: RulesetDefect[] = [];
   const at = (field: string): string => `rules[${index}].${field}`;
@@ -175,6 +176,42 @@ function checkRule(
     }
   }
 
+  /*
+    A corroboration pair must exist, be mutual, and not be a rule with itself (D-050).
+
+    Mutual because the report renders the pair on **both** findings. A one-sided declaration
+    would show the relation on one finding and not the other, so a reader arriving at the second
+    would not know the first existed — and which finding a reader opens first is not something
+    the rule set gets to decide.
+  */
+  for (const partner of rule.corroborates ?? []) {
+    if (partner === rule.id) {
+      defects.push(defect(rule.id, at('corroborates'), 'names itself'));
+      continue;
+    }
+    if (!knownRuleIds.has(partner)) {
+      defects.push(
+        defect(
+          rule.id,
+          at('corroborates'),
+          `names rule '${partner}', which is not in the rule set`,
+        ),
+      );
+      continue;
+    }
+    const other = allRules.get(partner);
+    if (other !== undefined && !(other.corroborates ?? []).includes(rule.id)) {
+      defects.push(
+        defect(
+          rule.id,
+          at('corroborates'),
+          `names '${partner}', but '${partner}' does not name it back — the report renders the ` +
+            `pair on both findings, so the relation has to be declared on both rules`,
+        ),
+      );
+    }
+  }
+
   // Tiers that the check type forbids. Hard constraint 4.
   const forbidden = ALWAYS_REVIEW_ONLY[rule.type as keyof typeof ALWAYS_REVIEW_ONLY];
   if (forbidden !== undefined && rule.tier !== 'review_only') {
@@ -213,8 +250,9 @@ export function checkInvariantsOn(
 
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
   const knownRuleIds = new Set(rules.map(({ rule }) => rule.id));
+  const allRules = new Map(rules.map(({ rule }) => [rule.id, rule]));
   for (const { rule, index } of rules) {
-    defects.push(...checkRule(rule, index, categoriesById, knownRuleIds));
+    defects.push(...checkRule(rule, index, categoriesById, knownRuleIds, allRules));
   }
 
   return defects;

@@ -196,9 +196,21 @@ function linkTextFinding(
   expect: 'present' | 'absent',
   terms: readonly string[],
 ): Finding {
+  /*
+    The rule's declared surface decides which links are examined (D-049).
+
+    PAY-003 declares `surface: footer` and expects presence. Scanning the whole page would let a
+    "Returns" link in the header satisfy a rule about the footer — a wider search producing a
+    `pass` the declared surface does not support. OFFS-007 declares `homepage` and keeps the whole
+    page. The rule set is data; the handler follows what it says (hard constraint 1).
+  */
+  const footerOnly = rule.params.surface === 'footer';
+  const scope = footerOnly ? page.links.filter((link) => link.inFooter) : page.links;
+  const where = footerOnly ? 'the rendered homepage footer' : 'the rendered homepage';
+
   const matches: { text: string; href: string; term: string }[] = [];
 
-  for (const link of page.links) {
+  for (const link of scope) {
     const text = link.text.toLowerCase();
     if (text === '') continue;
     const term = terms.find((candidate) => text.includes(candidate.toLowerCase()));
@@ -208,7 +220,7 @@ function linkTextFinding(
   const found = matches.length > 0;
   const violates = expect === 'absent' ? found : !found;
 
-  const examined = page.links.filter((link) => link.text.trim() !== '').length;
+  const examined = scope.filter((link) => link.text.trim() !== '').length;
   const caveat =
     ' The visible text of these links was examined; their destinations were not followed.';
 
@@ -216,7 +228,7 @@ function linkTextFinding(
     return satisfied(
       rule,
       expect === 'absent'
-        ? `${examined} link(s) with visible text on the rendered homepage were examined for ${quoteAll(terms)}; none matched.${caveat}`
+        ? `${examined} link(s) with visible text in ${where} were examined for ${quoteAll(terms)}; none matched.${caveat}`
         : `Observed link text matching ${quoteAll(terms)}.${caveat}`,
       RENDERED,
       pageEvidence(page),
@@ -226,7 +238,7 @@ function linkTextFinding(
   if (!found) {
     return violation(
       rule,
-      `No link with visible text matching ${quoteAll(terms)} was observed among ${examined} link(s) on the rendered homepage.${caveat}`,
+      `No link with visible text matching ${quoteAll(terms)} was observed among ${examined} link(s) in ${where}.${caveat}`,
       RENDERED,
       pageEvidence(page),
     );
@@ -240,7 +252,7 @@ function linkTextFinding(
 
   return violation(
     rule,
-    `${dedupe(matches).length} of ${examined} link(s) on the rendered homepage have visible text matching ${quoteAll(terms)}: ${listed}${more}.${caveat}`,
+    `${dedupe(matches).length} of ${examined} link(s) in ${where} have visible text matching ${quoteAll(terms)}: ${listed}${more}.${caveat}`,
     RENDERED,
     [
       {

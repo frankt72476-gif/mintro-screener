@@ -19,6 +19,21 @@ import { describeSession, type SessionDescriptor } from '../session.js';
 export type FlowStage =
   /** The flow could not start — the product or the control was not found. */
   | 'not_started'
+  /**
+   * The flow ran but could not establish where it ended up (D-056).
+   *
+   * Distinct from `not_started`, and distinct from every stage that names a place. A flow that
+   * navigated somewhere it cannot identify has **observed nothing about checkout**, and saying so
+   * is the only honest report.
+   *
+   * This exists because the previous code had no way to say it. `runCheckoutFlow` returned
+   * `checkout` whenever it found no payment marker, wherever it happened to be standing — and on
+   * swisschems.is, whose empty-cart `/checkout` redirects to `/shop/`, that made GATE-003 report
+   * a product listing as "stopped at checkout, no payment field observed". Since GATE-003 is
+   * `fail_if: payment_step_reached`, that read as a **pass**: a false pass on a `critical`
+   * `auto_fail` rule, roughly nine runs in ten.
+   */
+  | 'unestablished'
   | 'cart'
   | 'checkout'
   /** A payment form was reached: card fields present and fillable. */
@@ -51,18 +66,57 @@ export interface FlowProbeInput {
   readonly session: SessionDescriptor;
 }
 
+/**
+ * The flows and stages, in words a reader outside Mintro can use (D-060).
+ *
+ * `add_to_cart_then_checkout` and `payment_step_reached` are identifiers in the rule set and in
+ * this file. They were reaching the report verbatim — *"The 'add_to_cart_then_checkout' flow
+ * reached 'payment_step_reached'"* — in a document an underwriter reads to decide on a merchant.
+ *
+ * Caught by `auditInternalVocabulary` the first time it matched on **shape** rather than on a list
+ * of check-type names. The list had been extended once for D-044 and did not cover these, because
+ * a flow name is not a check type: the same failure in a new spelling, which is why the audit now
+ * matches the shape.
+ */
+const FLOW_NAMES: Readonly<Record<string, string>> = {
+  add_to_cart_then_checkout: 'adding a product to the cart and going to checkout',
+  checkout_address_validation: 'entering a delivery address at checkout',
+};
+
+const STAGE_NAMES: Readonly<Record<FlowStage, string>> = {
+  not_started: 'the flow could not be started',
+  unestablished: 'a page that could not be identified',
+  cart: 'the cart',
+  checkout: 'the checkout page, with no payment form shown',
+  payment_step_reached: 'a payment form',
+  redirected_to_login: 'a sign-in page',
+  accepted: 'the value being accepted',
+  rejected: 'the value being rejected',
+};
+
+const flowName = (flow: string): string => FLOW_NAMES[flow] ?? 'the scripted purchase flow';
+const stageName = (stage: string): string =>
+  STAGE_NAMES[stage as FlowStage] ?? 'a stage this report cannot name';
+
 /** A flow is driven in a browser, so its capture is a rendered page. */
 const RENDERED = 'rendered_page' as const;
 
 export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeInput): Finding {
   const { observation, session } = input;
 
-  // A flow that never started observed nothing. "We could not add anything to a cart" is not
-  // "guest checkout is disabled" — the second is a finding, the first is a failure to look.
-  if (observation.reached === 'not_started') {
+  /*
+    Two ways of having observed nothing, and neither may become a verdict (D-056).
+
+    `not_started` is a failure to begin. `unestablished` is a flow that went somewhere it could
+    not identify — which is not the same as arriving at checkout and finding no payment form.
+    Reading the second as the first is how this rule spent its life passing merchants who offer
+    guest checkout: "we did not see a payment field" is only an observation if you know you were
+    looking at checkout.
+  */
+  if (observation.reached === 'not_started' || observation.reached === 'unestablished') {
     return notEvaluable(
       rule,
-      observation.error ?? `the '${observation.flow}' flow could not be started on this storefront`,
+      observation.error ?? `${flowName(observation.flow)} could not be started on this storefront`,
       RENDERED,
       'not_exposed',
       [flowEvidence(observation, session)],
@@ -78,7 +132,18 @@ export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeI
   }
 
   return violation(rule, describeViolation(rule, observation, session), RENDERED, [
-    { ...flowEvidence(observation, session), matchedValue: `reached ${observation.reached}` },
+    {
+      ...flowEvidence(observation, session),
+      /*
+        What was observed on the merchant's page, not our name for the stage (D-060 amended).
+
+        This used to read `reached payment_step_reached`. `matchedValue` is documented as "what was
+        matched, verbatim" — merchant content — and putting our own identifier there both misstates
+        the field and would exempt that identifier from the vocabulary audit, since the audit trusts
+        this field to be theirs.
+      */
+      matchedValue: observation.steps[observation.steps.length - 1] ?? observation.finalUrl,
+    },
   ]);
 }
 
@@ -87,7 +152,7 @@ function describeViolation(
   observation: FlowObservation,
   session: SessionDescriptor,
 ): string {
-  return `The '${observation.flow}' flow reached '${observation.reached}', which this rule treats as a violation. Steps: ${observation.steps.join(' → ')}. The flow was ${describeSession(session)}.`;
+  return `${capitalise(flowName(observation.flow))} reached ${stageName(observation.reached)}, which this rule treats as a violation. Steps: ${observation.steps.join(' → ')}. The flow was ${describeSession(session)}.`;
 }
 
 /**
@@ -104,9 +169,9 @@ function describeClean(
   const stopped =
     observation.reached === 'redirected_to_login'
       ? 'it was redirected to a sign-in page'
-      : `it stopped at '${observation.reached}'`;
+      : `it stopped at ${stageName(observation.reached)}`;
 
-  return `The '${observation.flow}' flow did not reach '${rule.params.fail_if}': ${stopped}. Steps: ${observation.steps.join(' → ')}. The flow was ${describeSession(session)}. Only this one path through checkout was exercised.`;
+  return `${capitalise(flowName(observation.flow))} did not reach ${stageName(rule.params.fail_if)}: ${stopped}. Steps: ${observation.steps.join(' → ')}. The flow was ${describeSession(session)}. Only this one path through checkout was exercised.`;
 }
 
 function flowEvidence(observation: FlowObservation, session: SessionDescriptor): Evidence {
@@ -126,3 +191,6 @@ function flowEvidence(observation: FlowObservation, session: SessionDescriptor):
     session,
   };
 }
+
+/** Sentence case, for a phrase that starts a finding. */
+const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);

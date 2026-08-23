@@ -59,12 +59,15 @@ export {
   MISSING_REGION,
   NO_GATE,
   NO_SHOP_STRUCTURE,
+  NO_SIGNUP_FORM,
+  type FormField,
   type GateContext,
   type PageContext,
   type PageLink,
   type PageRegion,
   type Rgb,
   type ShopStructure,
+  type SignupForm,
   type StyledText,
 } from './page.js';
 
@@ -119,6 +122,7 @@ export {
   INTERNAL_TERMS,
   auditCopy,
   auditInternalVocabulary,
+  quotedFromEvidence,
   auditRequirement,
   REQUIREMENT_HEADINGS,
   auditAnalystNote,
@@ -129,17 +133,79 @@ export {
 
 export { checkDomAssert } from './checks/domAssert.js';
 export { checkTextCooccurrence, findCooccurrences, type Cooccurrence } from './checks/textCooccurrence.js';
-export { runLayer2, layer2Rules, type Layer2Run, type SampledPage } from './layer2.js';
+export {
+  runLayer2,
+  layer2Rules,
+  assessSampleDistinctness,
+  describeSampleCollapse,
+  type Layer2Run,
+  type SampledPage,
+} from './layer2.js';
+export { runLayer3, layer3Rules, isBuilt, type Layer3Input, type Layer3Run } from './layer3.js';
+export { checkPaymentTerms, type PublicSurface } from './checks/payment.js';
+export {
+  checkSignupAcknowledgement,
+  checkSignupResearchField,
+  isAccountField,
+  additionalFields,
+  checkboxes,
+} from './checks/signupForm.js';
+
+export {
+  checkCoaDate,
+  checkCoaPurity,
+  checkCoaFields,
+  findDate,
+  findPurity,
+  type Certificate,
+  type CertificateOutcome,
+} from './checks/docParse.js';
+export { extractPdfText, looksLikePdf, isReadableText, type PdfText } from './pdf.js';
+
+export {
+  invitesComment,
+  commentaryFor,
+  describeCommentary,
+  type MerchantComment,
+  type CommentInvitation,
+  type CommentVisit,
+  type CommentaryState,
+  type FindingCommentary,
+} from './commentary.js';
+
+export {
+  readRunCommentary,
+  type CommentaryReader,
+  type RunCommentary,
+} from './commentaryStore.js';
+
+export {
+  COMMENT_PATH,
+  commentLinkFor,
+  commentTokenFrom,
+} from './commentLink.js';
+
+export {
+  located,
+  unreachable,
+  endedAtWhatWasAsked,
+  pathNamesSurface,
+  normalisePath,
+  type Located,
+  type SurfaceSpec,
+} from './surface.js';
 
 export {
   assembleReport,
   computeCoverage,
+  pairSameObservation,
   describeVerdict,
   type AssembleInput,
   type ReportCategory,
   type ReportAccess,
   type ReportCoverage,
   type ReportFinding,
+  type SameObservationPair,
   type ScanMode,
   type ScreeningReport,
 } from './report.js';

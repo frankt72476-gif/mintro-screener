@@ -1016,3 +1016,246 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 
 .queue-open:hover { color: var(--violet-deep); }
+
+/* ── Coverage breakdown (D-049) ─────────────────────────────────────────────────────────────
+   Whose limitation each gap is, said in the report rather than worked out by the reader. The
+   colour carries the same distinction the words do: violet is Mintro's own shortfall. */
+
+.cov-break { margin: 14px 0 16px; }
+
+.cov-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.cov-split { font-size: 12px; color: var(--slate); }
+.cov-split b { color: var(--ink); }
+
+.cov-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
+}
+
+.cov-col {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 7px;
+  background: var(--card);
+}
+
+.cov-n {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.cov-t {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  margin-top: 3px;
+}
+
+.cov-w {
+  display: block;
+  font-size: 10.5px;
+  color: var(--slate);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+.cov-col.done { border-left-color: #B7E7D2; }
+/* Mintro's own gap, in Mintro's own colour. */
+.cov-col.ours { border-left-color: var(--purple); }
+.cov-col.ours .cov-n { color: var(--purple); }
+.cov-col.nobody { border-left-color: #DCD8E8; }
+.cov-col.merchant { border-left-color: var(--amber); }
+.cov-col.legacy { border-left-color: var(--line); }
+
+.printing .cov-break { break-inside: avoid; page-break-inside: avoid; }
+
+/* -- Findings that describe the same observation (D-050) ------------------------------------
+   Side by side, and nothing between them. The layout is the whole statement: no connector, no
+   arrow, no summary line. Mintro shows; IQwallet concludes (D-001). */
+
+.same-obs { margin: 0 0 18px; }
+.same-obs > .eyebrow { display: block; margin-bottom: 8px; }
+
+.same-obs-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.same-obs-item {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.same-obs-item.fail { border-left-color: var(--rose); }
+.same-obs-item.review { border-left-color: var(--amber); }
+.same-obs-item.na { border-left-color: #DCD8E8; }
+.same-obs-item.pass { border-left-color: #B7E7D2; }
+
+.same-obs-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.same-obs-title { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.same-obs-id { font-size: 10px; color: var(--slate); }
+
+.same-obs-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+}
+
+.printing .same-obs-pair { break-inside: avoid; page-break-inside: avoid; }
+
+/* `not_retrieved` — this run's limitation, not the merchant's and not Mintro's (D-058). */
+.cov-col.run { border-left-color: #9C94BD; }
+.sect[data-bucket='not_retrieved']::before { content: 'This run could not fetch these'; }
+
+/* -- The merchant's response (D-063) --------------------------------------------------------
+   Attribution carried by four signals, not one: a separate container, a named source, a visible
+   quotation, and a serif face against the report's sans. Colour alone fails a reader who cannot
+   see it, and in print a border can read as a table rule.
+
+   Amber, deliberately not violet: violet is Mintro's colour throughout this report, and the one
+   thing this block must never look like is something Mintro said. */
+
+.mr {
+  margin: 8px 0 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1px solid #F0DCC0;
+  border-left: 4px solid var(--amber);
+  background: #FEFAF3;
+}
+
+.mr-head {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #8A5A12;
+  margin-bottom: 6px;
+}
+
+/* Their words. Serif, quoted, and their own line breaks preserved. */
+.mr-body {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 2px solid #E6C89A;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.mr-cite {
+  display: block;
+  margin-top: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-style: normal;
+  color: #8A5A12;
+}
+
+/* Said nothing, or never opened it. Sans-serif and grey: this is Mintro describing delivery,
+   not the merchant speaking, and it must not look like a quotation. */
+.mr-silent { background: #FBFAFD; border-color: var(--line); border-left-color: #DCD8E8; }
+.mr-none { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--slate); }
+
+.mr-note {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.printing .mr { break-inside: avoid; page-break-inside: avoid; }
+
+/* -- The run-level commentary note (D-063) --------------------------------------------------
+   Two facts that cannot be stated beneath a finding, because both are the reason the spaces
+   beneath findings are blank: the responses could not be read, and the invitation was never
+   transmitted. Near the top, where a reader meets it before the blanks it explains.
+
+   Grey and sans, like `.mr-silent`: this is Mintro describing its own delivery, not the merchant
+   speaking, and nothing here may look like a quotation. */
+
+.cnote {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border-left: 3px solid #DCD8E8;
+}
+
+.cnote-head {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 5px;
+}
+
+.cnote p { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--slate); }
+
+.printing .cnote { break-inside: avoid; page-break-inside: avoid; }
+
+/* -- The merchant's comment box (D-063) -----------------------------------------------------
+   A textarea and a button. No character counter, no formatting controls, no placeholder — a
+   placeholder is a suggestion about content, and this box suggests nothing. */
+
+.cbox {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border: 1px dashed #E6C89A;
+  border-radius: 8px;
+  background: #FFFDF8;
+}
+
+.cbox .flabel { display: block; margin-bottom: 6px; }
+.cbox-input { width: 100%; font-family: inherit; font-size: 13px; line-height: 1.55; resize: vertical; }
+.cbox-foot { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.cbox-problem { font-size: 11.5px; color: #7A1F31; }
+
+/* What they already wrote. Shown above the box because it is already part of the document
+   IQwallet may have read — adding never replaces (D-002). */
+.cbox-prior { margin-bottom: 12px; }
+.cbox-prior p {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 2px solid #E6C89A;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.cbox-when {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  color: #8A5A12;
+  margin-bottom: 3px;
+}
+.cbox-hint { font-family: inherit !important; font-size: 11px !important; color: var(--slate); border: 0 !important; padding-left: 0 !important; }
+
+/* Who is responding (D-063). Asked once, before anything can be written. */
+.ident { padding: 14px 16px; margin: 14px 0 18px; }
+.ident-done { font-size: 12.5px; color: var(--ink-mid); }

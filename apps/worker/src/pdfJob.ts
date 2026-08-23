@@ -20,7 +20,7 @@
  */
 
 import type { Browser } from 'playwright';
-import type { ScreeningReport } from '@mintro/engine';
+import { readRunCommentary, type ScreeningReport } from '@mintro/engine';
 import { startReportServer } from './reportServer.js';
 import { renderReportPdf } from './pdf.js';
 import { attachmentName } from './send.js';
@@ -29,7 +29,15 @@ import { signEvidenceUrl, type WorkerSupabase } from './store/supabase.js';
 export interface PdfJobResult {
   readonly storageKey: string;
   readonly pages: number;
-  readonly bytes: number;
+  /**
+   * The rendered bytes.
+   *
+   * Returned as well as stored so the send attaches **the artifact that was stored** rather than a
+   * second render. Two renders of the same run can differ — fonts, capture availability, a rule
+   * set that moved — and the document IQwallet holds must be the one Mintro can produce again
+   * (D-002).
+   */
+  readonly pdf: Buffer;
 }
 
 /**
@@ -52,6 +60,20 @@ export async function renderRunPdf(
   // render. Same component, different data source — not a second template.
   const evidence = await signCitedCaptures(supabase, report);
 
+  /*
+    The merchant's responses travel with the observations (D-063).
+
+    This is the document that reaches IQwallet, so it carries who identified themselves, when they
+    opened it, when each response was written, and which invited findings were left unanswered. A
+    screen that shows a merchant's account and an export that drops it are two documents, and the
+    export is the one that decides anything.
+
+    `null` — the read failed — is passed through rather than omitted. Omitting it would render as
+    a report that never used commentary at all; passing it renders "these could not be read",
+    which is the fact. Never an absence of comment.
+  */
+  const commentary = await readRunCommentary(supabase.client, input.runId);
+
   const server = await startReportServer({
     webRoot: input.webRoot,
     // No local mounts. Everything the page needs is injected or signed; a worker that served
@@ -63,7 +85,7 @@ export async function renderRunPdf(
     const pdf = await renderReportPdf(browser, {
       origin: server.origin,
       domain: report.merchantDomain,
-      inject: { report, evidence },
+      inject: { report, evidence, commentary },
     });
 
     const storageKey = `${input.runId}/report/${input.requestId}.pdf`;
@@ -80,7 +102,7 @@ export async function renderRunPdf(
       throw new Error(`could not store the rendered PDF at ${storageKey}: ${error.message}`);
     }
 
-    return { storageKey, pages: pdf.pages, bytes: pdf.bytes.byteLength };
+    return { storageKey, pages: pdf.pages, pdf: pdf.bytes };
   } finally {
     await server.close();
   }

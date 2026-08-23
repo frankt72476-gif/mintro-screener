@@ -208,13 +208,85 @@ export const REQUIREMENT_HEADINGS = {
 } as const;
 
 /**
- * Finds Mintro's internal vocabulary in reader-facing text (D-044).
+ * URLs, removed before a vocabulary scan.
+ *
+ * A URL is the merchant's own text quoted back, and it may legitimately contain anything —
+ * `/wp-content/uploads/COA_BPC-157.pdf` is not Mintro vocabulary leaking into a report. Scanning
+ * it would produce failures no one could act on, and the usual response to those is to weaken the
+ * guard.
+ */
+const URL_PATTERN = /https?:\/\/\S+/g;
+
+/**
+ * Identifiers shaped like code: `batch_lot`, `purity_pct`, `not_evaluable`.
+ *
+ * **Matched by shape, not by a list** (D-060). A list of known identifiers catches the ones
+ * someone thought of; the shape catches the next one, whatever it is called. `auditCopy`'s term
+ * list was extended once for check-type names and immediately missed `batch_lot` in COA-004's
+ * note, because a rule's own field names are not check types — the same failure in a new spelling.
+ *
+ * Lowercase-only, so a merchant's `COA_BPC-157` filename is not mistaken for one of ours.
+ */
+const SNAKE_CASE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
+
+/**
+ * Finds Mintro's internal vocabulary in reader-facing text (D-044, D-060).
  *
  * Separate from `auditCopy` because the two failures are different: directive language breaks
  * D-001 and hard constraint 7 by telling the reader what to do, while this breaks the report's
  * usefulness by describing Mintro's implementation to someone who has no reason to know it.
  * Both are build failures; keeping them apart keeps the diagnostic honest about which one fired.
  */
-export function auditInternalVocabulary(text: string): CopyAudit {
-  return auditCopy(text, INTERNAL_TERMS);
+export function auditInternalVocabulary(text: string, quoted: readonly string[] = []): CopyAudit {
+  const withoutUrls = text.replace(URL_PATTERN, ' ');
+
+  /*
+    What the merchant wrote is exempt; what we wrote is not. **The distinction is provenance, not
+    shape** (D-060, amended).
+
+    The first version matched snake_case anywhere and flagged `et_pb_column`, `et_pb_module`,
+    `et_pb_text_inner` in DISC-002's finding on two merchants. Those are Divi theme class names —
+    the **merchant's markup**, quoted as the evidence for where the disclaimer was found. A CSS
+    selector *is* the evidence, and rewriting it would destroy the finding's backing.
+
+    A guard matching form rather than origin keeps catching the wrong things, and one that cries
+    wolf on legitimate evidence is one people learn to suppress.
+
+    `quoted` is what the finding recorded as coming from the merchant — `matchedValue`,
+    `sourceUrl`, `matchedUrls`, the URLs of attempts. Any identifier appearing there is theirs.
+    Anything left is ours.
+  */
+  const exempt = new Set((quoted.join(' ').match(SNAKE_CASE) ?? []).map((token) => token));
+
+  const named = auditCopy(withoutUrls, INTERNAL_TERMS).flagged.filter((term) => !exempt.has(term));
+  const shaped = [...new Set(withoutUrls.match(SNAKE_CASE) ?? [])].filter(
+    (token) => !exempt.has(token),
+  );
+
+  const flagged = [...named, ...shaped.filter((token) => !named.includes(token))];
+  return { flagged, clean: flagged.length === 0 };
+}
+
+/**
+ * The merchant-derived strings a finding recorded, for `auditInternalVocabulary`.
+ *
+ * Reads only fields the `Evidence` type defines as the merchant's: `matchedValue` is documented as
+ * "what was matched, verbatim", and the URLs are theirs by construction. **Where our own text ends
+ * up in one of these, that is a defect in the finding rather than a reason to distrust the field**
+ * — and this audit surfaces it, because our identifier then becomes exempt and stops being caught.
+ */
+export function quotedFromEvidence(
+  evidence: readonly {
+    readonly matchedValue?: string;
+    readonly sourceUrl?: string;
+    readonly matchedUrls?: readonly string[];
+    readonly attempts?: readonly { readonly url: string }[];
+  }[],
+): readonly string[] {
+  return evidence.flatMap((entry) => [
+    entry.matchedValue ?? '',
+    entry.sourceUrl ?? '',
+    ...(entry.matchedUrls ?? []),
+    ...(entry.attempts ?? []).map((attempt) => attempt.url),
+  ]);
 }

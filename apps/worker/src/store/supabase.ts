@@ -75,7 +75,7 @@ export async function putEvidence(
   supabase: WorkerSupabase,
   artifact: EvidenceArtifact,
 ): Promise<StoredEvidence> {
-  const body = artifact.kind === 'screenshot' ? artifact.gzip : artifact.gzip;
+  const body = artifact.gzip;
   const path = storagePathFor(artifact);
 
   const { error } = await supabase.client.storage.from(supabase.bucket).upload(path, body, {
@@ -100,7 +100,8 @@ export async function putEvidence(
 /**
  * The storage path for an artifact.
  *
- * Text artifacts are stored gzipped and carry `.gz`; screenshots are PNG and already compressed.
+ * Text artifacts are stored gzipped and carry `.gz`. Already-compressed kinds — a screenshot's
+ * PNG, a certificate's PDF — are stored as fetched and keep their key.
  *
  * ## The path is derived from the key. It is not the key.
  *
@@ -123,8 +124,21 @@ export function storagePathFor(artifact: EvidenceArtifact): string {
  * spelling the rule out separately is how the divergence above happened.
  */
 export function storagePathForKey(key: string, kind: string): string {
-  return kind === 'screenshot' ? key : `${key}.gz`;
+  return ALREADY_COMPRESSED.has(kind) ? key : `${key}.gz`;
 }
+
+/**
+ * Artifact kinds stored as fetched rather than gzipped.
+ *
+ * The rule was `kind === 'screenshot'`, written when PNG was the only already-compressed kind.
+ * Adding `coa` in D-057 meant a PDF was stored raw and **named `.gz`** — a file whose name says
+ * gzip and whose bytes are not, which anything decompressing by extension would fail on. Found by
+ * reading a stored artifact back (D-058).
+ *
+ * A set rather than a comparison, so the next already-compressed kind is a one-line addition here
+ * instead of a second place expressing the same rule.
+ */
+const ALREADY_COMPRESSED = new Set(['screenshot', 'coa']);
 
 function contentTypeFor(artifact: EvidenceArtifact): string {
   switch (artifact.kind) {

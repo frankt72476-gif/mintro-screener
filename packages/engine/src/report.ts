@@ -70,6 +70,14 @@ export interface ReportCoverage {
    */
   readonly notApplicable: number;
   /**
+   * This run could not fetch it — a timeout or a connection failure (D-058).
+   *
+   * Counted apart from every other kind because it is the only one that is about **this run**
+   * rather than about Mintro, the nature of the question, or the merchant. A re-run may resolve
+   * it; nothing else here changes on repetition.
+   */
+  readonly notRetrieved: number;
+  /**
    * `not_evaluable` findings from runs recorded before D-044, which carry no kind.
    *
    * Counted separately and never folded into another bucket. Those runs are immutable (D-002),
@@ -89,6 +97,18 @@ export interface ReportCoverage {
   readonly outstanding: number;
 }
 
+/**
+ * Two findings the rule set pairs, with what each observed (D-050).
+ *
+ * Carries no characterisation, no severity of its own, and no sentence saying what the two have
+ * in common — the earlier draft ended with "both concern whether an account is required", and
+ * that is Mintro saying what the pair means. Adjacency conveys it without us saying it.
+ */
+export interface SameObservationPair {
+  readonly ruleIds: readonly [string, string];
+  readonly findings: readonly ReportFinding[];
+}
+
 export interface ScreeningReport {
   readonly runId: string;
   readonly merchantDomain: string;
@@ -105,6 +125,13 @@ export interface ScreeningReport {
   /** Descriptive summary. States counts and consequential failures; instructs nothing. */
   readonly verdict: string;
   readonly categories: readonly ReportCategory[];
+  /**
+   * Findings the rule set declares as describing the same observation (D-050).
+   *
+   * Shown side by side under a neutral heading. The report says nothing about what a pair means —
+   * adjacency is the whole of it. Mintro shows; IQwallet concludes (D-001).
+   */
+  readonly sameObservation: readonly SameObservationPair[];
   /** Every finding in rule-set order, for the tick strip. */
   readonly strip: readonly { readonly ruleId: string; readonly title: string; readonly state: State }[];
   /** Coverage limits the run hit, in words. Empty when nothing was truncated. */
@@ -221,6 +248,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     finishedAt: input.finishedAt,
     counts,
     coverage: computeCoverage(enriched),
+    sameObservation: pairSameObservation(enriched, ruleset),
     verdict: describeVerdict(enriched, counts),
     categories,
     strip: categories.flatMap((category) =>
@@ -262,6 +290,69 @@ function kindForUnrun(rule: Rule): NotEvaluableKind {
 
 
 /**
+ * Findings the rule set pairs as describing one observation (D-050).
+ *
+ * ## Which findings may take part
+ *
+ * `pass` never does: a rule that was satisfied describes nothing that needs a second angle.
+ *
+ * The subtler half is `not_evaluable`, and D-044's kinds do the work. **`not_exposed` takes
+ * part** — the check ran, the site did not carry what it looks for, and that is an observation
+ * about the merchant backed by the requests attempted. **`no_check_built` and `not_reachable`
+ * never do**: the first is a fact about Mintro and the second about what any crawl can see, and
+ * pairing either would manufacture significance out of nobody having looked. `not_applicable`
+ * does not either — a rule whose subject is absent has been resolved, not observed.
+ *
+ * That distinction matters because the pair this was built for is exactly that shape: GATE-002
+ * observing products served anonymously, beside GATE-004 and GATE-005 observing no reachable
+ * account-creation form. A rule of "both must be evaluated" would have excluded the case that
+ * motivated the feature.
+ *
+ * ## Declared, never inferred
+ *
+ * Pairs come from `corroborates` in the rule set, and `invariants.ts` requires the relation on
+ * both rules. An engine that noticed findings "going together" would start finding coincidences.
+ */
+export function pairSameObservation(
+  findings: readonly ReportFinding[],
+  ruleset: Ruleset,
+): readonly SameObservationPair[] {
+  const byRule = new Map<string, ReportFinding[]>();
+  for (const finding of findings) {
+    const list = byRule.get(finding.ruleId);
+    if (list === undefined) byRule.set(finding.ruleId, [finding]);
+    else list.push(finding);
+  }
+
+  const pairs: SameObservationPair[] = [];
+  const seen = new Set<string>();
+
+  for (const rule of ruleset.rules) {
+    for (const partnerId of rule.corroborates ?? []) {
+      const key = [rule.id, partnerId].sort().join('|');
+      if (seen.has(key)) continue;
+
+      const own = (byRule.get(rule.id) ?? []).filter(participates);
+      const other = (byRule.get(partnerId) ?? []).filter(participates);
+      if (own.length === 0 || other.length === 0) continue;
+
+      seen.add(key);
+      pairs.push({ ruleIds: [rule.id, partnerId], findings: [...own, ...other] });
+    }
+  }
+
+  return pairs;
+}
+
+/** Whether a finding is an observation about the merchant that a pair can rest on. */
+function participates(finding: ReportFinding): boolean {
+  if (finding.state === 'pass') return false;
+  if (finding.state !== 'not_evaluable') return true;
+  // Only the kind that means "the check ran and this storefront did not carry it".
+  return finding.notEvaluableKind === 'not_exposed';
+}
+
+/**
  * Coverage, computed from the findings themselves.
  *
  * Each `not_evaluable` finding is counted under the kind **it declared** when it was created. No
@@ -281,6 +372,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
   const noCheckBuilt = of('no_check_built');
   const notReachable = of('not_reachable');
   const notExposed = of('not_exposed');
+  const notRetrieved = of('not_retrieved');
   const kindNotRecorded = unevaluated.filter((finding) => finding.notEvaluableKind === undefined).length;
 
   return {
@@ -290,12 +382,15 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     notReachable,
     notExposed,
     notApplicable,
+    notRetrieved,
     kindNotRecorded,
     // Resolved and outstanding are derived here rather than in the renderer, for the same reason
     // coverage itself is: a renderer that computed them could get the split wrong quietly, and
     // the PDF and the screen would then disagree about how much was screened.
     resolved: evaluable + notApplicable,
-    outstanding: noCheckBuilt + notReachable + notExposed + kindNotRecorded,
+    // `not_retrieved` is outstanding: a request that failed established nothing, so nothing was
+    // resolved. Unlike the others it may resolve on a re-run (D-058).
+    outstanding: noCheckBuilt + notReachable + notExposed + notRetrieved + kindNotRecorded,
   };
 }
 

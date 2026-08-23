@@ -42,6 +42,20 @@ const ruleCommon = {
   tier: z.enum(TIERS),
   title: z.string().min(1),
   clause: z.string().min(1),
+  /**
+   * Rules that describe the same observation from another angle (D-050).
+   *
+   * Declared here, in data, never inferred by the engine. A heuristic that noticed findings
+   * "going together" would start finding coincidences, and each pair is a ruling with a decision
+   * number behind it.
+   *
+   * The report shows the paired findings side by side and says nothing about what the pair
+   * means. Mintro shows; IQwallet concludes (D-001).
+   *
+   * `invariants.ts` checks that every id named here exists and that the relation is declared on
+   * both rules — a one-sided pair would render on one finding and not the other.
+   */
+  corroborates: z.array(z.string().regex(RULE_ID_PATTERN)).optional(),
 } as const;
 
 /**

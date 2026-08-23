@@ -12,6 +12,8 @@
 
 import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
+import { cartHoldsProduct } from './cart.js';
+import { establishCheckout } from './locate.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
 
 /** Markers that identify a payment step without submitting anything. */
@@ -83,9 +85,37 @@ export async function runCheckoutFlow(
 
     const added = await clickFirst(page, ADD_TO_CART, timeout);
     if (!added) return await observe('not_started', 'no add-to-cart control was found on the product page');
-    steps.push('added to cart');
+    steps.push('clicked add to cart');
 
-    await page.waitForLoadState('domcontentloaded', { timeout }).catch(() => undefined);
+    /*
+      The cart is established by asking the store, never inferred from the click (D-056).
+
+      A click landing is not an item in a cart. WooCommerce adds over AJAX, and the wait below
+      used to resolve immediately because no navigation happens — so the flow reached `/checkout`
+      with an empty cart, which swisschems.is answers with a redirect to `/shop/`. No payment
+      field on a product listing, and GATE-003 is `fail_if: payment_step_reached`, so that read
+      as a **pass** on a merchant whose guest checkout reaches a card field.
+    */
+    const cart = await cartHoldsProduct(page, options.origin, options.productUrl);
+
+    if (cart === null) {
+      steps.push('the cart could not be read');
+      return await observe(
+        'unestablished',
+        'the cart could not be read, so it is not known whether anything was added — and a ' +
+          'checkout reached with an empty cart says nothing about guest checkout',
+      );
+    }
+
+    if (cart === 'empty') {
+      steps.push('the cart was still empty after adding');
+      return await observe(
+        'not_started',
+        'the add-to-cart control was clicked but the cart remained empty, so the flow never began',
+      );
+    }
+
+    steps.push('cart confirmed to hold the product');
 
     const proceeded = await clickFirst(page, CHECKOUT_CONTROLS, timeout);
     if (!proceeded) {
@@ -102,8 +132,9 @@ export async function runCheckoutFlow(
     await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
 
     // A redirect to a sign-in page is the compliant behaviour, and is reported as such rather
-    // than as a failure to reach payment.
-    if (/login|signin|sign-in|account/i.test(new URL(page.url()).pathname)) {
+    // than as a failure to reach payment. It is a *positive* observation about where the flow
+    // ended, which is why it stands where "no payment field" does not.
+    if (/login|signin|sign-in|account|register/i.test(new URL(page.url()).pathname)) {
       steps.push(`redirected to ${new URL(page.url()).pathname}`);
       return await observe('redirected_to_login');
     }
@@ -117,7 +148,20 @@ export async function runCheckoutFlow(
       }
     }
 
-    steps.push('no payment field observed');
+    /*
+      No payment field. That is only an observation if we know we are looking at checkout.
+
+      This is the sixth instance of one defect and the costliest: the old code returned `checkout`
+      from wherever it happened to be standing, so a product listing reached by redirect was
+      reported as "stopped at checkout, no payment field observed" (D-054, D-056).
+    */
+    const where = await establishCheckout(page);
+    if (!where.located) {
+      steps.push(where.reason);
+      return await observe('unestablished', where.reason);
+    }
+
+    steps.push(`no payment field observed on ${where.how}`);
     return await observe('checkout');
   } catch (error) {
     const raw = error instanceof Error ? error.message : String(error);
@@ -145,4 +189,10 @@ async function clickFirst(
     }
   }
   return false;
+}
+
+/** The first line of an error message, which is the part that names what went wrong. */
+function firstLine(message: string): string {
+  const [first] = message.split(/\r?\n/);
+  return first === undefined || first === '' ? 'the flow failed' : first;
 }
