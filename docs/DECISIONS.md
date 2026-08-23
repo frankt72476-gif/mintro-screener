@@ -3575,6 +3575,33 @@ radius.
 
 What no check can establish is whether the named person actually answers. That stays Frank's.
 
+### The first live send failed, and the failure was worth more than the send
+
+Two defects, found by sending one real message and by no test.
+
+**The insert named a column that has never existed.** `sends` has no `merchant_domain` — the domain
+is reachable through `run_id` — and PostgREST refused the row. By then **the message had already
+gone to Resend**, because `sendReport` transmits and then records: a provider's message id does not
+exist until it has been asked for one.
+
+**The queue row then said `failed`, which this document defines as *never reached a mailer*.** That
+is the serious half. An operator reading it would re-send, and IQwallet would receive the report
+twice. The job did fail; the message did not.
+
+So `send_requests.transmitted` records what the provider did, set the moment it answers and before
+the row is attempted — the same separation as `comment_invites.delivery`, for the same reason. The
+job's outcome and the message's outcome are two facts, and a schema that can only hold one will
+hold the wrong one exactly when it matters. A `done` job whose transmission contradicts its outcome
+is refused by a check constraint.
+
+**The regression test was wrong first, in the same shape.** It compared the table against a column
+list typed into the test file, so re-introducing `merchant_domain` in `sendJob.ts` left it green —
+a test asserting its own assumptions rather than the code's. The list now comes from `sendRowFor`,
+the single owner of the row shape, and re-introducing the bug fails it.
+
+That is the D-026 boundary lesson again, one day old: the seam between what the code writes and
+what the table holds had no owner, and each side was correct alone.
+
 ### Still open: the covering email to IQwallet
 
 The ruling was about the invitation, and it is implemented there. The report send now also has a

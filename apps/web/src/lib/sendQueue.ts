@@ -26,11 +26,19 @@ export interface SendSummary {
   readonly outcome: 'accepted' | 'rejected' | null;
   /** The `sends` row. Present whenever an attempt was recorded, rejection included. */
   readonly sendId: string | null;
+  /**
+   * Whether the provider accepted the message.
+   *
+   * Separate from `status` because a job can fail *after* transmitting — the record write can
+   * break once the mail has gone. A failed job with this true means the recipient may already
+   * have the report, and re-sending would deliver it twice (0018).
+   */
+  readonly transmitted: boolean;
   readonly error: string | null;
   readonly createdAt: string;
 }
 
-const COLUMNS = 'id, run_id, to_email, status, outcome, send_id, error, created_at';
+const COLUMNS = 'id, run_id, to_email, status, outcome, send_id, transmitted, error, created_at';
 
 interface SendRow {
   id: string;
@@ -39,6 +47,7 @@ interface SendRow {
   status: string;
   outcome: string | null;
   send_id: string | null;
+  transmitted: boolean;
   error: string | null;
   created_at: string;
 }
@@ -50,6 +59,7 @@ const toSummary = (row: SendRow): SendSummary => ({
   status: row.status as SendStatus,
   outcome: row.outcome as 'accepted' | 'rejected' | null,
   sendId: row.send_id,
+  transmitted: row.transmitted,
   error: row.error,
   createdAt: row.created_at,
 });
@@ -114,6 +124,14 @@ export const isSendPending = (status: SendStatus): boolean =>
  * action in this product with an outside recipient.
  */
 export function describeSend(send: SendSummary): string {
+  if (send.status === 'failed' && send.transmitted) {
+    // The mail went and the record did not. Never "nothing was sent" — an analyst who read that
+    // would send again, and the recipient would get the report twice (0018).
+    return (
+      `The report reached ${send.toEmail} but Mintro could not record the send. ` +
+      `Do not send again without checking. ${send.error ?? 'No reason was recorded.'}`
+    );
+  }
   if (send.status === 'failed') {
     return (
       `Nothing was sent to ${send.toEmail}, and no send was recorded. ` +

@@ -45,6 +45,25 @@ export interface SendJobResult {
 }
 
 /**
+ * Thrown when the message went and the record did not.
+ *
+ * A plain error here reads as "the send failed", and the queue would mark the job `failed` — which
+ * 0017 defines as *never reached a mailer*. An operator would re-send and IQwallet would receive
+ * the report twice. This type exists so the caller can write down which of the two happened.
+ */
+export class SentButUnrecordedError extends Error {
+  readonly transmitted = true;
+
+  constructor(
+    message: string,
+    readonly resendId: string | null,
+  ) {
+    super(message);
+    this.name = 'SentButUnrecordedError';
+  }
+}
+
+/**
  * Renders, sends, and records.
  *
  * Throws only for the things that stop the attempt happening at all — a run with no report, a
@@ -67,7 +86,7 @@ export async function sendRunReport(
   const report = await loadReport(supabase, input.runId);
   const log = createSupabaseSendLog(supabase);
 
-  const record = await sendReport(mailer, log, {
+  const request = {
     report,
     pdf: rendered.pdf,
     to: input.toEmail,
@@ -77,7 +96,30 @@ export async function sendRunReport(
     sentBy: await addressOf(supabase, input.requestedBy),
     sentById: input.requestedBy,
     noteWarningAcknowledged: input.noteWarningAcknowledged,
-  });
+  };
+
+  let record: SendRecord;
+  try {
+    record = await sendReport(mailer, log, request);
+  } catch (error) {
+    /*
+      `sendReport` transmits and then records — the provider's message id does not exist until it
+      has — so a throw from here may mean the mail went.
+
+      `log.transmitted` is set by the mailer's own answer, before the row is attempted. It is the
+      only thing that can tell the two apart, and telling them apart is the difference between
+      "re-send this" and "do not, IQwallet already has it".
+    */
+    if (log.transmitted) {
+      throw new SentButUnrecordedError(
+        `the report was TRANSMITTED to ${input.toEmail} but could not be recorded: ` +
+          `${error instanceof Error ? error.message : String(error)}. ` +
+          'Do not re-send without checking: the recipient may already have it.',
+        log.resendId,
+      );
+    }
+    throw error;
+  }
 
   const sendId = log.lastId;
   if (sendId === null) {
@@ -99,34 +141,64 @@ export async function sendRunReport(
  * that an *accepted* row carry a provider id. It also holds the id it wrote, because the queue row
  * has to point at the record and the alternative is looking up the newest.
  */
-export function createSupabaseSendLog(supabase: WorkerSupabase): SendLog & { lastId: string | null } {
-  const state = { lastId: null as string | null };
+/**
+ * The row this module writes, from a `SendRecord`.
+ *
+ * Exported so the schema test can compare it against the actual table rather than against a list
+ * someone typed into a test file. The first version of that test hardcoded the column names, which
+ * meant re-introducing the bug it was written for left it green — a test asserting its own
+ * assumptions rather than the code's.
+ *
+ * There is no `merchant_domain`: `sends` has never had that column, and the domain is reachable
+ * through `run_id`. Writing one cost a live send — the message had already gone to Resend when
+ * PostgREST refused the row (0018).
+ */
+export function sendRowFor(entry: SendRecord): Record<string, unknown> {
+  return {
+    run_id: entry.runId,
+    to_email: entry.toEmail,
+    resend_id: entry.resendId,
+    sent_at: entry.sentAt,
+    sent_by: entry.sentById ?? null,
+    sent_by_email: entry.sentBy,
+    outcome: entry.outcome,
+    error: entry.error ?? null,
+    attachment_bytes: entry.attachmentBytes,
+    note: entry.note,
+    note_flagged: entry.noteFlagged,
+    note_warning_acknowledged: entry.noteWarningAcknowledged,
+    mailer: entry.mailer,
+  };
+}
+
+export function createSupabaseSendLog(
+  supabase: WorkerSupabase,
+): SendLog & {
+  readonly lastId: string | null;
+  /** Whether the provider accepted the message, known before the row is attempted. */
+  readonly transmitted: boolean;
+  readonly resendId: string | null;
+} {
+  const state = { lastId: null as string | null, transmitted: false, resendId: null as string | null };
 
   return {
     get lastId() {
       return state.lastId;
     },
+    get transmitted() {
+      return state.transmitted;
+    },
+    get resendId() {
+      return state.resendId;
+    },
 
     async record(entry) {
-      const { data, error } = await supabase.client
-        .from('sends')
-        .insert({
-          run_id: entry.runId,
-          to_email: entry.toEmail,
-          resend_id: entry.resendId,
-          sent_at: entry.sentAt,
-          sent_by: entry.sentById ?? null,
-          sent_by_email: entry.sentBy,
-          merchant_domain: entry.merchantDomain,
-          outcome: entry.outcome,
-          error: entry.error ?? null,
-          attachment_bytes: entry.attachmentBytes,
-          note: entry.note,
-          note_flagged: entry.noteFlagged,
-          note_warning_acknowledged: entry.noteWarningAcknowledged,
-          mailer: entry.mailer,
-        })
-        .select('id');
+      // Recorded before the write is attempted, because the write is what may fail. This is the
+      // only in-memory fact that survives to tell "sent and unrecorded" from "not sent" (0018).
+      state.transmitted = entry.outcome === 'accepted';
+      state.resendId = entry.resendId;
+
+      const { data, error } = await supabase.client.from('sends').insert(sendRowFor(entry)).select('id');
 
       if (error !== null) {
         // The mail has already been handed to the provider by the time this runs. Losing the row

@@ -45,7 +45,7 @@ import { establishSession } from '../src/auth/login.js';
 import { createHttpFetcher } from '@mintro/engine';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
-import { sendRunReport } from '../src/sendJob.js';
+import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { addressesFor, contactFor, type MailAddresses } from '../src/addresses.js';
 
@@ -769,6 +769,8 @@ async function handleSend(
         status: 'done',
         send_id: result.sendId,
         outcome: result.record.outcome,
+        // What the provider actually did, kept distinct from what the job did (0018).
+        transmitted: result.record.outcome === 'accepted',
         storage_key: result.storageKey,
         // A rejection carries its reason onto the queue row too, so the analyst watching this row
         // sees why without a second query.
@@ -799,11 +801,25 @@ async function handleSend(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`  FAILED: ${message}`);
+
+    /*
+      Two failures that must not look alike (0018).
+
+      `SentButUnrecordedError` means the message reached the provider and the row did not get
+      written. Marking that `failed` with `transmitted` left false would tell an operator to
+      re-send, and IQwallet would receive the report twice. The job did fail; the mail did not.
+    */
+    const transmitted = error instanceof SentButUnrecordedError;
+    console.error(transmitted ? `  FAILED AFTER SENDING: ${message}` : `  FAILED: ${message}`);
 
     await supabase.client
       .from('send_requests')
-      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .update({
+        status: 'failed',
+        transmitted,
+        error: message.slice(0, 2000),
+        finished_at: new Date().toISOString(),
+      })
       .eq('id', request.id)
       .then(() => undefined, () => undefined);
   }

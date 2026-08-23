@@ -9,6 +9,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSchema, seedRun, type SchemaFixture } from './harness.js';
+import { sendRowFor } from '../../src/sendJob.js';
 
 let schema: SchemaFixture;
 let analystId: string;
@@ -382,5 +383,96 @@ describe('the report send queue', () => {
         [runId],
       ),
     ).rejects.toThrow(/mailer/);
+  });
+});
+
+/**
+ * "The job failed" and "nothing was sent" are different facts (0018).
+ *
+ * Found by the first live send and by no test, which is the part worth keeping. The insert into
+ * `sends` named a `merchant_domain` column that has never existed on that table. PostgREST refused
+ * the row — **after the message had already gone to Resend**, because a provider's message id does
+ * not exist until it has been asked for one.
+ *
+ * The result was mail out, no `sends` row, and a queue row reading `failed` — which 0017 defines as
+ * a job that never reached a mailer. An operator would have re-sent, and IQwallet would have
+ * received the report twice.
+ */
+describe('a send that transmitted and could not be recorded', () => {
+  it('writes every column the worker writes, and no column it does not', async () => {
+    /*
+      The regression test for the actual defect, and the column list comes **from the code**.
+
+      The first version of this test hardcoded the names. Re-introducing `merchant_domain` in
+      `sendJob.ts` left it green — a test asserting its own assumptions rather than the code's,
+      which is the same defect as the one it was written for, in test form.
+
+      `sendRowFor` is the single owner of the row shape now, so a column the worker invents fails
+      here instead of after a message has left the building.
+    */
+    const written = Object.keys(
+      sendRowFor({
+        runId: 'r', toEmail: 'a@b.co', resendId: 're_1', sentAt: 'now', sentBy: 'a@b.co',
+        mailer: 'Resend', merchantDomain: 'shop.example', outcome: 'accepted',
+        attachmentBytes: 1, note: '', noteFlagged: [], noteWarningAcknowledged: false,
+      }),
+    );
+
+    const columns = await schema.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'sends'`,
+    );
+    const present = new Set(columns.map((row) => row.column_name));
+
+    expect(written.filter((column) => !present.has(column))).toEqual([]);
+  });
+
+  it('records transmission separately from the job outcome', async () => {
+    const { runId } = await seedRun(schema, 'unrecorded.example');
+    const [job] = await schema.query<{ id: string }>(
+      `insert into public.send_requests (run_id, requested_by, to_email)
+       values ($1, $2, 'underwriting@iqwallet.com') returning id`,
+      [runId, analystId],
+    );
+
+    // The mail went; the row did not get written. `failed` is right about the job and would be
+    // catastrophically wrong about the message, so the message gets its own column.
+    await schema.query(
+      `update public.send_requests
+          set status = 'failed', transmitted = true, error = 'could not be recorded'
+        where id = $1`,
+      [job!.id],
+    );
+
+    const [row] = await schema.query<{ status: string; transmitted: boolean }>(
+      `select status, transmitted from public.send_requests where id = $1`,
+      [job!.id],
+    );
+    expect(row!.status).toBe('failed');
+    expect(row!.transmitted).toBe(true);
+  });
+
+  it('refuses a done job whose transmission contradicts its outcome', async () => {
+    const { runId } = await seedRun(schema, 'contradiction.example');
+    const [job] = await schema.query<{ id: string }>(
+      `insert into public.send_requests (run_id, requested_by, to_email)
+       values ($1, $2, 'underwriting@iqwallet.com') returning id`,
+      [runId, analystId],
+    );
+    const [record] = await schema.query<{ id: string }>(
+      `insert into public.sends (run_id, to_email, sent_by_email, outcome, resend_id, mailer)
+       values ($1, 'underwriting@iqwallet.com', 'a@example.com', 'accepted', 're_1', 'Resend')
+       returning id`,
+      [runId],
+    );
+
+    // Accepted but not transmitted is a job claiming a delivery it did not make.
+    await expect(
+      schema.query(
+        `update public.send_requests set status = 'done', send_id = $2, outcome = 'accepted',
+            transmitted = false where id = $1`,
+        [job!.id, record!.id],
+      ),
+    ).rejects.toThrow(/done_send_requests_agree_on_transmission/);
   });
 });
