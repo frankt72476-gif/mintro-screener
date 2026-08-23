@@ -20,23 +20,15 @@
  * It also never characterises the findings. No "issues", no "problems", no "concerns" — those are
  * readings, and IQwallet makes them. What Mintro has is observations and a count.
  *
- * ## What it must say: a named human contact
+ * ## What it must say: a way to reach a person (D-065)
  *
- * **Frank's ruling.** The invitation carries `Questions about this request? Contact <name> at
- * <address>.` and cannot be composed without one — `InvitationInput.contact` is required, so a
- * build that drops the line does not compile.
- *
- * The reason is not courtesy. An agent receiving this from a company they may not recognise will
- * want to verify it is real, and a `no-reply@` reply-to answers that with silence. The invitation
- * then goes unanswered and the report renders it as **merchant silence** — the misattribution
- * `comment_invites.delivery` exists to prevent, arriving through the email instead of through the
- * database. A named person answers the question without anyone maintaining a new inbox.
- *
- * This replaced a technical guard that refused `no-reply@` in a reply-to (D-064). The requirement
- * moved; it did not disappear.
+ * The invitation carries a contact line and the copy audit fails the build without one. The line
+ * is a **pointer, not a mailbox** — see `contactLine.ts` for why an address printed inside a
+ * message someone is suspicious of verifies nothing.
  */
 
 import { randomBytes, createHash } from 'node:crypto';
+import { INVITATION_CONTACT_LINE } from './contactLine.js';
 
 /** A token and the digest that will be stored in its place. */
 export interface IssuedToken {
@@ -75,29 +67,12 @@ export function expiresAt(issuedAt: Date): Date {
   return new Date(issuedAt.getTime() + LINK_LIFETIME_DAYS * 86_400_000);
 }
 
-/**
- * A named person at Mintro, and how to reach them.
- *
- * Required, not optional. An optional contact is a contact that is absent the first time someone
- * adds a call site — and the whole point is that the line is never missing.
- */
-export interface InvitationContact {
-  readonly name: string;
-  readonly email: string;
-}
-
 export interface InvitationInput {
   readonly merchantDomain: string;
   readonly link: string;
   readonly expiresAt: Date;
   /** How many findings are open for comment. A count, never a characterisation. */
   readonly openForComment: number;
-  /**
-   * The named human contact. **Required** — see the note at the top of this file.
-   *
-   * The reply-to on the message may be a `no-reply@` address; this is what makes that acceptable.
-   */
-  readonly contact: InvitationContact;
 }
 
 export interface Invitation {
@@ -112,20 +87,8 @@ export interface Invitation {
  * looks like marketing gets treated as marketing.
  */
 export function composeInvitation(input: InvitationInput): Invitation {
-  const { merchantDomain, link, openForComment, contact } = input;
+  const { merchantDomain, link, openForComment } = input;
   const until = input.expiresAt.toISOString().slice(0, 10);
-
-  // The type makes the field mandatory; this makes an empty one mandatory too. A blank name
-  // renders `Contact  at hello@…`, which reads as a template someone forgot to fill in — worse
-  // than no line at all, because it advertises carelessness to a reader already deciding whether
-  // to trust the sender.
-  if (contact.name.trim() === '' || contact.email.trim() === '') {
-    throw new Error(
-      'the invitation needs a named contact and an address: an agent who does not recognise ' +
-        'Mintro has no other way to check this is real, and an unanswered invitation is later ' +
-        'rendered as merchant silence.',
-    );
-  }
 
   const subject = `Screening report for ${merchantDomain} — your response`;
 
@@ -158,9 +121,8 @@ export function composeInvitation(input: InvitationInput): Invitation {
     `The link works until ${until}. If it has expired, reply to this message and we will send`,
     `another; anything you have already written is kept.`,
     ``,
-    // A named person, not a role address. Someone deciding whether this is a phishing attempt is
-    // reassured by a name they can look up and unmoved by `reports@`.
-    `Questions about this request? Contact ${contact.name.trim()} at ${contact.email.trim()}.`,
+    // A pointer out of this message, not an address inside it (D-065).
+    INVITATION_CONTACT_LINE,
   ].join('\n');
 
   return { subject, body };

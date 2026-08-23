@@ -17,15 +17,14 @@
  * `comment_invites.delivery` exists to prevent, arriving through the email instead of through the
  * database.
  *
- * A named human contact answers it without anyone maintaining a new inbox. So the requirement is
- * now a **copy requirement on the invitation**: `composeInvitation` cannot be called without a
- * contact, because its input type says so, and `apps/worker/test/copy.test.ts` asserts the line
- * reaches the body. A build without a contact line does not compile.
+ * A contact line answers it without anyone maintaining a new inbox. So the requirement is now a
+ * **copy requirement**, in `contactLine.ts`, asserted by `apps/worker/test/copy.test.ts` on both
+ * outbound messages.
  *
- * What no check can establish is whether a named person actually answers. That stays Frank's.
+ * That line carries no name and no address (D-065): an address printed inside the same email a
+ * reader is suspicious of verifies nothing, and it would put a personal address into a document
+ * built to be forwarded.
  */
-
-import type { InvitationContact } from './invite.js';
 
 /** The four addresses, resolved. */
 export interface MailAddresses {
@@ -75,37 +74,6 @@ export function addressesFor(env: NodeJS.ProcessEnv = process.env): MailAddresse
   }
 
   return addresses;
-}
-
-/**
- * The named contact the invitation must carry.
- *
- * **No default.** A default here would be a name nobody agreed to put in front of merchants, and
- * the failure mode of getting it wrong is an agent emailing a person who does not know what the
- * message is about. Unset fails the invitation job, loudly, naming the two variables.
- *
- * Separate from `addressesFor` on purpose: a missing contact must stop invitations without
- * stopping the worker. Scans and report sends have nothing to do with it, and a worker that
- * refused to start would take them down for an unrelated setting.
- */
-export function contactFor(env: NodeJS.ProcessEnv = process.env): InvitationContact {
-  const name = (env['INVITE_CONTACT_NAME'] ?? '').trim();
-  const email = (env['INVITE_CONTACT_EMAIL'] ?? '').trim();
-
-  if (name === '' || email === '') {
-    throw new Error(
-      'INVITE_CONTACT_NAME and INVITE_CONTACT_EMAIL must both be set. The invitation carries a ' +
-        'named human contact because an agent who does not recognise Mintro has no other way to ' +
-        'check the message is real, and an unanswered invitation is later rendered as merchant ' +
-        'silence.',
-    );
-  }
-
-  if (!ADDRESS.test(email)) {
-    throw new Error(`INVITE_CONTACT_EMAIL is not a usable email address: ${JSON.stringify(email)}.`);
-  }
-
-  return { name, email };
 }
 
 function pick(env: NodeJS.ProcessEnv, name: string, fallback: string): string {

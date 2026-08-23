@@ -23,7 +23,7 @@
  */
 
 import { commentLinkFor, invitesComment, type ScreeningReport } from '@mintro/engine';
-import { composeInvitation, expiresAt, issueToken, type InvitationContact } from './invite.js';
+import { composeInvitation, expiresAt, issueToken } from './invite.js';
 import { mailersFor, type Messenger } from './send.js';
 import type { WorkerSupabase } from './store/supabase.js';
 
@@ -38,8 +38,6 @@ export interface InviteJobInput {
    */
   readonly replyTo: string;
   readonly from: string;
-  /** The named human contact the invitation must carry (D-064). */
-  readonly contact: InvitationContact;
 }
 
 export interface InviteJobResult {
@@ -98,7 +96,6 @@ export async function issueInvitation(
     link: commentLinkFor(input.webOrigin, token),
     expiresAt: until,
     openForComment,
-    contact: input.contact,
   });
 
   const outcome = await messenger.send({

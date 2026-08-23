@@ -1021,6 +1021,52 @@ value's shape needs an owner, and the test that matters is the round trip rather
 A boundary is exactly where "each side is correct" stops implying "the system is correct" — and it
 is invisible to the per-side tests that make everyone feel covered.
 
+### A provider id does not exist until the message is gone — the twelfth (D-064)
+
+**Frank's ruling: this belongs in D-026.** Confirmed by a real double-send: two identical reports
+six minutes apart, same run id.
+
+`sendReport` transmits and then records, and it cannot do otherwise — the provider's message id
+does not exist until the message has been handed over. **Every failure in the gap between those two
+steps is a sent message with no record of it.**
+
+The absence being read from is the missing `sends` row, and the reading taken was *"never reached a
+mailer"*. That is the dangerous direction, and the asymmetry is what makes this worth a ruling: the
+two possible errors do not cost the same.
+
+- Read as *not sent* when it was sent → an operator re-sends → **an underwriter receives the
+  report twice**, from a screening tool whose entire claim is that it keeps an accurate record of
+  what went out.
+- Read as *sent* when it was not → someone checks and finds no message. Recoverable.
+
+So the state carrying the answer is written **before** the write that can fail:
+`send_requests.transmitted` is set from the mailer's own answer. The job's outcome and the
+message's outcome are two facts, and a schema that can only hold one holds the wrong one exactly
+when it matters — which is the same argument as `comment_invites.delivery`, arrived at from the
+other direction.
+
+Note what did *not* work here. The queue row did record the failure, with the exact error message,
+which felt like enough at the time. It was not: an accurate error string still leaves the reader to
+infer whether the mail went, and inference is the thing this entry is about.
+
+### The regression test had the defect it was written for — the same day
+
+Written **one day after** the boundary lesson above, to catch the phantom `merchant_domain` column.
+It compared the table against a column list **typed into the test file**.
+
+Re-introducing the bug left it green. The test asserted its own assumptions rather than the code's,
+which is the identical shape: two things that must agree, each internally consistent, with nobody
+owning the seam. The list now comes from `sendRowFor`, the single owner of the row shape, and
+re-introducing the bug fails it.
+
+Kept because it is the strongest evidence in this document for how the family behaves. **A fix for
+a boundary defect is unusually likely to contain one** — three earlier instances contained the
+defect they were fixing, and this one reproduced a lesson written down twenty-four hours before by
+someone who had just written it down. Knowing the shape is not the same as noticing it.
+
+The practical test: *does this assertion get its expected value from the same place the code gets
+its actual value?* If it does, it can only confirm the code agrees with itself.
+
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
 Both rules carry `unauthenticated: true`, so the unauthenticated probe is the finding. The
@@ -3602,14 +3648,46 @@ the single owner of the row shape, and re-introducing the bug fails it.
 That is the D-026 boundary lesson again, one day old: the seam between what the code writes and
 what the table holds had no owner, and each side was correct alone.
 
-### Still open: the covering email to IQwallet
+### The subject line is the domain and nothing more
 
-The ruling was about the invitation, and it is implemented there. The report send now also has a
-no-reply reply-to, and an underwriter with a question about a capture meets the same silence.
+**2026-08-23 · Frank's ruling**
 
-Not changed, because it is a different case — IQwallet knows who Mintro is, so the "verify this is
-real" reasoning does not carry — and because widening a ruling on my own initiative is how scope
-drifts. **Flagged for Frank rather than decided.**
+It carried the counts: `Screening report — shop.example — 3 failed, 7 for review`. They are gone.
+
+> Counts in a subject line are a characterisation of the merchant travelling in the most-forwarded,
+> least-contextual part of the message.
+
+A subject line is read where nothing else is: a phone notification, a thread title in someone
+else's inbox, a forward with the body collapsed. *"3 failed"* seen there is a verdict, and the
+verdict is IQwallet's to reach rather than Mintro's to broadcast — the same discipline the report
+copy keeps, applied to the one string that travels furthest from its context.
+
+The body keeps the counts **with the coverage line beside them**, which is where a reader can weigh
+them: three failures out of ninety-seven evaluable findings is a different fact from three out of
+five, and a subject line cannot hold the difference.
+
+**The cost, recorded so nobody re-adds it without knowing what it was traded for**: an underwriter
+loses inbox-level triage. They must open the report to learn whether it needs them today. That is a
+real loss, and it was accepted deliberately rather than overlooked.
+
+### The IQwallet email gets the contact line too — my asymmetry argued the wrong way
+
+I flagged the report send as a different case and did not extend the ruling: IQwallet knows who
+Mintro is, so the "verify this is real" reasoning does not carry.
+
+**Frank's correction, which is right:**
+
+> IQwallet knowing who Mintro is removes the need to verify the *sender*, not the need to reach a
+> *person*. An underwriter with a question about a capture is mid-decision on a merchant, and
+> silence costs more there, not less.
+
+The two audiences need the line for different reasons and the reason I identified was only the
+invitation's. Reaching a person is the shared one, and it is the one the no-reply address takes
+away from both. Same treatment: the line is required, the copy audit fails the build without it.
+
+Worth noting how the error happened. I found a real asymmetry and then let it decide the question,
+without asking whether the *other* reason for the requirement survived it. A difference between two
+cases does not establish which way the difference cuts.
 
 ### A rejection is a recorded outcome, not a failure
 
@@ -3645,3 +3723,64 @@ record of Mintro having decided what IQwallet gets to see.
 
 The dialog does wait on the worker's account of the attempt before saying "Sent". That is not a
 gate on an outcome; it is a refusal to report a delivery that has not happened.
+
+---
+
+## D-065 — The contact line is a pointer, not a mailbox
+**2026-08-23 · Frank's ruling · supersedes the named contact in D-064**
+
+D-064 required the invitation to name a person and print their address. It now points the reader at
+their existing Mintro contact instead, and carries no name or address at all.
+
+> An agent verifying that an unexpected email is legitimate does so best by asking someone they
+> already have a relationship with. **An address printed inside the same email they are suspicious
+> of verifies nothing.**
+
+That is a better statement of the problem than the version it replaces, and it is worth being
+precise about why. The named contact was meant to answer *"is this real?"* — but a printed contact
+carries no evidence toward that question, because a message designed to deceive would print one
+too. The only thing that can answer it is a channel the reader already trusts, which by definition
+is not inside this message. The line's job is to send them **out** of it.
+
+It also removes a personal address from a document built to be forwarded (D-063), which the earlier
+design would have published in every invitation Mintro ever sends.
+
+### The wording
+
+    Invitation:  Questions about this request, or want to confirm it is genuine?
+                 Contact your usual point of contact at Mintro.
+
+    IQwallet:    Questions about this report? Contact your usual point of contact at Mintro.
+
+The invitation names the verification purpose out loud. An agent who has received something
+unexpected from a company they may not recognise is *already* wondering whether it is real, and
+saying so tells them that checking is the intended response rather than leaving them to choose
+between trusting a stranger's email and ignoring it. Ignoring it is the outcome that costs the
+merchant a voice in their own screening.
+
+The IQwallet line drops that clause. They commissioned the screening and are expecting the report;
+inviting them to verify a document they asked for would read as boilerplate at best.
+
+### What did not change
+
+**The build still fails without the line.** A message that leaves a reader no way to reach anyone
+goes unanswered, and an unanswered invitation is later rendered as merchant silence — the
+misattribution `comment_invites.delivery` exists to prevent, arriving through the email instead of
+through the database.
+
+What went away is the *configuration*: `INVITE_CONTACT_NAME` and `INVITE_CONTACT_EMAIL` are
+deleted, along with `contactFor` and the required `contact` field. The line is copy, and it is
+enforced as copy — `contactLine.ts` owns both strings and `copy.test.ts` asserts each reaches its
+message.
+
+The teeth are `isPointerContactLine`, which fails on any line containing `@`, plus an assertion
+that the invitation body holds **no email address at all** once the token link is excluded. An
+address is precisely what would creep back in, from someone reading "contact line" and reaching for
+a mailbox.
+
+### Not settled here
+
+Whether "your usual point of contact at Mintro" reads correctly for a merchant who received the
+invitation as a **forward** from their agent, and has no Mintro contact of their own. They would
+sensibly ask the agent who forwarded it, which is the right answer and one the line does not say.
+Left alone rather than lengthened on my own initiative — flagged for Frank.

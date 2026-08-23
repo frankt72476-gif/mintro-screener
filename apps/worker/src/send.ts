@@ -12,6 +12,7 @@
  */
 
 import { auditAnalystNote, type ScreeningReport } from '@mintro/engine';
+import { REPORT_CONTACT_LINE } from './contactLine.js';
 
 /** A row in the `sends` table (docs/ARCHITECTURE.md § Data model). */
 export interface SendRecord {
@@ -227,8 +228,24 @@ export async function sendReport(
  * report — the same discipline the verdict banner follows, applied to the covering email, which
  * is the part most likely to slip back into a recommendation.
  */
+/**
+ * The subject line: the domain, and nothing more (D-064).
+ *
+ * It used to carry the counts. **Counts in a subject line are a characterisation of the merchant
+ * travelling in the most-forwarded, least-contextual part of the message** — a phone notification,
+ * a thread title in someone else's inbox, a forward with no body in view. "3 failed" seen there is
+ * a verdict, which is IQwallet's to reach and not Mintro's to broadcast.
+ *
+ * The body carries the same counts with the coverage line beside them, which is where a reader can
+ * weigh them: three failures out of ninety-seven evaluable findings is a different fact from three
+ * out of five, and the subject line cannot hold the difference.
+ *
+ * **The cost, recorded honestly so nobody re-adds it without knowing what it was traded for**: an
+ * underwriter loses inbox-level triage. They must open the report to see whether it needs them
+ * today. That is a real loss and it was accepted deliberately.
+ */
 export function subjectFor(report: ScreeningReport): string {
-  return `Screening report — ${report.merchantDomain} — ${report.counts.fail} failed, ${report.counts.review} for review`;
+  return `Screening report — ${report.merchantDomain}`;
 }
 
 export function bodyFor(report: ScreeningReport, note: string): string {
@@ -250,6 +267,11 @@ export function bodyFor(report: ScreeningReport, note: string): string {
     '',
     'The attached report carries a capture behind every finding.',
     'Findings state what was observed. They are not compliance determinations.',
+    '',
+    // D-065, extended to this audience on Frank's ruling. IQwallet knowing who Mintro is removes
+    // the need to verify the sender, not the need to reach a person: an underwriter with a question
+    // about a capture is mid-decision on a merchant, and the reply-to here is a no-reply address.
+    REPORT_CONTACT_LINE,
   ]
     .filter((line) => line !== '')
     .join('\n');

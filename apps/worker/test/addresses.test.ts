@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { addressesFor, contactFor, DEFAULT_FROM } from '../src/addresses.js';
+import { addressesFor, DEFAULT_FROM } from '../src/addresses.js';
 
 describe('defaults', () => {
   it('sends from the verified domain when nothing is configured', () => {
@@ -60,55 +60,28 @@ describe('a no-reply reply-to is allowed, because the requirement moved', () => 
 
   it('keeps the reasoning alive next door', async () => {
     /*
-      The reason a no-reply address is acceptable is that the invitation names a person instead.
+      A no-reply address is acceptable because both messages point the reader at a person instead.
 
-      An agent receiving this from a company they may not recognise will want to verify it is real;
-      silence sends the invitation unanswered, and the report then renders that as **merchant
-      silence** — the misattribution `comment_invites.delivery` exists to prevent, arriving through
-      the email rather than through the database.
+      The pointer is the whole of it (D-065): an address printed inside the same email a reader is
+      suspicious of verifies nothing, so what helps them is a channel they already trust — which by
+      definition is not in this message.
 
-      So this asserts the replacement exists. If `composeInvitation` ever stops requiring a
-      contact, this fails here as well as in the copy audit.
+      Asserted here as well as in the copy audit so the pair cannot come apart. Deleting the guard
+      that used to live in this file without the replacement existing would otherwise leave every
+      test green and the reasoning gone.
     */
-    const { composeInvitation } = await import('../src/invite.js');
+    const { INVITATION_CONTACT_LINE, REPORT_CONTACT_LINE, isPointerContactLine } = await import(
+      '../src/contactLine.js'
+    );
 
-    expect(() =>
-      composeInvitation({
-        merchantDomain: 'shop.example',
-        link: 'https://mintro-screener.netlify.app/comment/TOKEN',
-        expiresAt: new Date('2026-09-22T00:00:00.000Z'),
-        openForComment: 3,
-        contact: { name: '', email: '' },
-      }),
-    ).toThrow(/named contact/);
+    expect(isPointerContactLine(INVITATION_CONTACT_LINE)).toBe(true);
+    expect(isPointerContactLine(REPORT_CONTACT_LINE)).toBe(true);
   });
 
   it('allows a from-address that is not a reply-to', () => {
     expect(() =>
       addressesFor({ MAIL_FROM: 'reports@gomintro.com', MAIL_REPLY_TO: 'frank@gomintro.com' }),
     ).not.toThrow();
-  });
-});
-
-describe('the invitation contact', () => {
-  it('has no default, because a default is a name nobody agreed to', () => {
-    expect(() => contactFor({})).toThrow(/INVITE_CONTACT_NAME and INVITE_CONTACT_EMAIL/);
-    expect(() => contactFor({ INVITE_CONTACT_NAME: 'Frank Tsen' })).toThrow(/must both be set/);
-  });
-
-  it('refuses an address that is not one', () => {
-    expect(() =>
-      contactFor({ INVITE_CONTACT_NAME: 'Frank Tsen', INVITE_CONTACT_EMAIL: 'gomintro.com' }),
-    ).toThrow(/not a usable email address/);
-  });
-
-  it('resolves a configured contact', () => {
-    const contact = contactFor({
-      INVITE_CONTACT_NAME: ' Frank Tsen ',
-      INVITE_CONTACT_EMAIL: ' frank@gomintro.com ',
-    });
-
-    expect(contact).toEqual({ name: 'Frank Tsen', email: 'frank@gomintro.com' });
   });
 });
 

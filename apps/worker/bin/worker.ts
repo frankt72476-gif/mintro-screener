@@ -47,7 +47,7 @@ import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
-import { addressesFor, contactFor, type MailAddresses } from '../src/addresses.js';
+import { addressesFor, type MailAddresses } from '../src/addresses.js';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
@@ -158,12 +158,7 @@ async function main(argv: readonly string[]): Promise<number> {
   if (WEB_ORIGIN === undefined) {
     console.log('  --    WEB_ORIGIN                                      unset — invitations will fail');
   }
-  try {
-    const contact = contactFor();
-    console.log(`  ok    invitation contact                             ${contact.name} <${contact.email}>`);
-  } catch {
-    console.log('  --    invitation contact                             unset — invitations will fail');
-  }
+  // No contact to report: the line is copy, not configuration (D-065).
 
   console.log(once ? 'draining the queue' : 'polling for scan requests');
 
@@ -634,10 +629,6 @@ async function handleInvite(
       );
     }
 
-    // Fails this job, never the worker: scans and report sends have nothing to do with the
-    // invitation contact, and taking them down for it would be the wrong blast radius.
-    const contact = contactFor();
-
     const result = await issueInvitation(supabase, {
       runId: request.run_id,
       sendTo: request.send_to,
@@ -645,7 +636,6 @@ async function handleInvite(
       webOrigin: WEB_ORIGIN,
       replyTo: addresses.inviteReplyTo,
       from: addresses.inviteFrom,
-      contact,
     });
 
     const { error } = await supabase.client

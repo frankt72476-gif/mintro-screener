@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
 import { composeInvitation } from '../src/invite.js';
+import { INVITATION_CONTACT_LINE, REPORT_CONTACT_LINE, isPointerContactLine } from '../src/contactLine.js';
 import {
   DIRECTIVE_TERMS,
   INTERNAL_TERMS,
@@ -293,7 +294,6 @@ describe('the merchant invitation', () => {
     link: 'https://mintro-screener.netlify.app/comment/TOKEN',
     expiresAt: new Date('2026-09-22T00:00:00.000Z'),
     openForComment: 12,
-    contact: { name: 'Frank Tsen', email: 'frank@gomintro.com' },
   });
 
   it('instructs nobody', () => {
@@ -338,37 +338,34 @@ describe('the merchant invitation', () => {
   });
 
   /**
-   * The requirement that replaced the no-reply guard (D-064).
+   * The requirement that replaced the no-reply guard (D-064), as amended by D-065.
    *
-   * Frank overruled a check that refused `no-reply@` in a reply-to and kept the reasoning: an
-   * agent receiving this from a company they may not recognise will want to verify it is real. A
-   * no-reply address answers that with silence, the invitation goes unanswered, and the report
-   * then renders it as **merchant silence** — the misattribution `comment_invites.delivery` exists
-   * to prevent, arriving through the email instead of through the database.
+   * Frank overruled a check that refused `no-reply@` in a reply-to and kept the reasoning: a reader
+   * needs a way to reach a person. He then replaced the named contact with a **pointer**, on
+   * stronger reasoning — an address printed inside the same email a reader is suspicious of
+   * verifies nothing, and it puts a personal address into a document built to be forwarded.
    *
-   * So it fails here instead. The build already refuses a `composeInvitation` call with no
-   * contact; these assert the line survives into the body a merchant actually reads.
+   * What did not change: **the build fails without the line.** An invitation that leaves a reader
+   * no way to check goes unanswered, and an unanswered invitation is later rendered as merchant
+   * silence — the misattribution `comment_invites.delivery` exists to prevent, arriving through the
+   * email instead of through the database.
    */
-  it('names a human contact and how to reach them', () => {
-    expect(invitation.body).toContain('Questions about this request? Contact Frank Tsen at frank@gomintro.com.');
+  it('points the reader at a person they already deal with', () => {
+    expect(invitation.body).toContain(INVITATION_CONTACT_LINE);
+    expect(isPointerContactLine(INVITATION_CONTACT_LINE)).toBe(true);
   });
 
-  it('refuses to compose without a contact, rather than dropping the line', () => {
-    // A blank renders `Contact  at frank@…`, which reads as a template someone forgot to fill in
-    // — worse than no line, in front of a reader already deciding whether to trust the sender.
-    const base = {
-      merchantDomain: 'shop.example',
-      link: 'https://mintro-screener.netlify.app/comment/TOKEN',
-      expiresAt: new Date('2026-09-22T00:00:00.000Z'),
-      openForComment: 12,
-    };
+  it('publishes no individual address anywhere in the message', () => {
+    /*
+      The teeth of D-065, and the thing most likely to creep back — from someone who reads
+      "contact line" and reaches for a mailbox.
 
-    expect(() => composeInvitation({ ...base, contact: { name: '', email: 'f@gomintro.com' } })).toThrow(
-      /named contact/,
-    );
-    expect(() => composeInvitation({ ...base, contact: { name: 'Frank Tsen', email: '  ' } })).toThrow(
-      /named contact/,
-    );
+      The link is exempt: it is the point of the message, and it carries a token rather than a
+      person. Everything else that looks like an address is a person's address in a document built
+      to be forwarded.
+    */
+    const withoutLink = invitation.body.replace(/https:\S+/g, '');
+    expect(withoutLink).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
   });
 });
 
@@ -376,9 +373,49 @@ describe('the covering email', () => {
   const reports = storedReports();
 
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(
-    'subject for %s states counts without instructing',
+    'subject for %s instructs nobody',
     (_domain, report) => {
       expect(offending(subjectFor(report))).toEqual([]);
+    },
+  );
+
+  /**
+   * The subject is the domain and nothing more (D-064).
+   *
+   * Counts used to travel in it. They are a characterisation of the merchant, and the subject line
+   * is the most-forwarded, least-contextual part of the message — a phone notification, a thread
+   * title in someone else's inbox. "3 failed" seen there is a verdict, which is IQwallet's to
+   * reach and not Mintro's to broadcast; the body carries the same counts with the coverage line
+   * beside them, where a reader can weigh them.
+   */
+  it.each(reports.map((report) => [report.merchantDomain, report] as const))(
+    'subject for %s carries no counts',
+    (_domain, report) => {
+      expect(subjectFor(report)).toBe(`Screening report — ${report.merchantDomain}`);
+      expect(subjectFor(report)).not.toMatch(/\d/);
+      expect(subjectFor(report)).not.toMatch(/fail|review|pass|evaluable/i);
+    },
+  );
+
+  it.each(reports.map((report) => [report.merchantDomain, report] as const))(
+    'body for %s keeps the counts, beside the coverage that qualifies them',
+    (_domain, report) => {
+      // Dropped from the subject, not from the message. Three failures out of ninety-seven
+      // evaluable findings is a different fact from three out of five.
+      const body = bodyFor(report, 'Captures attached.');
+      expect(body).toContain(`${report.counts.fail} failed`);
+      expect(body).toContain('findings were evaluable from this crawl');
+    },
+  );
+
+  it.each(reports.map((report) => [report.merchantDomain, report] as const))(
+    'body for %s points the reader at a person',
+    (_domain, report) => {
+      // D-065, extended to this audience: IQwallet knowing who Mintro is removes the need to
+      // verify the sender, not the need to reach a person. An underwriter with a question about a
+      // capture is mid-decision on a merchant, and the reply-to here is a no-reply address.
+      expect(bodyFor(report, 'Captures attached.')).toContain(REPORT_CONTACT_LINE);
+      expect(isPointerContactLine(REPORT_CONTACT_LINE)).toBe(true);
     },
   );
 

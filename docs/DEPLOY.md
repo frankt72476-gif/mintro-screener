@@ -382,16 +382,16 @@ makes the send log the only record of what went out and when.
 
 ### Secrets and settings this needs on Fly
 
-    fly secrets set       WEB_ORIGIN="https://mintro-screener.netlify.app"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       INVITE_CONTACT_NAME="<name>"       INVITE_CONTACT_EMAIL="<address>"       --app mintro-screener-worker
+    fly secrets set       WEB_ORIGIN="https://mintro-screener.netlify.app"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       --app mintro-screener-worker
 
 `WEB_ORIGIN` has **no default**. Everything else here does, because a wrong guess costs a retry; a
 wrong guess in `WEB_ORIGIN` puts a dead link in a merchant's inbox under Mintro's name, carrying the
 only token that report will ever have. An invitation job with it unset fails and says so.
 
-`INVITE_CONTACT_NAME` and `INVITE_CONTACT_EMAIL` also have no default, and both are required. The
-invitation carries *"Questions about this request? Contact &lt;name&gt; at &lt;address&gt;."* and
-cannot be composed without one — that named contact is what makes a `no-reply@` reply-to acceptable
-(D-064). Unset fails the invitation job, not the worker: scans and report sends are unaffected.
+There is no contact to configure. Both messages point the reader at their existing Mintro contact
+rather than printing a name and address (D-065) — an address inside a message someone is suspicious
+of verifies nothing, and it would publish a personal address in a document built to be forwarded.
+The line lives in `apps/worker/src/contactLine.ts` and the copy audit fails the build without it.
 
 The worker prints all of this at startup, so `fly logs` after a deploy shows what it will actually
 send as.
@@ -439,8 +439,6 @@ repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as writ
 | `MAIL_REPLY_TO` | — | optional | — | optional |
 | `INVITE_MAIL_FROM` | — | optional | — | optional |
 | `INVITE_REPLY_TO` | — | optional | — | optional |
-| `INVITE_CONTACT_NAME` | — | ✅ | — | for local invites |
-| `INVITE_CONTACT_EMAIL` | — | ✅ | — | for local invites |
 
 Two `.env` files, and they are not interchangeable. **`apps/web/.env` is Vite's** and may hold
 only `VITE_`-prefixed values, all of which are public. **The root `.env`** is the worker's and
