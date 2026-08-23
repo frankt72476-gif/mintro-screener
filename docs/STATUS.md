@@ -329,10 +329,27 @@ Nothing below is a technical problem. Each waits on a decision.
 |---|---|
 | **Mintro creating merchant accounts** | Whether Mintro may create its own accounts on merchant sites — agreeing to terms under an identity we chose, without the merchant's knowledge. Still blocked. **Merchant-supplied logins are authorized and built** (D-039); the two are deliberately separate rulings. |
 | **Session authorization** | Whether Mintro may hold merchant sessions established by a *person* rather than by stored credentials. This blocks **assisted sign-in**, designed in full in `apps/worker/src/auth/assisted.ts` and deliberately unimplemented. |
-| **Resend domain verification** | SPF and DKIM on the sending domain. **This is now the single gate on two features**: the report send to IQwallet, and the merchant invitation (D-063). Both route through `mailersFor()`, so setting `RESEND_API_KEY` turns them on together with no further code. Until then a dry-run implementation composes and transmits nothing — a separate implementation, not a flag, so a test send cannot be mistaken for a delivered report. |
+| ~~**Resend domain verification**~~ | **Done, 2026-08-23.** `gomintro.com` verified, `RESEND_API_KEY` set on Fly. Both sends live and verified against a real recipient — see below. |
 
 Assisted sign-in additionally needs two smaller decisions recorded in its own file: which machine
 an analyst uses, and whether a hosted browser vendor is acceptable for a live handoff.
+
+### Live-send verification, 2026-08-23
+
+Both paths exercised against a real recipient, and the results read from the received mail and the
+database rather than from the API's answer.
+
+| | Result |
+|---|---|
+| Report send, accepted | `sends.resend_id` = a real Resend UUID, `mailer` = `Resend`, 60-page 6.3 MB PDF attached and stored |
+| Report send, rejected | Forced with an unverified `from`. **A `sends` row was still written** — `resend_id` null, `outcome` `rejected`, provider's 403 captured (D-001) |
+| Merchant invitation | **Not yet run.** Blocked on `INVITE_CONTACT_NAME` / `INVITE_CONTACT_EMAIL` |
+
+The first attempt failed and produced the most useful finding of the exercise — see D-064, *"The
+first live send failed, and the failure was worth more than the send"*. A message went to Resend
+and its `sends` row did not get written, leaving a queue row reading `failed`, which this codebase
+defines as *never reached a mailer*. **One test report reached the recipient with no `sends` row
+behind it.** `send_requests.transmitted` now separates the two facts.
 
 ### An untransmitted invitation must never read as merchant silence
 
