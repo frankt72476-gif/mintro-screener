@@ -39,7 +39,18 @@ describe('the merchant page holds no operator action', () => {
     // while looking at the evidence (D-063).
     expect(pane).toContain('<ReportView');
     expect(pane).toContain('commentBox=');
-    expect(pane).toContain('commentaryOf=');
+  });
+
+  it('does not narrate the reader back at themselves', () => {
+    /*
+      `MerchantResponse` is written for an underwriter — it explains what a blank space means.
+      On this page it would tell the reader, finding by finding, that they left no comment on it
+      (D-067). The page's one rule is never to imply that saying nothing is a failure.
+
+      Asserted on the prop rather than on the rendering, because passing `commentaryOf` is exactly
+      what would bring it back.
+    */
+    expect(pane).not.toMatch(/commentaryOf=\{/);
   });
 });
 

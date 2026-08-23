@@ -122,7 +122,26 @@ describe('what the email claims', () => {
     // fail + review + not_exposed. Not the pass, and not the two that are Mintro's own gaps —
     // telling a merchant "6 are open" and showing them 3 is the drift D-034 is about.
     expect(result.openForComment).toBe(3);
-    expect((messenger.outbox[0] as Message).text).toContain('3 of the observations');
+    expect((messenger.outbox[0] as Message).text).toContain('3 observations are open');
+  });
+
+  it('counts the nothing-observed callout without sweeping in our own gaps', async () => {
+    const { supabase } = store();
+    const messenger = createDryRunMessenger();
+
+    const result = await issueInvitation(supabase, INPUT, { messenger, now: NOW });
+
+    /*
+      One: the `not_exposed` finding. **Not** `no_check_built` or `not_retrieved`, which are gaps
+      in what Mintro looked at rather than in what the pages showed (D-046).
+
+      They carry no box, so counting them would promise a response the page does not offer — and
+      the report's own four-column breakdown labels them as ours, which this would contradict.
+    */
+    expect(result.nothingObserved).toBe(1);
+    expect((messenger.outbox[0] as Message).text).toContain(
+      '1 of them are ones where your pages did not show one way',
+    );
   });
 
   it('sets the expiry the link was actually given', async () => {

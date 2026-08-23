@@ -293,7 +293,8 @@ describe('the merchant invitation', () => {
     merchantDomain: 'shop.example',
     link: 'https://mintro-screener.netlify.app/comment/TOKEN',
     expiresAt: new Date('2026-09-22T00:00:00.000Z'),
-    openForComment: 12,
+    openForComment: 50,
+    nothingObserved: 12,
   });
 
   it('instructs nobody', () => {
@@ -313,43 +314,65 @@ describe('the merchant invitation', () => {
     expect(invitation.body).not.toMatch(/(issues?|problems?|concerns?|violations?|failures?)/i);
   });
 
-  it('says plainly what happens to what they write', () => {
-    expect(invitation.body).toContain('recorded exactly as you write it');
-    expect(invitation.body).toContain('Mintro does not edit it, shorten it, or reply to it');
-    // Nothing they write changes a finding (D-063).
-    expect(invitation.body).toContain('Nothing you write changes what was observed');
+  /**
+   * What the email no longer says, and why that is the point (D-067).
+   *
+   * The first version explained the whole arrangement: which findings have no box and why they are
+   * Mintro's gaps, that nothing they write changes an observation, that a fresh link keeps what was
+   * already written, that Mintro does not check the address. All true, and all of it made the
+   * message longer than the attention an unexpected email from an unfamiliar company gets.
+   *
+   * **The email only has to get them to the page.** The page carries every one of these beside the
+   * evidence it is about, which is where each one means something.
+   */
+  it('leaves the arrangement to the page', () => {
+    const moved = [
+      'they are our gaps, not yours',
+      'Nothing you write changes what was observed',
+      'anything you have already written is kept',
+      'Mintro does not check the address',
+      'recorded exactly as you write it',
+    ];
+
+    for (const sentence of moved) {
+      expect(invitation.body, `"${sentence}" belongs on the page now`).not.toContain(sentence);
+    }
   });
 
-  it('explains the findings with no box, as ours rather than theirs', () => {
-    expect(invitation.body).toContain('they are our gaps, not yours');
+  it('keeps what the reader needs before they open anything', () => {
+    // What this is, what is asked, the link, the expiry — and the contact line, asserted below.
+    expect(invitation.body).toContain('Mintro screened the public pages of shop.example');
+    expect(invitation.body).toContain('50 observations are open for your response');
+    expect(invitation.body).toContain('/comment/TOKEN');
+    expect(invitation.body).toContain('The link works until 2026-09-22');
   });
 
-  it('names the expiry and says a new link keeps what was written', () => {
-    expect(invitation.body).toContain('works until 2026-09-22');
-    expect(invitation.body).toContain('anything you have already written is kept');
+  it('calls out the findings where a response is worth most', () => {
+    // The sentence most likely to make someone open the link: it is where their answer is worth
+    // most, and the only place on the report with nothing on the site to read instead.
+    expect(invitation.body).toContain('12 of them are ones where your pages did not show one way');
   });
 
-  it('says the link may be forwarded and how attribution works', () => {
-    // One link per report, forwardable — Mintro generally has no direct channel to the merchant,
-    // so the agent may forward it or answer on their behalf (D-063).
+  it('says the link may be forwarded, because that decision precedes opening it', () => {
+    /*
+      The one detail that cannot wait for the page.
+
+      The agent decides whether to forward *before* opening anything, and knowing that responses
+      are attributed per person changes that decision — they may answer some findings themselves
+      and pass the rest to the merchant rather than answering on their behalf.
+    */
     expect(invitation.body).toContain('You can forward this link');
     expect(invitation.body).toContain('gives an email address first');
-    expect(invitation.body).toContain('Mintro does not check the address');
   });
 
-  /**
-   * The requirement that replaced the no-reply guard (D-064), as amended by D-065.
-   *
-   * Frank overruled a check that refused `no-reply@` in a reply-to and kept the reasoning: a reader
-   * needs a way to reach a person. He then replaced the named contact with a **pointer**, on
-   * stronger reasoning — an address printed inside the same email a reader is suspicious of
-   * verifies nothing, and it puts a personal address into a document built to be forwarded.
-   *
-   * What did not change: **the build fails without the line.** An invitation that leaves a reader
-   * no way to check goes unanswered, and an unanswered invitation is later rendered as merchant
-   * silence — the misattribution `comment_invites.delivery` exists to prevent, arriving through the
-   * email instead of through the database.
-   */
+  it('is short enough to be read', () => {
+    // Not a style preference. An unexpected message from an unfamiliar company gets a glance, and
+    // the link has to survive it. The first version ran to 24 lines of prose.
+    const prose = invitation.body.split(String.fromCharCode(10)).filter((line) => line.trim() !== '');
+    expect(prose.length).toBeLessThanOrEqual(14);
+  });
+
+
   it('points the reader at a person they already deal with', () => {
     expect(invitation.body).toContain(INVITATION_CONTACT_LINE);
     expect(isPointerContactLine(INVITATION_CONTACT_LINE)).toBe(true);

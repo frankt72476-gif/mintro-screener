@@ -1218,16 +1218,87 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .printing .cnote { break-inside: avoid; page-break-inside: avoid; }
 
-/* -- The merchant's comment box (D-063) -----------------------------------------------------
-   A textarea and a button. No character counter, no formatting controls, no placeholder — a
-   placeholder is a suggestion about content, and this box suggests nothing. */
+/* -- The merchant page's "nothing was observed" callout (D-067) -----------------------------
+   The hierarchy inverted: for a merchant the report is context and responding is the task, so
+   the findings where a response is worth most sit above the report rather than inside it.
+
+   Violet, not amber and not the muted `na` grey. This is Mintro asking for something, which is
+   the one thing on this page that *is* Mintro speaking — the amber family belongs to the
+   merchant's own words and the grey to findings that are nobody's failure. */
+
+.unseen {
+  margin: 0 0 18px;
+  padding: 15px 18px;
+  border-left: 3px solid var(--violet);
+}
+
+.unseen-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.unseen-jump {
+  flex: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--violet);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.unseen-jump:hover { opacity: 0.75; }
+
+.unseen p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--slate); }
+
+/* The anchor the jump lands on. `scroll-margin-top` keeps the section heading clear of the
+   viewport edge, so a reader arrives at a heading rather than mid-sentence. */
+#nothing-observed { scroll-margin-top: 24px; }
+
+/* "optional", on every comment box. The constraint made visible at the point of decision: a
+   merchant may reasonably have nothing to add to an observation they accept. */
+.flabel-opt {
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--slate);
+  opacity: 0.8;
+}
+
+.cbox-input::placeholder { color: var(--slate); opacity: 0.65; }
+
+/* -- The merchant's comment box (D-063, restyled D-067) -------------------------------------
+   A textarea and a button. No character counter and no formatting controls.
+
+   **It reads as expected input, not as an afterthought.** It was a dashed outline on near-white:
+   dashes read as a placeholder or a drop target, which is the visual form of "you probably will
+   not use this". A solid edge and a filled ground make an empty box beside a finding look like
+   somewhere to write, which is what the page is for.
+
+   Amber, staying in the merchant's own palette — the same family as `.mr`, because both hold
+   their words rather than Mintro's. The violet callout above is Mintro asking; this is them
+   answering, and the two must not look like the same voice. */
 
 .cbox {
   margin: 10px 0 14px;
-  padding: 12px 14px;
-  border: 1px dashed #E6C89A;
+  padding: 13px 15px;
+  border: 1px solid #F0DCC0;
+  border-left: 3px solid var(--amber);
   border-radius: 8px;
-  background: #FFFDF8;
+  background: #FEFAF3;
 }
 
 .cbox .flabel { display: block; margin-bottom: 6px; }

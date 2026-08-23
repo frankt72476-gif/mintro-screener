@@ -1067,6 +1067,37 @@ someone who had just written it down. Knowing the shape is not the same as notic
 The practical test: *does this assertion get its expected value from the same place the code gets
 its actual value?* If it does, it can only confirm the code agrees with itself.
 
+### A required prop satisfied by an inert value — the thirteenth (D-066)
+
+**Frank's ruling: this belongs in D-026.** Found in first use of the merchant page.
+
+**"Send to IQwallet" was rendered on the anonymous merchant view.** A merchant or their agent could
+see a control that transmits their own screening report to an underwriter. It was inert — the
+handler was `() => undefined` — and one refactor from not being.
+
+The general form, which is the reason it is here:
+
+> **A required prop satisfied by an inert value is not a constraint, it is a convention.**
+
+`onSend` and `onDownload` were required. The merchant view satisfied them the only way it could,
+with no-ops, and *satisfying the prop is what rendered the button*. The type system was fully
+enforced and enforcing nothing: correctness had moved into the **body of a handler**, where no type
+can see it and any later edit can change it.
+
+This is the boundary family again, in the shape a type system is worst at showing. The prop
+contract said "you must supply a send handler" and the page needed to say "there is no send here" —
+a statement the contract had no way to express, so the page said the nearest thing it could and the
+component believed it.
+
+The fix is to make the absent case representable: one optional `actions` group, omitted entirely.
+The compiler then found **all four call sites**, including two print paths carrying the identical
+defect invisibly — a PDF has no buttons, so nothing was ever seen, and only luck separated the
+visible instance from the hidden ones.
+
+**What to take from it.** When a component's props force a caller to say something untrue, the
+props are wrong, not the caller. And an inert value is the tell: a no-op handler, an empty string,
+a zero passed to satisfy a signature is a caller with no way to express what it means.
+
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
 Both rules carry `unauthenticated: true`, so the unauthenticated probe is the finding. The
@@ -3784,3 +3815,122 @@ Whether "your usual point of contact at Mintro" reads correctly for a merchant w
 invitation as a **forward** from their agent, and has no Mintro contact of their own. They would
 sensibly ask the agent who forwarded it, which is the right answer and one the line does not say.
 Left alone rather than lengthened on my own initiative — flagged for Frank.
+
+---
+
+## D-066 — Nothing on the merchant page acts on Mintro's behalf
+**2026-08-23 · Frank's ruling · found in first use**
+
+> The merchant view should render the report and the comment boxes and nothing that acts on
+> Mintro's behalf.
+
+*Send to IQwallet* and *Download PDF* were both rendered on the anonymous merchant page. The
+mechanism, and why it is a D-026 instance rather than an oversight, is recorded there: a required
+prop satisfied by an inert value is not a constraint.
+
+Operator actions are now one optional `actions` group. The merchant route passes none, so none
+exist — the correctness is in what the page **can hold**, not in what its handlers happen to do.
+
+### The audit
+
+Everything else interactive on that route is a filter chip or a disclosure toggle. Both are
+read-only and both belong there: the page exists so a merchant can respond *while looking at the
+evidence*, which means navigating it.
+
+One further thing was removed for a related reason — see D-067 on `MerchantResponse`. It is not an
+operator *action*, but it is operator-facing text, and it was narrating the reader's own silence
+back at them.
+
+---
+
+## D-067 — The merchant page asks; the report is context
+**2026-08-23 · Frank's ruling · found in first use**
+
+> The commentary is buried, and the cause is that the page treats it as an optional annotation on a
+> document. For the merchant it is the other way round: **the report is context, responding is the
+> task.** Invert the hierarchy.
+
+The diagnosis is the valuable part. The page was not badly laid out; it was laid out for the wrong
+reader. It was the analyst's report with boxes added, and a merchant does not arrive to read a
+document — they arrive because someone told them their storefront was screened.
+
+### What changed
+
+- A header stating what is being asked and how many findings are open, before anything else.
+- The findings where nothing was observed **called out above the report**, with a jump link.
+- Comment boxes styled as expected input: a solid edge and a filled ground, not a dashed outline
+  on near-white. Dashes read as a placeholder or a drop target — the visual form of *"you probably
+  will not use this"*.
+- A placeholder question in each box, reversing an earlier rule against one. That rule was right
+  for a blank box on an annotation surface and wrong here: an unlabelled empty box beside a
+  compliance observation reads as a demand to justify yourself.
+
+### The constraint, and where it lives
+
+> Never imply an unanswered finding is a failure or an admission. A merchant may reasonably have
+> nothing to add to a finding they accept. The framing is "this is your opportunity", never "you
+> must account for this".
+
+Carried in two places, deliberately: **"You can respond to any of them, or none"** in the header,
+and **optional** on every box — the header states it once, the box states it where the decision is
+actually made. Nothing on the page counts unanswered findings back at the reader.
+
+`MerchantResponse` was removed from this route for the same reason. It is written for an
+underwriter — it explains what a blank space means — and on this page it told the reader, finding
+by finding, that they *left no comment on it*. Their own words are not lost: the box shows what
+they have already written, above the space to add to it.
+
+### "Did not show one way or the other", not "nothing could be observed"
+
+I flagged a discrepancy: the callout counts only the three not-evaluable kinds a merchant can
+close, but "nothing could be observed" is equally true of the two that are Mintro's own gaps, and a
+merchant who noticed would have no way to resolve it.
+
+Frank's phrasing fixes it rather than papering over it:
+
+> The excluded ones are gaps in what Mintro checked, not in what the pages showed, so the phrasing
+> no longer overlaps them. The four-column breakdown already labels ours as ours; **the callout must
+> not contradict it.**
+
+The count is derived from the same `invitesComment` predicate the boxes use, so the callout and the
+section it points at cannot come to mean different sets.
+
+### "The team reviewing your account"
+
+On the page, not "the underwriting team" and never "IQwallet". A merchant may not know who IQwallet
+is, and IQwallet is not their counterparty. **A merchant who does not know an underwriting team
+exists should not have to infer one to understand the sentence.** The email keeps the fuller
+phrasing, where the register suits it.
+
+Dropped from the identify box: *"Mintro does not check it."* True, and it told the reader nothing
+they could use while undercutting the ask at the moment it was made. The self-declared framing
+belongs in the **report** — "identified themselves as", never "from" — where it informs an
+underwriter's reading of a response rather than discouraging one.
+
+### The box asks what they do, never whether they comply
+
+**This is a hard constraint 7 matter, recorded so the stronger wording is not restored later as a
+clarification.** Frank's own draft said *"explain how their site does or will comply"*; he overruled
+it on my objection.
+
+The box asks: *"How does your site handle this, now or in future?"*
+
+Asking a merchant to state that they comply **solicits a compliance claim**. Mintro does not make
+compliance determinations and does not collect or transmit them — a response saying *"we comply
+with 4.2"* is a determination, sitting in Mintro's document, forwarded to an underwriter under
+Mintro's name. The question as written asks what they do; the reader draws the conclusion. That is
+the same division the whole report keeps, applied to the one field where the words are theirs.
+
+### The email is short
+
+Cut from 24 lines to 13. Kept: what this is, what they are asked to do, the link, the expiry, the
+contact line. Everything else moved to the page, which carries it beside the evidence it is about.
+
+The forwarding sentence stayed against that rule, and Frank confirmed the reason: **the agent
+decides whether to forward before opening anything**, and knowing responses are attributed per
+person changes that decision — they may answer some findings and pass the rest on rather than
+answering on the merchant's behalf.
+
+The subject became *"Your response to the screening report for &lt;domain&gt;"* — leading with what
+is wanted rather than with what Mintro did, since this arrives unexpected from a company the reader
+may not know.

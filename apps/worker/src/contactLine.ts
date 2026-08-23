@@ -36,10 +36,14 @@
  * them that checking is the intended response, rather than leaving them to decide between trusting
  * a stranger's email and ignoring it. Ignoring it is the outcome that costs the merchant a voice in
  * their own screening.
+ *
+ * **And the agent, because the link is forwardable.** A merchant reading a forward has no usual
+ * Mintro contact — the line as first written pointed them at a relationship they do not have. The
+ * person who forwarded it is their real answer, and the one this omitted.
  */
 export const INVITATION_CONTACT_LINE =
   'Questions about this request, or want to confirm it is genuine? Contact your usual point of ' +
-  'contact at Mintro.';
+  'contact at Mintro, or the agent who sent this to you.';
 
 /**
  * The IQwallet report's line, adjusted for its audience.

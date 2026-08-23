@@ -153,6 +153,29 @@ function OpenReport({
     null,
   );
 
+  /**
+   * How many findings are ones the pages did not show either way (D-067).
+   *
+   * The same `invitesComment` predicate, narrowed to `not_evaluable` — so this is exactly the set
+   * that carries a box, never the wider set of things nobody observed. `no_check_built` and
+   * `not_retrieved` are gaps in what Mintro looked at, they carry no box, and the report labels
+   * them as ours (D-046). Counting them here would promise a response this page does not offer.
+   *
+   * Derived from the report rather than passed in, so the callout and the section it points at
+   * cannot come to mean different sets.
+   */
+  const nothingObserved = useMemo(
+    () =>
+      opened.report.categories
+        .flatMap((category) => category.findings)
+        .filter(
+          (finding) =>
+            finding.state === 'not_evaluable' &&
+            invitesComment(finding.state, finding.notEvaluableKind),
+        ).length,
+    [opened.report],
+  );
+
   const invited = useMemo(
     () =>
       opened.report.categories
@@ -227,23 +250,82 @@ function OpenReport({
   return (
     <div className="shell">
       <main className="main">
+        {/*
+          The hierarchy, inverted (D-067).
+
+          The page used to open with a report and treat responding as an annotation on it. For a
+          merchant that is backwards: **the report is context and responding is the task.** They
+          did not ask for this document and will not read it as one — they are here because
+          someone told them their storefront was screened and they have something to say about it.
+
+          So the header states the ask, the count leads it, and the findings where a response is
+          worth most are surfaced before the report rather than buried inside it.
+        */}
         <div className="eyebrow">Screening report · {opened.merchantDomain}</div>
         <h1>Your response</h1>
+
         <p className="sub">
-          Mintro screened the public pages of {opened.merchantDomain} against the peptide
-          research-use programme rule set for IQwallet. Every observation below shows the
-          screenshot or document it came from.
+          {/*
+            "The team reviewing your account", not "the underwriting team" (D-067). A merchant who
+            does not know an underwriting team exists should not have to infer one to understand
+            the sentence. The email keeps the fuller phrasing, where the register suits it.
+          */}
+          The team reviewing your account asked Mintro to screen your public pages against the
+          peptide research-use programme rule set. This is what was observed, with the capture
+          behind each one.
         </p>
+
         <p className="sub">
-          {invited.length} observation(s) have a box for your response. Write whatever you want, or
-          nothing. What you write is recorded exactly as written, shown as yours, and passed to
-          IQwallet with the report. It does not change what was observed, and Mintro does not edit
-          or reply to it.
+          {/*
+            "or none" comes in the second sentence, before anything asks them for anything.
+
+            Frank's constraint: never imply that an unanswered finding is a failure or an
+            admission. A merchant may reasonably have nothing to add to an observation they accept,
+            and nothing on this page counts silence back at them.
+          */}
+          <strong>{invited.length} observations are open for your response.</strong> You can
+          respond to any of them, or none. What you write is recorded exactly as you write it,
+          shown as yours, and passed to the team reviewing your account with the report. Mintro
+          does not edit it, shorten it, or reply to it.
         </p>
+
+        {nothingObserved > 0 && (
+          <div className="card unseen">
+            <h2 className="unseen-head">
+              {nothingObserved} where your pages did not show one way or the other
+              <a className="unseen-jump" href="#nothing-observed">
+                Jump to these
+              </a>
+            </h2>
+            {/*
+              "did not show one way or the other" — not "nothing could be observed" (D-067).
+
+              The narrower phrasing resolves a real overlap. Findings Mintro has not built a check
+              for are also ones where nothing was observed, but they are gaps in what *we* looked
+              at rather than in what the pages showed; they carry no box, and the report's
+              four-column breakdown labels them as ours. A callout that swept them in would
+              contradict it, and would promise a response this page does not offer.
+            */}
+            <p>
+              For these, your public pages did not show either way — an order-handling practice, a
+              page behind a login, a document not published.{' '}
+              <strong>A response here adds more than anywhere else on this report</strong>, because
+              there is nothing on the site for the team reviewing your account to read instead. You
+              can describe how your site handles it now, or how you intend to.
+            </p>
+          </div>
+        )}
+
         <p className="sub">
           This link works until {opened.expiresAt.slice(0, 10)}. It can be forwarded — whoever
           responds says who they are, and each response is shown against the address given when it
           was written.
+        </p>
+
+        <p className="sub">
+          {/* D-065, and the agent because a forwarded merchant has no Mintro contact of their own. */}
+          Questions about this request, or want to confirm it is genuine? Contact your usual point
+          of contact at Mintro, or the agent who sent this to you.
         </p>
 
         <Identify identity={identity} onIdentify={identify} />
@@ -260,10 +342,21 @@ function OpenReport({
           screening report to an underwriter. It was on this page because the props were required
           and no-op handlers satisfied them.
         */}
+        {/*
+          No `commentaryOf` either, and for a reason of the same kind (D-067).
+
+          `MerchantResponse` is written for an underwriter: it explains what a blank space means —
+          *"the merchant has not opened the report"*, *"identified themselves as X, and left no
+          comment on it"*. Rendering it here narrates the reader's own behaviour back at them,
+          finding by finding, on a page whose one rule is never to imply that saying nothing is a
+          failure.
+
+          Their own words are not lost: `CommentBox` shows what they have already written, above
+          the box they would add to.
+        */}
         <ReportView
           report={opened.report}
           access={access}
-          commentaryOf={commentaryOf}
           commentBox={(finding, ordinal) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
@@ -314,9 +407,17 @@ function Identify({
       <label className="flabel" htmlFor="ident">
         Your email address
       </label>
+      {/*
+        "the team reviewing your account", and no "Mintro does not check it" (D-067).
+
+        The disclaimer was true and told the reader nothing they could use, while undercutting the
+        ask at the exact moment it is made. The self-declared framing belongs in the **report** —
+        "identified themselves as", never "from" — where it informs the underwriter's reading of a
+        response rather than discouraging one.
+      */}
       <p className="fhint">
-        Needed before you can respond, so IQwallet can see who answered. It is recorded as you give
-        it and shown with your responses; Mintro does not check it.
+        Needed before you can respond, so the team reviewing your account can see who answered.
+        Each response is shown against the address you give.
       </p>
       <div className="queue-row">
         <input
@@ -392,13 +493,36 @@ function CommentBox({
 
       <label className="flabel" htmlFor={`c-${existing.length}`}>
         {existing.length > 0 ? 'Add to your response' : 'Your response'}
+        {/*
+          "optional" on every box, always (D-067).
+
+          Frank's constraint: never imply that an unanswered finding is a failure or an admission.
+          A merchant may reasonably have nothing to add to an observation they accept. This is the
+          per-finding half of the header's "or none" — the header states it once and this states it
+          where the decision is actually made.
+        */}
+        <span className="flabel-opt">optional</span>
       </label>
+      {/*
+        A placeholder, reversing this file's earlier rule against one (D-067).
+
+        The old comment said a placeholder is a suggestion about content. That was right for a
+        blank box on an annotation surface and wrong here: the page's job is to make responding
+        the task, and an unlabelled empty box beside a compliance observation reads as a demand to
+        justify yourself. A question that can be answered plainly lowers that.
+
+        **"How does your site handle this" and never "how do you comply".** Asking a merchant to
+        state compliance solicits a compliance claim, and hard constraint 7 says Mintro does not
+        collect or transmit those — Frank's own "does or will comply" was overruled on that
+        ground. The question asks what they do; the reader draws the conclusion.
+      */}
       <textarea
         className="input cbox-input"
         id={`c-${existing.length}`}
         rows={4}
         value={body}
         disabled={!identified}
+        placeholder={identified ? 'How does your site handle this, now or in future?' : ''}
         onChange={(event) => setBody(event.target.value)}
       />
       {!identified && (

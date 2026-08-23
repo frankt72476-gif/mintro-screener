@@ -45,6 +45,8 @@ export interface InviteJobResult {
   /** What carried it. `dry_run` means nobody was invited (D-063). */
   readonly delivery: 'resend' | 'dry_run';
   readonly openForComment: number;
+  /** How many of those are ones the pages did not show either way (D-067). */
+  readonly nothingObserved: number;
   readonly expiresAt: string;
 }
 
@@ -64,6 +66,7 @@ export async function issueInvitation(
 
   const report = await loadReport(supabase, input.runId);
   const openForComment = countOpenForComment(report);
+  const nothingObserved = countNothingObserved(report);
 
   const { token, sha256 } = issueToken();
   const until = expiresAt(now);
@@ -96,6 +99,7 @@ export async function issueInvitation(
     link: commentLinkFor(input.webOrigin, token),
     expiresAt: until,
     openForComment,
+    nothingObserved,
   });
 
   const outcome = await messenger.send({
@@ -114,8 +118,29 @@ export async function issueInvitation(
     linkId,
     delivery: messenger.description === 'Resend' ? 'resend' : 'dry_run',
     openForComment,
+    nothingObserved,
     expiresAt: until.toISOString(),
   };
+}
+
+/**
+ * How many of the invited findings are ones the pages did not show either way.
+ *
+ * `not_reachable`, `not_exposed` and `not_applicable` — the three `not_evaluable` kinds that are
+ * about the merchant's surface. **Not `no_check_built` or `not_retrieved`**, which are gaps in what
+ * Mintro looked at rather than in what the pages showed (D-046). Those carry no box either, so
+ * including them would promise a response the page does not offer, and would contradict the
+ * report's own four-column breakdown, which labels ours as ours.
+ */
+export function countNothingObserved(report: ScreeningReport): number {
+  let count = 0;
+  for (const category of report.categories) {
+    for (const finding of category.findings) {
+      if (finding.state !== 'not_evaluable') continue;
+      if (invitesComment(finding.state, finding.notEvaluableKind)) count += 1;
+    }
+  }
+  return count;
 }
 
 /**

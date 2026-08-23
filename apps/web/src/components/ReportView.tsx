@@ -202,17 +202,40 @@ export function ReportView({
         </div>
       ) : (
         <div>
-          {groupReport(report)
-            .filter((section) => filter === 'all' || section.state === filter)
-            .map((section) => (
+          {(() => {
+            const sections = groupReport(report).filter(
+              (section) => filter === 'all' || section.state === filter,
+            );
+
+            /*
+              Where "jump to these" lands (D-067).
+
+              The merchant page points at the findings where nothing was observed *from their
+              pages* — the three not-evaluable buckets a merchant can actually close. The anchor
+              goes on the first of them that is rendered, so it survives filtering and survives a
+              report where one of the three is empty.
+
+              Derived here rather than hard-coded to a bucket name, because a report with no
+              `not_reachable` findings would otherwise have a callout pointing at nothing.
+            */
+            const target = sections.find(
+              (section) =>
+                section.bucket === 'not_reachable' ||
+                section.bucket === 'not_exposed' ||
+                section.bucket === 'not_applicable',
+            );
+
+            return sections.map((section) => (
               <StateSection
-              key={section.key}
-              section={section}
-              access={access}
-              {...(commentaryOf === undefined ? {} : { commentaryOf })}
-              {...(commentBox === undefined ? {} : { commentBox })}
-            />
-            ))}
+                key={section.key}
+                section={section}
+                access={access}
+                anchored={section === target}
+                {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                {...(commentBox === undefined ? {} : { commentBox })}
+              />
+            ));
+          })()}
         </div>
       )}
 
@@ -722,9 +745,12 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
 function StateSection({
   section,
   access,
+  anchored = false,
   commentaryOf,
   commentBox,
 }: {
+  /** Carries the `#nothing-observed` anchor the merchant page jumps to (D-067). */
+  readonly anchored?: boolean;
   readonly section: import('../lib/grouping.js').ReportSection;
   readonly access: EvidenceAccess;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
@@ -748,7 +774,11 @@ function StateSection({
     carry it". Rendering them identically is the thing this fixes.
   */
   return (
-    <section className={`sect ${stateClass(section.state)}`} data-bucket={section.bucket ?? undefined}>
+    <section
+      className={`sect ${stateClass(section.state)}`}
+      data-bucket={section.bucket ?? undefined}
+      {...(anchored ? { id: 'nothing-observed' } : {})}
+    >
       <div className="sect-head">
         <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
         <span className="sect-count">

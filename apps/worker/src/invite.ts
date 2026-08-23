@@ -73,6 +73,18 @@ export interface InvitationInput {
   readonly expiresAt: Date;
   /** How many findings are open for comment. A count, never a characterisation. */
   readonly openForComment: number;
+  /**
+   * How many of those are ones the pages did not show either way.
+   *
+   * Called out in its own sentence because it is the sentence most likely to make someone open the
+   * link: it is where their answer is worth most, and the only place on the report where there is
+   * nothing on the site to read instead.
+   *
+   * **Mintro's own gaps are not in this number** (D-046). A check we never built is a gap in what
+   * was looked at, not in what the pages showed — and the report's four-column breakdown already
+   * labels ours as ours. A callout that swept them in would contradict it.
+   */
+  readonly nothingObserved: number;
 }
 
 export interface Invitation {
@@ -90,36 +102,44 @@ export function composeInvitation(input: InvitationInput): Invitation {
   const { merchantDomain, link, openForComment } = input;
   const until = input.expiresAt.toISOString().slice(0, 10);
 
-  const subject = `Screening report for ${merchantDomain} — your response`;
+  // Leads with what is wanted from them rather than with what Mintro did. This arrives unexpected,
+  // from a company they may not know, and "your response" is the part that says it is not a
+  // broadcast.
+  const subject = `Your response to the screening report for ${merchantDomain}`;
 
+  /*
+    Short, deliberately (D-067).
+
+    The first version explained the whole arrangement — what happens to their words, which findings
+    have no box, that nothing they write changes an observation, how to get a fresh link. All true,
+    and all of it made the message longer than the attention an unexpected email gets.
+
+    **The email only has to get them to the page.** The page carries the detail, beside the
+    evidence it is about, which is where it means something.
+
+    The forwarding sentence stays, against that rule, because it is the one thing that cannot wait
+    for the page: the agent decides whether to forward *before* opening anything, and knowing that
+    responses are attributed per person changes that decision.
+  */
   const body = [
     `Mintro screened the public pages of ${merchantDomain} against the peptide research-use`,
-    `programme rule set on behalf of IQwallet, who are reviewing the account.`,
+    `programme rule set, on behalf of the underwriting team reviewing the account.`,
     ``,
     `The report is here, with the screenshot or document behind every observation:`,
     ``,
     `  ${link}`,
     ``,
-    `${openForComment} of the observations are open for your response. They are the ones where`,
-    `something could not be established from your public pages, or where what was observed may`,
-    `have an explanation the pages do not carry.`,
-    ``,
-    `There is a box under each one. Write whatever you want in it, or nothing. What you write is`,
-    `recorded exactly as you write it, shown as yours, and passed to IQwallet with the report.`,
-    `Mintro does not edit it, shorten it, or reply to it.`,
+    `${openForComment} observations are open for your response.`,
+    input.nothingObserved > 0
+      ? `${input.nothingObserved} of them are ones where your pages did not show one way or the ` +
+        `other — those are where your answer adds the most, because there is nothing on the site ` +
+        `for us to have looked at.`
+      : '',
     ``,
     `You can forward this link. Whoever responds gives an email address first, and each response`,
-    `is shown against the address given when it was written — so the merchant and their agent can`,
-    `both answer, on whichever points each is placed to answer. Mintro does not check the address.`,
+    `is shown against the address given when it was written.`,
     ``,
-    `Some observations have no box. Those are ones Mintro has not built a check for, or where a`,
-    `request of ours failed — they are our gaps, not yours, and the report says so.`,
-    ``,
-    `Nothing you write changes what was observed. The observation and your response travel`,
-    `together, and IQwallet decides what to make of them.`,
-    ``,
-    `The link works until ${until}. If it has expired, reply to this message and we will send`,
-    `another; anything you have already written is kept.`,
+    `The link works until ${until}.`,
     ``,
     // A pointer out of this message, not an address inside it (D-065).
     INVITATION_CONTACT_LINE,

@@ -77,6 +77,13 @@ should mean), stop and ask. Do not guess at business rules.
    not "do not forward", not "recommend", not "should". State the observation and attach
    the capture. See D-001.
 
+   **And never solicit a compliance claim.** The constraint runs in both directions: Mintro does
+   not make compliance determinations, and does not collect or transmit them either. A merchant
+   response field asking *"explain how your site complies"* would put a determination — *"we comply
+   with 4.2"* — in Mintro's document, forwarded to an underwriter under Mintro's name. Ask what
+   they do: *"How does your site handle this, now or in future?"* The reader draws the conclusion.
+   See D-067.
+
 8. **Runs are immutable.** Re-scanning a merchant creates a new run. Nothing in application
    code updates or deletes a completed run or overwrites its evidence. See D-002.
 
