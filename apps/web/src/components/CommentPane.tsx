@@ -252,11 +252,17 @@ function OpenReport({
           The report as the analyst and IQwallet see it — the same component, the same evidence.
           `commentBox` is the only thing this view adds.
         */}
+        {/*
+          No `actions` prop, and that is the fix rather than an omission (D-066).
+
+          This page is anonymous: anyone holding a forwarded link is here. Every operator action
+          acts on Mintro's behalf, and *Send to IQwallet* would let a merchant transmit their own
+          screening report to an underwriter. It was on this page because the props were required
+          and no-op handlers satisfied them.
+        */}
         <ReportView
           report={opened.report}
           access={access}
-          onSend={() => undefined}
-          onDownload={() => undefined}
           commentaryOf={commentaryOf}
           commentBox={(finding, ordinal) => (
             <CommentBox

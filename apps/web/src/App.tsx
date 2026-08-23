@@ -476,8 +476,6 @@ function Screener({
                 report={report}
                 access={access}
                 print
-                onSend={() => undefined}
-                onDownload={() => undefined}
               />
             </>
           )}
@@ -595,10 +593,12 @@ function Screener({
               <ReportView
               report={report}
               access={access}
-                onSend={() => setSending(true)}
-                onDownload={() => void downloadPdf(report)}
-                onInvite={() => setInviting(true)}
-                downloading={pdfBusy}
+                actions={{
+                  onSend: () => setSending(true),
+                  onDownload: () => void downloadPdf(report),
+                  onInvite: () => setInviting(true),
+                  downloading: pdfBusy,
+                }}
                 {...commentaryProps(commentary)}
               />
             </>
@@ -965,8 +965,6 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
           report={injected.report}
           access={access}
           print
-          onSend={() => undefined}
-          onDownload={() => undefined}
           {...commentaryProps(injected.commentary)}
         />
       </main>

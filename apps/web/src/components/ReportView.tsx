@@ -25,15 +25,34 @@ import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
 
 type Filter = State | 'all';
 
-interface Props {
-  readonly report: ScreeningReport;
-  readonly access: EvidenceAccess;
+/**
+ * What an operator can do with a report. Never available on the merchant route (D-066).
+ */
+export interface ReportActions {
   readonly onSend: () => void;
   readonly onDownload: () => void;
-  /** Opens the merchant-invitation dialog (D-063). Absent where inviting does not apply. */
+  /** Opens the merchant-invitation dialog (D-063). */
   readonly onInvite?: () => void;
   /** True while the worker is rendering. The button says so rather than appearing inert. */
   readonly downloading?: boolean;
+}
+
+interface Props {
+  readonly report: ScreeningReport;
+  readonly access: EvidenceAccess;
+  /**
+   * Operator actions — send, export, invite. **Omit them and none are rendered.**
+   *
+   * This used to be three separate props, two of them required, and the merchant view satisfied
+   * them with no-op functions. The result was *Send to IQwallet* on an anonymous page: inert,
+   * because the handler did nothing, and one refactor away from not being. A merchant or their
+   * agent could see a control that transmits their own screening report to an underwriter.
+   *
+   * Grouping them makes the merchant view's correctness structural rather than a matter of what
+   * its handlers happen to do. There is nothing to pass, so there is nothing to get wrong — the
+   * same reasoning as `Located<T>` having no variant that carries a value without `how` (D-054).
+   */
+  readonly actions?: ReportActions;
   /**
    * Print mode: every category and every finding expanded, no filtering, no actions.
    *
@@ -66,10 +85,7 @@ interface Props {
 export function ReportView({
   report,
   access,
-  onSend,
-  onDownload,
-  onInvite,
-  downloading = false,
+  actions,
   print = false,
   commentaryOf,
   commentaryNote,
@@ -107,10 +123,14 @@ export function ReportView({
             </p>
           )}
         </div>
-        {!print && (
+        {!print && actions !== undefined && (
           <div className="acts">
-            <button className="btn btn-ghost" onClick={onDownload} disabled={downloading}>
-              {downloading ? 'Rendering…' : 'Download PDF'}
+            <button
+              className="btn btn-ghost"
+              onClick={actions.onDownload}
+              disabled={actions.downloading === true}
+            >
+              {actions.downloading === true ? 'Rendering…' : 'Download PDF'}
             </button>
             {/*
               Enabled, unlike Send — and the difference is not an oversight.
@@ -120,8 +140,8 @@ export function ReportView({
               weaker state is that the mail may be composed rather than transmitted, and that is
               reported as what happened rather than hidden behind a disabled control (D-063).
             */}
-            {onInvite !== undefined && (
-              <button className="btn btn-ghost" onClick={onInvite}>
+            {actions.onInvite !== undefined && (
+              <button className="btn btn-ghost" onClick={actions.onInvite}>
                 Invite merchant response
               </button>
             )}
@@ -134,7 +154,7 @@ export function ReportView({
               own account of the attempt, so an analyst is never shown "Sent" for a message a
               provider refused.
             */}
-            <button className="btn btn-primary" onClick={onSend}>
+            <button className="btn btn-primary" onClick={actions.onSend}>
               Send to IQwallet
             </button>
           </div>
