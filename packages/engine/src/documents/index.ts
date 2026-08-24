@@ -35,3 +35,20 @@ export type * from './types.js';
 export { runFamilyC, sources, type RoutingDirectory, type Source } from './familyC.js';
 export { runFamilyD, MATERIAL_GAP } from './familyD.js';
 export * as normalise from './normalise.js';
+export {
+  buildDocumentsReport,
+  diffRuns,
+  assertReportCopyClean,
+  ReportCopyError,
+  type DocumentsReport,
+  type ReportSlot,
+  type ReportFinding,
+  type ReportDocumentGroup,
+  type CollapsedCause,
+  type ReportDiff,
+  type RunRecord,
+  type StoredSlot,
+  type StoredDocument,
+  type StoredFinding,
+  type NotCheckedItem,
+} from './report.js';

@@ -295,6 +295,40 @@
       "note": "Public download, no vendor cost. Confirms a routing number resolves to a real institution and names it; confirms nothing about the account."
     }
   ],
+  "not_checked": {
+    "$comment": "CHECK-INVENTORY section 7, verbatim. This renders in the report as a section, not as a footnote: it is a feature, not a disclaimer (D-076). Coverage a reader might reasonably assume must be denied explicitly rather than merely not asserted (D-018) — silence is not a boundary, because an absent claim reads the same whether the IRS was consulted and matched or never consulted at all.",
+    "external_verification": "No external verification was performed on any document in this package, beyond a lookup of the bank routing number in the Federal Reserve E-Payments routing directory. Every other observation is a comparison between documents the merchant supplied.",
+    "items": [
+      {
+        "subject": "EIN exists at IRS and maps to this business",
+        "why": "No free API; TIN Matching requires 1099-filer standing. Vendor spend, out of scope (D-093)."
+      },
+      {
+        "subject": "Entity is in good standing with the Secretary of State",
+        "why": "Fifty state sources; vendor spend or fifty scrapers, both refused."
+      },
+      {
+        "subject": "Bank account is open and belongs to the merchant",
+        "why": "Requires Plaid or similar; declined on cost."
+      },
+      {
+        "subject": "Document authenticity",
+        "why": "No mechanism exists at any price from the document alone."
+      },
+      {
+        "subject": "Sanctions and watchlist screening",
+        "why": "Free list, but untuned name matching produces false positives that erode trust faster than absent checks."
+      },
+      {
+        "subject": "Marketing and advertising material",
+        "why": "Collected only."
+      },
+      {
+        "subject": "Anything reached by Site Check",
+        "why": "Handled there; duplicating produces two findings on one artifact."
+      }
+    ]
+  },
   "not_evaluable_conditions": [
     "chargebacks_not_itemized",
     "date_not_extracted",

@@ -107,6 +107,23 @@ export const checksFileSchema = z
     external_sources: z.array(
       z.object({ key: SLOT_KEY, label: z.string().min(1), note: z.string().optional() }).strict(),
     ),
+    /**
+     * CHECK-INVENTORY §7, verbatim, as data.
+     *
+     * It renders as a section of the report rather than a footnote (D-076). Held here because it
+     * is a claim about what the system does and does not do — a capability statement, which is
+     * what this file is for — and because a boundary that lives only in a React component is one
+     * that can be edited without a decision number.
+     */
+    not_checked: z
+      .object({
+        $comment: z.string().optional(),
+        external_verification: z.string().min(1),
+        items: z
+          .array(z.object({ subject: z.string().min(1), why: z.string().min(1) }).strict())
+          .min(1),
+      })
+      .strict(),
     not_evaluable_conditions: z.array(SLOT_KEY),
     checks: z.array(checkSchema).min(1),
   })

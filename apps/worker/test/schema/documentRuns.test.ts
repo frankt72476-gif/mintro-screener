@@ -35,10 +35,15 @@ async function seedPackage(): Promise<string> {
 }
 
 async function seedRun(packageId: string): Promise<string> {
+  // `slots`, `documents` and `package_digest` are NOT NULL without defaults since 0028: a run has to
+  // record what it ran against, or the report cannot be a pure function of it (D-085), and the
+  // staleness gate has nothing to compare (D-117).
   const [run] = await db.query<{ id: string }>(
-    `insert into public.document_runs (package_id, ruleset_version, engine_version, run_at, families)
-     values ($1, 'documents-1', '0.1.0', now(), array['A','B']) returning id`,
-    [packageId],
+    `insert into public.document_runs
+       (package_id, ruleset_version, engine_version, run_at, families, slots, documents, package_digest)
+     values ($1, 'documents-1', '0.1.0', now(), array['A','B'], '[]'::jsonb, '[]'::jsonb, $2)
+     returning id`,
+    [packageId, '0'.repeat(64)],
   );
   return run!.id;
 }
@@ -192,5 +197,83 @@ describe('slot origin carries all three values (D-121)', () => {
     await expect(insert('added', 'state pharmacy licence')).resolves.not.toThrow();
     // Retaining it would let the mapping that lost the distinction quietly persist.
     await expect(insert('template', null)).rejects.toThrow();
+  });
+});
+
+describe('a run records what it ran against (0028)', () => {
+  it('refuses a run that does not say what it read', async () => {
+    const pkg = await seedPackage();
+    // Without the snapshot the report would be a function of the run plus whatever the slots say
+    // today, and regenerating it later would produce a different document under the same run id.
+    await expect(
+      db.query(
+        `insert into public.document_runs (package_id, ruleset_version, engine_version, run_at, families)
+         values ($1, 'documents-1', '0.1.0', now(), array['A'])`,
+        [pkg],
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('sending is an event, not a state transition (D-083)', () => {
+  async function seedAnalyst(): Promise<string> {
+    const [user] = await db.query<{ id: string }>(
+      `insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id`,
+      [`sender-${Math.random().toString(36).slice(2)}@gomintro.com`],
+    );
+    const [analyst] = await db.query<{ id: string }>(
+      `insert into public.analysts (id, email) values ($1, $2) returning id`,
+      [user!.id, `sender-${Math.random().toString(36).slice(2)}@gomintro.com`],
+    );
+    return analyst!.id;
+  }
+
+  const send = (runId: string, pkg: string, analyst: string, over: Record<string, unknown> = {}) => {
+    const row: Record<string, unknown> = {
+      run_id: runId, package_id: pkg, recipient: 'underwriting@iqwallet.com', sent_by: analyst,
+      mailer: 'dry_run', pdf_sha256: 'a'.repeat(64), pdf_bytes: 1024, ...over,
+    };
+    const keys = Object.keys(row);
+    return db.query(
+      `insert into public.document_report_sends (${keys.join(', ')})
+       values (${keys.map((_, i) => `$${i + 1}`).join(', ')})`,
+      keys.map((k) => row[k]),
+    );
+  };
+
+  it('records more than one send of the same run', async () => {
+    const pkg = await seedPackage();
+    const run = await seedRun(pkg);
+    const analyst = await seedAnalyst();
+    await send(run, pkg, analyst);
+    // A second send is ordinary, not forbidden and not an edit to the first.
+    await expect(send(run, pkg, analyst, { recipient: 'second@iqwallet.com' })).resolves.not.toThrow();
+    const rows = await db.query(`select id from public.document_report_sends where run_id = $1`, [run]);
+    expect(rows).toHaveLength(2);
+  });
+
+  it('never lets a send record be edited or removed', async () => {
+    const pkg = await seedPackage();
+    const run = await seedRun(pkg);
+    const analyst = await seedAnalyst();
+    await send(run, pkg, analyst);
+    await expect(db.query(`update public.document_report_sends set recipient = 'x@y.com' where run_id = $1`, [run])).rejects.toThrow();
+    await expect(db.query(`delete from public.document_report_sends where run_id = $1`, [run])).rejects.toThrow();
+  });
+
+  it('refuses a mailer that is neither resend nor dry_run', async () => {
+    const pkg = await seedPackage();
+    const run = await seedRun(pkg);
+    const analyst = await seedAnalyst();
+    // A dry-run send composes a message and transmits nothing; the record must never blur the two.
+    await expect(send(run, pkg, analyst, { mailer: 'maybe' })).rejects.toThrow();
+  });
+
+  it('refuses a recipient that is not an address, and a pdf hash that is not one', async () => {
+    const pkg = await seedPackage();
+    const run = await seedRun(pkg);
+    const analyst = await seedAnalyst();
+    await expect(send(run, pkg, analyst, { recipient: 'not-an-address' })).rejects.toThrow();
+    await expect(send(run, pkg, analyst, { pdf_sha256: 'short' })).rejects.toThrow();
   });
 });
