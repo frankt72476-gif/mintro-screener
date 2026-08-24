@@ -87,13 +87,51 @@ export interface RunSendDeps {
   readonly client: SupabaseClient;
   readonly browser: Browser;
   readonly origin: string;
+}
+
+/**
+ * Who the package is for, read from the merchant row.
+ *
+ * **Not a parameter.** It was one, and nothing real supplied it — the live scripts hardcoded a
+ * name and the pane showed `processorKey` in its place. A fact carried down two paths is a fact
+ * that can differ between them, and the two places it would differ are a report's masthead and the
+ * screen the operator read before sending it.
+ *
+ * `legal_name` with `domain` as the fallback, matching `createPackages` in the frontend: a merchant
+ * created from a crawl has a domain before anyone has typed a name, and a masthead reading nothing
+ * looks like a rendering fault rather than missing data.
+ */
+export interface Identity {
   readonly merchantName: string;
   readonly dba: string | null;
   readonly processor: string;
 }
 
+export async function identityOf(client: SupabaseClient, packageId: string): Promise<Identity> {
+  const { data } = await client
+    .from('packages')
+    .select('processor_key, merchants!inner(legal_name, domain)')
+    .eq('id', packageId)
+    .single();
+
+  const embedded = (data?.['merchants'] ?? null) as Record<string, unknown> | Record<string, unknown>[] | null;
+  const row = Array.isArray(embedded) ? embedded[0] : embedded;
+  const legal = row === null || row === undefined ? '' : String(row['legal_name'] ?? '');
+  const domain = row === null || row === undefined ? '' : String(row['domain'] ?? '');
+
+  return {
+    merchantName: legal !== '' ? legal : domain,
+    // The trading name is on no merchant column; it is a value extracted from the application, and
+    // C-02 is the check that compares it. Sourcing it for the masthead is a separate job from
+    // sending, and inventing one here would put a second derivation beside C-02's.
+    dba: null,
+    processor: String(data?.['processor_key'] ?? 'default'),
+  };
+}
+
 export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<void> {
   const { client } = deps;
+  const identity = await identityOf(client, request.packageId);
   const store = createDocumentRunStore(client);
   const rules = loadDocumentsRules();
 
@@ -203,10 +241,10 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       origin: deps.origin,
       inject: {
         report,
-        merchantName: deps.merchantName,
-        dba: deps.dba,
+        merchantName: identity.merchantName,
+        dba: identity.dba,
         packageRef: request.packageId.slice(0, 8),
-        processor: deps.processor,
+        processor: identity.processor,
         reportNumber: `${sentBefore.length + 1} of ${sentBefore.length + 1}`,
         previousSentAt: sentBefore.length === 0 ? null : sentBefore[sentBefore.length - 1]!.sent_at.slice(0, 10),
       },
@@ -219,7 +257,7 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       from: 'reports@gomintro.com',
       sentByAnalystId: request.requestedBy,
       diffAgainstRunId: previous?.id ?? null,
-      merchantName: deps.merchantName,
+      merchantName: identity.merchantName,
     });
 
     const { data: recorded } = await client

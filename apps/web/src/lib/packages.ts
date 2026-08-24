@@ -28,6 +28,19 @@ export type UploadStatus = 'queued' | 'running' | 'done' | 'failed';
 export interface PackageSummary {
   readonly id: string;
   readonly merchantId: string;
+  /**
+   * The merchant, resolved here rather than by each caller.
+   *
+   * The pane was showing `processorKey` where a merchant name belonged, and the worker's send job
+   * took a name as a parameter that nothing real supplied. Two paths carrying the same fact is how
+   * they come to disagree — a report addressed to one name and a UI showing another — so the join
+   * lives at the view and both read it from here.
+   *
+   * `legal_name` is what the merchant row holds; `domain` is the fallback, because a merchant
+   * created from a crawl has a domain before anyone has typed a name.
+   */
+  readonly merchantName: string;
+  readonly merchantDomain: string;
   readonly processorKey: string;
   readonly templateVersion: string;
   readonly lifecycle: 'open' | 'submitted' | 'cancelled' | 'reopened' | 'archived';
@@ -78,6 +91,20 @@ export interface PackageView {
   readonly uploads: readonly UploadSummary[];
 }
 
+/**
+ * The merchant's name and domain off the embedded row.
+ *
+ * A merchant with no `legal_name` falls back to its domain rather than to an empty string: a report
+ * headed by nothing is worse than one headed by the address it was screened from, and an empty
+ * masthead reads as a rendering fault rather than as missing data.
+ */
+function merchantNames(embedded: unknown): { merchantName: string; merchantDomain: string } {
+  const row = (Array.isArray(embedded) ? embedded[0] : embedded) as Record<string, unknown> | null;
+  const domain = row === null || row === undefined ? '' : String(row['domain'] ?? '');
+  const legal = row === null || row === undefined ? '' : String(row['legal_name'] ?? '');
+  return { merchantName: legal !== '' ? legal : domain, merchantDomain: domain };
+}
+
 interface ExtractionShape {
   pages?: { page: number; route: string; reason: string | null }[];
 }
@@ -87,7 +114,7 @@ export function createPackages(client: SupabaseClient) {
     async load(packageId: string): Promise<PackageView | { readonly error: string }> {
       const pkgResult = await client
         .from('packages')
-        .select('id, merchant_id, processor_key, template_version, lifecycle, opened_at')
+        .select('id, merchant_id, processor_key, template_version, lifecycle, opened_at, merchants!inner(legal_name, domain)')
         .eq('id', packageId)
         .limit(1);
       if (pkgResult.error !== null) return { error: pkgResult.error.message };
@@ -146,6 +173,7 @@ export function createPackages(client: SupabaseClient) {
         pkg: {
           id: String(pkgRow['id']),
           merchantId: String(pkgRow['merchant_id']),
+          ...merchantNames(pkgRow['merchants']),
           processorKey: String(pkgRow['processor_key']),
           templateVersion: String(pkgRow['template_version']),
           lifecycle: pkgRow['lifecycle'] as PackageSummary['lifecycle'],

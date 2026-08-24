@@ -48,6 +48,10 @@ import { issueInvitation } from '../src/inviteJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
+import {
+  claimNextSend as claimNextDocumentsSend,
+  runSend as runDocumentsSend,
+} from '../src/documentsSendJob.js';
 import { createIngestStore } from '../src/store/ingestStore.js';
 import { openRasterizer, type RasterizerHandle } from '../src/rasterize.js';
 import { createAnthropicVisionClient } from '@mintro/extraction';
@@ -211,6 +215,36 @@ async function main(argv: readonly string[]): Promise<number> {
             ? {}
             : { vision: createAnthropicVisionClient() }),
         });
+        continue;
+      }
+
+      /*
+        A Documents Check send: render the report route, then transmit.
+
+        Beside the Site Check send rather than behind the uploads, for the same reason that one sits
+        where it does — it is a render plus a transmission and an operator is watching it. It needs
+        `WEB_ORIGIN`, because the report is printed from the deployed route; without one there is
+        nothing to navigate to, and the request is failed with that as its reason rather than left
+        queued forever looking like the worker is busy.
+      */
+      const documentsSend = await claimNextDocumentsSend(supabase.client);
+      if (documentsSend !== null) {
+        if (WEB_ORIGIN === undefined) {
+          await supabase.client
+            .from('document_send_requests')
+            .update({
+              status: 'failed',
+              error: 'WEB_ORIGIN is not set on this worker, so the report route could not be reached',
+              finished_at: new Date().toISOString(),
+            })
+            .eq('id', documentsSend.id);
+        } else {
+          await runDocumentsSend(documentsSend, {
+            client: supabase.client,
+            browser,
+            origin: WEB_ORIGIN,
+          });
+        }
         continue;
       }
 

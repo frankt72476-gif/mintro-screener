@@ -248,7 +248,7 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
         <DocumentsSendModal
           packageId={packageId}
           runId={sendable.runId}
-          merchantName={view.pkg.processorKey}
+          merchantName={view.pkg.merchantName}
           queue={sendQueue.current}
           history={history}
           onCancel={() => setSending(false)}
