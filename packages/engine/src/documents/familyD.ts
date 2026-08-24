@@ -58,12 +58,21 @@ function firstDeclared(check: DocumentCheck, candidates: readonly string[]): str
  *
  * A merchant estimating their monthly volume is not reading it off a statement, so exact agreement
  * is not the expectation and reporting every rounding difference would bury the cases that matter.
- * **20% is a judgement, not a measurement** — recorded here as one so it is not mistaken for a
- * derived constant later.
  *
- * It changes only how much gets surfaced. Both figures and the derivation appear in the finding
- * either way, so nothing is hidden by the threshold; it decides `pass` against `review`, and both
- * states show the same numbers.
+ * **20% is a judgement and it is unmeasured.** Recorded as one so it is not mistaken later for a
+ * figure derived from something.
+ *
+ * **It is a presentation dial, not a determination.** Both the derived figure and the stated one
+ * appear in the finding either way, together with the derivation and its sources — so moving this
+ * number moves a finding between `pass` and `review` without hiding anything from anybody. That is
+ * what makes it safe to leave unmeasured, and it is also why it must not be made to carry weight
+ * it cannot bear: the gap itself is IQwallet's to judge (D-001), and this only decides how loudly
+ * we hand it to them.
+ *
+ * **Do not tune it against the verification package.** Fitting it to the synthetic merchant in
+ * `scripts/live/m4-all-checks-live.mjs` would tune it to numbers this repository invented, and the
+ * result would look calibrated while meaning nothing. It gets set from real packages or it stays
+ * where it is (D-122).
  */
 export const MATERIAL_GAP = 0.2;
 

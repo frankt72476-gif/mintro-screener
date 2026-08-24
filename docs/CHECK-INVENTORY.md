@@ -375,10 +375,10 @@ with source pages. Never a judgment about the gap.
 
 | ID | Check | States | not_evaluable when | Rel |
 |---|---|---|---|---|
-| D-01 | Derived monthly volume vs stated | review / pass | no processing stmts | v1 |
-| D-02 | Derived average ticket vs stated | review / pass | no processing stmts | v1 |
-| D-03 | Derived high ticket vs stated | review / pass | high ticket not itemized | v1 |
-| D-04 | Derived chargeback rate vs stated | review / pass | chargebacks not itemized | v1 |
+| D-01 | Derived monthly volume vs stated | review / pass | no processing stmts; stated figure absent (D-122) | v1 |
+| D-02 | Derived average ticket vs stated | review / pass | no processing stmts; stated figure absent (D-122) | v1 |
+| D-03 | Derived high ticket vs stated | review / pass | high ticket not itemized; stated figure absent (D-122) | v1 |
+| D-04 | Derived chargeback rate vs stated | review / pass | chargebacks not itemized; stated figure absent (D-122) | v1 |
 | D-05 | Derived refund rate | review / pass | refunds not itemized | def |
 | D-06 | Bank deposits reconcile to processing net deposits | review / pass | either side unreadable | def |
 
@@ -386,6 +386,17 @@ Where processing statements are `not_provided`, all of these return `not_evaluab
 and **carry the recorded reason through to the report** — "not evaluated: no
 processing statements, new business." That is the honest rendering and it is why
 D-078 kept `not_provided` distinct from `waived`.
+
+**`stated_figure_absent` is the other half (D-122).** The statements are present, the
+derivation succeeded, and the application states no figure to set it against — three
+months implying $410,000 a month against a blank field. That is not a `pass`, because
+nothing was compared; it is not "no processing statements", because there are some.
+The derived figure is still reported. It simply is not a comparison, and is not
+rendered as one.
+
+**C-02 also gains one** — `no_dba_declared`, for the merchant who has no DBA — and
+**C-10 gains `routing_directory_unavailable`**, because a lookup that never ran cannot
+be reported as one that passed. Both under D-122.
 
 **No trend or seasonality analysis in any release.** Low pre-screen value, and it is
 the one derived output that reads as an opinion no matter how it is phrased.

@@ -6620,6 +6620,67 @@ as an adapter. Widen the column.
 
 ---
 
+## D-122 — Three conditions M4 needed, and what a global assertion cannot see
+**2026-08-24 · Frank's ruling · amends CHECK-INVENTORY §6**
+
+Three `not_evaluable` conditions are added, and per D-025 this is their decision number.
+
+| Condition | On | Status |
+|---|---|---|
+| `no_dba_declared` | C-02 | follows from a ruling already made |
+| `routing_directory_unavailable` | C-10 | follows from a ruling already made |
+| `stated_figure_absent` | D-01 … D-04 | new, and belongs in §6 |
+
+### The first two were already decided, only unnamed
+
+C-02 must not report a clean check on a merchant who has no DBA. A sole proprietor trading under
+their own name has nothing to compare, and a `pass` there is a finding about something that never
+happened. C-10 cannot pass on a lookup it never made: with no directory loaded there is no
+observation, and reporting one would be the constraint 2 failure in its plainest form. Both
+conditions are the name the existing ruling needed in order to be expressible.
+
+### `stated_figure_absent` is a genuinely new case
+
+Three months of processing statements implying $410,000 a month, set against an application field
+that is blank.
+
+That is not a `pass` — nothing was compared. It is not `no_processing_statements` — the statements
+are there and were read, and the derivation succeeded. It is not
+`processing_statements_not_provided` — nobody recorded a reason, because nothing was refused. The
+situation is that **one side of a comparison is absent**, and until now family D had no way to say
+so.
+
+This is D-098's reasoning arriving at a case D-098 did not name. That rule is about corroboration
+between documents; this is a derived figure with no stated figure to meet. Different subject, same
+logic: a comparison with one side missing has established nothing, and the honest report of
+nothing established is `not_evaluable` with a reason, never a state that reads as a result.
+
+The derivation is still recorded in the finding text. What we worked out is worth having even when
+there is nothing to set it against — it simply is not a comparison, and must not be rendered as
+one.
+
+### Recorded alongside: what the existing test could not see
+
+An unanchored `str.replace` during D-120's work put `document_not_readable` onto D-06 as well as
+the five A-family checks it was aimed at. The four-space pattern matched as a substring inside an
+eight-space-indented line.
+
+The test that should have caught it asserted that **every condition a check declares appears in the
+global `not_evaluable_conditions` list**. That assertion was true before the corruption and true
+after it, because the condition added to D-06 was a properly enumerated one — just on a check that
+does not mean it.
+
+**A global assertion over a set cannot detect misassignment within it.** Membership and allocation
+are different properties, and a test of the first says nothing about the second. The corrupted file
+was valid by every rule the loader and the suite enforced.
+
+So each check's conditions are now pinned individually — thirty-eight entries, tedious on purpose.
+The generalisation worth keeping: where a wrong value would still satisfy every constraint the
+system checks, the constraint is not the thing that needs strengthening. The allocation does, and
+that means writing it down.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 
