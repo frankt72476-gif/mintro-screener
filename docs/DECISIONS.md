@@ -49,6 +49,39 @@ produce a **new immutable run**, never an update to an existing one:
 This costs nothing now and means adding scheduled re-scans later is a scheduler plus a
 diff view, not a data migration.
 
+### The first time this was exercised, it was against the person who built it
+
+**2026-08-24 · Frank's ruling that it be recorded here.**
+
+Debugging the merchant page (D-070) needed a working token. Tokens are stored only as digests and
+are minted worker-side, so there was no way to obtain one — and I inserted a diagnostic
+`comment_links` row **against a live run**, then identified through it to drive the anonymous path.
+
+Having finished, I tried to remove the rows. The trigger refused, **for `service_role` as well**:
+
+    DELETE on public.comment_visits is not permitted: this table is append-only
+
+The visits are in that run's record permanently.
+
+**That is the case this guarantee exists for.** Not an attacker, and not a bug — someone with
+legitimate access, a good reason, and every intention of cleaning up after themselves. Every append-
+only table in this schema was written against exactly that person, and the first time one of them
+was tested in earnest the answer was *no* to its author, mid-debugging, with a defensible
+explanation ready.
+
+Two things follow.
+
+**A guarantee that yields to a good reason is not a guarantee.** The value is entirely in its
+refusing when refusing is inconvenient; a rule that holds only against bad actors holds only against
+the ones who announce themselves. Had the trigger checked the role, or accepted a flag, or been
+disabled "just for the diagnostic", the record of a merchant's screening would have been silently
+editable by whoever held the service key — which is every part of the worker.
+
+**"I will clean it up afterwards" is not available here, and that is deliberate.** It has to be
+planned for rather than discovered: debug against a scratch run or a local database, because
+anything written to one of these tables is written for good. Recorded operationally in
+`docs/STATUS.md` and in D-072, which describes the correctness gap the episode exposed.
+
 ---
 
 ## D-003 — Logo pending
