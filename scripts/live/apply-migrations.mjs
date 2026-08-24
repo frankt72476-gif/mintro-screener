@@ -19,13 +19,39 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { assertTestDatabase, banner } from './guard.mjs';
 
-banner('Applying migrations 0001-0025');
+banner('Applying migrations');
 
 const dbUrl = assertTestDatabase();
 
+const psql = (...args) =>
+  execFileSync('psql', [dbUrl, '-v', 'ON_ERROR_STOP=1', '-At', ...args], { encoding: 'utf8' });
+
+/**
+ * A ledger, so this is safe to re-run.
+ *
+ * The first version applied every file every time. That worked exactly once and then failed on
+ * `relation "analysts" already exists`, which left no way to add a new migration short of dropping
+ * the project.
+ *
+ * `supabase_migrations.schema_migrations` is the Supabase CLI's own table, used deliberately. A
+ * private ledger would let this script and `supabase db push` disagree about what has been applied,
+ * and two answers to that question is how a migration gets run twice.
+ */
+psql('-c', 'create schema if not exists supabase_migrations');
+psql('-c', 'create table if not exists supabase_migrations.schema_migrations (version text primary key)');
+
 const dir = 'supabase/migrations';
-const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-console.log(`${files.length} migrations\n`);
+const all = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+// `.trim()` per line, not just `.split('\n')`: psql on Windows returns CRLF, so an untrimmed set
+// contains "0001_analysts.sql\r", matches nothing, and the ledger silently does nothing at all.
+const done = new Set(
+  psql('-c', 'select version from supabase_migrations.schema_migrations')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean),
+);
+const files = all.filter((f) => !done.has(f));
+console.log(`${all.length} migrations, ${done.size} already applied, ${files.length} to run\n`);
 
 // Buckets first: 0008 raises if `evidence` is missing or public, deliberately, so the storage
 // state is a precondition of the schema rather than something the schema creates.
@@ -38,6 +64,7 @@ for (const file of files) {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     });
+    psql('-c', `insert into supabase_migrations.schema_migrations (version) values ('${file}')`);
     console.log('ok');
     applied += 1;
   } catch (error) {

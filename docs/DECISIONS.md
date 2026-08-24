@@ -6540,6 +6540,86 @@ rather than only from a live call.
 
 ---
 
+## D-120 — An unavailable input is `not_evaluable`, never silence
+**2026-08-24 · Frank's ruling · amends CHECK-INVENTORY §1**
+
+A check whose input is unavailable returns `not_evaluable` with a named reason. It does not decline
+to appear.
+
+### What M3 did, and why it was wrong
+
+When A-01 established that a document could not be read, the checks that needed that document were
+not run at all. The reasoning was that five checks emitting one observation is noise, and the
+observation had already been made once, correctly, by A-01.
+
+The noise is real. Silence is not the remedy.
+
+A reader looking at a report cannot tell the difference between **"we asked and could not answer"**
+and **"we never asked"**. Those are different facts about our diligence, and only one of them is
+true. Worse, they are indistinguishable in the direction that flatters us: an absent A-04 looks
+like a check that had nothing to say, when what actually happened is that the check could not run
+and we did not say so.
+
+The whole posture of this product is that every finding is a fact with a capture behind it, and
+that an unobservable thing is reported as unobserved rather than as anything else. That posture
+does not survive a check quietly removing itself from the report. **Every check in the inventory is
+accounted for in every run**, with one of four states, and where the state is `not_evaluable` the
+reason names what was missing.
+
+This is D-092 applied one level up. D-092 says every input, and every page, resolves to a recorded
+outcome — nothing is silently dropped at extraction. The same rule holds at the check layer: a
+check is an input too.
+
+### Where the noise goes instead
+
+Presentation is M5's problem and it is a good one to have. The report collapses findings that share
+a single cause into one line that names its dependents — *"the document could not be read; A-02,
+A-04, A-05 and A-07 could not be evaluated"* — so the reader sees one observation and can still
+account for four checks.
+
+**Do not solve a display problem in the engine.** The engine's output is the record; the report is a
+rendering of it. Compressing the record to make the rendering tidy destroys information at the only
+layer that has it, and it is not recoverable downstream — the same mistake in miniature that D-077
+refuses at the extraction boundary.
+
+---
+
+## D-121 — Slot origin is the same three values at every layer
+**2026-08-24 · Frank's ruling · migration 0026**
+
+`origin` is `required | conditional | added`, in `rules/documents.templates.json`, in the engine's
+`SlotSnapshot`, and in the `slots` table. Migration 0026 widens `slots_origin_check`, which allowed
+only `template | added`.
+
+The live M1 run found this: the seeding code had to map three values onto two, and there was no
+mapping that did not throw something away.
+
+### Why `conditional` has to reach the database
+
+It would be easy to read `conditional` as a detail of how a slot got seeded — a fact about the
+template's logic, spent at seeding time, of no further interest once the row exists. That is exactly
+wrong, and D-081 is the reason.
+
+D-081's mechanism is that conditional slots fire on **structural impossibility**: a slot is seeded
+because the facts make it inapplicable to omit, not because someone chose to include it. So
+`conditional` on a stored slot is the answer to *"why is this slot here?"* — and that is the
+question someone asks when a package looks wrong. A merchant contests a request; an analyst asks why
+we wanted a document; a reviewer six months out asks why this package had nine slots and a similar
+one had seven. Collapsed into `template`, every one of those questions is unanswerable from the
+data, and the only remaining route is re-deriving the template against facts that may themselves
+have been edited since.
+
+A column that cannot distinguish "the template always asks for this" from "the template asked for
+this because of what you told us" has lost the part that a person would want to know.
+
+### The general shape
+
+The storage layer is not entitled to a narrower vocabulary than the layer above it. Where it has
+one, code between them must map, and a mapping that is not injective is silent data loss dressed up
+as an adapter. Widen the column.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 

@@ -11,7 +11,7 @@
  */
 
 import type { DocumentCheck } from '@mintro/ruleset';
-import { evaluateCoverage, formatMonth, monthOfPeriod, type CoverageVerdict, type Period } from './coverage.js';
+import { DEFAULT_GRACE_DAYS, evaluateCoverage, formatMonth, monthOfPeriod, type CoverageVerdict, type Period } from './coverage.js';
 import { adverse, clean, notEvaluable } from './findings.js';
 import type {
   DocumentFinding,
@@ -211,7 +211,7 @@ function b04(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFinding[]
 
     const verdict = evaluateCoverage(
       periods,
-      { requiredCount: slot.requiredCount, monthly: slot.monthly, graceDays: slot.graceDays },
+      { requiredCount: slot.requiredCount, monthly: slot.monthly, graceDays: slot.graceDays ?? DEFAULT_GRACE_DAYS },
       snapshot.runAt,
     );
 

@@ -47,8 +47,17 @@ export interface SlotDefinition {
    * month.
    */
   readonly monthly: boolean;
-  /** Days allowed between a cycle closing and its statement existing. See `DEFAULT_GRACE_DAYS`. */
-  readonly graceDays: number;
+  /**
+   * Days allowed between a cycle closing and its statement existing — **`null` unless `monthly`**.
+   *
+   * Grace without a coverage window is meaningless: it measures the lag between a cycle closing and
+   * the statement for it existing, and a slot with no cycles has no such lag. The definition used to
+   * carry `DEFAULT_GRACE_DAYS` on every slot, which the `slots` table refuses
+   * (`grace_is_set_exactly_for_monthly_slots`). The constraint was right and the definition was
+   * wrong; found by the first live seeding, because nothing before it had mapped a definition to a
+   * row.
+   */
+  readonly graceDays: number | null;
   readonly expiryAfterRun: boolean;
   /** D-082. A collected-only slot reports "present, not examined" and carries no findings. */
   readonly examined: boolean;
@@ -111,7 +120,7 @@ function toDefinition(slot: TemplateSlot, catalog: Map<string, CatalogEntry>): S
     title: entry?.title ?? slot.slot_key,
     requiredCount: slot.required_count,
     monthly: slot.coverage !== null,
-    graceDays: slot.coverage?.grace_days ?? DEFAULT_GRACE_DAYS,
+    graceDays: slot.coverage === null ? null : (slot.coverage.grace_days ?? DEFAULT_GRACE_DAYS),
     expiryAfterRun: slot.expiry_after_run,
     examined: entry?.examined ?? true,
     include,

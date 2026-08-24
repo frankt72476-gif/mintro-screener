@@ -25,6 +25,7 @@ import { ingestDocument } from '../../apps/worker/dist/src/ingest.js';
 import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/store/ingestStore.js';
 import { openRasterizer } from '../../apps/worker/dist/src/rasterize.js';
 import { banner, assertTestProject } from './guard.mjs';
+import { ensureAnalyst, slotRow } from './setup.mjs';
 
 banner('M1 — eight steps, live (reconstruction)');
 const { url } = assertTestProject();
@@ -85,28 +86,7 @@ try {
   const definitions = slotsForPackage(facts);
   const { data: slots, error: slotError } = await service
     .from('slots')
-    .insert(definitions.map((d) => ({
-      package_id: pkg.id,
-      slot_key: d.slotKey,
-      required_count: d.requiredCount,
-      coverage_monthly: d.monthly,
-      // The schema requires grace exactly for monthly slots (`grace_is_set_exactly_for_monthly_slots`),
-      // while SlotDefinition carries DEFAULT_GRACE_DAYS on every definition. Nothing in the repo maps
-      // definitions to rows yet, so this is the first code to meet that mismatch — reported, not
-      // papered over: the seeding code M1 still needs has to do this too.
-      coverage_grace_days: d.monthly ? d.graceDays : null,
-      expiry_after_run: d.expiryAfterRun,
-      // MISMATCH, reported not resolved: `slots_origin_check` allows only 'template' | 'added',
-      // while rules/documents.templates.json and the engine's SlotSnapshot use
-      // 'required' | 'conditional' | 'added'. Mapped here so the run can proceed; the two
-      // vocabularies need reconciling and that is a ruling, not a script's decision.
-      origin: 'template',
-      examined: d.examined,
-      // `not_evaluable_means_the_count_is_unknown` is an iff, so D-107 is enforced by the schema:
-      // a slot whose count is unknown cannot be recorded as `missing`. That is the constraint doing
-      // exactly its job — we do not know how many to expect, so we cannot say any are absent.
-      state: d.requiredCount === null ? 'not_evaluable' : 'missing',
-    })))
+    .insert(definitions.map((d) => slotRow(pkg.id, d)))
     .select('id, slot_key, required_count, state');
   if (slotError) throw new Error(`slot insert: ${slotError.message}`);
 
@@ -122,22 +102,11 @@ try {
   const stagingKey = `staging/${pkg.id}/statement.pdf`;
   const { error: upErr } = await service.storage.from(DOCUMENTS_BUCKET)
     .upload(stagingKey, bytes, { contentType: 'application/pdf', upsert: false });
-  // `analysts.id` is a foreign key to `auth.users`, so an analyst is an authenticated person and
-  // not a row someone can invent. An upload has to name one — which is the right shape, and is
-  // also why this cannot be set up through PostgREST alone.
-  const email = 'verify@gomintro.com';
-  const existing = await service.auth.admin.listUsers();
-  const found = (existing.data?.users ?? []).find((u) => u.email === email);
-  const authUser = found ?? (await service.auth.admin.createUser({ email, email_confirm: true })).data?.user;
-  if (!authUser) throw new Error('could not create the auth user the analyst row needs');
-  const { data: analyst, error: analystError } = await service
-    .from('analysts').upsert({ id: authUser.id, email, active: true }, { onConflict: 'id' })
-    .select('id').single();
-  if (analystError) throw new Error(`analyst upsert: ${analystError.message}`);
+  const analystId = await ensureAnalyst(service);
   const { data: uploadRow, error: rowErr } = await service
     .from('document_uploads')
     .insert({ package_id: pkg.id, slot_id: bankSlot.id, staging_key: stagingKey,
-              original_filename: 'statement.pdf', requested_by: analyst.id, status: 'queued' })
+              original_filename: 'statement.pdf', requested_by: analystId, status: 'queued' })
     .select('id, status').single();
   step(3, 'browser-side staged upload: bytes to the bucket, a row to the queue',
     !upErr && !rowErr && uploadRow?.status === 'queued',

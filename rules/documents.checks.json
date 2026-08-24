@@ -298,6 +298,7 @@
   "not_evaluable_conditions": [
     "chargebacks_not_itemized",
     "date_not_extracted",
+    "document_not_readable",
     "either_side_unreadable",
     "expiry_not_extracted",
     "fewer_than_two_sources",
@@ -357,6 +358,7 @@
         "pass"
       ],
       "not_evaluable_when": [
+        "document_not_readable",
         "page_numbering_absent"
       ],
       "release": "v1"
@@ -397,8 +399,9 @@
         "pass"
       ],
       "not_evaluable_when": [
-        "no_marker_set_for_type",
-        "markers_not_searchable"
+        "document_not_readable",
+        "markers_not_searchable",
+        "no_marker_set_for_type"
       ],
       "release": "v1",
       "note": "Deliberately weak. No classifier exists. It confirms a document filed in the EIN Letter slot carries CP 575 or 147C markers, which catches a W-9 in the wrong slot. It does not catch a forgery and must never be described as if it does. D-118: it may only report markers ABSENT where the searched text is complete — character-tier text or form fields. On a vision-routed page the model returns only the closed field list, so marker text cannot be in the searched set and the answer is markers_not_searchable."
@@ -423,6 +426,7 @@
         "pass"
       ],
       "not_evaluable_when": [
+        "document_not_readable",
         "signature_block_not_located"
       ],
       "release": "v1"
@@ -449,6 +453,7 @@
         "pass"
       ],
       "not_evaluable_when": [
+        "document_not_readable",
         "expiry_not_extracted"
       ],
       "release": "v1"
@@ -475,7 +480,8 @@
         "pass"
       ],
       "not_evaluable_when": [
-        "date_not_extracted"
+        "date_not_extracted",
+        "document_not_readable"
       ],
       "release": "v1"
     },
@@ -1316,7 +1322,8 @@
         "pass"
       ],
       "not_evaluable_when": [
-        "either_side_unreadable",
+        "document_not_readable",
+    "either_side_unreadable",
         "processing_statements_not_provided"
       ],
       "release": "deferred"

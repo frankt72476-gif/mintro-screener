@@ -32,7 +32,8 @@ export interface SlotSnapshot {
   /** `null` means unknown — not zero, not one (D-107). */
   readonly requiredCount: number | null;
   readonly monthly: boolean;
-  readonly graceDays: number;
+  /** `null` unless `monthly` — grace without a coverage window is meaningless. */
+  readonly graceDays: number | null;
   readonly expiryAfterRun: boolean;
   /** D-082. A collected-only slot is present-not-examined and family A skips it. */
   readonly examined: boolean;

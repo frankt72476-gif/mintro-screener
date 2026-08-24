@@ -12,6 +12,7 @@
 
 import type { DocumentCheck } from '@mintro/ruleset';
 import type { Tier } from '@mintro/extraction';
+import { DEFAULT_GRACE_DAYS } from './coverage.js';
 import { adverse, clean, notEvaluable } from './findings.js';
 import type { DocumentFinding, DocumentSnapshot, FindingSubject, PackageSnapshot, ReadDocument, SlotSnapshot } from './types.js';
 
@@ -337,7 +338,13 @@ function a07(
   const ageDays = Math.floor((runAt.getTime() - parsed.getTime()) / 86_400_000);
   // Three months of grace beyond the slot's own, because a slot asking for three consecutive
   // months legitimately holds documents two months older than the newest one.
-  const outerLimit = slot.graceDays + 31 * (slot.requiredCount ?? 1);
+  //
+  // A non-monthly slot carries no grace (it has no cycles to lag behind), so the default stands in
+  // here rather than in the stored definition. Naming it makes the reuse visible: A-07's window is
+  // a tolerance on a document's age, which is a different thing from D-113's coverage grace that
+  // happens to want the same number.
+  const grace = slot.graceDays ?? DEFAULT_GRACE_DAYS;
+  const outerLimit = grace + 31 * (slot.requiredCount ?? 1);
   return ageDays <= outerLimit
     ? clean(check, `${name(document)} states a period of ${period}, inside the window its slot covers.`, subject, read)
     : adverse(
@@ -383,11 +390,34 @@ export function runFamilyA(input: FamilyAInput): DocumentFinding[] {
     const a01Check = get('A-01');
     if (a01Check) push(a01(a01Check, document));
 
-    // Everything after A-01 depends on the document having been read. A-01 already recorded the
-    // failure; repeating it as five more findings would be five copies of one observation.
+    // Everything after A-01 depends on the document having been read.
+    //
+    // These used to be skipped, on the reasoning that five checks repeating one observation is
+    // noise. D-120 overturned that: the noise is real but silence is not the remedy, because a
+    // reader cannot tell "asked and could not answer" from "never asked", and every check in the
+    // inventory has to be accounted for in every run. The report collapses a shared cause into one
+    // line (M5); the engine does not compress the record to make the rendering tidy.
+    //
+    // A-03 is exempt because it is not downstream of anything: whether the file needed a password
+    // is something we established by trying to open it, which is exactly what failed.
     if (document.outcome !== 'extracted') {
       const a03Check = get('A-03');
       if (a03Check) push(a03(a03Check, document));
+
+      const why = document.outcomeReason ?? document.outcome;
+      for (const id of ['A-02', 'A-04', 'A-05', 'A-06', 'A-07']) {
+        const check = get(id);
+        if (check === undefined) continue;
+        push(
+          notEvaluable(
+            check,
+            'document_not_readable',
+            `${name(document)} yielded no readable content (${why}), so ${id} had nothing to evaluate.`,
+            subjectOf(document),
+            reading(document),
+          ),
+        );
+      }
       continue;
     }
 

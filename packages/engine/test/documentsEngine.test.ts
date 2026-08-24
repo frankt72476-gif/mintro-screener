@@ -161,17 +161,32 @@ describe('A-01 — readable content', () => {
     }
   });
 
+  it('accounts for every family A check on an unreadable document, none silently absent', () => {
+    const findings = run(
+      snapshot({ documents: [doc({ outcome: 'unreadable', outcomeReason: 'no page could be read', extraction: null })] }),
+      ['A'],
+    );
+    const seen = new Set(findings.map((f) => f.checkId));
+    expect([...seen].sort()).toEqual(['A-01', 'A-02', 'A-03', 'A-04', 'A-05', 'A-06', 'A-07']);
+  });
+
   it('an unreadable document produces named not_evaluable causes downstream', () => {
     const findings = run(
       snapshot({ documents: [doc({ outcome: 'unreadable', outcomeReason: 'no page could be read', extraction: null })] }),
       ['A'],
     );
-    // A-01 records the failure once. The checks that wanted the document are not run at all rather
-    // than emitting five copies of the same observation — and the slot-level story is family B's.
+    // D-120. These were skipped until the live run made the cost visible: a reader cannot tell a
+    // check that could not answer from one that was never asked, and both look the same in the
+    // direction that flatters us. Every check in the inventory is accounted for in every run.
     expect(one(findings, 'A-01').state).toBe('fail');
-    expect(of(findings, 'A-02')).toHaveLength(0);
-    expect(of(findings, 'A-05')).toHaveLength(0);
-    // A-03 still runs: whether it needed a password is exactly what we did establish.
+    for (const id of ['A-02', 'A-04', 'A-05', 'A-06', 'A-07']) {
+      const f = one(findings, id);
+      expect(f.state, id).toBe('not_evaluable');
+      expect(f.notEvaluableReason, id).toBe('document_not_readable');
+      expect(f.note, id).toMatch(/no page could be read/);
+    }
+    // A-03 still runs and still answers: whether the file needed a password is exactly what we did
+    // establish by failing to open it. It is not downstream of anything.
     expect(one(findings, 'A-03').state).toBe('pass');
   });
 });

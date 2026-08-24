@@ -8,12 +8,9 @@
  * from real rows — slots the template seeded, documents ingest wrote, extractions the extractor
  * produced — and runs the same `runDocumentChecks` the worker would.
  *
- * **Re-run immutability is not verified here and is not claimed.** D-002 requires that re-running
- * a merchant creates a new run and leaves the prior run's findings untouched. There is no
- * persistence layer for Documents Check findings — no table, no store — so there is no prior run to
- * leave untouched. Running the engine twice and comparing two in-memory arrays would demonstrate
- * that a pure function is pure, which is not the property D-002 is about. It is reported below as
- * unverifiable, deliberately, rather than as passed.
+ * Re-run immutability is NOT tested here — it needs persistence, and it lives in
+ * `m3-persistence-live.mjs` since migration 0027 gave it something to persist into. This script
+ * stays about the engine's output; that one is about what survives a second run.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -21,6 +18,7 @@ import { loadDocumentsRules } from '@mintro/ruleset';
 import { documents } from '@mintro/engine';
 import { ingestDocument } from '../../apps/worker/dist/src/ingest.js';
 import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/store/ingestStore.js';
+import { snapshotOf } from './snapshot.mjs';
 import { banner, assertTestProject } from './guard.mjs';
 
 banner('M3 — the check engine over a real package');
@@ -34,68 +32,8 @@ const { data: pkg } = await service
 if (!pkg) throw new Error('no package found — run m1-eight-steps.mjs first');
 console.log(`package ${pkg.id}\n`);
 
-/**
- * Assemble a PackageSnapshot from rows.
- *
- * `origin` is mapped back on the way out: the column allows 'template' | 'added', the engine and
- * rules/documents.templates.json use 'required' | 'conditional' | 'added'. The two vocabularies
- * disagree and that needs a ruling; this maps rather than pretending it does not.
- */
-async function snapshotOf(packageId, runAt) {
-  const { data: slotRows } = await service
-    .from('slots')
-    .select('id, slot_key, instance_label, required_count, coverage_monthly, coverage_grace_days, expiry_after_run, examined, origin, state, reason')
-    .eq('package_id', packageId).order('slot_key');
-
-  const { data: versionRows } = await service
-    .from('document_versions')
-    .select('id, document_id, version, supersedes, detected_type, original_filename, outcome, outcome_reason, extraction, documents!inner(slot_id)')
-    .eq('package_id', packageId).order('created_at');
-
-  const supersededBy = new Map();
-  for (const v of versionRows ?? []) if (v.supersedes) supersededBy.set(v.supersedes, v.id);
-
-  const slotById = new Map((slotRows ?? []).map((s) => [s.id, s]));
-
-  return {
-    packageId,
-    runAt,
-    facts: { entityType: 'llc', hasExistingProcessor: true, usDomiciled: true },
-    slots: (slotRows ?? []).map((s) => ({
-      id: s.id,
-      slotKey: s.slot_key,
-      instanceLabel: s.instance_label,
-      requiredCount: s.required_count,
-      monthly: s.coverage_monthly,
-      graceDays: s.coverage_grace_days ?? 10,
-      expiryAfterRun: s.expiry_after_run,
-      examined: s.examined,
-      origin: s.origin === 'added' ? 'added' : 'required',
-      state: s.state,
-      reason: s.reason,
-    })),
-    documents: (versionRows ?? []).map((v) => {
-      const slot = slotById.get(v.documents.slot_id);
-      return {
-        documentId: v.document_id,
-        versionId: v.id,
-        version: v.version,
-        slotId: v.documents.slot_id,
-        slotKey: slot?.slot_key ?? 'unknown',
-        supersedes: v.supersedes,
-        supersededBy: supersededBy.get(v.id) ?? null,
-        detectedType: v.detected_type,
-        originalFilename: v.original_filename,
-        outcome: v.outcome,
-        outcomeReason: v.outcome_reason,
-        extraction: v.extraction,
-      };
-    }),
-  };
-}
-
 const RUN_AT = new Date('2026-05-15T00:00:00Z');
-const snapshot = await snapshotOf(pkg.id, RUN_AT);
+const snapshot = await snapshotOf(service, pkg.id, RUN_AT);
 console.log(`${snapshot.slots.length} slots, ${snapshot.documents.length} documents\n`);
 
 const show = (findings, title) => {
@@ -144,7 +82,7 @@ const bad = await ingestDocument(
 );
 console.log(`ingested a corrupt PDF: outcome=${bad.outcome}, reason=${String(bad.outcomeReason).slice(0, 70)}`);
 
-const withBad = await snapshotOf(pkg.id, RUN_AT);
+const withBad = await snapshotOf(service, pkg.id, RUN_AT);
 const second = documents.runDocumentChecks(withBad, rules, { runId: 'live-m3-2', families: ['A', 'B'] });
 const badDoc = withBad.documents.find((d) => d.versionId === bad.versionId);
 const aboutBad = second.findings.filter((f) => f.subject.versionId === badDoc.versionId);
@@ -156,11 +94,11 @@ const downstream = aboutBad.filter((f) => f.checkId !== 'A-01');
 console.log(`downstream checks on it: ${downstream.map((f) => `${f.checkId}=${f.state}${f.notEvaluableReason ? `[${f.notEvaluableReason}]` : ''}`).join(', ') || '(none emitted)'}`);
 
 // --- 5: re-run immutability ---------------------------------------------------------------------
-console.log('\nre-run immutability (D-002)               : UNVERIFIABLE, not passed');
-console.log('  There is no findings table and no store. Two runs of a pure function over the same');
-console.log('  snapshot returning equal arrays would prove the function is pure, which is not the');
-console.log('  property. D-002 is about a persisted prior run surviving a later one, and there is');
-console.log('  nothing persisted to survive.');
+console.log('\nre-run immutability (D-002)               : see m3-persistence-live.mjs');
+console.log('  It was unverifiable while nothing persisted findings — two runs of a pure function');
+console.log('  returning equal arrays shows the function is pure, which is not the property.');
+console.log('  Migration 0027 added the runs and findings tables, so it now has something to hold');
+console.log('  about, and that script verifies it against the database.');
 
 const ok = allNamed && allDeclared && tierOk && a01?.state === 'fail' && ownerB02?.state === 'not_evaluable';
 console.log(`\n${ok ? 'all verifiable properties held' : 'SOMETHING FAILED'}`);

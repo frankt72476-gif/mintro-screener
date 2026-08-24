@@ -270,7 +270,15 @@ match rather than the other way round. It read "39 checks, 36 in v1" until D-117
 
 **A-01 is never `not_evaluable`, and this matters.** We attempted the read and the
 attempt is the observation — unreadability is a fact we established, so it is `fail`
-on A-01. It is then a named `not_evaluable` cause for every downstream check. Under
+on A-01. It is then a named `not_evaluable` cause for every downstream check —
+`document_not_readable` on A-02, A-04, A-05, A-06 and A-07, emitted rather than
+skipped (**D-120**). A-03 is exempt: whether the file needed a password is what we
+established by failing to open it, so it is not downstream of anything.
+
+Those five were skipped until D-120, to avoid five checks repeating one observation.
+The noise was real; silence was the wrong remedy, because a reader cannot tell
+"asked and could not answer" from "never asked". The report collapses a shared cause
+into one line (M5); the engine keeps the record complete. Under
 D-092 the file resolves to a recorded outcome either way; nothing is stamped without
 a persisted result.
 
