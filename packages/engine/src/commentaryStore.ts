@@ -63,7 +63,13 @@ export async function readRunCommentary(
   db: CommentaryReader,
   runId: string,
 ): Promise<RunCommentary | null> {
-  const links = await rows<LinkRow>(db, 'comment_links', 'id, first_opened_at, expires_at', runId, 'issued_at');
+  const links = await rows<LinkRow>(
+    db,
+    'comment_links',
+    'id, first_opened_at, expires_at, sent_to',
+    runId,
+    'issued_at',
+  );
   if (links === null) return null;
   if (links.length === 0) return NOTHING;
 
@@ -114,6 +120,9 @@ export async function readRunCommentary(
       ...(openings[0] === undefined ? {} : { firstOpenedAt: openings[0] }),
       // The latest expiry: while any delivered link still works, the merchant can still respond.
       ...(expiries.length === 0 ? {} : { expiresAt: expiries[expiries.length - 1] as string }),
+      // Only the links that were actually transmitted. Where an untransmitted link was addressed
+      // is not somewhere the merchant was invited (D-064).
+      sentTo: [...new Set(delivered.map((link) => link.sent_to))],
       visits: visits.map(
         (visit): CommentVisit => ({
           identifiedAs: visit.identified_as,
@@ -138,6 +147,7 @@ interface LinkRow {
   id: string;
   first_opened_at: string | null;
   expires_at: string;
+  sent_to: string;
 }
 interface JobRow {
   link_id: string | null;

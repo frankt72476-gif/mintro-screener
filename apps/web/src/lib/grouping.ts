@@ -24,7 +24,7 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import type { NotEvaluableKind, ReportFinding, ScreeningReport } from '@mintro/engine';
+import { invitesComment, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
  * The bucket a `not_evaluable` finding belongs to for reading (D-044).
@@ -211,4 +211,73 @@ export function describeGroup(group: FindingGroup): string {
 /** Every finding in the report, flat, in rule-set order. What the PDF and any export render. */
 export function ungrouped(report: ScreeningReport): readonly ReportFinding[] {
   return report.categories.flatMap((category) => category.findings);
+}
+
+/**
+ * Which finding of a rule this is, for rules that produce one per sampled page.
+ *
+ * `undefined` for a group of one — a rule with a single finding needs no discriminator, and giving
+ * it one would key its comment differently from every report where the rule produced one finding.
+ *
+ * **This is how a comment is keyed**, so it lives beside the grouping it depends on. `ReportView`
+ * uses it to render boxes and `invitedFindings` uses it to count them, and if the two disagreed a
+ * merchant would answer a finding the participation record still called unanswered.
+ */
+export function ordinalOf(group: FindingGroup, index: number): number | undefined {
+  return group.findings.length > 1 ? index : undefined;
+}
+
+/**
+ * Every finding's ordinal, decided once for the whole report (D-063).
+ *
+ * **The two views enumerate findings differently** — the reading view walks display groups, the
+ * print view walks categories — so an ordinal taken from a position in either one would key a
+ * comment differently depending on which view you were in. A merchant answers a finding on screen
+ * and the PDF shows the response against a different one, or against none.
+ *
+ * So the ordinal is decided in exactly one place, from `groupReport`, and both views look it up.
+ * Keyed by the finding object itself: within one render every view holds the same `report`, and
+ * identity is the only thing that survives two different traversals of it.
+ *
+ * Absent from the map means no ordinal — a rule with one finding needs no discriminator.
+ */
+export function ordinalsFor(report: ScreeningReport): ReadonlyMap<ReportFinding, number> {
+  const ordinals = new Map<ReportFinding, number>();
+
+  for (const section of groupReport(report)) {
+    for (const group of section.groups) {
+      group.findings.forEach((finding, index) => {
+        const ordinal = ordinalOf(group, index);
+        if (ordinal !== undefined) ordinals.set(finding, ordinal);
+      });
+    }
+  }
+
+  return ordinals;
+}
+
+/**
+ * Every finding that carries a comment box, keyed the way its comment is keyed (D-063).
+ *
+ * Walks the same `groupReport` output the page renders, so the list an underwriter is counted
+ * against is the list of boxes the merchant was actually shown.
+ */
+export function invitedFindings(report: ScreeningReport): readonly InvitedRef[] {
+  const invited: InvitedRef[] = [];
+
+  for (const section of groupReport(report)) {
+    for (const group of section.groups) {
+      group.findings.forEach((finding, index) => {
+        if (!invitesComment(finding.state, finding.notEvaluableKind)) return;
+        const ordinal = ordinalOf(group, index);
+        invited.push({
+          ruleId: finding.ruleId,
+          title: finding.title,
+          ...(ordinal === undefined ? {} : { ordinal }),
+        });
+      });
+    }
+  }
+
+  return invited;
 }

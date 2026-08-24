@@ -57,6 +57,13 @@ export interface CommentInvitation {
   readonly expiresAt?: string;
   /** Everyone who identified themselves, in the order they did. */
   readonly visits?: readonly CommentVisit[];
+  /**
+   * Where Mintro sent the link. **Not who may use it** — it is forwardable (D-063).
+   *
+   * In the participation record because "we asked, here is where" is Mintro's own action, and it
+   * is what makes *the merchant was invited* a fact rather than a recollection.
+   */
+  readonly sentTo?: readonly string[];
 }
 
 /**

@@ -68,6 +68,13 @@ export {
   commentTokenFrom,
 } from './commentLink.js';
 
+export {
+  participationFor,
+  type Participation,
+  type InvitedRef,
+  type InvitedFinding,
+} from './participation.js';
+
 export type { FormField, SignupForm } from './page.js';
 export type { SessionDescriptor, SessionMode, SessionOrigin } from './session.js';
 export type { GateContext, PageContext, PageLink, PageRegion, StyledText } from './page.js';

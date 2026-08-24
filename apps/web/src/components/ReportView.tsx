@@ -13,14 +13,16 @@ import type { State } from '@mintro/ruleset';
 import {
   REQUIREMENT_HEADINGS,
   type FindingCommentary,
+  type Participation,
   type ReportCategory,
   type ReportFinding,
   type ScreeningReport,
 } from '@mintro/engine';
-import { describeGroup, groupReport, type FindingGroup } from '../lib/grouping.js';
+import { describeGroup, groupReport, ordinalsFor, type FindingGroup } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { MerchantResponse } from './MerchantResponse.js';
+import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
 
 type Filter = State | 'all';
@@ -78,6 +80,15 @@ interface Props {
    * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
    */
   readonly commentaryNote?: string;
+  /**
+   * What the merchant's side of this looks like (D-063).
+   *
+   * Rendered above the findings, because an underwriter reading a response needs to know who wrote
+   * it and how much else went unanswered *before* they read it. Present on the analyst screen and
+   * in the PDF; absent on the merchant's own page, where it would narrate them back at themselves
+   * (D-067).
+   */
+  readonly participation?: Participation;
   /** The merchant's own view supplies a box; nothing else does. */
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }
@@ -89,8 +100,11 @@ export function ReportView({
   print = false,
   commentaryOf,
   commentaryNote,
+  participation,
   commentBox,
 }: Props): JSX.Element {
+  // Both branches read from this, so a comment keys the same way whichever view is rendering.
+  const ordinals = useMemo(() => ordinalsFor(report), [report]);
   const [filter, setFilter] = useState<Filter>('all');
 
   return (
@@ -161,6 +175,10 @@ export function ReportView({
         )}
       </div>
 
+      {participation !== undefined && (
+        <ParticipationRecord participation={participation} print={print} />
+      )}
+
       {commentaryNote !== undefined && (
         <div className="card cnote">
           <span className="cnote-head">Merchant response</span>
@@ -187,6 +205,17 @@ export function ReportView({
         first section has read the part that decides anything. The rule-set ordering is preserved
         inside each section, so the report still reads the way the rules do.
       */}
+      {/*
+        The print branch carries `commentaryOf` and never `commentBox`.
+
+        It carried neither. The PDF is the document that reaches IQwallet and it was rendering **no
+        merchant responses at all** — the props existed, `CategoryCard` accepted them, and this one
+        call site never passed them. The screen showed a merchant's account and the export did not,
+        which is the one place D-063 says the two must not differ.
+
+        No `commentBox`, because a printed page has nowhere to type. That asymmetry is the entire
+        difference between the two views, and it is why the props are separate rather than one.
+      */}
       {print ? (
         <div>
           {report.categories.map((category, index) => (
@@ -197,6 +226,8 @@ export function ReportView({
               filter="all"
               access={access}
               print
+              ordinals={ordinals}
+              {...(commentaryOf === undefined ? {} : { commentaryOf })}
             />
           ))}
         </div>
@@ -231,6 +262,7 @@ export function ReportView({
                 section={section}
                 access={access}
                 anchored={section === target}
+                ordinals={ordinals}
                 {...(commentaryOf === undefined ? {} : { commentaryOf })}
                 {...(commentBox === undefined ? {} : { commentBox })}
               />
@@ -578,12 +610,26 @@ function CategoryCard({
   filter,
   access,
   print = false,
+  commentaryOf,
+  ordinals,
 }: {
   readonly category: ReportCategory;
   readonly index: number;
   readonly filter: Filter;
   readonly access: EvidenceAccess;
   readonly print?: boolean;
+  /**
+   * What the merchant said about each finding (D-063).
+   *
+   * This component had no such prop, and the print branch passed one anyway — a spread of a
+   * conditional object, `{...(x === undefined ? {} : { x })}`, which JSX accepts without an
+   * excess-property check. The call site read as correct and the value went nowhere, so the PDF
+   * that reaches IQwallet carried no merchant responses at all.
+   */
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  /** Decided once for the whole report, because this view and the reading view traverse it
+   *  differently and a positional ordinal would key the same comment two ways. */
+  readonly ordinals?: ReadonlyMap<ReportFinding, number>;
 }): JSX.Element | null {
   const visible = useMemo(
     () => category.findings.filter((finding) => filter === 'all' || finding.state === filter),
@@ -611,7 +657,15 @@ function CategoryCard({
       </button>
       <div className="cat-body">
         {visible.map((finding, i) => (
-          <FindingRow key={`${finding.ruleId}-${i}`} finding={finding} access={access} print={print} />
+          <FindingRow
+            key={`${finding.ruleId}-${i}`}
+            finding={finding}
+            access={access}
+            print={print}
+            {...(commentaryOf === undefined
+              ? {}
+              : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
+          />
         ))}
       </div>
     </div>
@@ -625,10 +679,6 @@ function CategoryCard({
  * ordinal that will shift if the sample size changes. Matches what `merchant_comments.ordinal`
  * stores (D-063).
  */
-function ordinalOf(group: FindingGroup, index: number): number | undefined {
-  return group.findings.length > 1 ? index : undefined;
-}
-
 function FindingRow({
   finding,
   access,
@@ -746,9 +796,11 @@ function StateSection({
   section,
   access,
   anchored = false,
+  ordinals,
   commentaryOf,
   commentBox,
 }: {
+  readonly ordinals: ReadonlyMap<ReportFinding, number>;
   /** Carries the `#nothing-observed` anchor the merchant page jumps to (D-067). */
   readonly anchored?: boolean;
   readonly section: import('../lib/grouping.js').ReportSection;
@@ -763,6 +815,15 @@ function StateSection({
    * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
    */
   readonly commentaryNote?: string;
+  /**
+   * What the merchant's side of this looks like (D-063).
+   *
+   * Rendered above the findings, because an underwriter reading a response needs to know who wrote
+   * it and how much else went unanswered *before* they read it. Present on the analyst screen and
+   * in the PDF; absent on the merchant's own page, where it would narrate them back at themselves
+   * (D-067).
+   */
+  readonly participation?: Participation;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   /*
@@ -792,6 +853,7 @@ function StateSection({
           key={`${group.ruleId}-${group.state}`}
           group={group}
           access={access}
+          ordinals={ordinals}
           {...(commentaryOf === undefined ? {} : { commentaryOf })}
           {...(commentBox === undefined ? {} : { commentBox })}
         />
@@ -810,9 +872,11 @@ function StateSection({
 function GroupCard({
   group,
   access,
+  ordinals,
   commentaryOf,
   commentBox,
 }: {
+  readonly ordinals: ReadonlyMap<ReportFinding, number>;
   readonly group: FindingGroup;
   readonly access: EvidenceAccess;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
@@ -825,6 +889,15 @@ function GroupCard({
    * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
    */
   readonly commentaryNote?: string;
+  /**
+   * What the merchant's side of this looks like (D-063).
+   *
+   * Rendered above the findings, because an underwriter reading a response needs to know who wrote
+   * it and how much else went unanswered *before* they read it. Present on the analyst screen and
+   * in the PDF; absent on the merchant's own page, where it would narrate them back at themselves
+   * (D-067).
+   */
+  readonly participation?: Participation;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -838,8 +911,8 @@ function GroupCard({
               key={`${finding.ruleId}-${i}`}
               finding={finding}
               access={access}
-              {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinalOf(group, i)) })}
-              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinalOf(group, i)) })}
+              {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
+              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
             />
           ))}
         </div>
@@ -865,8 +938,8 @@ function GroupCard({
             key={`${finding.ruleId}-${i}`}
             finding={finding}
             access={access}
-            {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinalOf(group, i)) })}
-            {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinalOf(group, i)) })}
+            {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
+            {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
           />
         ))}
       </div>

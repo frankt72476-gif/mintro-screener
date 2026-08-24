@@ -1077,7 +1077,14 @@ handler was `() => undefined` — and one refactor from not being.
 
 The general form, which is the reason it is here:
 
-> **A required prop satisfied by an inert value is not a constraint, it is a convention.**
+> **An inert value passed to satisfy a signature is the tell that a caller has no way to express
+> what it means.**
+
+Frank's version of the same point — *a required prop satisfied by an inert value is not a
+constraint, it is a convention* — says what goes wrong. This says how to **see** it coming: the
+no-op handler, the empty string, the zero passed to fill a slot. Each is a caller that needed to
+say "there is none of this here" and had no vocabulary for it, so it said the nearest permitted
+thing and the callee believed it.
 
 `onSend` and `onDownload` were required. The merchant view satisfied them the only way it could,
 with no-ops, and *satisfying the prop is what rendered the button*. The type system was fully
@@ -1277,6 +1284,35 @@ Four things it states plainly, because a merchant receiving this has no context 
 what happens to what they write (recorded exactly, shown as theirs, passed on unedited), that
 nothing they write changes what was observed, that findings with no box are **Mintro's gaps rather
 than theirs**, and that a fresh link keeps anything already written.
+
+### Copy written for one audience becomes an assertion about the reader when it moves
+
+**2026-08-23 · found while building the merchant page, and not on the list.**
+
+`MerchantResponse` is written for an underwriter. It exists to say what a blank space means:
+*"the merchant has not opened the report"*, *"identified themselves as X, and left no comment on
+it"*. Every word of it is careful, and it was rendering **on the merchant's own page**, telling the
+reader finding by finding that they had left no comment — on a page whose one rule is never to
+imply that saying nothing is a failure (D-067).
+
+The general form, which is why this sits in D-063 rather than in a commit message:
+
+> **Copy written for one audience becomes an assertion about the reader when it moves to another.**
+> A sentence *about* someone, read *by* that someone, is a different sentence.
+
+Nothing was wrong with the words. They were correct, carefully hedged, and D-001-compliant in the
+document they were written for. The defect was entirely in who was reading them, which no copy
+audit can detect — `auditCopy` and `auditInternalVocabulary` both pass on that text, and should.
+
+It reached the merchant page because that page reuses `ReportView`, which is the right decision:
+one component means the merchant comments *while looking at the same evidence* IQwallet sees. Reuse
+carries copy across audience boundaries silently, and the boundary is invisible in the component
+tree.
+
+**What to check when a component is reused for a second audience**: not whether its copy is
+accurate, but whether any of it is *about* the new reader. Descriptions of delivery, of silence, of
+what someone did or did not do — those are the sentences that change meaning when the subject
+becomes the audience.
 
 ### Sending is never blocked, so the log carries the weight
 
@@ -3449,6 +3485,35 @@ The merchant is not a user of this system: no account, no password, no session. 
 definer` functions are the whole of what the link can do, and **neither accepts a run id** — a
 caller without a token cannot name a run to read or write.
 
+### Copy written for one audience becomes an assertion about the reader when it moves
+
+**2026-08-23 · found while building the merchant page, and not on the list.**
+
+`MerchantResponse` is written for an underwriter. It exists to say what a blank space means:
+*"the merchant has not opened the report"*, *"identified themselves as X, and left no comment on
+it"*. Every word of it is careful, and it was rendering **on the merchant's own page**, telling the
+reader finding by finding that they had left no comment — on a page whose one rule is never to
+imply that saying nothing is a failure (D-067).
+
+The general form, which is why this sits in D-063 rather than in a commit message:
+
+> **Copy written for one audience becomes an assertion about the reader when it moves to another.**
+> A sentence *about* someone, read *by* that someone, is a different sentence.
+
+Nothing was wrong with the words. They were correct, carefully hedged, and D-001-compliant in the
+document they were written for. The defect was entirely in who was reading them, which no copy
+audit can detect — `auditCopy` and `auditInternalVocabulary` both pass on that text, and should.
+
+It reached the merchant page because that page reuses `ReportView`, which is the right decision:
+one component means the merchant comments *while looking at the same evidence* IQwallet sees. Reuse
+carries copy across audience boundaries silently, and the boundary is invisible in the component
+tree.
+
+**What to check when a component is reused for a second audience**: not whether its copy is
+accurate, but whether any of it is *about* the new reader. Descriptions of delivery, of silence, of
+what someone did or did not do — those are the sentences that change meaning when the subject
+becomes the audience.
+
 ### Sending is never blocked
 
 Outstanding commentary does not hold a report (D-001). The report shows which findings were open
@@ -3934,3 +3999,59 @@ answering on the merchant's behalf.
 The subject became *"Your response to the screening report for &lt;domain&gt;"* — leading with what
 is wanted rather than with what Mintro did, since this arrives unexpected from a company the reader
 may not know.
+
+---
+
+## D-068 — The PDF carries the participation record
+**2026-08-23 · completing D-063 point 6**
+
+> The PDF to IQwallet carries all of it: who identified themselves, when they opened it, when each
+> comment was entered, and which invited findings were left unanswered.
+
+### It was carrying none of it
+
+The print branch passed `commentaryOf` to `CategoryCard`, and **`CategoryCard` had no such prop**.
+JSX accepts `{...(x === undefined ? {} : { x })}` without an excess-property check, so the call site
+read as correct, the value went nowhere, and the exported document contained no merchant responses
+at all. Every test passed, because the component tree was internally consistent with itself.
+
+Two more of the same family were underneath it:
+
+- **The ordinal was positional, and the two views traverse differently.** The reading view walks
+  display groups; print walks categories. A comment keyed by position in one is keyed differently in
+  the other, so a merchant could answer a finding and see the response attached to another — or to
+  none. `ordinalsFor` now decides every ordinal once, from `groupReport`, and both views look it up
+  by finding identity.
+- **A `<details>` cannot be opened by a stylesheet.** The unanswered list was collapsed with its
+  summary hidden in print, so the export would have held strictly less than the screen it claims to
+  reproduce (D-042). It takes a prop.
+
+### The check that would have caught it
+
+`npm run print-check` renders the print path with commentary injected and asks the **rendered
+document** what it says — all five commentary states, the attribution treatment, and the PDF
+itself.
+
+It reads the DOM rather than the PDF's text, and the reason is worth recording: `extractPdfText`
+cannot decode the subset-embedded fonts Chromium writes. It was built to tell whether a *fetched*
+document is readable prose (D-057), and pointing it at our own output returns a Caesar-shifted
+alphabet. The DOM is what `page.pdf()` prints, so it is the authority on what the PDF contains.
+
+**Nothing that inspected the component tree could have found this**, because the tree agreed with
+itself. That is the same test the regression check for the phantom `merchant_domain` column failed:
+*does this assertion get its expected value from the same place the code gets its actual value?*
+
+### The participation record
+
+Structured, not a sentence. "Which findings were left unanswered" is a list an underwriter reads
+against the findings themselves, and prose would make them count.
+
+Every line states a fact about delivery. A finding with no response is **unanswered** — never
+"unaddressed", "ignored", "declined" or "unexplained", each of which is a reading of the merchant
+(D-001). A merchant may reasonably have nothing to add to an observation they accept; the merchant
+page therefore never counts silence back at them (D-067), and this gives an underwriter the count
+and nothing more.
+
+It is sans-serif and in the report's own palette, deliberately. This is **Mintro speaking** — our
+record of what we sent and what came back — and it must not be mistaken for the merchant's words,
+which keep the serif face and the amber rule. `print-check` asserts the two faces differ.

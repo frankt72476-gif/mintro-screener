@@ -20,9 +20,12 @@ import { createCredentialDeposit } from './lib/credentials.js';
 import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
 import { createInviteQueue, describeInvite } from './lib/inviteQueue.js';
 import { createSendQueue, describeSend } from './lib/sendQueue.js';
+import { invitedFindings } from './lib/grouping.js';
 import {
   commentaryFor,
+  participationFor,
   readRunCommentary,
+  type Participation,
   type FindingCommentary,
   type ReportFinding,
   type RunCommentary,
@@ -599,7 +602,7 @@ function Screener({
                   onInvite: () => setInviting(true),
                   downloading: pdfBusy,
                 }}
-                {...commentaryProps(commentary)}
+                {...commentaryProps(commentary, report)}
               />
             </>
           )}
@@ -965,7 +968,7 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
           report={injected.report}
           access={access}
           print
-          {...commentaryProps(injected.commentary)}
+          {...commentaryProps(injected.commentary, injected.report)}
         />
       </main>
     </div>
@@ -1051,9 +1054,13 @@ function usePrintReady(report: ScreeningReport | null): void {
  * One helper for both surfaces on purpose: the screen and the PDF must agree about what a blank
  * space means, and the surest way to get two answers is two expressions.
  */
-function commentaryProps(commentary: RunCommentary | null | undefined): {
+function commentaryProps(
+  commentary: RunCommentary | null | undefined,
+  report?: ScreeningReport,
+): {
   commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   commentaryNote?: string;
+  participation?: Participation;
 } {
   if (commentary === undefined) return {};
 
@@ -1076,6 +1083,22 @@ function commentaryProps(commentary: RunCommentary | null | undefined): {
   const props = {
     commentaryOf: (finding: ReportFinding, ordinal?: number): FindingCommentary =>
       commentaryFor(finding, ordinal, commentary.invitation, commentary.comments),
+    /*
+      The participation record, from the same grouping the boxes came from (D-063).
+
+      `invitedFindings` walks `groupReport`, which is what decided which boxes to render, so the
+      count an underwriter reads against is the count of boxes the merchant was shown. Deriving it
+      any other way would let a merchant answer a finding this still called unanswered.
+    */
+    ...(report === undefined
+      ? {}
+      : {
+          participation: participationFor(
+            invitedFindings(report),
+            commentary.invitation,
+            commentary.comments,
+          ),
+        }),
   };
 
   // A link was made and nothing was transmitted. Said once, at the top, because it changes what

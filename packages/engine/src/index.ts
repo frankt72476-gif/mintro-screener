@@ -186,6 +186,13 @@ export {
 } from './commentLink.js';
 
 export {
+  participationFor,
+  type Participation,
+  type InvitedRef,
+  type InvitedFinding,
+} from './participation.js';
+
+export {
   located,
   unreachable,
   endedAtWhatWasAsked,
