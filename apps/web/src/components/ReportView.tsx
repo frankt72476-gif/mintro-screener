@@ -18,14 +18,21 @@ import {
   type ReportFinding,
   type ScreeningReport,
 } from '@mintro/engine';
-import { describeGroup, groupReport, ordinalsFor, type FindingGroup } from '../lib/grouping.js';
+import {
+  describeGroup,
+  groupReport,
+  nothingObservedSection,
+  ordinalsFor,
+  NOTHING_OBSERVED_ID,
+  type FindingGroup,
+} from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
 
-type Filter = State | 'all';
+export type Filter = State | 'all';
 
 /**
  * What an operator can do with a report. Never available on the merchant route (D-066).
@@ -89,6 +96,17 @@ interface Props {
    * (D-067).
    */
   readonly participation?: Participation;
+  /**
+   * A controlled filter, when the caller needs one.
+   *
+   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
+   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
+   * filter first — which it can only do if it owns the value (D-069).
+   *
+   * Uncontrolled when omitted, which is every other caller.
+   */
+  readonly filter?: Filter;
+  readonly onFilterChange?: (filter: Filter) => void;
   /** The merchant's own view supplies a box; nothing else does. */
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }
@@ -101,11 +119,18 @@ export function ReportView({
   commentaryOf,
   commentaryNote,
   participation,
+  filter: controlledFilter,
+  onFilterChange,
   commentBox,
 }: Props): JSX.Element {
   // Both branches read from this, so a comment keys the same way whichever view is rendering.
   const ordinals = useMemo(() => ordinalsFor(report), [report]);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [ownFilter, setOwnFilter] = useState<Filter>('all');
+  const filter = controlledFilter ?? ownFilter;
+  const setFilter = (next: Filter): void => {
+    setOwnFilter(next);
+    onFilterChange?.(next);
+  };
 
   return (
     <div>
@@ -239,22 +264,19 @@ export function ReportView({
             );
 
             /*
-              Where "jump to these" lands (D-067).
+              Where "jump to these" lands (D-067, fixed in D-069).
 
-              The merchant page points at the findings where nothing was observed *from their
-              pages* — the three not-evaluable buckets a merchant can actually close. The anchor
-              goes on the first of them that is rendered, so it survives filtering and survives a
-              report where one of the three is empty.
+              `nothingObservedSection` is the same call the callout uses to decide whether to render
+              a link at all, so the link and the anchor cannot disagree about whether the target
+              exists. They were two computations and did: the callout counted with one rule, this
+              picked a section with another, and a report could satisfy the first and not the
+              second — which is what produced a link that did nothing.
 
-              Derived here rather than hard-coded to a bucket name, because a report with no
-              `not_reachable` findings would otherwise have a callout pointing at nothing.
+              Matched by key rather than by object identity, because `sections` here is filtered and
+              `nothingObservedSection` reads the unfiltered report.
             */
-            const target = sections.find(
-              (section) =>
-                section.bucket === 'not_reachable' ||
-                section.bucket === 'not_exposed' ||
-                section.bucket === 'not_applicable',
-            );
+            const targetKey = nothingObservedSection(report)?.key;
+            const target = sections.find((section) => section.key === targetKey);
 
             return sections.map((section) => (
               <StateSection
@@ -824,6 +846,17 @@ function StateSection({
    * (D-067).
    */
   readonly participation?: Participation;
+  /**
+   * A controlled filter, when the caller needs one.
+   *
+   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
+   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
+   * filter first — which it can only do if it owns the value (D-069).
+   *
+   * Uncontrolled when omitted, which is every other caller.
+   */
+  readonly filter?: Filter;
+  readonly onFilterChange?: (filter: Filter) => void;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   /*
@@ -838,7 +871,7 @@ function StateSection({
     <section
       className={`sect ${stateClass(section.state)}`}
       data-bucket={section.bucket ?? undefined}
-      {...(anchored ? { id: 'nothing-observed' } : {})}
+      {...(anchored ? { id: NOTHING_OBSERVED_ID } : {})}
     >
       <div className="sect-head">
         <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
@@ -898,6 +931,17 @@ function GroupCard({
    * (D-067).
    */
   readonly participation?: Participation;
+  /**
+   * A controlled filter, when the caller needs one.
+   *
+   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
+   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
+   * filter first — which it can only do if it owns the value (D-069).
+   *
+   * Uncontrolled when omitted, which is every other caller.
+   */
+  readonly filter?: Filter;
+  readonly onFilterChange?: (filter: Filter) => void;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
   const [open, setOpen] = useState(false);

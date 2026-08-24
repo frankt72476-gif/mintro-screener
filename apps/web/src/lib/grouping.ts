@@ -228,6 +228,46 @@ export function ordinalOf(group: FindingGroup, index: number): number | undefine
 }
 
 /**
+ * The `not_evaluable` buckets that are about the merchant's own surface (D-069).
+ *
+ * **Positively recorded kinds only.** A finding whose kind was never written lands in `unrecorded`
+ * and is *not* here, because nobody knows whose gap it is — it may be `no_check_built`, which is
+ * Mintro's. Telling a merchant "your pages did not show one way or the other" about it would be an
+ * assertion about their storefront derived from a missing field, and it would contradict the
+ * four-column breakdown, which labels an unrecorded kind as neither theirs nor ours (D-044).
+ *
+ * Found the hard way: a run on rule set 2.4.0 recorded no kinds at all, so all 41 of its
+ * not-evaluable findings were `unrecorded`. The callout counted every one of them and the jump link
+ * pointed at a section that did not exist.
+ */
+export const MERCHANT_SURFACE_BUCKETS = ['not_reachable', 'not_exposed', 'not_applicable'] as const;
+
+const isMerchantSurface = (bucket: Bucket | undefined): boolean =>
+  bucket !== undefined && (MERCHANT_SURFACE_BUCKETS as readonly string[]).includes(bucket);
+
+/**
+ * The section the merchant page's callout points at, or null when there is none.
+ *
+ * **One computation for the count, the link and the anchor.** They were three: the callout counted
+ * with `invitesComment`, the anchor was chosen from a bucket list in `ReportView`, and neither knew
+ * about the other. A report could have a non-zero count and no anchored section — which is exactly
+ * what Frank clicked on.
+ */
+export function nothingObservedSection(report: ScreeningReport): ReportSection | null {
+  return groupReport(report).find((section) => isMerchantSurface(section.bucket)) ?? null;
+}
+
+/** How many findings the callout is about. Zero means it must not render at all. */
+export function nothingObservedCount(report: ScreeningReport): number {
+  return groupReport(report)
+    .filter((section) => isMerchantSurface(section.bucket))
+    .reduce((total, section) => total + section.count, 0);
+}
+
+/** The DOM id the callout's link targets. One constant, so the two cannot disagree. */
+export const NOTHING_OBSERVED_ID = 'nothing-observed';
+
+/**
  * Every finding's ordinal, decided once for the whole report (D-063).
  *
  * **The two views enumerate findings differently** — the reading view walks display groups, the

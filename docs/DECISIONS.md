@@ -1067,43 +1067,95 @@ someone who had just written it down. Knowing the shape is not the same as notic
 The practical test: *does this assertion get its expected value from the same place the code gets
 its actual value?* If it does, it can only confirm the code agrees with itself.
 
-### A required prop satisfied by an inert value — the thirteenth (D-066)
+### The tree agreed with itself — instances thirteen to sixteen (D-066, D-068, D-069)
 
-**Frank's ruling: this belongs in D-026.** Found in first use of the merchant page.
+**Frank's ruling: one entry, because the through-line is the point.** Four defects in two days,
+each invisible to a test that inspected the component tree, **because the tree agreed with itself**.
 
-**"Send to IQwallet" was rendered on the anonymous merchant view.** A merchant or their agent could
-see a control that transmits their own screening report to an underwriter. It was inert — the
-handler was `() => undefined` — and one refactor from not being.
+The operative check, which has now caught all of them and two of my own tests:
 
-The general form, which is the reason it is here:
+> **Does this assertion get its expected value from the same place the code gets its actual value?**
+> If it does, it can only confirm that the code agrees with itself.
 
-> **An inert value passed to satisfy a signature is the tell that a caller has no way to express
-> what it means.**
+#### The four
 
-Frank's version of the same point — *a required prop satisfied by an inert value is not a
-constraint, it is a convention* — says what goes wrong. This says how to **see** it coming: the
-no-op handler, the empty string, the zero passed to fill a slot. Each is a caller that needed to
-say "there is none of this here" and had no vocabulary for it, so it said the nearest permitted
-thing and the callee believed it.
+**1. A required prop satisfied by an inert value** *(the merchant page, D-066)*. `onSend` and
+`onDownload` were required, the merchant view satisfied them with no-ops, and satisfying the prop
+rendered the button. **"Send to IQwallet" was on an anonymous page** where a merchant could transmit
+their own screening report to an underwriter. The type system was fully enforced and enforcing
+nothing: correctness had moved into a handler body, where no type can see it.
 
-`onSend` and `onDownload` were required. The merchant view satisfied them the only way it could,
-with no-ops, and *satisfying the prop is what rendered the button*. The type system was fully
-enforced and enforcing nothing: correctness had moved into the **body of a handler**, where no type
-can see it and any later edit can change it.
+> An inert value passed to satisfy a signature is the tell that a caller has no way to express what
+> it means.
 
-This is the boundary family again, in the shape a type system is worst at showing. The prop
-contract said "you must supply a send handler" and the page needed to say "there is no send here" —
-a statement the contract had no way to express, so the page said the nearest thing it could and the
-component believed it.
+That is the sentence to keep. Frank's version — *a required prop satisfied by an inert value is not
+a constraint, it is a convention* — says what goes wrong; this says how to see it coming. The no-op
+handler, the empty string, the zero passed to fill a slot: each is a caller that needed to say
+"there is none of this here" and had no vocabulary for it.
 
-The fix is to make the absent case representable: one optional `actions` group, omitted entirely.
-The compiler then found **all four call sites**, including two print paths carrying the identical
-defect invisibly — a PDF has no buttons, so nothing was ever seen, and only luck separated the
-visible instance from the hidden ones.
+**2. A prop passed to a component that does not accept it** *(the PDF, D-068)*. The print branch
+passed `commentaryOf` to `CategoryCard`, which had no such prop. JSX accepts
+`{...(x === undefined ? {} : { x })}` without an excess-property check, so the call site read as
+correct and the value went nowhere. **The document that reaches IQwallet carried no merchant
+responses at all.**
 
-**What to take from it.** When a component's props force a caller to say something untrue, the
-props are wrong, not the caller. And an inert value is the tell: a no-op handler, an empty string,
-a zero passed to satisfy a signature is a caller with no way to express what it means.
+**3. A positional key across two traversals** *(the ordinal, D-068)*. The reading view walks display
+groups; print walks categories. An ordinal taken from a position in either keys a comment
+differently in the other.
+
+This is the one that would have done real damage, and Frank named it exactly: *a merchant's
+explanation of their COA rendering under a finding about affiliate programs, in a document sent to
+an underwriter, under Mintro's name.* **Attribution that lands on the wrong finding is worse than no
+attribution** — it puts words in their mouth about something they never addressed. Every other
+defect in this list omits something; this one fabricates.
+
+**4. Two computations of one decision** *(the jump link, D-069)*. The callout counted findings with
+one rule and the anchor was chosen with another. A rule set 2.4.0 run recorded no `notEvaluableKind`
+at all, so all 41 of its not-evaluable findings landed in `unrecorded`: the count was 41, no section
+matched, and the link resolved to nothing.
+
+The same data exposed a second defect underneath. The callout told the merchant *"41 where your
+pages did not show one way or the other"* — an assertion about their storefront **derived from a
+field that was never written**. Some may be `no_check_built`, which is ours. Find-by-nothing, in
+copy written the day before, in the exact place the ruling said must not contradict the four-column
+breakdown.
+
+#### Why no test caught any of them
+
+Each component was internally consistent. A prop existed, a constant matched a string, a handler
+satisfied a signature — and every unit test asked one side whether it agreed with itself.
+
+The fixes are all the same move: **ask the output**. `print-check` renders the print path and reads
+the rendered DOM. `anchors.test.ts` renders the component and requires every `href="#x"` it emitted
+to have a matching `id="x"` in the same markup — no list of anchors to maintain, so a link added
+tomorrow is checked tomorrow.
+
+#### An assertion can pass for the wrong reason, and only an unexplained result exposes it
+
+Three of my own checks had the defect they were written for.
+
+- The regression test for the phantom `merchant_domain` column compared the table against a column
+  list **typed into the test file**. Re-introducing the bug left it green.
+- `print-check` asserted the merchant's words were serif with `/serif/i` — which matches
+  `sans-serif`, so the participation record passed the "is not serif" check for the wrong reason.
+- `anchors.test.ts` first rendered `ReportView` alone, which emits **no anchors at all**, and
+  reported that every anchor resolved. A dangling-link check that never saw a link.
+
+The `/serif/i` one is worth its own note, because of **how it was found**: a FAIL appeared that did
+not make sense. Nothing was looking for it. The assertion was wrong in both directions and only one
+direction happened to fail — had the styles been slightly different, it would have passed, stayed
+in the suite, and asserted nothing forever.
+
+So: **an assertion that passes is not evidence it can fail.** A result that does not make sense is
+worth more attention than a green run, and a check that has never been seen to fail has never been
+tested. Each of these was fixed by making the check fail on purpose first.
+
+#### Frank's observation about this family
+
+A fix for a defect in this family is unusually likely to contain one. Three earlier instances
+contained the defect they were fixing, and three of the four above were caught by checks that
+themselves had it — one written twenty-four hours after the lesson, by someone who had just written
+the lesson down. **Knowing the shape is not the same as noticing it.**
 
 ### GATE-002 and GATE-003 are pairs, and only the pinned half is the finding
 
@@ -4055,3 +4107,52 @@ and nothing more.
 It is sans-serif and in the report's own palette, deliberately. This is **Mintro speaking** — our
 record of what we sent and what came back — and it must not be mistaken for the merchant's words,
 which keep the serif face and the amber rule. `print-check` asserts the two faces differ.
+
+---
+
+## D-069 — The callout, its count, and its anchor are one decision
+**2026-08-23 · found in first use of the deployed merchant page**
+
+"Jump to these" did nothing. Two defects, and the second is the worse one.
+
+### The link resolved to nothing
+
+The callout counted findings with one rule and the anchor was chosen with another. Frank's run was
+rule set **2.4.0**, which recorded no `notEvaluableKind` at all: all 41 of its not-evaluable
+findings fell in the `unrecorded` bucket, the count came out 41, no section matched the anchor's
+bucket list, and no element carried the id.
+
+Frank distinguished the two possible failures before I looked — an anchor that resolves to nothing,
+and an anchor that resolves to something that cannot be scrolled to. It was the first. The second
+was also latent: a section hidden by the filter cannot be scrolled to, so the merchant page now owns
+the filter and the jump clears it before scrolling.
+
+`grouping.ts` holds `nothingObservedCount`, `nothingObservedSection` and `NOTHING_OBSERVED_ID`, and
+the callout renders **only when the section it points at exists**. That makes the pairing a property
+of the code rather than of the data it happens to be given.
+
+### The count was an assertion about the merchant, from a field nobody wrote
+
+The more serious half. The callout said *"41 where your pages did not show one way or the other"*
+about findings whose kind was **never recorded**. Nobody knows whose gap those are; some may be
+`no_check_built`, which is Mintro's.
+
+The four-column breakdown labels an unrecorded kind as neither theirs nor ours (D-044), and Frank's
+own ruling on this callout was that it **must not contradict** that. It did — one day after the
+ruling, in the copy written to satisfy it.
+
+So the count includes only **positively recorded** merchant-surface kinds: `not_reachable`,
+`not_exposed`, `not_applicable`. A finding whose kind was never written is counted nowhere and
+claimed about nobody. On Frank's 2.4.0 run the callout now does not render at all, which is the
+honest outcome — that run cannot say whose gaps those were.
+
+### The check
+
+`apps/web/test/anchors.test.ts` renders the callout and the report **together** and requires every
+`href="#x"` in the output to have a matching `id="x"` in the same markup.
+
+Not a comparison against the id constant: both sides would read the same string and neither would
+know whether an element existed. Not a list of known anchors either — there is nothing to maintain,
+so a link added tomorrow is checked tomorrow.
+
+Recorded in D-026 with the other three, and with the two ways this test was wrong first.

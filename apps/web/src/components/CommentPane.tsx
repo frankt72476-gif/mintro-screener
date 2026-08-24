@@ -34,7 +34,12 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { createEvidenceAccess } from '../lib/evidence.js';
-import { ReportView } from './ReportView.js';
+import {
+  NOTHING_OBSERVED_ID,
+  nothingObservedCount,
+  nothingObservedSection,
+} from '../lib/grouping.js';
+import { ReportView, type Filter } from './ReportView.js';
 import { formatStamp } from '../lib/format.js';
 
 /** `?comment=<token>` — the merchant's whole credential. */
@@ -164,17 +169,33 @@ function OpenReport({
    * Derived from the report rather than passed in, so the callout and the section it points at
    * cannot come to mean different sets.
    */
-  const nothingObserved = useMemo(
-    () =>
-      opened.report.categories
-        .flatMap((category) => category.findings)
-        .filter(
-          (finding) =>
-            finding.state === 'not_evaluable' &&
-            invitesComment(finding.state, finding.notEvaluableKind),
-        ).length,
-    [opened.report],
-  );
+  const nothingObserved = useMemo(() => nothingObservedCount(opened.report), [opened.report]);
+
+  /*
+    Whether the link has anywhere to land (D-069).
+
+    The callout used to count with one rule and the anchor was chosen with another, so a report
+    could produce a non-zero count and no anchored section — which is what Frank clicked. Both now
+    come from `grouping.ts`, and the link renders only when the section it points at exists.
+  */
+  const jumpTarget = useMemo(() => nothingObservedSection(opened.report), [opened.report]);
+
+  /*
+    The filter is held here, not inside `ReportView`.
+
+    A section hidden by the filter cannot be scrolled to, so jumping clears the filter first and
+    scrolls on the next frame, once the section is in the document. The alternative was a link that
+    worked until someone touched a filter chip — the same failure, waiting.
+  */
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const jump = (event: { preventDefault: () => void }): void => {
+    event.preventDefault();
+    setFilter('all');
+    requestAnimationFrame(() => {
+      document.getElementById(NOTHING_OBSERVED_ID)?.scrollIntoView({ behavior: 'smooth' });
+    });
+  };
 
   const invited = useMemo(
     () =>
@@ -289,32 +310,7 @@ function OpenReport({
           does not edit it, shorten it, or reply to it.
         </p>
 
-        {nothingObserved > 0 && (
-          <div className="card unseen">
-            <h2 className="unseen-head">
-              {nothingObserved} where your pages did not show one way or the other
-              <a className="unseen-jump" href="#nothing-observed">
-                Jump to these
-              </a>
-            </h2>
-            {/*
-              "did not show one way or the other" — not "nothing could be observed" (D-067).
-
-              The narrower phrasing resolves a real overlap. Findings Mintro has not built a check
-              for are also ones where nothing was observed, but they are gaps in what *we* looked
-              at rather than in what the pages showed; they carry no box, and the report's
-              four-column breakdown labels them as ours. A callout that swept them in would
-              contradict it, and would promise a response this page does not offer.
-            */}
-            <p>
-              For these, your public pages did not show either way — an order-handling practice, a
-              page behind a login, a document not published.{' '}
-              <strong>A response here adds more than anywhere else on this report</strong>, because
-              there is nothing on the site for the team reviewing your account to read instead. You
-              can describe how your site handles it now, or how you intend to.
-            </p>
-          </div>
-        )}
+        <NothingObservedCallout report={opened.report} onJump={jump} />
 
         <p className="sub">
           This link works until {opened.expiresAt.slice(0, 10)}. It can be forwarded — whoever
@@ -357,6 +353,8 @@ function OpenReport({
         <ReportView
           report={opened.report}
           access={access}
+          filter={filter}
+          onFilterChange={setFilter}
           commentBox={(finding, ordinal) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
@@ -367,6 +365,62 @@ function OpenReport({
           )}
         />
       </main>
+    </div>
+  );
+}
+
+/**
+ * The findings where a response is worth most (D-067).
+ *
+ * Exported and separate from `CommentPane` for a reason that is not tidiness: **the anchor check
+ * has to render this and the report together.** The link lives here and the id it targets lives in
+ * `ReportView`, and the only way to know they meet is to render both and look. Buried inside a
+ * component that needs a Supabase client and a live token, it could not be rendered at all — and a
+ * link that resolves to nothing is what happened.
+ *
+ * It renders **only when the section it points at exists** (D-069), which is what makes the pairing
+ * a property of the code rather than of the data it happens to be given.
+ */
+export function NothingObservedCallout({
+  report,
+  onJump,
+}: {
+  readonly report: ScreeningReport;
+  readonly onJump?: (event: { preventDefault: () => void }) => void;
+}): JSX.Element | null {
+  const count = nothingObservedCount(report);
+  if (count === 0 || nothingObservedSection(report) === null) return null;
+
+  return (
+    <div className="card unseen">
+      <h2 className="unseen-head">
+        {count} where your pages did not show one way or the other
+        <a
+          className="unseen-jump"
+          href={`#${NOTHING_OBSERVED_ID}`}
+          {...(onJump === undefined ? {} : { onClick: onJump })}
+        >
+          Jump to these
+        </a>
+      </h2>
+      {/*
+        "did not show one way or the other" — not "nothing could be observed" (D-067).
+
+        The narrower phrasing resolves a real overlap. Findings Mintro has not built a check for are
+        also ones where nothing was observed, but they are gaps in what *we* looked at rather than
+        in what the pages showed; they carry no box, and the report's four-column breakdown labels
+        them as ours. A callout that swept them in would contradict it.
+
+        The same applies to a finding whose kind was never recorded, which is why the count comes
+        from `grouping.ts` and includes only positively recorded merchant-surface kinds (D-069).
+      */}
+      <p>
+        For these, your public pages did not show either way — an order-handling practice, a page
+        behind a login, a document not published.{' '}
+        <strong>A response here adds more than anywhere else on this report</strong>, because there
+        is nothing on the site for the team reviewing your account to read instead. You can describe
+        how your site handles it now, or how you intend to.
+      </p>
     </div>
   );
 }
