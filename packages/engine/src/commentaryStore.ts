@@ -93,8 +93,27 @@ export async function readRunCommentary(
     };
   }
 
-  const visits = await rows<VisitRow>(db, 'comment_visits', 'identified_as, identified_at', runId, 'identified_at');
+  const visits = await rows<VisitRow>(
+    db,
+    'comment_visits',
+    'link_id, identified_as, identified_at',
+    runId,
+    'identified_at',
+  );
   if (visits === null) return null;
+
+  /*
+    Only arrivals through a link Mintro actually sent (D-072).
+    
+    A visit is evidence the merchant participated. If a link was never transmitted, nobody
+    legitimately holds its token — so an arrival through it is not the merchant, and listing it
+    under "identified themselves" tells an underwriter that someone answered when nobody was asked.
+
+    The same reasoning as `delivery` itself (D-064), applied one level down. It was missed because
+    `comment_invites.delivery` gated the *links* and the visits were read run-wide.
+  */
+  const deliveredIds = new Set(delivered.map((link) => link.id));
+  const arrived = visits.filter((visit) => deliveredIds.has(visit.link_id));
 
   const comments = await rows<CommentRow>(
     db,
@@ -123,7 +142,7 @@ export async function readRunCommentary(
       // Only the links that were actually transmitted. Where an untransmitted link was addressed
       // is not somewhere the merchant was invited (D-064).
       sentTo: [...new Set(delivered.map((link) => link.sent_to))],
-      visits: visits.map(
+      visits: arrived.map(
         (visit): CommentVisit => ({
           identifiedAs: visit.identified_as,
           identifiedAt: visit.identified_at,
@@ -155,6 +174,7 @@ interface JobRow {
   delivery: string | null;
 }
 interface VisitRow {
+  link_id: string;
   identified_as: string;
   identified_at: string;
 }

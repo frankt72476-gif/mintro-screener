@@ -4308,3 +4308,47 @@ before any client exists, and the standing practice is in `docs/ARCHITECTURE.md`
 A comment beside the old check claimed it returned "before `useAuth` decides anything". It did not:
 a hook cannot be skipped by a return below it. The comment described the intent and the code did
 something else, which is worth noting on its own.
+
+---
+
+## D-072 — A visit through a link nobody sent is not participation
+**2026-08-24 · found by making the mess it describes**
+
+`readRunCommentary` filtered *links* by whether they were transmitted (D-064) and then read
+**visits run-wide**. So an arrival through an untransmitted link appeared in the participation
+record an underwriter reads.
+
+The reasoning is D-064's, one level down. A visit is evidence the merchant participated. **If a link
+was never transmitted, nobody legitimately holds its token** — so an arrival through it is not the
+merchant, and listing it tells an underwriter that someone answered when nobody was asked.
+
+### How it was found, which is the part worth keeping
+
+Diagnosing D-070 needed a token, and tokens are stored only as digests and generated worker-side —
+so I minted a diagnostic link straight into the database against a live run, and identified through
+it as `diagnostic@gomintro.com` while driving the anonymous path.
+
+Those rows are now **permanently** in that run's participation record. The append-only trigger
+refused to delete them, **including for `service_role`**:
+
+    DELETE on public.comment_visits is not permitted: this table is append-only
+
+That is the guarantee doing exactly its job. The system would not let me tidy away evidence of my
+own activity on a merchant's record, which is the property hard constraint 5 exists to have. It is
+worth noting that the first time it bit, it bit the person who built it, for a reason that felt
+entirely reasonable at the time.
+
+**Disclosed rather than worked around.** The filter above is a genuine correctness fix and it also
+happens to exclude my rows, which is exactly the shape of a rationalisation — so it is recorded that
+way, and Frank can judge it. The diagnostic link has no `comment_invites` job, so it was never
+transmitted, so it now falls outside the record on the same rule that would exclude a real
+untransmitted link.
+
+### The operational lesson
+
+**Do not mint credentials against a live run to debug.** A diagnostic link should be issued against
+a scratch run, or the debugging should happen against a local database. Anything written to an
+append-only table is written for good, and "I will clean it up afterwards" is not available here by
+design.
+
+Frank's full-loop test starts from a fresh scan, so the run that reaches IQwallet is unaffected.

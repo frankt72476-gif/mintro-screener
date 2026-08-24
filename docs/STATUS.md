@@ -365,6 +365,16 @@ finished job that does not say which, and a run whose links were never transmitt
 — it is not scaffolding to remove when Resend is verified, since a genuine send failure produces
 the same situation.
 
+### Do not mint credentials against a live run to debug
+
+Diagnosing the merchant page needed a working token, and tokens exist only as digests. A diagnostic
+`comment_links` row was inserted against a live run — and the visits made through it are now
+**permanently** in that run's participation record, because the append-only trigger refuses a
+delete even from `service_role` (D-072).
+
+That is the guarantee working. It also means debugging against a real run leaves marks that cannot
+be removed. Use a scratch run, or a local database.
+
 ### The token never reaches a browser
 
 The analyst-side control queues an intent (`comment_invites`, one field: the address) and the worker

@@ -67,7 +67,9 @@ describe('an invitation that was transmitted', () => {
   const tables: Tables = {
     comment_links: [{ ...LINK, first_opened_at: '2026-08-24T09:00:00.000Z' }],
     comment_invites: [SENT],
-    comment_visits: [{ identified_as: 'ops@shop.example', identified_at: '2026-08-24T09:01:00.000Z' }],
+    comment_visits: [
+      { link_id: 'link-1', identified_as: 'ops@shop.example', identified_at: '2026-08-24T09:01:00.000Z' },
+    ],
     merchant_comments: [
       {
         rule_id: 'FULF-001',
@@ -106,6 +108,33 @@ describe('an invitation that was transmitted', () => {
     expect(result?.invitation.firstOpenedAt).toBe('2026-08-24T09:00:00.000Z');
     // While any delivered link still works, they can still respond.
     expect(result?.invitation.expiresAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it('ignores an arrival through a link that was never sent', async () => {
+    /*
+      A visit is evidence the merchant participated. If a link was never transmitted nobody
+      legitimately holds its token, so an arrival through it is not the merchant — and listing it
+      would tell an underwriter that someone answered when nobody was asked (D-072).
+
+      Found for real: diagnostic links minted straight into the database, to drive the anonymous
+      path while debugging, appeared in a live run's participation record.
+    */
+    const result = await readRunCommentary(
+      reader({
+        ...tables,
+        comment_links: [
+          { ...LINK, first_opened_at: '2026-08-24T09:00:00.000Z' },
+          { id: 'link-untransmitted', first_opened_at: null, expires_at: '2026-10-01T00:00:00.000Z' },
+        ],
+        comment_visits: [
+          { link_id: 'link-1', identified_as: 'ops@shop.example', identified_at: '2026-08-24T09:01:00.000Z' },
+          { link_id: 'link-untransmitted', identified_as: 'nobody@example.com', identified_at: '2026-08-24T10:00:00.000Z' },
+        ],
+      }),
+      'run-1',
+    );
+
+    expect(result?.invitation.visits?.map((v) => v.identifiedAs)).toEqual(['ops@shop.example']);
   });
 
   it('ignores a link whose own job failed', async () => {
