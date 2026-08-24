@@ -675,7 +675,14 @@ function FindingRow({
   const isOpen = print || open;
 
   return (
-    <div className={`find ${stateClass(finding.state)} ${isOpen ? 'open' : ''}`}>
+    <div
+      className={
+        `find ${stateClass(finding.state)} ${isOpen ? 'open' : ''}` +
+        // Kept whole on paper, so a merchant's words never land overleaf from the observation
+        // they answer (D-075). Only these rows pay the page-break cost; the rest may continue.
+        (commentary?.state === 'commented' ? ' has-response' : '')
+      }
+    >
       <button className="find-head" onClick={() => setOpen(!open)} disabled={print}>
         <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
         <span className="find-main">

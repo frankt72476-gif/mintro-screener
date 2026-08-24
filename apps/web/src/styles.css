@@ -514,8 +514,24 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .printing .ev{padding-bottom:10px}
 .printing .cat-head{cursor:default}
 
-/* Keep a finding and its evidence on one page where the page break allows. */
-.printing .find{break-inside:avoid;page-break-inside:avoid}
+/* -- What must not split across a page, and what may (D-075) --------------------------------
+   `break-inside: avoid` on every finding row cost **12.8 pages, 27% of the printed document**:
+   a row that does not fit pushes to the next page and leaves the rest of the current one blank,
+   ninety-seven times over. That was a small tax when a page held three findings; the document now
+   holds twelve.
+
+   So a finding row may continue overleaf, and the two things that must not are named instead:
+
+   - **the evidence slip**, so a capture is never separated from what it is evidence of
+   - **a finding carrying a merchant response**, so their words never land overleaf from the
+     observation they answer
+
+   The second is Frank's, and the reasoning is the ordinal bug's: attribution that appears against
+   the wrong finding is worse than no attribution, and layout can do that as surely as data can. A
+   reader turning a page to find a quotation with no observation above it has to work out what it
+   refers to, and may work it out wrong. */
+.printing .find{break-inside:auto}
+.printing .find.has-response{break-inside:avoid;page-break-inside:avoid}
 .printing .cat{break-inside:auto;box-shadow:none}
 .printing .slip{break-inside:avoid;page-break-inside:avoid}
 .printing .strip-wrap,
@@ -537,7 +553,8 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   .shell{display:block}
   .main{max-width:none;padding:0}
   .cat-body,.ev{display:block !important}
-  .find,.slip{break-inside:avoid;page-break-inside:avoid}
+  .find{break-inside:auto}
+  .find.has-response,.slip{break-inside:avoid;page-break-inside:avoid}
   .card{box-shadow:none}
   .print-head{display:flex !important}
 }
@@ -774,6 +791,8 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
    Two columns of equal weight. Neither is styled as the answer to the other: the report
    states a fact and cites a source, and the layout should not imply a correction. */
 
+/* Print spacing is trimmed at the foot of this file (D-075): these values were chosen when a
+   page held three findings and are paid sixty-one times on a page that holds twelve. */
 .req {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1383,3 +1402,27 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 /* Who is responding (D-063). Asked once, before anything can be written. */
 .ident { padding: 14px 16px; margin: 14px 0 18px; }
 .ident-done { font-size: 12.5px; color: var(--ink-mid); }
+
+/* -- Print density (D-075) -------------------------------------------------------------------
+   Screen spacing and paper spacing are not the same problem. On screen there is no page cost and
+   a reader scrolls; on paper every block's padding is paid once per finding, and the document now
+   carries sixty-one requirement pairs and ninety-seven evidence slips.
+
+   Measured, not estimated: `npm run page-budget` reports each section's height and the height of
+   what it contains, and the difference is what is trimmed here. **Nothing below removes content**
+   — no smaller type, no shorter text, and no change to capture size, which was measured and
+   settled at D-047 and is not re-litigated blind.
+
+   The screen keeps the roomier values, which is why these sit under `.printing` rather than
+   replacing them. */
+
+.printing .req { padding: 7px 10px; margin-bottom: 5px; gap: 12px; }
+.printing .req-h { margin-bottom: 3px; }
+
+.printing .mr { margin: 5px 0 7px; padding: 7px 11px; }
+.printing .mr-head { margin-bottom: 4px; }
+.printing .mr-body { margin-bottom: 5px; padding-left: 10px; }
+.printing .mr-note { font-size: 9.5px; }
+
+.printing .slip { margin-top: 6px; }
+.printing .find-main { padding-bottom: 6px; }
