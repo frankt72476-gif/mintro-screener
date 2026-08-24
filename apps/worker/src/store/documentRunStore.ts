@@ -12,6 +12,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { documents } from '@mintro/engine';
+import type { DocumentsSendRow } from '../documentsSend.js';
 
 type DocumentFinding = ReturnType<typeof documents.runDocumentChecks>['findings'][number];
 
@@ -22,6 +23,17 @@ export interface PersistRunInput {
   readonly engineVersion: string;
   readonly families: readonly string[];
   readonly findings: readonly DocumentFinding[];
+  /**
+   * What the run ran against (D-123, migration 0028).
+   *
+   * Not optional and not defaulted. Slots are mutable, so a report built from a run plus *current*
+   * slots is a function of the run and the clock; recording them here is what makes D-085's
+   * "same run in, byte-identical report out" true rather than aspirational, and what gives the
+   * staleness gate something to compare.
+   */
+  readonly slots: readonly unknown[];
+  readonly documents: readonly unknown[];
+  readonly packageDigest: string;
 }
 
 export interface PersistedRun {
@@ -40,6 +52,23 @@ export interface DocumentRunStore {
   persist(input: PersistRunInput): Promise<PersistedRun>;
   findingsOf(runId: string): Promise<readonly StoredFinding[]>;
   runsOf(packageId: string): Promise<readonly { id: string; run_at: string; created_at: string }[]>;
+  /** The send log (D-083). Insert only — there is no update and no delete, here or in the schema. */
+  recordSend(row: DocumentsSendRow): Promise<void>;
+  sendsOf(packageId: string): Promise<readonly StoredSend[]>;
+}
+
+export interface StoredSend {
+  readonly id: string;
+  readonly run_id: string;
+  readonly recipient: string;
+  readonly mailer: string;
+  readonly outcome: string;
+  readonly error: string | null;
+  readonly provider_id: string | null;
+  readonly pdf_sha256: string;
+  readonly pdf_bytes: number;
+  readonly diff_against_run_id: string | null;
+  readonly sent_at: string;
 }
 
 export interface StoredFinding {
@@ -70,6 +99,9 @@ export function createDocumentRunStore(client: SupabaseClient): DocumentRunStore
           engine_version: input.engineVersion,
           run_at: input.runAt.toISOString(),
           families: [...input.families],
+          slots: input.slots,
+          documents: input.documents,
+          package_digest: input.packageDigest,
         })
         .select('id')
         .single();
@@ -116,6 +148,39 @@ export function createDocumentRunStore(client: SupabaseClient): DocumentRunStore
         .order('ordinal');
       if (error !== null) throw new DocumentRunStoreError(`could not read run ${runId}: ${error.message}`);
       return (data ?? []) as unknown as StoredFinding[];
+    },
+
+    async recordSend(row) {
+      const { error } = await client.from('document_report_sends').insert({
+        run_id: row.runId,
+        package_id: row.packageId,
+        recipient: row.recipient,
+        sent_by: row.sentBy,
+        mailer: row.mailer,
+        provider_id: row.providerId,
+        pdf_sha256: row.pdfSha256,
+        pdf_bytes: row.pdfBytes,
+        diff_against_run_id: row.diffAgainstRunId,
+        outcome: row.outcome,
+        error: row.error,
+      });
+      // Thrown, never swallowed. A send that happened and was not recorded is the one state this
+      // log exists to prevent: the report is in an underwriter's inbox and nothing here says so.
+      if (error !== null) {
+        throw new DocumentRunStoreError(
+          `report was sent to ${row.recipient} but the send did not record: ${error.message}`,
+        );
+      }
+    },
+
+    async sendsOf(packageId) {
+      const { data, error } = await client
+        .from('document_report_sends')
+        .select('id, run_id, recipient, mailer, outcome, error, provider_id, pdf_sha256, pdf_bytes, diff_against_run_id, sent_at')
+        .eq('package_id', packageId)
+        .order('sent_at', { ascending: true });
+      if (error !== null) throw new DocumentRunStoreError(`could not read sends: ${error.message}`);
+      return (data ?? []) as unknown as StoredSend[];
     },
 
     async runsOf(packageId) {

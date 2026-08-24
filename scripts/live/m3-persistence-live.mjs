@@ -23,6 +23,7 @@ import { ingestDocument } from '../../apps/worker/dist/src/ingest.js';
 import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/store/ingestStore.js';
 import { createDocumentRunStore } from '../../apps/worker/dist/src/store/documentRunStore.js';
 import { snapshotOf } from './snapshot.mjs';
+import { packageDigest } from '../../apps/worker/dist/src/documentsReportGate.js';
 import { banner, assertTestProject } from './guard.mjs';
 
 banner('D-002 — a re-run leaves the prior run untouched');
@@ -40,6 +41,26 @@ console.log(`package ${pkg.id}\n`);
 const RUN_AT = new Date('2026-05-15T00:00:00Z');
 const meta = { rulesetVersion: rules.checks.version ?? 'documents-1', engineVersion: '0.1.0', families: ['A', 'B'] };
 
+/** What a run must record about its inputs (D-123). */
+const inputsOf = (snap) => {
+  const slots = snap.slots.map((s) => ({
+    slotId: s.id, slotKey: s.slotKey, instanceLabel: s.instanceLabel, state: s.state,
+    reason: s.reason, requiredCount: s.requiredCount, examined: s.examined,
+  }));
+  const docs = snap.documents.map((d) => ({
+    versionId: d.versionId, slotId: d.slotId, slotKey: d.slotKey,
+    filename: d.originalFilename, outcome: d.outcome, tier: documents.tierOf(d),
+  }));
+  return {
+    slots,
+    documents: docs,
+    packageDigest: packageDigest({
+      slots: slots.map((s) => ({ slotId: s.slotId, state: s.state, reason: s.reason, requiredCount: s.requiredCount })),
+      documents: docs.map((d) => ({ versionId: d.versionId, outcome: d.outcome })),
+    }),
+  };
+};
+
 const results = [];
 const check = (name, ok, detail) => {
   results.push({ name, ok });
@@ -49,7 +70,7 @@ const check = (name, ok, detail) => {
 // --- run 1 --------------------------------------------------------------------------------------
 const snap1 = await snapshotOf(service, pkg.id, RUN_AT);
 const engine1 = documents.runDocumentChecks(snap1, rules, { runId: 'pending', families: ['A', 'B'] });
-const run1 = await runStore.persist({ packageId: pkg.id, runAt: RUN_AT, ...meta, findings: engine1.findings });
+const run1 = await runStore.persist({ packageId: pkg.id, runAt: RUN_AT, ...meta, findings: engine1.findings, ...inputsOf(snap1) });
 const stored1 = await runStore.findingsOf(run1.runId);
 const before = JSON.stringify(stored1);
 
@@ -99,7 +120,7 @@ console.log(`\n  a document arrives between the runs: ${added.kind}, outcome=${a
 // --- run 2 --------------------------------------------------------------------------------------
 const snap2 = await snapshotOf(service, pkg.id, RUN_AT);
 const engine2 = documents.runDocumentChecks(snap2, rules, { runId: 'pending', families: ['A', 'B'] });
-const run2 = await runStore.persist({ packageId: pkg.id, runAt: RUN_AT, ...meta, findings: engine2.findings });
+const run2 = await runStore.persist({ packageId: pkg.id, runAt: RUN_AT, ...meta, findings: engine2.findings, ...inputsOf(snap2) });
 
 const after = JSON.stringify(await runStore.findingsOf(run1.runId));
 const stored2 = await runStore.findingsOf(run2.runId);

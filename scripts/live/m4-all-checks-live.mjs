@@ -20,6 +20,7 @@ import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/
 import { createDocumentRunStore } from '../../apps/worker/dist/src/store/documentRunStore.js';
 import { snapshotOf } from './snapshot.mjs';
 import { slotRow } from './setup.mjs';
+import { packageDigest } from '../../apps/worker/dist/src/documentsReportGate.js';
 import { banner, assertTestProject } from './guard.mjs';
 
 banner('M4 — all 38 v1 checks against a real package');
@@ -193,6 +194,18 @@ for (const family of ['A', 'B', 'C', 'D']) {
   }
 }
 
+// What the run ran against (D-123). Recorded on the run so the report is a function of the run
+// alone, and so the staleness gate has something to compare a later package state against.
+const runSlots = snapshot.slots.map((s) => ({
+  slotId: s.id, slotKey: s.slotKey, instanceLabel: s.instanceLabel, state: s.state,
+  reason: s.reason, requiredCount: s.requiredCount, examined: s.examined,
+}));
+const runDocuments = snapshot.documents.map((d) => ({
+  versionId: d.versionId, slotId: d.slotId, slotKey: d.slotKey,
+  filename: d.originalFilename, outcome: d.outcome,
+  tier: documents.tierOf(d),
+}));
+
 const run = await runStore.persist({
   packageId: pkg.id,
   runAt: RUN_AT,
@@ -200,6 +213,12 @@ const run = await runStore.persist({
   engineVersion: '0.1.0',
   families: ['A', 'B', 'C', 'D'],
   findings: result.findings,
+  slots: runSlots,
+  documents: runDocuments,
+  packageDigest: packageDigest({
+    slots: runSlots.map((s) => ({ slotId: s.slotId, state: s.state, reason: s.reason, requiredCount: s.requiredCount })),
+    documents: runDocuments.map((d) => ({ versionId: d.versionId, outcome: d.outcome })),
+  }),
 });
 const stored = await runStore.findingsOf(run.runId);
 

@@ -115,43 +115,57 @@ export interface Mailer {
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
+/**
+ * The Resend POST, in one place.
+ *
+ * Three callers now compose different payloads — the Site Check report with its attachment, a
+ * plain message, and the Documents Check report — and all three want the same transport: accept a
+ * 2xx, turn anything else into a recorded rejection rather than a throw, and never let a network
+ * error escape as an exception. A second copy of that is the shape D-034 warns about, where a fix
+ * lands in one and not the other.
+ *
+ * It returns an outcome rather than throwing, because a refused send is a fact the log has to
+ * carry, not an exception the caller may or may not catch.
+ */
+export async function postToResend(apiKey: string, payload: Record<string, unknown>): Promise<SendOutcome> {
+  try {
+    const response = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return { resendId: null, accepted: false, error: `${response.status} ${detail.slice(0, 200)}` };
+    }
+
+    const body = (await response.json()) as { id?: string };
+    return { resendId: body.id ?? null, accepted: true };
+  } catch (error) {
+    return {
+      resendId: null,
+      accepted: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+
 export function createResendMailer(apiKey: string): Mailer {
   return {
     description: 'Resend',
     async send(request) {
-      try {
-        const response = await fetch(RESEND_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: request.from,
-            to: [request.to],
-            subject: subjectFor(request.report),
-            text: bodyFor(request.report, request.note),
-            attachments: [
-              {
-                filename: attachmentName(request.report),
-                content: request.pdf.toString('base64'),
-              },
-            ],
-            ...(request.replyTo === undefined ? {} : { reply_to: [request.replyTo] }),
-          }),
-        });
-
-        if (!response.ok) {
-          const detail = await response.text().catch(() => '');
-          return { resendId: null, accepted: false, error: `${response.status} ${detail.slice(0, 200)}` };
-        }
-
-        const payload = (await response.json()) as { id?: string };
-        return { resendId: payload.id ?? null, accepted: true };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return { resendId: null, accepted: false, error: message };
-      }
+      return postToResend(apiKey, {
+        from: request.from,
+        to: [request.to],
+        subject: subjectFor(request.report),
+        text: bodyFor(request.report, request.note),
+        attachments: [
+          { filename: attachmentName(request.report), content: request.pdf.toString('base64') },
+        ],
+        ...(request.replyTo === undefined ? {} : { reply_to: [request.replyTo] }),
+      });
     },
   };
 }
@@ -307,33 +321,13 @@ export function createResendMessenger(apiKey: string): Messenger {
   return {
     description: 'Resend',
     async send(message) {
-      try {
-        const response = await fetch(RESEND_ENDPOINT, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            from: message.from,
-            to: [message.to],
-            subject: message.subject,
-            text: message.text,
-            ...(message.replyTo === undefined ? {} : { reply_to: [message.replyTo] }),
-          }),
-        });
-
-        if (!response.ok) {
-          const detail = await response.text().catch(() => '');
-          return { resendId: null, accepted: false, error: `${response.status} ${detail.slice(0, 200)}` };
-        }
-
-        const payload = (await response.json()) as { id?: string };
-        return { resendId: payload.id ?? null, accepted: true };
-      } catch (error) {
-        return {
-          resendId: null,
-          accepted: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
+      return postToResend(apiKey, {
+        from: message.from,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+        ...(message.replyTo === undefined ? {} : { reply_to: [message.replyTo] }),
+      });
     },
   };
 }

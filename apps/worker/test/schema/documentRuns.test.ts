@@ -231,7 +231,10 @@ describe('sending is an event, not a state transition (D-083)', () => {
   const send = (runId: string, pkg: string, analyst: string, over: Record<string, unknown> = {}) => {
     const row: Record<string, unknown> = {
       run_id: runId, package_id: pkg, recipient: 'underwriting@iqwallet.com', sent_by: analyst,
-      mailer: 'dry_run', pdf_sha256: 'a'.repeat(64), pdf_bytes: 1024, ...over,
+      mailer: 'dry_run', pdf_sha256: 'a'.repeat(64), pdf_bytes: 1024,
+      // NOT NULL without a default since 0029: a send that omitted its outcome would record itself
+      // as accepted by silence, which is the failure that migration exists to prevent.
+      outcome: 'accepted', error: null, ...over,
     };
     const keys = Object.keys(row);
     return db.query(
@@ -275,5 +278,16 @@ describe('sending is an event, not a state transition (D-083)', () => {
     const analyst = await seedAnalyst();
     await expect(send(run, pkg, analyst, { recipient: 'not-an-address' })).rejects.toThrow();
     await expect(send(run, pkg, analyst, { pdf_sha256: 'short' })).rejects.toThrow();
+  });
+
+  it('refuses a rejection with no reason, and a reason on an acceptance (0029)', async () => {
+    const pkg = await seedPackage();
+    const run = await seedRun(pkg);
+    const analyst = await seedAnalyst();
+    // An error belongs to a rejection and only to a rejection. A rejected send with no reason says
+    // something went wrong and declines to say what.
+    await expect(send(run, pkg, analyst, { outcome: 'rejected', error: null })).rejects.toThrow();
+    await expect(send(run, pkg, analyst, { outcome: 'accepted', error: 'why' })).rejects.toThrow();
+    await expect(send(run, pkg, analyst, { outcome: 'rejected', error: '422 domain not verified' })).resolves.not.toThrow();
   });
 });
