@@ -18,6 +18,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DocumentsSendModal } from './DocumentsSendModal';
+import {
+  createDocumentsSendQueue,
+  type DocumentsSendQueue,
+  type PastSend,
+  type Sendability,
+} from '../lib/documentsSendQueue';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   createPackages,
@@ -95,6 +102,10 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
   const [view, setView] = useState<PackageView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busySlot, setBusySlot] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendable, setSendable] = useState<Sendability | null>(null);
+  const [history, setHistory] = useState<readonly PastSend[]>([]);
+  const sendQueue = useRef<DocumentsSendQueue>(createDocumentsSendQueue(client, analystId));
   const packages = useRef(createPackages(client));
 
   const refresh = useCallback(async () => {
@@ -106,6 +117,16 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
     }
     setError(null);
     setView(result);
+    if (packageId !== null) {
+      // Read together, because the button and the history are two halves of one answer: whether
+      // this run may be sent, and what has already gone out.
+      const [state, past] = await Promise.all([
+        sendQueue.current.sendability(packageId).catch(() => null),
+        sendQueue.current.history(packageId).catch(() => []),
+      ]);
+      setSendable(state);
+      setHistory(past);
+    }
   }, [packageId]);
 
   useEffect(() => {
@@ -198,6 +219,45 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
       <p className="sub">
         {view.pkg.processorKey} · {view.pkg.lifecycle} · template {view.pkg.templateVersion}
       </p>
+
+      {/*
+        The send control.
+
+        The stale-run gate answers before the modal opens (D-117). Where the run no longer describes
+        the package the button is replaced by the reason — asking for a recipient and then refusing
+        reads as the tool losing the send, and the operator can act on "run it again" immediately.
+      */}
+      <div className="doc-send">
+        {sendable === null ? null : sendable.sendable && sendable.runId !== null ? (
+          <button className="btn btn-primary" onClick={() => setSending(true)}>
+            Send to agent
+          </button>
+        ) : (
+          <p className="doc-send-blocked" role="status">
+            {sendable.reason}
+          </p>
+        )}
+        {history.length === 0 ? null : (
+          <span className="doc-send-count">
+            {history.length} previous send{history.length === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+
+      {sending && sendable?.runId != null && (
+        <DocumentsSendModal
+          packageId={packageId}
+          runId={sendable.runId}
+          merchantName={view.pkg.processorKey}
+          queue={sendQueue.current}
+          history={history}
+          onCancel={() => setSending(false)}
+          onSent={() => {
+            setSending(false);
+            void refresh();
+          }}
+        />
+      )}
       {error !== null ? <p className="sub" role="alert">{error}</p> : null}
 
       <p className="sub">

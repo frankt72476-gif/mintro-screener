@@ -208,3 +208,34 @@ table {width:100%;border-collapse:collapse}
   .documents-report section{break-inside:avoid}
   .documents-report .docgroup{break-inside:avoid}
 }
+
+/* -------------------------------------------------------------------------------------------
+ * The send control and its history.
+ *
+ * Outside `.documents-report`: these belong to the analyst's pane, not to the document, and must
+ * never print. Kept in this file because they are part of the Documents Check surface and a
+ * reader looking for it should find it in one place.
+ * ---------------------------------------------------------------------------------------- */
+.doc-send{display:flex;align-items:center;gap:14px;margin:18px 0 26px}
+.doc-send-blocked{
+  margin:0;font-size:13.5px;color:#8A5A00;background:#FAF3E4;
+  border:1px solid #E3D3AC;padding:9px 12px;max-width:70ch;
+}
+.doc-send-count{font-size:12.5px;color:#787D85}
+
+.send-scope{margin:12px 0 0;font-size:12.5px;color:#787D85;max-width:60ch}
+.send-history-block{margin-top:18px;border-top:1px solid #E2E2DB;padding-top:12px}
+.send-history-block h3{margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:#787D85}
+.send-history{list-style:none;margin:0;padding:0;max-height:150px;overflow-y:auto}
+.send-history li{display:flex;gap:12px;align-items:baseline;padding:5px 0;
+  border-bottom:1px solid #F0F0EA;font-size:12.5px}
+.send-history li:last-child{border-bottom:0}
+.sh-when{font-variant-numeric:tabular-nums;color:#4A4F57;flex:none}
+.sh-to{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-run{color:#787D85;flex:none}
+/* A dry run composed a message and transmitted nothing. It must never read as delivered. */
+.sh-flag{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  border:1px solid #CFCFC6;color:#6B6F76;padding:1px 5px;flex:none}
+.sh-flag.sh-bad{color:#A81F16;border-color:#A81F16}
+.send-history-empty{margin:0;font-size:12.5px;color:#787D85}

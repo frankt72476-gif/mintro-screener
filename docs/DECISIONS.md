@@ -6793,6 +6793,55 @@ anyone having to remember which environment was configured at the time.
 
 ---
 
+## D-125 — The check records what it compared; the renderer displays it
+**2026-08-24 · Frank's ruling · migration 0030**
+
+A finding records the sources its comparison consulted and which value differed, written at the
+point the comparison happened. `document_findings.evidence` and `evidence_note`.
+
+### Why not derive it in the renderer
+
+The report shows three routing numbers and marks the odd one. That marking could be worked out
+again at render time — group the values, find the minority, mark the rest. It would usually agree.
+
+**The failure mode is not cost, it is disagreement.** Two derivations means two normalisers, and
+the moment they differ by a comma or a leading zero, the renderer marks a different value than the
+check did. The report then says one thing in its sentence and another in its evidence rows, and
+both look authoritative because both were produced by us.
+
+The check is the only thing that knows. It ran the comparison, with the normaliser for that field,
+and reached a state on that basis. Anything else re-deriving the same answer is a second opinion
+wearing the first one's clothes.
+
+**The general form: a display of a decision must come from the decision, not from a reconstruction
+of its inputs.** Where a renderer needs to show *why*, the reason travels with the result. This is
+the same argument D-123 makes about the run recording its own inputs, at the level of a single
+finding — and both were found the same way, by trying to render something the data could not
+support and noticing before inventing it.
+
+### Recorded alongside, both from the first live PDF
+
+**Mounted and renderable are different states.** `DocumentsPrintOnly` set its readiness flag in a
+mount effect, `page.pdf()` fired immediately, and the PDF came out in Consolas and Segoe UI because
+the webfonts had not arrived. The page asserted it was ready and was not, and nothing failed —
+there was simply a different document at the end of it.
+
+So anything that prints, screenshots or snapshots waits on `document.fonts.ready`, bounded so a
+page that never settles still produces something. Typography is not decoration in a document whose
+mono face carries every id, count and value; a silent substitution is the quiet kind of wrong,
+looking like a rendering quirk and actually being a different artifact from the one approved.
+
+**Our own pdfjs rasterizer renders repeating-gradient tiling patterns as a flat fill.** A rasterized
+page of the report shows the `not_evaluable` hatching as solid colour. A Chromium print-media
+screenshot of the same page shows it hatched correctly.
+
+**The PDF is right and the inspection tool is wrong**, and that is worth writing down precisely
+because the instinct on seeing it is to go and fix the hatching. It is also a caution about the
+rasterizer generally: it exists to feed page images to a vision model, where a flattened background
+pattern costs nothing, and it is not a faithful renderer for looking at our own output.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 
