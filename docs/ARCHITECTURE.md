@@ -204,6 +204,27 @@ An RLS policy forbidding `UPDATE` on `evidence` would be enforced against the br
 had write access anyway, and ignored by the worker, which is the only thing that could overwrite
 a capture. The guarantee would read as watertight and protect against nobody.
 
+### The trigger must refuse the person with a good reason
+
+This stopped being theoretical on 2026-08-24. Debugging the merchant page needed a working token,
+and tokens exist only as digests, so a diagnostic `comment_links` row went into a **live run** and
+was identified through. Cleaning up afterwards was not possible: the trigger refused the delete,
+**for `service_role` too**, and the rows are in that run's record permanently (D-002, D-072).
+
+That is the case these triggers exist for. **Not an attacker** — someone with legitimate access, a
+real reason, and every intention of tidying up after themselves.
+
+> **A guarantee that yields to a good reason is not a guarantee**, and a rule that holds only
+> against bad actors holds only against the ones who announce themselves.
+
+Which is why none of these triggers take a role check, an override flag, or a "just this once"
+escape. Every one of those would have been used that day, by the person who wrote them, with a
+defensible explanation ready — and after that the record of a merchant's screening would be
+editable by anything holding the service key, which is every part of the worker.
+
+The practical consequence has to be planned for rather than discovered: **debug against a scratch
+run or a local database**, because anything written to one of these tables is written for good.
+
 So the split is:
 
 | Question | Enforced by | Applies to |

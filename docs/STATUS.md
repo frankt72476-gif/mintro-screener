@@ -619,6 +619,29 @@ Two further limits are properties of what the crawl can see, and each finding st
   permanently `review_only`; only someone reading the article can tell rigorous chemistry from a
   dosing guide (D-020).
 
+### What `loop-check` does and does not tell you
+
+`npm run loop-check -- <run-id>` answers one question: **did the document IQwallet received carry
+what the merchant actually did?** Their words verbatim, the attribution treatment, the participation
+record, and an unanswered list cross-checked in both directions against the comments in the
+database.
+
+It is built so the two sources are independent — expected values from SQL rows, actual values from
+the rendered document, neither derived from the other or from the code that built the report. It
+caught its own first mistake that way, and the fix is the practice: **when a check needs to know a
+rule the code applies, derive it independently from the data rather than asking the code what it
+decided.**
+
+**It reads the rendered DOM, not the bytes of the PDF.** `extractPdfText` cannot decode the
+subset-embedded fonts Chromium writes — it exists to judge *fetched* documents (D-057) and returns a
+shifted alphabet on our own output. The DOM is what `page.pdf()` prints, so it is the honest
+authority on content; the stored artifact is checked only for what it can answer, that it exists and
+its size.
+
+**A PDF text layer is not being built.** If a check on the sent bytes themselves is ever needed —
+proving the file on disk says what the page said — that is a separate piece of work with a real PDF
+parser, and it should be decided as one rather than grown out of this.
+
 ---
 
 ## Repository layout
