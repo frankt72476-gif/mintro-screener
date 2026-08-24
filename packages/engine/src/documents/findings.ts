@@ -22,7 +22,7 @@
 import type { DocumentCheck } from '@mintro/ruleset';
 import type { Tier } from '@mintro/extraction';
 import { FINDING_TERMS, auditCopy } from '../copy.js';
-import type { CheckState, DocumentFinding, FindingSubject, ReadDocument } from './types.js';
+import type { CheckState, DocumentFinding, EvidenceRow, FindingSubject, ReadDocument } from './types.js';
 
 export class DeterminationError extends Error {
   constructor(checkId: string, flagged: readonly string[], note: string) {
@@ -55,16 +55,30 @@ export function weakestTier(read: readonly ReadDocument[]): Tier | null {
   return read.some((r) => r.tier === 'page') ? 'page' : 'character';
 }
 
+/** What a handler may attach beyond the note. */
+export interface Shown {
+  readonly evidence?: readonly EvidenceRow[];
+  readonly evidenceNote?: string;
+}
+
 function build(
   check: DocumentCheck,
   state: CheckState,
   note: string,
   subject: FindingSubject,
   read: readonly ReadDocument[],
+  shown: Shown = {},
   notEvaluableReason?: string,
 ): DocumentFinding {
   const audit = auditCopy(note, FINDING_TERMS);
   if (!audit.clean) throw new DeterminationError(check.id, audit.flagged, note);
+
+  // The evidence note renders in the report, so it is audited exactly like the finding's own text.
+  // It is the sentence most likely to reach for a qualification and land on a conclusion.
+  if (shown.evidenceNote !== undefined) {
+    const noteAudit = auditCopy(shown.evidenceNote, FINDING_TERMS);
+    if (!noteAudit.clean) throw new DeterminationError(check.id, noteAudit.flagged, shown.evidenceNote);
+  }
 
   return {
     checkId: check.id,
@@ -73,6 +87,8 @@ function build(
     subject,
     tier: weakestTier(read),
     read,
+    evidence: shown.evidence ?? [],
+    evidenceNote: shown.evidenceNote ?? null,
     ...(notEvaluableReason === undefined ? {} : { notEvaluableReason }),
   };
 }
@@ -90,9 +106,10 @@ export function adverse(
   note: string,
   subject: FindingSubject,
   read: readonly ReadDocument[] = [],
+  shown: Shown = {},
 ): DocumentFinding {
   const state: CheckState = check.states.includes('fail') ? 'fail' : 'review';
-  return build(check, state, note, subject, read);
+  return build(check, state, note, subject, read, shown);
 }
 
 /**
@@ -106,8 +123,9 @@ export function clean(
   note: string,
   subject: FindingSubject,
   read: readonly ReadDocument[] = [],
+  shown: Shown = {},
 ): DocumentFinding {
-  return build(check, 'pass', note, subject, read);
+  return build(check, 'pass', note, subject, read, shown);
 }
 
 /**
@@ -122,11 +140,12 @@ export function notEvaluable(
   note: string,
   subject: FindingSubject,
   read: readonly ReadDocument[] = [],
+  shown: Shown = {},
 ): DocumentFinding {
   if (!check.not_evaluable_when.includes(reason)) {
     throw new UndeclaredReasonError(check.id, reason, check.not_evaluable_when);
   }
-  return build(check, 'not_evaluable', note, subject, read, reason);
+  return build(check, 'not_evaluable', note, subject, read, shown, reason);
 }
 
 /** Every property a well-formed finding must have. Thrown on, not warned about. */
@@ -147,4 +166,12 @@ export function assertFindingWellFormed(finding: DocumentFinding, check: Documen
   }
   const audit = auditCopy(finding.note, FINDING_TERMS);
   if (!audit.clean) throw new DeterminationError(where, audit.flagged, finding.note);
+  if (finding.evidenceNote !== null) {
+    const shownAudit = auditCopy(finding.evidenceNote, FINDING_TERMS);
+    if (!shownAudit.clean) throw new DeterminationError(where, shownAudit.flagged, finding.evidenceNote);
+  }
+  for (const row of finding.evidence) {
+    const rowAudit = auditCopy(`${row.source} ${row.value}`, FINDING_TERMS);
+    if (!rowAudit.clean) throw new DeterminationError(where, rowAudit.flagged, `${row.source}: ${row.value}`);
+  }
 }

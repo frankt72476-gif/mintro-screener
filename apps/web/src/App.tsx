@@ -42,6 +42,7 @@ import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
 
 import type { Pane } from './components/Rail.js';
+import { DocumentsReportView, type DocumentsReportViewProps } from './components/DocumentsReportView';
 
 /**
  * `watching` is the scan the analyst just asked for, in flight. `running` is the much shorter
@@ -90,6 +91,24 @@ interface InjectedPrint {
   readonly commentary?: RunCommentary | null;
 }
 
+/**
+ * The Documents Check print payload.
+ *
+ * Same shape of arrangement as `InjectedPrint` and for the same reason: the worker holds the
+ * assembled report and hands it to the page, rather than a headless browser holding an analyst's
+ * session. It carries no evidence map — a Documents Check finding cites values, not captures, and
+ * the page images the vision route read are not reproduced in the report.
+ */
+interface InjectedDocumentsPrint {
+  readonly documents: DocumentsReportViewProps;
+}
+
+function injectedDocumentsPrint(): InjectedDocumentsPrint | null {
+  const injected = (window as unknown as { __MINTRO_DOCUMENTS_PRINT__?: InjectedDocumentsPrint })
+    .__MINTRO_DOCUMENTS_PRINT__;
+  return injected ?? null;
+}
+
 function injectedPrint(): InjectedPrint | null {
   const injected = (window as unknown as { __MINTRO_PRINT__?: InjectedPrint }).__MINTRO_PRINT__;
   return injected ?? null;
@@ -117,7 +136,12 @@ export function App(): JSX.Element {
     last two days while everyone read past it (D-070).
   */
   const injected = useMemo(() => injectedPrint(), []);
+  const documentsPrint = useMemo(() => injectedDocumentsPrint(), []);
   const token = useMemo(() => commentToken(), []);
+
+  // The Documents Check print path. Checked before the Site Check one only because they are
+  // mutually exclusive and this keeps the two branches side by side rather than nested.
+  if (documentsPrint !== null) return <DocumentsPrintOnly injected={documentsPrint} />;
 
   // The worker's print path: everything the page needs was handed to it, so there is no session to
   // establish and nothing to fetch.
@@ -990,6 +1014,47 @@ function PrintHeader({ report }: { readonly report: ScreeningReport }): JSX.Elem
  * Screenshots resolve from the pre-minted map the worker supplied — signed with the service key,
  * short-expiry, and never leaving the worker's own browser.
  */
+/**
+ * The Documents Check report, printed.
+ *
+ * No images and no signed URLs — but **not nothing asynchronous**, which is what the first version
+ * of this assumed. It set the ready signal on mount, `page.pdf()` fired immediately, and the PDF
+ * came out in Consolas and Segoe UI because the webfonts had not arrived yet. The page said it was
+ * ready and it was not.
+ *
+ * So it waits on `document.fonts.ready`. Typography is not decoration in this document: the mono
+ * face carries every id, count and value, and a PDF that silently substitutes a fallback is the
+ * quiet kind of wrong — it looks like a rendering quirk and is actually a different document from
+ * the one that was approved.
+ *
+ * Bounded, because a page that never settles must still produce something rather than hanging the
+ * worker. On timeout it prints in whatever it has, which is the same trade the Site Check path
+ * makes with its image settle loop.
+ */
+function DocumentsPrintOnly({ injected }: { readonly injected: InjectedDocumentsPrint }): JSX.Element {
+  useEffect(() => {
+    document.documentElement.classList.add('printing');
+
+    let done = false;
+    const ready = (): void => {
+      if (done) return;
+      done = true;
+      // 'true', matching what the worker waits on for the Site Check report. One signal, one value.
+      document.documentElement.dataset['printReady'] = 'true';
+    };
+
+    const timer = setTimeout(ready, 10_000);
+    void document.fonts.ready.then(() => {
+      clearTimeout(timer);
+      ready();
+    });
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return <DocumentsReportView {...injected.documents} />;
+}
+
 function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Element {
   const access = useMemo(
     () => ({

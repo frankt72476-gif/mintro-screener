@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documents Check — Northwind Peptides LLC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFBF9;
+  --ink:#16181C;
+  --ink-2:#4A4F57;
+  --ink-3:#787D85;
+  --rule:#E2E2DB;
+  --rule-2:#CFCFC6;
+  --fail:#A81F16;
+  --fail-bg:#FBEEEC;
+  --review:#8A5A00;
+  --review-bg:#FAF3E4;
+  --pass:#26654A;
+  --pass-bg:#EEF4F0;
+  --none:#6B6F76;
+  --shell:1080px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.shell{max-width:var(--shell);margin:0 auto;padding:0 40px 120px}
+
+/* ---------- masthead ---------- */
+.masthead{padding:48px 0 28px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.masthead h1{
+  margin:12px 0 2px;font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-.02em;
+}
+.dba{font-size:15px;color:var(--ink-2);margin:0 0 22px}
+.meta{
+  display:flex;flex-wrap:wrap;gap:0 40px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);
+}
+.meta div span{display:block;color:var(--ink-3);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+
+/* ---------- coverage strip (signature) ---------- */
+.coverage{padding:30px 0 34px;border-bottom:1px solid var(--rule)}
+.cov-bar{display:flex;height:34px;width:100%;border:1px solid var(--ink);overflow:hidden}
+.cov-seg{position:relative}
+.cov-seg.f{background:var(--fail)}
+.cov-seg.r{background:var(--review)}
+.cov-seg.p{background:var(--pass)}
+.cov-seg.n{
+  background:repeating-linear-gradient(-45deg,transparent 0 5px,var(--rule-2) 5px 6px);
+  border-left:1px solid var(--ink);
+}
+.cov-key{display:flex;flex-wrap:wrap;gap:0 30px;margin-top:12px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px}
+.cov-key b{font-weight:600}
+.cov-key i{width:11px;height:11px;display:inline-block;margin-right:7px;vertical-align:-1px;border:1px solid var(--ink)}
+.cov-key i.f{background:var(--fail)} .cov-key i.r{background:var(--review)}
+.cov-key i.p{background:var(--pass)}
+.cov-key i.n{background:repeating-linear-gradient(-45deg,transparent 0 3px,var(--rule-2) 3px 4px)}
+.cov-note{margin:14px 0 0;font-size:13.5px;color:var(--ink-2);max-width:62ch}
+
+/* ---------- sections ---------- */
+section{padding:38px 0;border-bottom:1px solid var(--rule)}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:20px}
+.sec-num{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;color:var(--ink-3)}
+.sec-head h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.sec-sub{margin:-12px 0 20px;font-size:13.5px;color:var(--ink-2);max-width:70ch}
+
+/* ---------- slot table ---------- */
+table{width:100%;border-collapse:collapse}
+th{
+  text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  padding:0 12px 8px 0;border-bottom:1px solid var(--rule-2);
+}
+td{padding:11px 12px 11px 0;border-bottom:1px solid var(--rule);vertical-align:top;font-size:14px}
+tr.chase td{background:var(--fail-bg)}
+.doc-name{font-weight:500}
+.count{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.reason{font-size:13px;color:var(--ink-2)}
+
+.state{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  padding:2px 7px;border:1px solid currentColor;
+}
+.state.satisfied{color:var(--pass)}
+.state.missing{color:var(--fail);background:var(--fail-bg)}
+.state.waived,.state.notprovided{color:var(--ink-2)}
+.state.notevaluable{color:var(--none);
+  background:repeating-linear-gradient(-45deg,transparent 0 4px,var(--rule-2) 4px 5px)}
+
+/* ---------- diff ---------- */
+.diff{list-style:none;margin:0;padding:0}
+.diff li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.diff li:last-child{border-bottom:0}
+.diff .mark{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;width:16px;flex:none}
+.diff .add .mark{color:var(--fail)}
+.diff .res .mark{color:var(--pass)}
+.diff .chg .mark{color:var(--ink-3)}
+
+/* ---------- findings ---------- */
+.docgroup{margin-bottom:34px}
+.docgroup:last-child{margin-bottom:0}
+.docgroup > h3{
+  margin:0 0 2px;font-size:15px;font-weight:600;
+  padding-bottom:8px;border-bottom:1px solid var(--rule-2);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.tier{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.08em;
+  text-transform:uppercase;padding:2px 6px;border:1px solid var(--rule-2);color:var(--ink-3);
+}
+.tier.page{border-style:dashed}
+
+.finding{display:grid;grid-template-columns:76px 1fr;gap:0 16px;padding:15px 0;border-bottom:1px solid var(--rule)}
+.finding:last-child{border-bottom:0}
+.fid{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--ink-2);padding-top:2px}
+.fbody{min-width:0}
+.fhead{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.fname{font-weight:500;font-size:14px}
+.ftext{margin:0;font-size:14px;color:var(--ink-2);max-width:74ch}
+
+.evidence{margin-top:10px;border-left:2px solid var(--rule-2);padding:2px 0 2px 14px}
+.evrow{display:flex;gap:14px;padding:3px 0;font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+.evsrc{color:var(--ink-3);width:210px;flex:none}
+.evval{color:var(--ink);font-weight:500}
+.evval.differs{color:var(--fail)}
+.evidence.pagetier{border-left-style:dashed}
+.evnote{margin:6px 0 0;font-size:12px;color:var(--ink-3);font-style:italic}
+
+.collapsed{
+  background:repeating-linear-gradient(-45deg,transparent 0 6px,rgba(207,207,198,.35) 6px 7px);
+  border:1px solid var(--rule-2);padding:12px 14px;margin-top:14px;
+}
+.collapsed p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.collapsed code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink)}
+
+/* ---------- not checked ---------- */
+.notchecked{border:1px solid var(--ink);padding:0}
+.notchecked h2{margin:0;padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--ink)}
+.nc-lead{padding:16px 20px;margin:0;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--rule);max-width:76ch}
+.nc-row{display:grid;grid-template-columns:1fr 1.15fr;gap:24px;padding:13px 20px;border-bottom:1px solid var(--rule);font-size:13.5px}
+.nc-row:last-child{border-bottom:0}
+.nc-row b{font-weight:500}
+.nc-row span{color:var(--ink-2)}
+
+/* ---------- footer ---------- */
+.foot{padding:30px 0 0;font-size:12.5px;color:var(--ink-3);max-width:76ch}
+
+@media (max-width:720px){
+  .shell{padding:0 20px 80px}
+  .masthead h1{font-size:26px}
+  .meta{gap:0 24px}
+  .finding{grid-template-columns:1fr;gap:8px}
+  .evrow{flex-direction:column;gap:0}
+  .evsrc{width:auto}
+  .nc-row{grid-template-columns:1fr;gap:4px}
+}
+@media print{
+  body{background:#fff}
+  .shell{max-width:none;padding:0}
+  section{break-inside:avoid}
+  .docgroup{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="masthead">
+  <div class="eyebrow">Mintro · Documents Check</div>
+  <h1>Northwind Peptides LLC</h1>
+  <p class="dba">DBA Northwind Labs</p>
+  <div class="meta">
+    <div><span>Package</span>NW-2026-0812</div>
+    <div><span>Processor</span>Default</div>
+    <div><span>Run</span>e402e078 · 24 Aug 2026 15:59 UTC</div>
+    <div><span>Report</span>3 of 3 · previous sent 19 Aug</div>
+  </div>
+</header>
+
+<div class="coverage">
+  <div class="cov-bar" role="img" aria-label="8 failed, 6 review, 45 passed, 35 not evaluated">
+    <div class="cov-seg f" style="width:8.5%"></div>
+    <div class="cov-seg r" style="width:6.4%"></div>
+    <div class="cov-seg p" style="width:47.9%"></div>
+    <div class="cov-seg n" style="width:37.2%"></div>
+  </div>
+  <div class="cov-key">
+    <span><i class="f"></i><b>8</b> failed</span>
+    <span><i class="r"></i><b>6</b> review</span>
+    <span><i class="p"></i><b>45</b> passed</span>
+    <span><i class="n"></i><b>35</b> not evaluated</span>
+  </div>
+  <p class="cov-note">35 of 94 checks could not be evaluated. Each names why below. A check that
+  could not run has established nothing — it is not a pass.</p>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">01</span><h2>Documents</h2></div>
+  <p class="sec-sub">Nine required, one added by the analyst. Two need action.</p>
+  <table>
+    <thead>
+      <tr><th style="width:34%">Document</th><th style="width:15%">State</th><th style="width:12%">Count</th><th>Note</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="doc-name">Application</td><td><span class="state satisfied">Satisfied</span></td><td class="count">1 of 1</td><td></td></tr>
+      <tr><td class="doc-name">EIN Letter</td><td><span class="state satisfied">Satisfied</span></td><td class="count">1 of 1</td><td></td></tr>
+      <tr><td class="doc-name">Articles of Organization</td><td><span class="state satisfied">Satisfied</span></td><td class="count">1 of 1</td><td></td></tr>
+      <tr><td class="doc-name">W-9</td><td><span class="state satisfied">Satisfied</span></td><td class="count">1 of 1</td><td></td></tr>
+      <tr><td class="doc-name">Voided Check</td><td><span class="state satisfied">Satisfied</span></td><td class="count">1 of 1</td><td></td></tr>
+      <tr><td class="doc-name">Bank Statement</td><td><span class="state satisfied">Satisfied</span></td><td class="count">3 of 3</td><td class="reason">May, Jun, Jul 2026</td></tr>
+      <tr><td class="doc-name">Processing Statement</td><td><span class="state satisfied">Satisfied</span></td><td class="count">3 of 3</td><td class="reason">May, Jun, Jul 2026</td></tr>
+      <tr class="chase"><td class="doc-name">Owner Photo ID</td><td><span class="state missing">Missing</span></td><td class="count">1 of 2</td><td class="reason">Two owners hold 25% or more. One ID on file.</td></tr>
+      <tr><td class="doc-name">Proof of domain ownership</td><td><span class="state waived">Waived</span></td><td class="count">—</td><td class="reason">Processor confirmed not required</td></tr>
+      <tr class="chase"><td class="doc-name">Business License — DE pharmacy <span class="tier">Added</span></td><td><span class="state missing">Missing</span></td><td class="count">0 of 1</td><td class="reason">Uploaded file could not be read. Replacement needed.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><h2>Changed since 19 August</h2></div>
+  <ul class="diff">
+    <li class="res"><span class="mark">✓</span><span>Bank Statement — July 2026 received. Slot now satisfied, 3 of 3.</span></li>
+    <li class="res"><span class="mark">✓</span><span>C-04 business address — resolved. EIN letter re-uploaded legibly.</span></li>
+    <li class="add"><span class="mark">+</span><span>C-16 owner date of birth — new discrepancy on the ID received 21 August.</span></li>
+    <li class="chg"><span class="mark">→</span><span>Business License added by analyst 21 August. Upload unreadable.</span></li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><h2>Findings</h2></div>
+  <p class="sec-sub">Grouped by the document each observation rests on. Dashed evidence is page-tier —
+  read by model from a page image, so it carries a page number but no text location.</p>
+
+  <div class="docgroup">
+    <h3>Voided Check <span class="tier page">Page tier</span></h3>
+
+    <div class="finding">
+      <div class="fid">C-08</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Routing number</span><span class="state missing">Fail</span></div>
+        <p class="ftext">The routing number on the voided check differs from the application by one digit.</p>
+        <div class="evidence pagetier">
+          <div class="evrow"><span class="evsrc">Application · field</span><span class="evval">121000248</span></div>
+          <div class="evrow"><span class="evsrc">Voided check · p.1</span><span class="evval differs">121000243</span></div>
+          <div class="evrow"><span class="evsrc">Bank statement · p.1</span><span class="evval">121000248</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="fid">C-10</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Routing number resolves to a bank</span><span class="state notprovided">Review</span></div>
+        <p class="ftext">121000248 resolves to Wells Fargo Bank, N.A. in the Federal Reserve routing
+        directory. The statement letterhead reads Wells Fargo Bank. Names differ only in suffix.</p>
+        <div class="evidence">
+          <div class="evrow"><span class="evsrc">FRB directory</span><span class="evval">WELLS FARGO BANK, N.A.</span></div>
+          <div class="evrow"><span class="evsrc">Bank statement · p.1 · ln 2</span><span class="evval">Wells Fargo Bank</span></div>
+        </div>
+        <p class="evnote">Confirms the number resolves to a real institution. Says nothing about the account.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="docgroup">
+    <h3>Owner Photo ID — Marcus Reyes <span class="tier page">Page tier</span></h3>
+
+    <div class="finding">
+      <div class="fid">C-16</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Owner date of birth</span><span class="state missing">Fail</span></div>
+        <p class="ftext">The date of birth on the ID differs from the application by one day.</p>
+        <div class="evidence pagetier">
+          <div class="evrow"><span class="evsrc">Application · field</span><span class="evval">1984-03-12</span></div>
+          <div class="evrow"><span class="evsrc">Photo ID · p.1</span><span class="evval differs">1984-03-11</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="fid">C-13</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">ID count matches owners at 25% or more</span><span class="state missing">Fail</span></div>
+        <p class="ftext">The application lists two owners at 60% and 40%. One photo ID is on file.</p>
+        <div class="evidence">
+          <div class="evrow"><span class="evsrc">Application · ownership</span><span class="evval">Marcus Reyes 60% · Dana Whitfield 40%</span></div>
+          <div class="evrow"><span class="evsrc">IDs on file</span><span class="evval differs">1</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="docgroup">
+    <h3>Processing Statements — May–Jul 2026 <span class="tier">Character tier</span></h3>
+
+    <div class="finding">
+      <div class="fid">C-18</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Stated prior processor matches statement letterhead</span><span class="state notprovided">Review</span></div>
+        <p class="ftext">The application names Stripe as the current processor. The statement letterhead names Square.</p>
+        <div class="evidence">
+          <div class="evrow"><span class="evsrc">Application · field</span><span class="evval">Stripe</span></div>
+          <div class="evrow"><span class="evsrc">Statement · p.1 · ln 1</span><span class="evval differs">Square, Inc.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="fid">D-01</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Monthly volume, derived against stated</span><span class="state notprovided">Review</span></div>
+        <p class="ftext">Three statements imply a monthly average of $410,220. The application states $350,000.</p>
+        <div class="evidence">
+          <div class="evrow"><span class="evsrc">May 2026 · p.1</span><span class="evval">$398,140.22</span></div>
+          <div class="evrow"><span class="evsrc">Jun 2026 · p.1</span><span class="evval">$421,006.71</span></div>
+          <div class="evrow"><span class="evsrc">Jul 2026 · p.1</span><span class="evval">$411,514.08</span></div>
+          <div class="evrow"><span class="evsrc">Derived average</span><span class="evval">$410,220.34</span></div>
+          <div class="evrow"><span class="evsrc">Application · field</span><span class="evval differs">$350,000.00</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="docgroup">
+    <h3>EIN Letter <span class="tier page">Page tier</span></h3>
+
+    <div class="finding">
+      <div class="fid">A-04</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Document carries markers of its declared type</span><span class="state notevaluable">Not evaluable</span></div>
+        <p class="ftext">Page 1 was read by the vision route, which returns only the fields it is asked
+        for and no page text. The markers expected for an EIN letter were never part of what was
+        searched, so their absence from the search is not evidence of their absence from the document.</p>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="fid">C-03</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">EIN digits</span><span class="state satisfied">Pass</span></div>
+        <p class="ftext">The same nine digits appear on the application, the EIN letter and the W-9.</p>
+        <div class="evidence pagetier">
+          <div class="evrow"><span class="evsrc">Application · field</span><span class="evval">47-2841903</span></div>
+          <div class="evrow"><span class="evsrc">EIN letter · p.1</span><span class="evval">47-2841903</span></div>
+          <div class="evrow"><span class="evsrc">W-9 · p.1 · ln 4</span><span class="evval">47-2841903</span></div>
+        </div>
+        <p class="evnote">Consistent across three documents. Not verified against the IRS — see section 05.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="docgroup">
+    <h3>Business License — DE pharmacy <span class="tier page">Page tier</span></h3>
+    <div class="finding">
+      <div class="fid">A-01</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">Document yields readable content</span><span class="state missing">Fail</span></div>
+        <p class="ftext">de-pharmacy-license.pdf yielded no readable content: invalid PDF structure.</p>
+      </div>
+    </div>
+    <div class="collapsed">
+      <p><code>A-02 · A-04 · A-05 · A-06 · A-07</code> — not evaluated, document not readable.
+      Five checks depend on content this file did not yield.</p>
+    </div>
+  </div>
+
+  <div class="docgroup">
+    <h3>Package-level</h3>
+    <div class="finding">
+      <div class="fid">C-02</div>
+      <div class="fbody">
+        <div class="fhead"><span class="fname">DBA name</span><span class="state notevaluable">Not evaluable</span></div>
+        <p class="ftext">Only the application states a DBA. A comparison needs a second source, so nothing
+        was established. Mintro does not collect a fictitious-name filing, so no document in this
+        package shows the name is registered.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="border-bottom:0;padding-bottom:20px">
+  <div class="notchecked">
+    <h2>05 · What was not checked</h2>
+    <p class="nc-lead">Mintro reports presence, absence, agreement, disagreement and legibility.
+    It does not verify documents against issuing authorities and does not assess risk. No external
+    verification was performed in this package beyond the Federal Reserve routing directory lookup.</p>
+    <div class="nc-row"><b>EIN exists at the IRS and maps to this business</b><span>No free API. Verification is a paid data vendor, out of scope this release.</span></div>
+    <div class="nc-row"><b>Entity is in good standing with the Secretary of State</b><span>Fifty separate state sources. Vendor spend, out of scope.</span></div>
+    <div class="nc-row"><b>Bank account is open and belongs to the merchant</b><span>Requires account linking. Declined on cost.</span></div>
+    <div class="nc-row"><b>Document authenticity</b><span>No mechanism exists at any price from the document alone.</span></div>
+    <div class="nc-row"><b>Sanctions and watchlist screening</b><span>Untuned name matching produces false positives that erode trust faster than an absent check.</span></div>
+    <div class="nc-row"><b>Marketing and advertising material</b><span>Collected, not examined.</span></div>
+  </div>
+  <p class="foot">This report is generated from run e402e078 and does not change. Documents received after
+  24 Aug 15:59 UTC appear in the next report. Findings describe what was observed in the documents
+  supplied; they are not underwriting determinations.</p>
+</section>
+
+</div>
+</body>
+</html>

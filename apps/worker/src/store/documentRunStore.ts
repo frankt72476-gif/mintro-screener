@@ -81,12 +81,14 @@ export interface StoredFinding {
   readonly document_version_id: string | null;
   readonly tier: string | null;
   readonly read_versions: string[];
+  readonly evidence: { source: string; value: string; differs: boolean }[];
+  readonly evidence_note: string | null;
   readonly ordinal: number;
 }
 
 /** The columns a comparison should look at: everything the run decided, and nothing about when. */
 export const FINDING_COLUMNS =
-  'check_id, state, not_evaluable_reason, note, subject_kind, slot_id, document_version_id, tier, read_versions, ordinal';
+  'check_id, state, not_evaluable_reason, note, subject_kind, slot_id, document_version_id, tier, read_versions, evidence, evidence_note, ordinal';
 
 export function createDocumentRunStore(client: SupabaseClient): DocumentRunStore {
   return {
@@ -122,6 +124,8 @@ export function createDocumentRunStore(client: SupabaseClient): DocumentRunStore
         document_version_id: f.subject.kind === 'document' ? f.subject.versionId : null,
         tier: f.tier,
         read_versions: f.read.map((r) => r.versionId),
+        evidence: f.evidence,
+        evidence_note: f.evidenceNote,
         ordinal,
       }));
 

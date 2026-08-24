@@ -104,6 +104,25 @@ export interface ReadDocument {
   readonly tier: Tier;
 }
 
+/**
+ * One source consulted by a finding, as the report shows it.
+ *
+ * Structured rather than prose because the report renders every source in a row and marks the one
+ * that differs — a reader comparing three routing numbers should not have to parse a sentence to
+ * find which is the odd one. The note still says it in words; this is the same fact in a shape the
+ * page can lay out.
+ *
+ * `differs` is the check's own judgement, made where the comparison happened. Deriving it in the
+ * renderer would mean re-running the comparison in a second place, with a second normaliser, and
+ * the two would eventually disagree about which value was the outlier.
+ */
+export interface EvidenceRow {
+  /** Where it was read: "Application · field", "Voided check · p.1". */
+  readonly source: string;
+  readonly value: string;
+  readonly differs: boolean;
+}
+
 export interface DocumentFinding {
   readonly checkId: string;
   readonly state: CheckState;
@@ -116,6 +135,16 @@ export interface DocumentFinding {
    */
   readonly tier: Tier | null;
   readonly read: readonly ReadDocument[];
+  /** Every source consulted, in the order the check saw them. Empty where there was nothing to show. */
+  readonly evidence: readonly EvidenceRow[];
+  /**
+   * A qualification the report prints under the evidence.
+   *
+   * Where a check's result invites an inference it does not support — C-10 resolving a routing
+   * number says nothing about the account, C-03 agreeing across three documents is not an IRS
+   * check — the qualification belongs beside the evidence rather than in a footnote nobody reaches.
+   */
+  readonly evidenceNote: string | null;
   /**
    * Present exactly when `state` is `not_evaluable`, and always one of the check's declared
    * `not_evaluable_when` conditions. Never a bare null, never an absence.

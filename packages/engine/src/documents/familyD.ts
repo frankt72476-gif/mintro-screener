@@ -32,7 +32,7 @@ import { adverse, clean, notEvaluable } from './findings.js';
 import { tierOf } from './familyA.js';
 import { normaliseAmount } from './normalise.js';
 import { sources, type Source } from './familyC.js';
-import type { DocumentFinding, FindingSubject, PackageSnapshot, ReadDocument } from './types.js';
+import type { DocumentFinding, EvidenceRow, FindingSubject, PackageSnapshot, ReadDocument } from './types.js';
 
 const PACKAGE: FindingSubject = { kind: 'package' };
 
@@ -92,6 +92,12 @@ function totalOf(snapshot: PackageSnapshot, field: string, slotKey: string): {
     parts,
     read: found.read,
   };
+}
+
+/** How a source is named in the report — the same labelling family C uses. */
+function sourceLabel(v: Source): string {
+  const title = v.slotKey.replace(/_/g, ' ');
+  return v.tier === 'character' ? `${title} · field` : `${title} · p.1`;
 }
 
 /** Where each figure was read, named so the derivation can be followed back to a page. */
@@ -160,7 +166,20 @@ function report(
   statedValue: Source | null,
   how: string,
   read: readonly ReadDocument[],
+  parts: readonly Source[] = [],
 ): DocumentFinding {
+  /**
+   * The arithmetic, one row per input.
+   *
+   * The derived figure appears as its own row rather than only in the sentence, so a reader can
+   * check the sum against the statements it came from. The stated figure is marked as the one that
+   * differs — which is a statement about the comparison, not about the merchant: it is the value
+   * that is not the derivation, and the report says nothing about why.
+   */
+  const rows: EvidenceRow[] = [
+    ...parts.map((p) => ({ source: sourceLabel(p), value: p.raw, differs: false })),
+    { source: `derived ${label}`, value: format(derived), differs: false },
+  ];
   if (statedValue === null) {
     // The derivation still stands on its own and is worth recording; there is simply nothing to
     // set it against, and that is a comparison we did not make rather than one that passed.
@@ -170,6 +189,7 @@ function report(
       `The statements imply a ${label} of ${format(derived)} (${how}). The application states no ${label}, so the two were not compared.`,
       PACKAGE,
       read,
+      { evidence: rows },
     );
   }
 
@@ -178,9 +198,14 @@ function report(
   const sentence =
     `The application states a ${label} of ${statedValue.raw}; the statements imply ${format(derived)} (${how}).`;
 
+  const withStated: EvidenceRow[] = [
+    ...rows,
+    { source: 'application · field', value: statedValue.raw, differs: gap > MATERIAL_GAP },
+  ];
+
   return gap <= MATERIAL_GAP
-    ? clean(check, sentence, PACKAGE, read)
-    : adverse(check, sentence, PACKAGE, read);
+    ? clean(check, sentence, PACKAGE, read, { evidence: withStated })
+    : adverse(check, sentence, PACKAGE, read, { evidence: withStated });
 }
 
 export interface FamilyDInput {
@@ -218,7 +243,7 @@ export function runFamilyD(input: FamilyDInput): DocumentFinding[] {
         // the derivation, and it is named in the finding so a reader can check the arithmetic.
         out.push(
           report(check, 'monthly volume', volume.total / months, money, stated(snapshot, 'stated_monthly_volume'),
-            `${derivation(volume.parts)} over ${months} statement(s)`, volume.read),
+            `${derivation(volume.parts)} over ${months} statement(s)`, volume.read, volume.parts),
         );
         break;
       }
@@ -236,7 +261,7 @@ export function runFamilyD(input: FamilyDInput): DocumentFinding[] {
         }
         out.push(
           report(check, 'average ticket', volume.total / count.total, money, stated(snapshot, 'stated_average_ticket'),
-            `${money(volume.total)} over ${count.total} transactions`, volume.read),
+            `${money(volume.total)} over ${count.total} transactions`, volume.read, [...volume.parts, ...count.parts]),
         );
         break;
       }
@@ -253,7 +278,7 @@ export function runFamilyD(input: FamilyDInput): DocumentFinding[] {
         }
         out.push(
           report(check, 'high ticket', Math.max(...amounts), money, stated(snapshot, 'stated_high_ticket'),
-            `the largest of ${derivation(high.values)}`, high.read),
+            `the largest of ${derivation(high.values)}`, high.read, high.values),
         );
         break;
       }
@@ -273,7 +298,7 @@ export function runFamilyD(input: FamilyDInput): DocumentFinding[] {
         out.push(
           report(check, 'chargeback rate', rate, (n) => `${n.toFixed(3)}%`,
             stated(snapshot, 'stated_chargeback_rate'),
-            `${chargebacks.total} chargeback(s) over ${count.total} transactions`, chargebacks.read),
+            `${chargebacks.total} chargeback(s) over ${count.total} transactions`, chargebacks.read, [...chargebacks.parts, ...count.parts]),
         );
         break;
       }

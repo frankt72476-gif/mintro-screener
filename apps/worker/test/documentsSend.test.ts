@@ -44,9 +44,9 @@ const report = documents.buildDocumentsReport(
       { versionId: 'ver-1', slotId: 's1', slotKey: 'application', filename: 'app.pdf', outcome: 'extracted', tier: 'character' },
     ],
     findings: [
-      { checkId: 'A-01', state: 'pass', notEvaluableReason: null, note: 'app.pdf was read.', subjectKind: 'document', slotId: null, documentVersionId: 'ver-1', tier: 'character', readVersionIds: ['ver-1'], ordinal: 0 },
-      { checkId: 'B-01', state: 'fail', notEvaluableReason: null, note: 'bank_statement is unresolved: missing.', subjectKind: 'slot', slotId: 's2', documentVersionId: null, tier: null, readVersionIds: [], ordinal: 1 },
-      { checkId: 'C-03', state: 'not_evaluable', notEvaluableReason: 'fewer_than_two_sources', note: 'nothing to compare.', subjectKind: 'package', slotId: null, documentVersionId: null, tier: null, readVersionIds: [], ordinal: 2 },
+      { checkId: 'A-01', state: 'pass', notEvaluableReason: null, note: 'app.pdf was read.', subjectKind: 'document', slotId: null, documentVersionId: 'ver-1', tier: 'character', readVersionIds: ['ver-1'], evidence: [], evidenceNote: null, ordinal: 0 },
+      { checkId: 'B-01', state: 'fail', notEvaluableReason: null, note: 'bank_statement is unresolved: missing.', subjectKind: 'slot', slotId: 's2', documentVersionId: null, tier: null, readVersionIds: [], evidence: [], evidenceNote: null, ordinal: 1 },
+      { checkId: 'C-03', state: 'not_evaluable', notEvaluableReason: 'fewer_than_two_sources', note: 'nothing to compare.', subjectKind: 'package', slotId: null, documentVersionId: null, tier: null, readVersionIds: [], evidence: [], evidenceNote: null, ordinal: 2 },
     ],
   },
   RULES,

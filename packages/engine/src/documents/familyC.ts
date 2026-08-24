@@ -35,6 +35,7 @@ import { tierOf } from './familyA.js';
 import { abaChecksumValid, normaliseDigits, normaliseName, normaliserFor } from './normalise.js';
 import type {
   DocumentFinding,
+  EvidenceRow,
   DocumentSnapshot,
   FindingSubject,
   PackageSnapshot,
@@ -43,6 +44,43 @@ import type {
 } from './types.js';
 
 const PACKAGE: FindingSubject = { kind: 'package' };
+
+/**
+ * The sources a comparison saw, as evidence rows.
+ *
+ * `differs` marks the minority value. Where every source agrees nothing is marked; where they
+ * disagree, the rows carrying a value other than the most common one are. Decided here, at the
+ * comparison, rather than in the renderer — a second derivation with a second normaliser would
+ * eventually disagree with this one about which value is the outlier.
+ *
+ * On an even split nothing is a minority and everything is marked, which is the honest rendering:
+ * two documents saying different things has no odd one out.
+ */
+function evidenceOf(values: readonly Source[]): EvidenceRow[] {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v.normalised, (counts.get(v.normalised) ?? 0) + 1);
+  const top = Math.max(0, ...counts.values());
+  const majorityIsUnique = [...counts.values()].filter((n) => n === top).length === 1;
+
+  return values.map((v) => ({
+    source: sourceLabel(v),
+    value: v.raw,
+    differs: counts.size > 1 && (!majorityIsUnique || (counts.get(v.normalised) ?? 0) < top),
+  }));
+}
+
+/**
+ * How a source is named in the report.
+ *
+ * Character tier says where on the page; page tier says only the page (D-100). The label is the
+ * tier distinction in words, sitting beside the dashed border that says it in layout — a reader
+ * skimming values sees "· field" against "· p.1" without having to notice a border style.
+ */
+function sourceLabel(v: Source): string {
+  const title = v.slotKey.replace(/_/g, ' ');
+  return v.tier === 'character' ? `${title} · field` : `${title} · p.1`;
+}
+
 
 /**
  * Read a declared property off `compares`, refusing a rule that does not carry it.
@@ -190,6 +228,7 @@ function fieldAcrossDocuments(check: DocumentCheck, snapshot: PackageSnapshot): 
         `${found.documentCount} documents state the same ${field.replace(/_/g, ' ')}: ${show(found.values)}.`,
         PACKAGE,
         found.read,
+        { evidence: evidenceOf(found.values) },
       ),
     ];
   }
@@ -200,6 +239,7 @@ function fieldAcrossDocuments(check: DocumentCheck, snapshot: PackageSnapshot): 
       `Documents state different values for ${field.replace(/_/g, ' ')}: ${show(found.values)}.`,
       PACKAGE,
       found.read,
+      { evidence: evidenceOf(found.values) },
     ),
   ];
 }
@@ -273,6 +313,7 @@ function fieldAgainstEither(check: DocumentCheck, snapshot: PackageSnapshot): Do
         `${show(subject.values)} matches ${compares.against.join(' or ').replace(/_/g, ' ')} as stated: ${show(alternatives)}.`,
         PACKAGE,
         read,
+        { evidence: [...evidenceOf(subject.values).map((e) => ({ ...e, differs: false })), ...evidenceOf(alternatives).map((e) => ({ ...e, differs: false }))] },
       ),
     ];
   }
@@ -282,6 +323,12 @@ function fieldAgainstEither(check: DocumentCheck, snapshot: PackageSnapshot): Do
       `${show(unmatched)} matches none of the ${compares.against.join(' or ').replace(/_/g, ' ')} stated: ${show(alternatives)}.`,
       PACKAGE,
       read,
+      {
+        evidence: [
+          ...unmatched.map((v) => ({ source: sourceLabel(v), value: v.raw, differs: true })),
+          ...alternatives.map((v) => ({ source: sourceLabel(v), value: v.raw, differs: false })),
+        ],
+      },
     ),
   ];
 }
@@ -393,6 +440,13 @@ function routingResolves(
           `and the documents state ${show(banks.values)}. This concerns the institution only.`,
         PACKAGE,
         read,
+        {
+          evidence: [
+            { source: 'FRB directory', value: institution, differs: false },
+            ...banks.values.map((b) => ({ source: sourceLabel(b), value: b.raw, differs: false })),
+          ],
+          evidenceNote: QUALIFICATION,
+        },
       ),
     ];
   }
@@ -403,12 +457,34 @@ function routingResolves(
         `while the documents state ${show(disagreeing)}. This concerns the institution only.`,
       PACKAGE,
       read,
+      {
+        evidence: [
+          { source: 'FRB directory', value: institution, differs: false },
+          ...banks.values.map((b) => ({
+            source: sourceLabel(b),
+            value: b.raw,
+            differs: disagreeing.includes(b),
+          })),
+        ],
+        evidenceNote: QUALIFICATION,
+      },
     ),
   ];
 }
 
 /** Owners at or above the threshold that requires an ID. */
 const ID_THRESHOLD_PCT = 25;
+
+/**
+ * Printed under C-10's evidence.
+ *
+ * The check resolves a number to an institution, and the inference a reader is one step away from
+ * is that the account was checked. It was not, at any point, by anything (§7). The qualification
+ * sits with the evidence rather than in the not-checked section, because that is where the
+ * inference is available to be made.
+ */
+const QUALIFICATION =
+  'This confirms the number resolves to an institution listed in the Federal Reserve directory. It says nothing about the account.';
 
 /**
  * C-13 — one photo ID per owner at 25% or more.
@@ -448,6 +524,7 @@ function idCount(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFindi
         `${qualifying.length} owner(s) at ${ID_THRESHOLD_PCT}% or more, and ${readable.length} photo ID(s) supplied.`,
         PACKAGE,
         read,
+        { evidence: idEvidence(qualifying, readable.length, false) },
       ),
     ];
   }
@@ -473,10 +550,22 @@ function idCount(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFindi
       `${qualifying.length} owner(s) at ${ID_THRESHOLD_PCT}% or more, and ${readable.length} readable photo ID(s) supplied.`,
       PACKAGE,
       read,
+      { evidence: idEvidence(qualifying, readable.length, true) },
     ),
   ];
 }
 
+/** The two sides C-13 sets against each other: who needs an ID, and how many are on file. */
+function idEvidence(qualifying: readonly Source[], held: number, short: boolean): EvidenceRow[] {
+  return [
+    {
+      source: 'application · ownership',
+      value: qualifying.map((v) => v.raw).join(' · '),
+      differs: false,
+    },
+    { source: 'IDs on file', value: String(held), differs: short },
+  ];
+}
 /**
  * C-14 — the ownership percentages sum to no more than 100.
  *
@@ -502,9 +591,13 @@ function ownershipSum(check: DocumentCheck, snapshot: PackageSnapshot): Document
   const total = parts.reduce((a, b) => a + b, 0);
   const shown = `${found.values.map((v, i) => `${v.raw} (${parts[i]})`).join(' + ')} = ${total}%`;
 
+  const rows: EvidenceRow[] = [
+    ...found.values.map((v) => ({ source: 'application · ownership', value: v.raw, differs: false })),
+    { source: 'sum', value: `${total}%`, differs: total > 100 },
+  ];
   return total <= 100
-    ? [clean(check, `The ownership percentages on the application sum to ${total}%: ${shown}.`, PACKAGE, found.read)]
-    : [adverse(check, `The ownership percentages on the application sum to more than 100%: ${shown}.`, PACKAGE, found.read)];
+    ? [clean(check, `The ownership percentages on the application sum to ${total}%: ${shown}.`, PACKAGE, found.read, { evidence: rows })]
+    : [adverse(check, `The ownership percentages on the application sum to more than 100%: ${shown}.`, PACKAGE, found.read, { evidence: rows })];
 }
 
 /**

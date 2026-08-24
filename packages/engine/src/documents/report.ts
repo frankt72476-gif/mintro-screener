@@ -51,6 +51,8 @@ export interface ReportSlot {
 /** One observation, with the evidence it rests on. */
 export interface ReportFinding {
   readonly checkId: string;
+  /** The check's title from the rule file — what the report prints beside the id. */
+  readonly title: string;
   readonly state: CheckState;
   readonly notEvaluableReason: string | null;
   readonly note: string;
@@ -60,6 +62,8 @@ export interface ReportFinding {
    */
   readonly tier: 'character' | 'page' | null;
   readonly readVersionIds: readonly string[];
+  readonly evidence: readonly { readonly source: string; readonly value: string; readonly differs: boolean }[];
+  readonly evidenceNote: string | null;
 }
 
 /**
@@ -157,6 +161,8 @@ export interface StoredFinding {
   readonly documentVersionId: string | null;
   readonly tier: 'character' | 'page' | null;
   readonly readVersionIds: readonly string[];
+  readonly evidence: readonly { readonly source: string; readonly value: string; readonly differs: boolean }[];
+  readonly evidenceNote: string | null;
   readonly ordinal: number;
 }
 
@@ -227,13 +233,16 @@ function group(findings: readonly StoredFinding[]): { collapsed: CollapsedCause[
   return { collapsed, remaining: remaining.sort(byOrdinal) };
 }
 
-const toReportFinding = (f: StoredFinding): ReportFinding => ({
+const toReportFinding = (titles: ReadonlyMap<string, string>) => (f: StoredFinding): ReportFinding => ({
   checkId: f.checkId,
+  title: titles.get(f.checkId) ?? f.checkId,
   state: f.state,
   notEvaluableReason: f.notEvaluableReason,
   note: f.note,
   tier: f.tier,
   readVersionIds: f.readVersionIds,
+  evidence: f.evidence,
+  evidenceNote: f.evidenceNote,
 });
 
 /**
@@ -248,6 +257,8 @@ export function buildDocumentsReport(
   previous?: RunRecord,
 ): DocumentsReport {
   const titles = new Map(rules.checks.catalog.map((c) => [c.key, c.title]));
+  const checkTitles = new Map(rules.checks.checks.map((c) => [c.id, c.title]));
+  const asFinding = toReportFinding(checkTitles);
   const reasonLabels = new Map(
     [...rules.checks.reasons.not_provided, ...rules.checks.reasons.waived].map((r) => [r.key, r.label]),
   );
@@ -294,7 +305,7 @@ export function buildDocumentsReport(
         filename: d.filename,
         outcome: d.outcome,
         tier: d.tier,
-        findings: remaining.map(toReportFinding),
+        findings: remaining.map(asFinding),
         collapsed,
       };
     });
@@ -311,7 +322,7 @@ export function buildDocumentsReport(
     counts,
     slots,
     documents,
-    packageFindings: packageLevel.map(toReportFinding),
+    packageFindings: packageLevel.map(asFinding),
     diff: previous === undefined ? null : diffRuns(previous, run),
     externalVerification: rules.checks.not_checked.external_verification,
     notChecked: rules.checks.not_checked.items,

@@ -52,6 +52,8 @@ const finding = (over: Partial<StoredFinding> = {}): StoredFinding => ({
   documentVersionId: 'ver-1',
   tier: 'character',
   readVersionIds: ['ver-1'],
+  evidence: [],
+  evidenceNote: null,
   ordinal: ordinal++,
   ...over,
 });

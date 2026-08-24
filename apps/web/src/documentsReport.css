@@ -1,0 +1,210 @@
+
+/* =================================================================================================
+ * Documents Check report — ported verbatim from documents-check-report-mockup.html.
+ *
+ * The mockup is the specification, so this is a transcription rather than an interpretation. Three
+ * rules in here carry meaning and must not be "tidied" into something that renders more evenly:
+ *
+ *   .tier.page, .evidence.pagetier   dashed borders. Page-tier evidence is not character-tier
+ *                                    evidence, and D-100 says the report must show which it is.
+ *   .state.notevaluable, .cov-seg.n, hatching. `not_evaluable` reads as absence, not as a third
+ *   .collapsed                       colour beside pass and fail. A check that could not run has
+ *                                    established nothing.
+ *   tr.chase                         tint on the rows an agent has to act on.
+ *
+ * Scoped under `.documents-report` so it cannot reach the Site Check report, which has its own
+ * visual language and its own spec in demo/index.html.
+ * ============================================================================================== */
+
+:root {
+  --paper:#FBFBF9;
+  --ink:#16181C;
+  --ink-2:#4A4F57;
+  --ink-3:#787D85;
+  --rule:#E2E2DB;
+  --rule-2:#CFCFC6;
+  --fail:#A81F16;
+  --fail-bg:#FBEEEC;
+  --review:#8A5A00;
+  --review-bg:#FAF3E4;
+  --pass:#26654A;
+  --pass-bg:#EEF4F0;
+  --none:#6B6F76;
+  --shell:1080px;
+}
+
+
+
+.documents-report {max-width:var(--shell);margin:0 auto;padding:0 40px 120px}
+/* -------------------------------------------------------------------------------------------
+ * The report's own typeface, forced onto its descendants.
+ *
+ * Inheritance is not enough. `styles.css` styles bare `h1`, `h2`, `td` and so on for the Site
+ * Check app, and a direct element rule beats an inherited value however specific the ancestor —
+ * so the masthead came out in Space Grotesk and the PDF embedded it, silently.
+ *
+ * Element+class here is (0,1,1); every mono rule below is class+class at (0,2,0) and still wins,
+ * which is why the ids, counts and values stay monospaced.
+ * ---------------------------------------------------------------------------------------- */
+.documents-report h1,
+.documents-report h2,
+.documents-report h3,
+.documents-report p,
+.documents-report td,
+.documents-report th,
+.documents-report li,
+.documents-report b,
+.documents-report span,
+.documents-report div{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+}
+
+.documents-report /* ---------- masthead ---------- */
+.masthead {padding:48px 0 28px;border-bottom:2px solid var(--ink)}
+.documents-report .eyebrow {
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.documents-report .masthead h1 {
+  margin:12px 0 2px;font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-.02em;
+}
+.documents-report .dba {font-size:15px;color:var(--ink-2);margin:0 0 22px}
+.documents-report .meta {
+  display:flex;flex-wrap:wrap;gap:0 40px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);
+}
+.documents-report .meta div span {display:block;color:var(--ink-3);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.documents-report /* ---------- coverage strip (signature) ---------- */
+.coverage {padding:30px 0 34px;border-bottom:1px solid var(--rule)}
+.documents-report .cov-bar {display:flex;height:34px;width:100%;border:1px solid var(--ink);overflow:hidden}
+.documents-report .cov-seg {position:relative}
+.documents-report .cov-seg.f {background:var(--fail)}
+.documents-report .cov-seg.r {background:var(--review)}
+.documents-report .cov-seg.p {background:var(--pass)}
+.documents-report .cov-seg.n {
+  background:repeating-linear-gradient(-45deg,transparent 0 5px,var(--rule-2) 5px 6px);
+  border-left:1px solid var(--ink);
+}
+.documents-report .cov-key {display:flex;flex-wrap:wrap;gap:0 30px;margin-top:12px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px}
+.documents-report .cov-key b {font-weight:600}
+.documents-report .cov-key i {width:11px;height:11px;display:inline-block;margin-right:7px;vertical-align:-1px;border:1px solid var(--ink)}
+.documents-report .cov-key i.f {background:var(--fail)}
+.documents-report .cov-key i.r {background:var(--review)}
+.documents-report .cov-key i.p {background:var(--pass)}
+.documents-report .cov-key i.n {background:repeating-linear-gradient(-45deg,transparent 0 3px,var(--rule-2) 3px 4px)}
+.documents-report .cov-note {margin:14px 0 0;font-size:13.5px;color:var(--ink-2);max-width:62ch}
+.documents-report /* ---------- sections ---------- */
+section {padding:38px 0;border-bottom:1px solid var(--rule)}
+.documents-report .sec-head {display:flex;align-items:baseline;gap:14px;margin-bottom:20px}
+.documents-report .sec-num {font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;color:var(--ink-3)}
+.documents-report .sec-head h2 {margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.documents-report .sec-sub {margin:-12px 0 20px;font-size:13.5px;color:var(--ink-2);max-width:70ch}
+.documents-report /* ---------- slot table ---------- */
+table {width:100%;border-collapse:collapse}
+.documents-report th {
+  text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  padding:0 12px 8px 0;border-bottom:1px solid var(--rule-2);
+}
+.documents-report td {padding:11px 12px 11px 0;border-bottom:1px solid var(--rule);vertical-align:top;font-size:14px}
+.documents-report tr.chase td {background:var(--fail-bg)}
+.documents-report .doc-name {font-weight:500}
+.documents-report .count {font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.documents-report .reason {font-size:13px;color:var(--ink-2)}
+.documents-report .state {
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  padding:2px 7px;border:1px solid currentColor;
+}
+.documents-report .state.satisfied {color:var(--pass)}
+.documents-report .state.missing {color:var(--fail);background:var(--fail-bg)}
+.documents-report .state.waived, .documents-report .state.notprovided {color:var(--ink-2)}
+.documents-report .state.notevaluable {color:var(--none);
+  background:repeating-linear-gradient(-45deg,transparent 0 4px,var(--rule-2) 4px 5px)}
+.documents-report /* ---------- diff ---------- */
+.diff {list-style:none;margin:0;padding:0}
+.documents-report .diff li {display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.documents-report .diff li:last-child {border-bottom:0}
+.documents-report .diff .mark {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;width:16px;flex:none}
+.documents-report .diff .add .mark {color:var(--fail)}
+.documents-report .diff .res .mark {color:var(--pass)}
+.documents-report .diff .chg .mark {color:var(--ink-3)}
+.documents-report /* ---------- findings ---------- */
+.docgroup {margin-bottom:34px}
+.documents-report .docgroup:last-child {margin-bottom:0}
+.documents-report .docgroup > h3 {
+  margin:0 0 2px;font-size:15px;font-weight:600;
+  padding-bottom:8px;border-bottom:1px solid var(--rule-2);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.documents-report .tier {
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.08em;
+  text-transform:uppercase;padding:2px 6px;border:1px solid var(--rule-2);color:var(--ink-3);
+}
+.documents-report .tier.page {border-style:dashed}
+.documents-report .finding {display:grid;grid-template-columns:76px 1fr;gap:0 16px;padding:15px 0;border-bottom:1px solid var(--rule)}
+.documents-report .finding:last-child {border-bottom:0}
+.documents-report .fid {font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--ink-2);padding-top:2px}
+.documents-report .fbody {min-width:0}
+.documents-report .fhead {display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.documents-report .fname {font-weight:500;font-size:14px}
+.documents-report .ftext {margin:0;font-size:14px;color:var(--ink-2);max-width:74ch}
+.documents-report .evidence {margin-top:10px;border-left:2px solid var(--rule-2);padding:2px 0 2px 14px}
+.documents-report .evrow {display:flex;gap:14px;padding:3px 0;font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+.documents-report .evsrc {color:var(--ink-3);width:210px;flex:none}
+.documents-report .evval {color:var(--ink);font-weight:500}
+.documents-report .evval.differs {color:var(--fail)}
+.documents-report .evidence.pagetier {border-left-style:dashed}
+.documents-report .evnote {margin:6px 0 0;font-size:12px;color:var(--ink-3);font-style:italic}
+.documents-report .collapsed {
+  background:repeating-linear-gradient(-45deg,transparent 0 6px,rgba(207,207,198,.35) 6px 7px);
+  border:1px solid var(--rule-2);padding:12px 14px;margin-top:14px;
+}
+.documents-report .collapsed p {margin:0;font-size:13.5px;color:var(--ink-2)}
+.documents-report .collapsed code {font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink)}
+.documents-report /* ---------- not checked ---------- */
+.notchecked {border:1px solid var(--ink);padding:0}
+.documents-report .notchecked h2 {margin:0;padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--ink)}
+.documents-report .nc-lead {padding:16px 20px;margin:0;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--rule);max-width:76ch}
+.documents-report .nc-row {display:grid;grid-template-columns:1fr 1.15fr;gap:24px;padding:13px 20px;border-bottom:1px solid var(--rule);font-size:13.5px}
+.documents-report .nc-row:last-child {border-bottom:0}
+.documents-report .nc-row b {font-weight:500}
+.documents-report .nc-row span {color:var(--ink-2)}
+.documents-report /* ---------- footer ---------- */
+.foot {padding:30px 0 0;font-size:12.5px;color:var(--ink-3);max-width:76ch}
+@media (max-width:720px) {
+.documents-report {padding:0 20px 80px}
+.documents-report .masthead h1 {font-size:26px}
+.documents-report .meta {gap:0 24px}
+.documents-report .finding {grid-template-columns:1fr;gap:8px}
+.documents-report .evrow {flex-direction:column;gap:0}
+.documents-report .evsrc {width:auto}
+.documents-report .nc-row {grid-template-columns:1fr;gap:4px}
+
+
+}
+@media print {
+
+.documents-report {max-width:none;padding:0}
+.documents-report section {break-inside:avoid}
+.documents-report .docgroup {break-inside:avoid}
+
+
+}
+
+
+/* The report's own type and ground, applied to the container rather than to `body`, so the app
+   around it keeps its own. In print the page is the report and nothing else. */
+.documents-report{
+  max-width:1080px;margin:0 auto;padding:0 40px 120px;
+  background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+@media print{
+  .documents-report{max-width:none;padding:0;background:#fff}
+  .documents-report section{break-inside:avoid}
+  .documents-report .docgroup{break-inside:avoid}
+}

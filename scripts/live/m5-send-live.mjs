@@ -3,15 +3,14 @@
  *
  *     node --env-file=.env.test scripts/live/m5-send-live.mjs
  *
- * Builds a report from a real persisted run and sends it. **The PDF is a stand-in** — the report
- * route does not exist yet, so this attaches a small placeholder document. That is the whole point
- * of taking bytes as an argument: the send path is provable before anything renders.
+ * Builds a report from a real persisted run, prints it through the report route, and sends it.
  *
  * `RESEND_API_KEY` is not set in `.env.test`, so this exercises the dry-run mailer: it composes the
  * message, transmits nothing, and records `mailer='dry_run'`. That distinction is a column value,
  * not a flag, so a test send here can never be read later as a delivered report.
  */
 
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { loadDocumentsRules } from '@mintro/ruleset';
 import { documents } from '@mintro/engine';
@@ -23,6 +22,9 @@ import {
   sendDocumentsReport,
   subjectFor,
 } from '../../apps/worker/dist/src/documentsSend.js';
+import { chromium } from 'playwright';
+import { startReportServer } from '../../apps/worker/dist/src/reportServer.js';
+import { renderDocumentsReportPdf } from '../../apps/worker/dist/src/documentsPdf.js';
 import { ensureAnalyst } from './setup.mjs';
 import { banner, assertTestProject } from './guard.mjs';
 
@@ -74,6 +76,8 @@ const asRecord = (row, findings) => ({
     documentVersionId: f.document_version_id,
     tier: f.tier,
     readVersionIds: f.read_versions ?? [],
+    evidence: f.evidence ?? [],
+    evidenceNote: f.evidence_note ?? null,
     ordinal: f.ordinal,
   })),
 });
@@ -94,8 +98,35 @@ check('byte-identical when the rows arrive reversed (D-085)',
 const analystId = await ensureAnalyst(service);
 const mailer = documentsMailerFor(process.env);
 
-// A stand-in. The report route lands with the mockup; this proves the send, not the rendering.
-const pdf = Buffer.from(`%PDF-1.7\n% placeholder for run ${report.runId}\n%%EOF\n`);
+// page.pdf() against the report route — the same component an analyst sees, in print mode.
+const server = await startReportServer({ webRoot: 'apps/web/dist', mounts: {} });
+const browser = await chromium.launch({ args: ['--no-sandbox'] });
+let pdf;
+try {
+  const rendered = await renderDocumentsReportPdf(browser, {
+    origin: server.origin,
+    inject: {
+      report,
+      merchantName: 'Northwind Peptides LLC',
+      dba: 'Northwind Labs',
+      packageRef: report.packageId.slice(0, 8),
+      processor: 'Default',
+      reportNumber: '1 of 1',
+      previousSentAt: null,
+    },
+  });
+  pdf = Buffer.from(rendered.bytes);
+  mkdirSync('scripts/live/out', { recursive: true });
+  writeFileSync('scripts/live/out/documents-report.pdf', pdf);
+  check(
+    'the report route printed to PDF',
+    pdf.byteLength > 0 && rendered.pages > 0,
+    `${rendered.pages} page(s), ${(pdf.byteLength / 1024).toFixed(1)} KB → scripts/live/out/documents-report.pdf`,
+  );
+} finally {
+  await browser.close().catch(() => undefined);
+  await server.close();
+}
 
 console.log(`\n  mailer      : ${mailer.kind} — ${mailer.description}`);
 console.log(`  subject     : ${subjectFor(report, 'Northwind Peptides LLC')}`);
