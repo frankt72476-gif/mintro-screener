@@ -1,7 +1,43 @@
 # Status
 
-Where the Mintro Screener stands as of **21 August 2026**. Written for someone who has never seen
+Where the Mintro Screener stands as of **24 August 2026**. Written for someone who has never seen
 this repository.
+
+---
+
+## Where this stands right now
+
+The screening loop is **complete and confirmed end to end against a real merchant**. A run was
+scanned, an invitation sent, responses written and attributed, the report rendered and delivered,
+and the received document verified against what the merchant actually did.
+
+| | State |
+|---|---|
+| **Layer 3** | Complete. The unbuilt column reads **zero** on all five storefronts — every rule in the set now has a check that runs, or a recorded reason why it cannot. |
+| **Merchant commentary** | Built and verified (D-063). One forwardable link per report, self-declared identity, per-comment attribution, five distinguishable commentary states. |
+| **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
+| **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
+
+### What "verified" means here, because it is not the usual thing
+
+Not that the tests pass. The checks compare **two independent sources**: what the merchant did, read
+as database rows, against what the delivered document says, read from the rendered output. Neither
+is derived from the other or from the code that built the report.
+
+That discipline came out of four defects in two days, all invisible to tests that inspected the
+code because the code agreed with itself (D-026). The question worth carrying forward:
+
+> **Does this assertion get its expected value from the same place the code gets its actual value?**
+
+Three of the checks written that week had the defect they were written for. Each was fixed by being
+made to fail on purpose first.
+
+### The tools a newcomer will want
+
+    npm run loop-check -- <run-id>    did the sent document carry what the merchant did?
+    npm run print-check               do all five commentary states render, with attribution intact?
+    npm run compose-check             does the document compose well at any report size?
+    npm run page-budget -- <run-id>   what does one document cost, by section?
 
 ---
 
@@ -27,7 +63,7 @@ A new engineer should be useful after the first three.
 |---|---|---|
 | 1 | `CLAUDE.md` | The brief and the nine hard constraints. Constraints 1, 2 and 9 explain most of the design. |
 | 2 | `docs/ARCHITECTURE.md` | Stack rulings with rationale, the check-type table, and the **triage axis** — read that section twice. |
-| 3 | `docs/DECISIONS.md` | 29 rulings (D-001 to D-029, D-022 unused), dated, with reasoning. Long, but it is why the code looks the way it does. |
+| 3 | `docs/DECISIONS.md` | Rulings D-001 to D-075, dated, with reasoning. Long, and it is why the code looks the way it does. **Read D-026 whatever else you skip** — it catalogues sixteen instances of one defect family and is the most useful thing in the file. |
 | 4 | `rules/ruleset.json` | 53 rules. The single source of truth. Data, not code. |
 | 5 | `packages/ruleset/src/` | The loader and validator. Start at `schema.ts`, then `invariants.ts`. |
 | 6 | `packages/engine/src/` | Crawl layers and check handlers. Start at `findings.ts` — it is where a state is decided. |
@@ -36,7 +72,7 @@ A new engineer should be useful after the first three.
 Then run it:
 
     npm install
-    npm run check                          # typecheck + 419 tests
+    npm run check                          # typecheck + 824 tests
     npm run validate                       # validate the rule set, exit 1 if malformed
     npm run scan-full -- --report-dir ./reports --evidence-dir ./evidence https://example.com
     npm run web                            # the report, reading those runs
@@ -384,12 +420,30 @@ digest computed it, so the plaintext was in a browser.
 
 ---
 
+## Open, and what each waits on
+
+Carried forward deliberately. Nothing here is forgotten work — each is a decision that has been
+taken or a measurement that has not been made, and each says which.
+
+| Open | Decision | Waits on |
+|---|---|---|
+| **Documents Check** | `CLAUDE.md` | **Never started.** The nav item and route are stubbed in `apps/web` and the pane describes the scope and does nothing. A later phase; do not start it without scoping. |
+| **Rule set page** | scoped, deferred | Scoped and deliberately held behind Layer 3, which is now complete — so this is unblocked and awaiting a decision to start rather than a dependency. |
+| **Multi-vertical rule sets** | scoping only | Scoping exists; nothing is built. The rule set is already data rather than code (hard constraint 1), so a second vertical is a data and validation question, not an engine one. |
+| **Evidence slip composition** | D-075 | **Unmeasured.** 16.6 pages, the largest component of the printed report, and how much is reserved space versus the captures themselves is not known — the measuring browser is not served evidence. Needs a run measured with evidence served. Reducing the largest thing in the document on an assumption is the trade D-047 ruled out. |
+| **PDF byte-level verification** | known limit | `loop-check` reads the rendered DOM, which is what `page.pdf()` prints and the honest authority on content. It does **not** read the PDF's bytes: `extractPdfText` cannot decode Chromium's subset-embedded fonts (D-057) and returns a shifted alphabet on our own output. Proving the file on disk says what the page said needs a real PDF parser, and is a separate decision. |
+| **`report_date` and the program document** | D-041, and the questions section below | `report_date` was renamed on an *interpretation* of the program document rather than a ruling from its owner. That and the other open questions are listed under **Questions for whoever owns the program document** — they are answerable only by that person, not by reading the rules harder. |
+
+Frank has signed off on the screening loop. The next section is being scoped before anything is
+built.
+
+---
+
 ## Deferred
 
 | Deferred | Decision | Note |
 |---|---|---|
 | **M6 — scheduled re-scans and diff** | D-002 | Deferred, not cancelled. Re-running a merchant already produces a new immutable run; evidence keys are run-scoped and never overwrite. Adding this later is a scheduler plus a diff view, not a data migration. |
-| **Documents Check** | `CLAUDE.md` | Later phase. Nav item and route are stubbed in `apps/web`; the pane describes the scope and does nothing. |
 | **`doc_parse` COA parsing** | — | COA-002, COA-003 and COA-004 report `not_evaluable` naming the gap. A COA rule silently passing because nobody wrote the parser would be a false pass. |
 | **`doc_parse` `max`** | — | Only `min` exists, because only `min` appears in the data. Adding an upper bound is a one-line schema change when a rule needs one. |
 | **COA authenticity** | `ARCHITECTURE.md` | COA-005 is a `manual` rule. Forged COAs are a known failure mode and accreditation cannot be verified from a PDF; an independent assay is the only real control. |
@@ -397,12 +451,18 @@ digest computed it, so the plaintext was in a browser.
 
 ---
 
-## Layer 3 — being built, one stage at a time
+## Layer 3 — complete, built one stage at a time
 
-**Until 2026-08-22 this appeared in no list here.** It was not blocked and not deferred; it was
-never written down, and the report described it in the same words it used for genuinely
-uncrawlable surfaces (D-044). Thirteen rules — a quarter of the rule set — produced
-`not_evaluable` for this reason alone, and every one of them is an ordinary page a browser loads.
+**Complete as of 2026-08-24. The unbuilt column reads zero on all five storefronts.**
+
+Until 2026-08-22 it appeared in no list here. It was not blocked and not deferred; it was never
+written down, and the report described it in the same words it used for genuinely uncrawlable
+surfaces (D-044). Thirteen rules — a quarter of the rule set — produced `not_evaluable` for this
+reason alone, and every one of them is an ordinary page a browser loads.
+
+Every rule in the set now has a check that runs, or a recorded reason it cannot. The stage table
+below is kept as built rather than as planned: it is the record of what each stage established, and
+several of the rulings in `docs/DECISIONS.md` only make sense beside it.
 
 | Stage | Surface | Rules | Status |
 |---|---|---|---|
