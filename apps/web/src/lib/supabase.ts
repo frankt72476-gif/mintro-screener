@@ -42,6 +42,8 @@ export function supabase(config: SupabaseConfig): SupabaseClient {
   return client;
 }
 
+let anonClient: SupabaseClient | null = null;
+
 /**
  * A client for a caller with no account (D-063).
  *
@@ -49,12 +51,27 @@ export function supabase(config: SupabaseConfig): SupabaseClient {
  * definer` functions decide what it reaches, and neither accepts a run id, so holding this client
  * without a token reaches nothing. Session persistence is off: a merchant is not signing in, and a
  * stored session on a shared machine would outlive their visit.
+ *
+ * ## One instance, and it is not a micro-optimisation (D-070)
+ *
+ * This built a **new client on every call**, and it is called from a render body. A React effect
+ * keyed on the client therefore refired on every render — three times during mount — firing three
+ * concurrent copies of a 107 KB RPC. Whichever resolved last set the page state, so when one
+ * duplicate lost its HTTP/2 stream the merchant saw *"The report could not be loaded just now"*
+ * even though the report had loaded fine on another of the three.
+ *
+ * Intermittent, and worse as the payload grew with each comment.
+ *
+ * A value handed to a hook dependency array **is** part of the interface. `createClient` also
+ * registers listeners and warns about multiple `GoTrueClient` instances in one context, which was
+ * the console saying this out loud while nothing was reading it.
  */
 export function anonymousClient(): SupabaseClient | null {
   const config = readConfig();
   if ('missing' in config) return null;
 
-  return createClient(config.url, config.anonKey, {
+  anonClient ??= createClient(config.url, config.anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  return anonClient;
 }
