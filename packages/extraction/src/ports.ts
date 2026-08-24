@@ -11,6 +11,8 @@
  * unbounded re-billing was found by reading commit messages rather than by a failing test.
  */
 
+import type { VisionUsage } from './types.js';
+
 /**
  * One page as an image, **normalised**, ready to be sent as an image content block.
  *
@@ -63,9 +65,24 @@ export interface VisionRequest {
   readonly user: string;
 }
 
-/** What the model returned, as text. Parsing and validation happen in this package. */
+/**
+ * What the model returned. Parsing and validation happen in this package.
+ *
+ * `stop_reason` and `usage` are carried rather than dropped (D-119). Both were discarded at the
+ * transport boundary until the first live call, and each cost something:
+ *
+ * - Without `stop_reason`, a `max_tokens` truncation arrives as unparseable JSON and is reported
+ *   as a malformed response — a wrong diagnosis, followed by a retry that must fail identically.
+ * - Without `usage`, the metered spend D-093 approved cannot be metered.
+ *
+ * Both are `| null` rather than optional: a transport that does not report them says so, instead
+ * of being indistinguishable from one that forgot.
+ */
 export interface VisionResponse {
   readonly text: string;
+  /** The vendor's own reason for stopping. `'max_tokens'` means `text` is cut off, not malformed. */
+  readonly stop_reason: string | null;
+  readonly usage: VisionUsage | null;
 }
 
 /**

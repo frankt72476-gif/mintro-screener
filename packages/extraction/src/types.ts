@@ -92,6 +92,17 @@ export interface ExtractedValue {
   readonly tier: Tier;
 }
 
+/**
+ * What one vendor call cost (D-119).
+ *
+ * D-093 approved vision on the ground that the spend is metered — bounded per page, attributable
+ * to a run, and stopping when we stop calling. That argument assumes a meter. This is it.
+ */
+export interface VisionUsage {
+  readonly input_tokens: number;
+  readonly output_tokens: number;
+}
+
 export interface PageResult {
   /** One-based, matching how a reader counts pages and how D-087 reports them. */
   readonly page: number;
@@ -100,6 +111,13 @@ export interface PageResult {
   readonly reason: string | null;
   /** Non-whitespace glyphs found in the text layer, after separator stripping (D-090). */
   readonly glyphs: number;
+  /**
+   * Tokens spent reading this page, or `null` where no vendor call was made (D-119).
+   *
+   * Per page because that is per call — D-095 sends one page at a time, so a page is the unit that
+   * has a cost. A document total is the sum and is not stored twice.
+   */
+  readonly usage: VisionUsage | null;
 }
 
 export interface ExtractionResult {

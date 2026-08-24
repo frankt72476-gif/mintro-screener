@@ -9,7 +9,7 @@ import {
   extract,
   mapVisionResponse,
 } from '@mintro/extraction';
-import { fakePageImager, fakeVision, fakeVisionByPage } from './fakes.js';
+import { fakePageImager, fakeVision, fakeVisionByPage, malformedVision, truncatedVision, unmeteredVision } from './fakes.js';
 import { imageOnlyPdf } from './fixtures.js';
 
 const HASH = 'a'.repeat(64);
@@ -145,7 +145,9 @@ describe('one call carries one page (D-095)', () => {
       pageImage: fakePageImager().fn,
       vision: async (request) => {
         calls++;
-        return request.page === 1 ? { text: 'not json' } : { text: '{"fields":[]}' };
+        return request.page === 1
+          ? { text: 'not json', stop_reason: 'end_turn' as const, usage: null }
+          : { text: '{"fields":[]}', stop_reason: 'end_turn' as const, usage: null };
       },
     });
 
@@ -162,5 +164,91 @@ describe('no vendor call happens by accident', () => {
     const vision = fakeVision();
     await extract(await textLayerPdf(), 'ein.pdf', { pageImage: fakePageImager().fn, vision: vision.fn });
     expect(vision.calls).toBe(0);
+  });
+});
+
+/**
+ * D-119 — what the transport keeps.
+ *
+ * `fakeVision` always returned complete, well-formed JSON and exactly the two fields the port
+ * declared. That made every one of these cases unreachable from the suite until the first live
+ * call, which is the reason they are here now rather than the reason they were missed.
+ */
+describe('the vision client retains stop_reason and usage (D-119)', () => {
+  it('names a truncation as a truncation, not as malformed JSON', async () => {
+    const { imageOnlyPdf } = await import('./fixtures.js');
+    const vision = truncatedVision();
+    const result = await extract(await imageOnlyPdf(1), 'scan.pdf', {
+      pageImage: fakePageImager().fn,
+      vision: vision.fn,
+    });
+
+    expect(result.pages[0]?.route).toBe('none');
+    expect(result.pages[0]?.reason).toMatch(/cut off at max_tokens/);
+    // The old message. Reporting a truncation this way sends the reader after a fault that is not
+    // there, and it is the specific wrong answer D-119 was written about.
+    expect(result.pages[0]?.reason).not.toMatch(/was not JSON/);
+  });
+
+  it('does not spend a second attempt on a truncation, because the retry is foregone', async () => {
+    const { imageOnlyPdf } = await import('./fixtures.js');
+    const vision = truncatedVision();
+    await extract(await imageOnlyPdf(1), 'scan.pdf', { pageImage: fakePageImager().fn, vision: vision.fn });
+    expect(vision.calls).toBe(1);
+  });
+
+  it('still spends both attempts on a genuinely malformed response', async () => {
+    const { imageOnlyPdf } = await import('./fixtures.js');
+    const vision = malformedVision();
+    const result = await extract(await imageOnlyPdf(1), 'scan.pdf', {
+      pageImage: fakePageImager().fn,
+      vision: vision.fn,
+    });
+    expect(vision.calls).toBe(2);
+    expect(result.pages[0]?.reason).toMatch(/was not JSON/);
+    expect(result.pages[0]?.reason).not.toMatch(/max_tokens/);
+  });
+
+  it('records what each page cost, and nothing for pages that made no call', async () => {
+    const { hybridPdf } = await import('./fixtures.js');
+    const vision = fakeVision({ fields: [] });
+    const result = await extract(await hybridPdf(), 'mixed.pdf', {
+      pageImage: fakePageImager().fn,
+      vision: vision.fn,
+    });
+
+    const byRoute = Object.fromEntries(result.pages.map((p) => [p.page, [p.route, p.usage]]));
+    expect(byRoute[1]?.[0]).toBe('text');
+    expect(byRoute[1]?.[1]).toBeNull();
+    expect(byRoute[2]?.[0]).toBe('vision');
+    expect(byRoute[2]?.[1]).toEqual({ input_tokens: 2364, output_tokens: 144 });
+    expect(byRoute[3]?.[1]).toBeNull();
+
+    // The document total is the sum and is not stored twice.
+    const total = result.pages.reduce((n, p) => n + (p.usage?.input_tokens ?? 0), 0);
+    expect(total).toBe(2364);
+  });
+
+  it('bills a failed page for the calls it made', async () => {
+    const { imageOnlyPdf } = await import('./fixtures.js');
+    const vision = malformedVision();
+    const result = await extract(await imageOnlyPdf(1), 'scan.pdf', {
+      pageImage: fakePageImager().fn,
+      vision: vision.fn,
+    });
+    // Two attempts were made and both were billed. A page that produced nothing usable still cost
+    // something, and a meter that only counts successes understates the spend D-093 approved.
+    expect(result.pages[0]?.usage).toEqual({ input_tokens: 2364 * 2, output_tokens: 144 * 2 });
+  });
+
+  it('accepts a transport that reports neither, and says so rather than inventing zero', async () => {
+    const { imageOnlyPdf } = await import('./fixtures.js');
+    const result = await extract(await imageOnlyPdf(1), 'scan.pdf', {
+      pageImage: fakePageImager().fn,
+      vision: unmeteredVision().fn,
+    });
+    expect(result.outcome).toBe('extracted');
+    expect(result.pages[0]?.route).toBe('vision');
+    expect(result.pages[0]?.usage).toBeNull();
   });
 });

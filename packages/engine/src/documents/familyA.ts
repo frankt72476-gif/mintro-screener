@@ -159,13 +159,18 @@ function a04(check: DocumentCheck, document: DocumentSnapshot, markers: readonly
     );
   }
 
-  const haystack = (document.extraction?.values ?? [])
-    .map((v) => `${v.field} ${v.value ?? ''}`)
-    .concat((document.extraction?.values ?? []).map((v) => ('snippet' in v.provenance ? v.provenance.snippet : '')))
-    .join(' ')
-    .toLowerCase();
+  const values = document.extraction?.values ?? [];
+  const haystack = normaliseForMarkers(
+    values
+      .map((v) => `${v.field} ${v.value ?? ''}`)
+      .concat(values.map((v) => ('snippet' in v.provenance ? v.provenance.snippet : '')))
+      .join(' '),
+  );
 
-  const found = markers.filter((m) => haystack.includes(m.toLowerCase()));
+  const found = markers.filter((m) => haystack.includes(normaliseForMarkers(m)));
+
+  // Finding one is conclusive whatever else was searched: a partial search is enough to prove
+  // presence. This branch is therefore reached before the completeness test, deliberately.
   if (found.length > 0) {
     return clean(
       check,
@@ -174,12 +179,70 @@ function a04(check: DocumentCheck, document: DocumentSnapshot, markers: readonly
       read,
     );
   }
+
+  // Nothing found — and now it matters whether we could have found it (D-118). A presence check
+  // over an incomplete haystack cannot report absent, because it never established that its search
+  // covered the space.
+  const gap = unsearchablePages(document);
+  if (gap !== null) {
+    return notEvaluable(
+      check,
+      'markers_not_searchable',
+      `${name(document)} carries none of the markers expected for ${document.slotKey}, but ${gap} — ` +
+        'so the text those pages show was never part of what was searched, and their absence from ' +
+        'the search is not evidence of their absence from the document.',
+      subject,
+      read,
+    );
+  }
+
   return adverse(
     check,
     `${name(document)} carries none of the markers expected for ${document.slotKey} (${markers.map((m) => `"${m}"`).join(', ')}).`,
     subject,
     read,
   );
+}
+
+/**
+ * Fold away the difference between how a document is referred to and how it is printed.
+ *
+ * A real notice prints "CP 575 A"; the marker was written "CP-575", which is the form's name in
+ * prose. Stripping everything that is not a letter or a digit makes those the same string, along
+ * with case and any run of spacing. Deliberately blunt: A-04 is a weak check by design (D-117),
+ * and the cost of an over-eager match here is a `pass` on a document that was going to be examined
+ * by every other check anyway.
+ */
+function normaliseForMarkers(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/**
+ * Whether any page's text was outside the search, and if so, how to say it.
+ *
+ * `text` and `form` pages put their content into values and snippets, so what was searched is what
+ * the page says. A `vision` page does not: D-100 stops page tier at the page, so there are no
+ * snippets, and the prompt closes the vocabulary — "Report only the field ids listed above" — so
+ * anything that is not a field we asked for never leaves the model. A `none` page was not read at
+ * all. Both are holes in the haystack.
+ */
+function unsearchablePages(document: DocumentSnapshot): string | null {
+  const pages = document.extraction?.pages ?? [];
+  if (pages.length === 0) return 'no page of it was read';
+
+  const vision = pages.filter((p) => p.route === 'vision').map((p) => p.page);
+  const unread = pages.filter((p) => p.route === 'none').map((p) => p.page);
+  if (vision.length === 0 && unread.length === 0) return null;
+
+  const parts: string[] = [];
+  if (vision.length > 0) {
+    parts.push(
+      `page(s) ${vision.join(', ')} were read by the vision route, which returns only the fields it ` +
+        'is asked for and no page text',
+    );
+  }
+  if (unread.length > 0) parts.push(`page(s) ${unread.join(', ')} were not read at all`);
+  return parts.join(' and ');
 }
 
 /**

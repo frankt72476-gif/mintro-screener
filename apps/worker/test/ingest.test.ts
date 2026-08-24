@@ -354,7 +354,7 @@ describe('HEIC through the pipeline (D-104)', () => {
         store: fake.store,
         convertHeic: async () => jpeg,
         pageImage: fakePageImager().fn,
-        vision: async () => ({ text: JSON.stringify({ fields: [] }) }),
+        vision: async () => ({ text: JSON.stringify({ fields: [] }), stop_reason: 'end_turn', usage: null }),
       },
     );
 
@@ -388,7 +388,7 @@ describe('HEIC through the pipeline (D-104)', () => {
           return new Uint8Array(Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex'));
         },
         pageImage: imager.fn,
-        vision: async () => ({ text: JSON.stringify({ fields: [] }) }),
+        vision: async () => ({ text: JSON.stringify({ fields: [] }), stop_reason: 'end_turn', usage: null }),
       },
     );
     expect(seen).toEqual(['converter']);

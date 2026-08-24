@@ -263,7 +263,7 @@ match rather than the other way round. It read "39 checks, 36 in v1" until D-117
 | A-01 | Document yields readable content by at least one path | fail / pass | never — see note | v1 |
 | A-02 | Declared page range complete ("page N of M") | fail / pass | no page numbering found | v1 |
 | A-03 | PDF not password-protected | fail / pass | never | v1 |
-| A-04 | Document carries markers of its declared type | review / pass | no marker set defined for type | v1 |
+| A-04 | Document carries markers of its declared type | review / pass | no marker set defined for type; markers not searchable (D-118) | v1 |
 | A-05 | Required signature and date present | fail / pass | signature block not located | v1 |
 | A-06 | Expiry date after run date (ID, license) | fail / pass | expiry not extracted | v1 |
 | A-07 | Issue or statement date within slot window | fail / pass | date not extracted | v1 |
@@ -276,8 +276,22 @@ a persisted result.
 
 **A-04 is deliberately weak.** No classifier exists (survey §7) and I am not building
 one for v1. This confirms that a document uploaded to the EIN Letter slot contains
-IRS CP-575 or 147C markers. It catches the merchant who uploaded a W-9 into the wrong
+IRS CP 575 or 147C markers. It catches the merchant who uploaded a W-9 into the wrong
 slot. It does not catch a forgery and should never be described as if it does.
+
+**And it may only report a marker ABSENT where the search covered the page — D-118.**
+On a vision-routed page it does not: there are no snippets (D-100) and the model
+returns only the closed field list the prompt permits, so marker text is never in
+what was searched. The result there is `markers_not_searchable`, not an adverse
+finding. Finding a marker is still conclusive wherever it happens, because a partial
+search proves presence and cannot prove absence. Measured: a scanned EIN letter
+printing INTERNAL REVENUE SERVICE in bold produced `review` before this.
+
+Marker sets are written from specimens. A real notice prints "CP 575 A", which
+"CP-575" does not match, so matching normalises spacing, punctuation and case. And a
+marker must discriminate: "Internal Revenue Service" was removed from the
+`ein_letter` set because a W-9 header carries it, which would have made A-04 pass the
+one document it exists to catch.
 
 ### Family B — Package completeness
 

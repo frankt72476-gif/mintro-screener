@@ -6434,6 +6434,112 @@ location in `packages/extraction`.
 
 ---
 
+## D-118 — A presence check over an incomplete haystack may not return absent
+**2026-08-24 · Frank's ruling · amends CHECK-INVENTORY §6 (A-04)**
+
+A-04 returns `not_evaluable` with reason `markers_not_searchable` on any vision-routed document.
+It may return `fail` or `pass` only where the searched text is complete — character-tier text or
+form fields.
+
+### What was measured
+
+The first live vision call read a scanned EIN letter. The page prints **INTERNAL REVENUE SERVICE**
+in bold across the top. A-04 returned `review`: *"carries none of the markers expected for
+ein_letter."*
+
+Not a tuning problem. A-04 searches the extracted values and, for character-tier values, their
+snippets. A vision page has no snippets — D-100 stops page tier at the page — and the vision prompt
+closes the vocabulary deliberately: *"Report only the field ids listed above. Anything else on the
+page is not asked for and must not be returned."* Marker text is not a field id. It therefore
+cannot appear in the searched set, for any scanned document, ever. The check was not looking in the
+wrong place; there was no place to look.
+
+### Why this is the expensive direction
+
+Constraint 9 names both failure directions and this is the one that costs more. With `expect:
+absent`, a partial search reads as absence and yields a false `pass` — bad, and the reason the
+constraint exists. With `expect: present`, it reads as *missing*, and produces an adverse finding
+about a document that is exactly what it claims to be. An agent then chases a merchant for a
+correct EIN letter. That wastes the merchant's time, wastes the agent's, and spends the thing the
+report exists to earn, which is the reader's belief that a flagged item is worth looking at.
+
+Scanned is not the exotic case here. An EIN letter is a piece of paper the IRS mailed; it arrives
+photographed far more often than as a text-layer PDF. The check was blind on the majority case.
+
+### The general form, which is the part worth carrying
+
+**A presence check over an incomplete haystack cannot return absent.** It can return *present* —
+finding something proves it is there, and a partial search is enough for that. It cannot return
+*not there*, because it never established that its search covered the space.
+
+So any check that asserts absence must first show the space was covered. Where it cannot, the
+honest answer is `not_evaluable`, which is a real answer: it says the question was not settled, and
+it names why. This is the same asymmetry constraint 2 is built on, applied to the search rather
+than to the surface — and it generalises past A-04 to every check in families C and D that reports
+something as missing.
+
+### Marker lists come from specimens
+
+`CP-575` does not match a real notice, which prints **CP 575 A**. That was written from memory of
+what the form is called rather than from a document, and the hyphen is the form's name in prose,
+not the string on the page.
+
+Two corrections follow. Matching normalises spacing, punctuation and case, so a marker survives the
+difference between how a document is *referred to* and how it is *printed*. And the `ein_letter`
+set is corrected against a specimen. The rule for new marker sets is the same one D-106 applies to
+fixtures: written from the artifact, not from recollection of it.
+
+---
+
+## D-119 — The vision client retains `stop_reason` and `usage`
+**2026-08-24 · Frank's ruling · amends D-093, D-096**
+
+`VisionResponse` carries the model's stop reason and its token counts. Both were being discarded at
+the transport boundary.
+
+### `stop_reason` — a truncation is not a parse failure
+
+At `max_tokens` the model's JSON comes back cut off mid-object. `mapVisionResponse` then throws
+`VisionParseError("model response was not JSON")`, which is a **wrong diagnosis of a real event**.
+The response was perfectly well-formed for as far as it went; what happened is that we did not
+allow enough room for the answer.
+
+Two costs follow, and the second is worse than the first. The operator reading the reason is sent
+looking for a malformed-output problem that does not exist. And D-096's bound spends one of its two
+attempts on a retry that is deterministic — same page, same prompt, same ceiling, same truncation —
+so the bound is half consumed by a repeat of a failure that could not have gone otherwise.
+
+Truncation is a distinct outcome with its own reason. Knowing it happened also makes it fixable:
+raise `max_tokens` for that page, or record it as terminal, both of which are decisions that
+require knowing which failure occurred.
+
+### `usage` — D-093 approved metered spend and nothing metered it
+
+D-093 approved vision on the ground that metered use is not vendor spend in the sense the
+architecture rules out: it is bounded per page, it is attributable to a run, and it stops when we
+stop calling. Every part of that argument assumes the meter exists. It did not. `VisionResponse`
+was `{ text }`, so the tokens a call cost were unobservable to everything above the transport.
+
+The measurement that closed this was taken by teeing `fetchImpl` inside a verification script,
+which is proof the number is reachable and no way to run a system. Input and output tokens are now
+recorded per call, so cost is observable through the port.
+
+**Baseline, so a future change has something to be compared against:** one scanned page at
+1160×1500, 2,364 input tokens, 144 output, $0.00925, 12.2 s end to end.
+
+### Why the suite could not see either
+
+`fakeVision` returns `{ text: JSON.stringify(payload) }` — always complete, always well-formed,
+always exactly the shape the port declares. That made the port faithful and the transport untested:
+no test had ever seen a real Messages API response, so nothing could notice that seven of its nine
+top-level keys were being dropped, or that one of them distinguished two failures we were merging.
+
+A fake that only produces the success shape tests the happy path and certifies nothing else. The
+fake is extended to produce truncated and malformed responses, so both are reachable from the suite
+rather than only from a live call.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 

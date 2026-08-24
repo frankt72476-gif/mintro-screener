@@ -43,12 +43,19 @@ export interface FakeVision {
   get calls(): number;
 }
 
+/**
+ * A plausible token count, so a test asserting cost is asserting arithmetic rather than zero.
+ *
+ * Anchored on the first live call (D-119): one scanned page cost 2,364 in / 144 out.
+ */
+export const FAKE_USAGE = { input_tokens: 2364, output_tokens: 144 } as const;
+
 /** Answers every page with the same canned payload. */
 export function fakeVision(payload: unknown = { fields: [] }): FakeVision {
   const requests: VisionRequest[] = [];
   const fn: VisionClient = async (request) => {
     requests.push(request);
-    return { text: JSON.stringify(payload) };
+    return { text: JSON.stringify(payload), stop_reason: 'end_turn', usage: { ...FAKE_USAGE } };
   };
   return { fn, requests, get calls() { return requests.length; } };
 }
@@ -58,7 +65,57 @@ export function fakeVisionByPage(byPage: Record<number, unknown>): FakeVision {
   const requests: VisionRequest[] = [];
   const fn: VisionClient = async (request) => {
     requests.push(request);
-    return { text: JSON.stringify(byPage[request.page] ?? { fields: [] }) };
+    return {
+      text: JSON.stringify(byPage[request.page] ?? { fields: [] }),
+      stop_reason: 'end_turn',
+      usage: { ...FAKE_USAGE },
+    };
+  };
+  return { fn, requests, get calls() { return requests.length; } };
+}
+
+/**
+ * The model ran out of room: `stop_reason: 'max_tokens'` and a body cut off mid-object.
+ *
+ * This shape had never been in the suite, because `fakeVision` always returned complete JSON, and
+ * that is precisely why the truncation was reported as a malformed response for as long as it was
+ * (D-119). The text really is invalid JSON — that part was never wrong — but the *reason* it is
+ * invalid is knowable from `stop_reason`, and it is a different fault with a different remedy.
+ */
+export function truncatedVision(): FakeVision {
+  const requests: VisionRequest[] = [];
+  const fn: VisionClient = async (request) => {
+    requests.push(request);
+    return {
+      text: '{"fields":[{"field":"legal_name","index":0,"presence":"present","value":"NORTHWIND PEP',
+      stop_reason: 'max_tokens',
+      usage: { input_tokens: FAKE_USAGE.input_tokens, output_tokens: 2048 },
+    };
+  };
+  return { fn, requests, get calls() { return requests.length; } };
+}
+
+/**
+ * A complete response that is not JSON — the model answered in prose.
+ *
+ * Distinct from `truncatedVision` on purpose: same symptom at the parse site, different cause, and
+ * the two must not collapse back into one reason.
+ */
+export function malformedVision(text = 'I can see a bank statement for Northwind Peptides LLC.'): FakeVision {
+  const requests: VisionRequest[] = [];
+  const fn: VisionClient = async (request) => {
+    requests.push(request);
+    return { text, stop_reason: 'end_turn', usage: { ...FAKE_USAGE } };
+  };
+  return { fn, requests, get calls() { return requests.length; } };
+}
+
+/** A transport that reports neither — the port allows it, so something must exercise it. */
+export function unmeteredVision(payload: unknown = { fields: [] }): FakeVision {
+  const requests: VisionRequest[] = [];
+  const fn: VisionClient = async (request) => {
+    requests.push(request);
+    return { text: JSON.stringify(payload), stop_reason: null, usage: null };
   };
   return { fn, requests, get calls() { return requests.length; } };
 }

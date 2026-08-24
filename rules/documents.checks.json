@@ -42,9 +42,10 @@
         "business_address"
       ],
       "markers": [
-        "CP-575",
+        "CP 575",
         "147C",
-        "Internal Revenue Service"
+        "We assigned you an Employer Identification Number",
+        "Form SS-4"
       ]
     },
     {
@@ -301,6 +302,7 @@
     "expiry_not_extracted",
     "fewer_than_two_sources",
     "high_ticket_not_itemized",
+    "markers_not_searchable",
     "no_marker_set_for_type",
     "no_processing_statements",
     "ownership_section_not_extracted",
@@ -395,10 +397,11 @@
         "pass"
       ],
       "not_evaluable_when": [
-        "no_marker_set_for_type"
+        "no_marker_set_for_type",
+        "markers_not_searchable"
       ],
       "release": "v1",
-      "note": "Deliberately weak. No classifier exists. It confirms a document filed in the EIN Letter slot carries CP-575 or 147C markers, which catches a W-9 in the wrong slot. It does not catch a forgery and must never be described as if it does."
+      "note": "Deliberately weak. No classifier exists. It confirms a document filed in the EIN Letter slot carries CP 575 or 147C markers, which catches a W-9 in the wrong slot. It does not catch a forgery and must never be described as if it does. D-118: it may only report markers ABSENT where the searched text is complete — character-tier text or form fields. On a vision-routed page the model returns only the closed field list, so marker text cannot be in the searched set and the answer is markers_not_searchable."
     },
     {
       "id": "A-05",

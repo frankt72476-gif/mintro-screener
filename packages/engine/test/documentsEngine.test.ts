@@ -61,6 +61,7 @@ function extraction(
       route,
       reason: route === 'none' ? 'no page imager was supplied' : null,
       glyphs: route === 'text' ? 200 : 0,
+      usage: route === 'vision' ? { input_tokens: 2364, output_tokens: 144 } : null,
     })),
     values,
     hash: 'h'.repeat(64),
@@ -231,6 +232,81 @@ describe('A-04 — markers of the declared type', () => {
     // Fuzzy comparison, so review rather than fail (D-099).
     expect(f.state).toBe('review');
     expect(f.note).toMatch(/none of the markers expected/);
+  });
+
+  /**
+   * D-118, and the case that produced it.
+   *
+   * A scanned EIN letter printing INTERNAL REVENUE SERVICE in bold returned `review` — "carries
+   * none of the markers expected". The page said so; the search could not see it. A vision page
+   * has no snippets (D-100) and returns only the closed field list the prompt permits, so marker
+   * text is never in the haystack and no amount of it being on the page changes that.
+   */
+  it('is not evaluable on a vision-routed page, because the marker text was never searchable', () => {
+    const d = doc({ extraction: extraction([value('legal_name', 'NORTHWIND PEPTIDES LLC', 'page')], 'vision') });
+    const f = one(run(snapshot({ documents: [d] }), ['A']), 'A-04');
+    expect(f.state).toBe('not_evaluable');
+    expect(f.notEvaluableReason).toBe('markers_not_searchable');
+    expect(f.note).toMatch(/vision route/);
+  });
+
+  /**
+   * The asymmetry is the whole ruling: a partial search proves presence and cannot prove absence.
+   * If this returned not_evaluable too, D-118 would have been implemented as "distrust vision",
+   * which is a different and weaker rule.
+   */
+  it('still passes on a vision page when a marker IS found, because finding one is conclusive', () => {
+    const d = doc({
+      extraction: extraction([value('legal_name', 'CP 575 A NORTHWIND PEPTIDES LLC', 'page')], 'vision'),
+    });
+    expect(one(run(snapshot({ documents: [d] }), ['A']), 'A-04').state).toBe('pass');
+  });
+
+  it('reports absent only where every page was searchable', () => {
+    const complete = doc({ extraction: extraction([value('legal_name', 'Northwind Peptides LLC')], 'text', 2) });
+    expect(one(run(snapshot({ documents: [complete] }), ['A']), 'A-04').state).toBe('review');
+  });
+
+  it('a hybrid document is judged by the hole, not by the majority', () => {
+    // Two text pages and one vision page. The text pages carry no marker; the vision page might.
+    const hybrid = doc({
+      extraction: {
+        ...extraction([value('legal_name', 'Northwind Peptides LLC')], 'text', 3),
+        pages: [
+          { page: 1, route: 'text', reason: null, glyphs: 200, usage: null },
+          { page: 2, route: 'vision', reason: null, glyphs: 0, usage: { input_tokens: 2364, output_tokens: 144 } },
+          { page: 3, route: 'text', reason: null, glyphs: 200, usage: null },
+        ],
+      },
+    });
+    const f = one(run(snapshot({ documents: [hybrid] }), ['A']), 'A-04');
+    expect(f.state).toBe('not_evaluable');
+    expect(f.note).toMatch(/page\(s\) 2 were read by the vision route/);
+  });
+
+  /**
+   * "CP-575" is what the notice is called in prose. "CP 575 A" is what is printed on it. A marker
+   * list written from memory rather than from a specimen matches the first and misses the second.
+   */
+  it('matches across spacing, punctuation and case', () => {
+    for (const printed of ['Notice CP 575 A', 'CP-575', 'cp575', 'NOTICE  CP   575   G']) {
+      const d = doc({ extraction: extraction([value('legal_name', `${printed} Northwind`)]) });
+      expect(one(run(snapshot({ documents: [d] }), ['A']), 'A-04').state, printed).toBe('pass');
+    }
+  });
+
+  /**
+   * The marker set has to discriminate, or the check cannot do the one thing D-117 credits it with.
+   * A W-9 header reads "Department of the Treasury Internal Revenue Service" — which is why that
+   * string was removed from the ein_letter set when D-118 corrected it against a specimen.
+   */
+  it('does not pass a W-9 filed in the EIN Letter slot', () => {
+    const w9 = doc({
+      extraction: extraction([
+        value('legal_name', 'Form W-9 (Rev. March 2024) Department of the Treasury Internal Revenue Service'),
+      ]),
+    });
+    expect(one(run(snapshot({ documents: [w9] }), ['A']), 'A-04').state).toBe('review');
   });
 
   it('is not evaluable for a type with no marker set', () => {

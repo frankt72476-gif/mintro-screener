@@ -24,7 +24,7 @@ import { assertWellFormed } from './invariants.js';
 import { EncryptedPdfError, UnreadablePdfError, openPdf, type FormField } from './pdf.js';
 import type { PageImager, RasterPage, ResultCache, VisionClient } from './ports.js';
 import { isReadable, refusalReason, sniff, type DetectedType, type RefusedType } from './sniff.js';
-import type { ExtractedValue, ExtractionResult, PageResult, Route } from './types.js';
+import type { ExtractedValue, ExtractionResult, PageResult, Route, VisionUsage } from './types.js';
 import { EXTRACTOR_VERSION } from './version.js';
 import { VISION_SYSTEM_PROMPT, VISION_USER_PROMPT, mapVisionResponse } from './vision.js';
 
@@ -74,19 +74,45 @@ async function readPageWithVision(
   documentVersion: string,
   vision: VisionClient,
   maxAttempts: number,
-): Promise<{ values: ExtractedValue[] } | { failure: string }> {
+): Promise<{ values: ExtractedValue[]; usage: VisionUsage | null } | { failure: string; usage: VisionUsage | null }> {
   let last = 'no attempt was made';
+  let usage: VisionUsage | null = null;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await vision({ image, page, system: VISION_SYSTEM_PROMPT, user: VISION_USER_PROMPT });
-      return { values: mapVisionResponse(response.text, page, documentVersion) };
+      // Recorded before anything can throw: a call that was made and billed is a call that was
+      // made and billed, whether or not we could use what came back (D-119).
+      if (response.usage !== null) {
+        usage =
+          usage === null
+            ? response.usage
+            : {
+                input_tokens: usage.input_tokens + response.usage.input_tokens,
+                output_tokens: usage.output_tokens + response.usage.output_tokens,
+              };
+      }
+
+      // A truncation is not a parse failure, and retrying it is not a retry (D-119). The same page
+      // at the same ceiling truncates identically, so a second attempt spends half the bound on a
+      // foregone conclusion and reports the wrong cause when it fails.
+      if (response.stop_reason === 'max_tokens') {
+        return {
+          failure:
+            `the model's answer was cut off at max_tokens on attempt ${attempt}, so the response is ` +
+            'incomplete rather than malformed. Retrying at the same ceiling would truncate identically.',
+          usage,
+        };
+      }
+
+      return { values: mapVisionResponse(response.text, page, documentVersion), usage };
     } catch (e) {
       last = String((e as Error)?.message ?? e);
     }
   }
   // Terminal. The reason names the bound so a reader can tell an exhausted page from one that was
   // never tried — the difference between "we tried and could not" and "nothing happened".
-  return { failure: `vision failed after ${maxAttempts} attempt(s), terminal: ${last}` };
+  return { failure: `vision failed after ${maxAttempts} attempt(s), terminal: ${last}`, usage };
 }
 
 async function extractImage(
@@ -114,7 +140,7 @@ async function extractImage(
       ...base,
       outcome: 'unreadable',
       reason: `an image can only be read by the vision route, and ${missing}`,
-      pages: [{ page: 1, route: 'none', reason: missing, glyphs: 0 }],
+      pages: [{ page: 1, route: 'none', reason: missing, glyphs: 0, usage: null }],
       values: [],
     };
   }
@@ -128,7 +154,7 @@ async function extractImage(
       ...base,
       outcome: 'unreadable',
       reason: why,
-      pages: [{ page: 1, route: 'none', reason: why, glyphs: 0 }],
+      pages: [{ page: 1, route: 'none', reason: why, glyphs: 0, usage: null }],
       values: [],
     };
   }
@@ -140,7 +166,7 @@ async function extractImage(
       ...base,
       outcome: 'unreadable',
       reason: read.failure,
-      pages: [{ page: 1, route: 'none', reason: read.failure, glyphs: 0 }],
+      pages: [{ page: 1, route: 'none', reason: read.failure, glyphs: 0, usage: read.usage }],
       values: [],
     };
   }
@@ -149,7 +175,7 @@ async function extractImage(
     ...base,
     outcome: 'extracted',
     reason: null,
-    pages: [{ page: 1, route: 'vision', reason: null, glyphs: 0 }],
+    pages: [{ page: 1, route: 'vision', reason: null, glyphs: 0, usage: read.usage }],
     values: read.values,
   };
 }
@@ -198,6 +224,7 @@ async function extractPdf(
 
     let route: Route;
     let reason: string | null = null;
+    let usage: VisionUsage | null = null;
 
     if (formFields.length > 0) {
       // D-089: fields first. The text layer of a form page is still read — a filled form usually
@@ -241,6 +268,7 @@ async function extractPdf(
           reason ??= 'page could not be imaged';
         } else {
           const read = await readPageWithVision(image, n, hash, vision, maxAttempts);
+          usage = read.usage;
           if ('failure' in read) {
             route = 'none';
             reason = read.failure;
@@ -252,7 +280,7 @@ async function extractPdf(
       }
     }
 
-    pages.push({ page: n, route, reason, glyphs });
+    pages.push({ page: n, route, reason, glyphs, usage });
   }
 
   const readAny = pages.some((p) => p.route !== 'none');

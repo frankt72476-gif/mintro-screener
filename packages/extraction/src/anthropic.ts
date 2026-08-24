@@ -111,11 +111,26 @@ export function createAnthropicVisionClient(options: AnthropicOptions = {}): Vis
         throw new AnthropicError(`Anthropic API ${res.status}: ${text.slice(0, 300)}`, res.status);
       }
 
-      const json = (await res.json()) as { content?: { type?: string; text?: string }[] };
+      const json = (await res.json()) as {
+        content?: { type?: string; text?: string }[];
+        stop_reason?: string | null;
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
       const text = Array.isArray(json.content)
         ? json.content.filter((b) => b?.type === 'text').map((b) => b.text ?? '').join('')
         : '';
-      return { text };
+
+      // Carried, not dropped (D-119). The live response has nine top-level keys and seven of them
+      // were being discarded here; two of those seven were load-bearing.
+      const stop_reason = typeof json.stop_reason === 'string' ? json.stop_reason : null;
+      const input = json.usage?.input_tokens;
+      const output = json.usage?.output_tokens;
+      const usage =
+        typeof input === 'number' && typeof output === 'number'
+          ? { input_tokens: input, output_tokens: output }
+          : null;
+
+      return { text, stop_reason, usage };
     } catch (e) {
       if (e instanceof AnthropicError) throw e;
       if (isAbortLike(e)) throw new AnthropicError(`Anthropic call timed out after ${timeoutMs}ms`, null, true);
