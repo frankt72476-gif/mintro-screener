@@ -11,7 +11,7 @@ import { parseRuleset, type Ruleset } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
 import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
-import { useAuth } from './lib/auth.js';
+import { AuthProvider, useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
 import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
@@ -163,6 +163,16 @@ function MerchantRoute({ token }: { readonly token: string }): JSX.Element {
  * empty report.
  */
 function AnalystApp(): JSX.Element {
+  // The provider lives here rather than around the whole tree, so the merchant route never
+  // constructs a client it has no use for (D-071).
+  return (
+    <AuthProvider>
+      <AnalystWorkspace />
+    </AuthProvider>
+  );
+}
+
+function AnalystWorkspace(): JSX.Element {
   const { state } = useAuth();
 
   if (state.status === 'loading') {
