@@ -6681,6 +6681,64 @@ that means writing it down.
 
 ---
 
+## D-123 — A run records what it ran against
+**2026-08-24 · Frank's ruling · migration 0028**
+
+`document_runs` carries the slot table and the document list the run executed against, alongside a
+digest over both.
+
+### D-085 was unachievable, not merely unenforced
+
+"Same run in, byte-identical report out" reads like a discipline — something you hold to by not
+putting a clock in the builder. It is not. Slots are mutable: a document arriving after a run
+changes `slots.state`, and a report assembled from the run plus *current* slots is a function of
+the run **and the moment it was rendered**.
+
+So regenerating a report a week later, from a run id that had not changed and could not change,
+produced a different document. Nothing was wrong with the builder. The property was false at the
+data layer, and no amount of care above it would have made it true.
+
+That is the part worth carrying: **a purity claim over mutable inputs is not a claim about the
+function.** The run had to be made self-contained before "pure function of a run" meant anything,
+and the fix was a schema change rather than a code change.
+
+The digest follows from the same fact. D-117 moved the stale-run precondition out of the engine
+because nothing in a snapshot distinguishes a fresh run from an aged one; a run that records its
+inputs can answer that question, and one that does not cannot.
+
+### How purity gets verified
+
+**By rebuilding from rows supplied in reversed order**, not by calling the builder twice on one
+object.
+
+The second establishes that a function is deterministic on an identical argument, which is true of
+almost any function and is not the property. What has to hold is that a run *reconstructed from its
+rows* yields the same bytes however the database returned them — because that is what regenerating
+a report actually does, and row order is not a fact about the run.
+
+The distinction is not academic. Break-testing found four ordering defects that the weaker test
+passed over, every one of them a fixture too small to tell two orders apart: one package-level
+finding cannot detect an unsorted list, and findings written out in check-id order cannot detect a
+missing sort. A test that cannot distinguish the failure is not evidence of the property.
+
+### §7 is data, not markup
+
+CHECK-INVENTORY §7 lives in `rules/documents.checks.json` as `not_checked`, with the D-076 line
+that no external verification was performed beyond the routing directory lookup.
+
+It is the report's statement of **what Mintro did not verify**, and that is a claim about the
+system's boundaries — the same kind of thing as a check definition, which is why it belongs in the
+same file. Held in a React component it would be editable by anyone touching the frontend, with no
+decision number and no review, and the sentence most in need of governance is precisely the one
+that says what we did not do.
+
+Silence is not a boundary (D-018, D-076). A reader cannot tell from an absent claim whether the IRS
+was consulted and matched or never consulted at all; both render as nothing. The section exists to
+deny coverage a reader would otherwise reasonably assume, and a denial that can be quietly deleted
+is not one.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 
