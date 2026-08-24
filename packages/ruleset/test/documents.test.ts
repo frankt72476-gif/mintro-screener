@@ -371,3 +371,75 @@ describe('the field vocabulary stays in step with the extractor', () => {
     expect(unknown).toEqual([]);
   });
 });
+
+/**
+ * Every check's declared `not_evaluable_when`, pinned.
+ *
+ * A bulk edit to this file once added `document_not_readable` to D-06 as well as the five A-family
+ * checks it was aimed at: the patch matched a four-space-indented line as a substring of an
+ * eight-space-indented one, and nothing noticed, because no test looked at the conditions a check
+ * declares — only at whether each one was enumerated globally, which it was.
+ *
+ * So this is a full inventory rather than a spot check. It is tedious on purpose: the failure mode
+ * is a condition quietly appearing on a check that does not mean it, and the only thing that
+ * catches that is knowing what every check is supposed to say.
+ */
+describe("each check's not_evaluable conditions", () => {
+  const EXPECTED: Readonly<Record<string, readonly string[]>> = {
+    'A-01': [],
+    'A-02': ['document_not_readable', 'page_numbering_absent'],
+    'A-03': [],
+    'A-04': ['document_not_readable', 'markers_not_searchable', 'no_marker_set_for_type'],
+    'A-05': ['document_not_readable', 'signature_block_not_located'],
+    'A-06': ['document_not_readable', 'expiry_not_extracted'],
+    'A-07': ['date_not_extracted', 'document_not_readable'],
+    'B-01': [],
+    'B-02': ['required_count_unknown'],
+    'B-03': ['periods_not_extracted'],
+    'B-04': ['periods_not_extracted'],
+    'B-05': ['predicate_inputs_not_extracted'],
+    'C-01': ['fewer_than_two_sources'],
+    'C-02': ['fewer_than_two_sources', 'no_dba_declared'],
+    'C-03': ['fewer_than_two_sources'],
+    'C-04': ['fewer_than_two_sources'],
+    'C-05': ['fewer_than_two_sources'],
+    'C-06': ['fewer_than_two_sources'],
+    'C-07': ['fewer_than_two_sources'],
+    'C-08': ['fewer_than_two_sources'],
+    'C-09': ['fewer_than_two_sources'],
+    'C-10': ['fewer_than_two_sources', 'routing_directory_unavailable', 'routing_number_not_extracted'],
+    'C-11': ['fewer_than_two_sources'],
+    'C-12': ['fewer_than_two_sources'],
+    'C-13': ['fewer_than_two_sources', 'ownership_section_not_extracted'],
+    // C-14 carries no `fewer_than_two_sources`, and that is the whole of D-116's exemption.
+    'C-14': ['ownership_section_not_extracted'],
+    'C-15': ['fewer_than_two_sources'],
+    'C-16': ['fewer_than_two_sources'],
+    'C-17': ['fewer_than_two_sources'],
+    'C-18': ['fewer_than_two_sources'],
+    'C-19': ['slot_not_resolved_to_not_provided'],
+    'C-20': ['fewer_than_two_sources'],
+    'D-01': ['no_processing_statements', 'processing_statements_not_provided', 'stated_figure_absent'],
+    'D-02': ['no_processing_statements', 'processing_statements_not_provided', 'stated_figure_absent'],
+    'D-03': ['high_ticket_not_itemized', 'processing_statements_not_provided', 'stated_figure_absent'],
+    'D-04': ['chargebacks_not_itemized', 'processing_statements_not_provided', 'stated_figure_absent'],
+    'D-05': ['refunds_not_itemized', 'processing_statements_not_provided'],
+    'D-06': ['either_side_unreadable', 'processing_statements_not_provided'],
+  };
+
+  it('are exactly what the inventory says, for every check', () => {
+    const rules = loadDocumentsRules();
+    const actual = Object.fromEntries(
+      rules.checks.checks.map((c) => [c.id, [...c.not_evaluable_when].sort()]),
+    );
+    const expected = Object.fromEntries(
+      Object.entries(EXPECTED).map(([id, conditions]) => [id, [...conditions].sort()]),
+    );
+    expect(actual).toEqual(expected);
+  });
+
+  it('names every check, so a new one cannot slip past this list', () => {
+    const rules = loadDocumentsRules();
+    expect(rules.checks.checks.map((c) => c.id).sort()).toEqual(Object.keys(EXPECTED).sort());
+  });
+});

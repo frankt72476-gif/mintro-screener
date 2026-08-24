@@ -32,3 +32,6 @@ export {
   type Period,
 } from './coverage.js';
 export type * from './types.js';
+export { runFamilyC, sources, type RoutingDirectory, type Source } from './familyC.js';
+export { runFamilyD, MATERIAL_GAP } from './familyD.js';
+export * as normalise from './normalise.js';

@@ -15,12 +15,21 @@ import type { DocumentsRules } from '@mintro/ruleset';
 import { assertFindingWellFormed } from './findings.js';
 import { runFamilyA } from './familyA.js';
 import { runFamilyB } from './familyB.js';
+import { runFamilyC, type RoutingDirectory } from './familyC.js';
+import { runFamilyD } from './familyD.js';
 import type { CheckState, DocumentFinding, DocumentsRun, PackageSnapshot } from './types.js';
 
 export interface RunOptions {
   readonly runId: string;
-  /** Families to run. M3 ships A and B; C and D land at M4 on this same shape. */
   readonly families?: readonly ('A' | 'B' | 'C' | 'D')[];
+  /**
+   * The Federal Reserve E-Payments routing directory, for C-10 — the only external check in v1.
+   *
+   * A port, not an import: a multi-megabyte file that changes weekly has no business being loaded
+   * by a pure check function. Absent, C-10 says so and returns `routing_directory_unavailable`
+   * rather than passing on a lookup it never made.
+   */
+  readonly routingDirectory?: RoutingDirectory;
 }
 
 /** Counts by state. Not a score, not a verdict — four numbers a reader can see the basis of. */
@@ -49,6 +58,14 @@ export function runDocumentChecks(
   const findings: DocumentFinding[] = [];
   if (families.includes('A')) findings.push(...runFamilyA({ snapshot, checks: byId, markers }));
   if (families.includes('B')) findings.push(...runFamilyB({ snapshot, checks: byId }));
+  if (families.includes('C')) {
+    findings.push(...runFamilyC({
+      snapshot,
+      checks: byId,
+      ...(options.routingDirectory === undefined ? {} : { routingDirectory: options.routingDirectory }),
+    }));
+  }
+  if (families.includes('D')) findings.push(...runFamilyD({ snapshot, checks: byId }));
 
   // Every finding re-checked against the check that produced it. Cheap, and it is the difference
   // between the constructors being a discipline and being a guarantee.

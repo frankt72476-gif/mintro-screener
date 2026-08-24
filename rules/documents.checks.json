@@ -304,6 +304,7 @@
     "fewer_than_two_sources",
     "high_ticket_not_itemized",
     "markers_not_searchable",
+    "no_dba_declared",
     "no_marker_set_for_type",
     "no_processing_statements",
     "ownership_section_not_extracted",
@@ -313,8 +314,10 @@
     "processing_statements_not_provided",
     "refunds_not_itemized",
     "required_count_unknown",
+    "routing_directory_unavailable",
     "routing_number_not_extracted",
     "signature_block_not_located",
+    "stated_figure_absent",
     "slot_not_resolved_to_not_provided"
   ],
   "checks": [
@@ -643,15 +646,18 @@
       "compares": {
         "kind": "field_across_documents",
         "field": "dba_name",
-        "exactness": "fuzzy"
+        "exactness": "fuzzy",
+        "absent_when": "dba_same_as_legal"
       },
       "states": [
         "review",
         "pass"
       ],
       "not_evaluable_when": [
-        "fewer_than_two_sources"
+        "fewer_than_two_sources",
+        "no_dba_declared"
       ],
+      "note": "Returns no_dba_declared when the application sets \"DBA same as legal name\": a sole proprietor with no DBA must never show a clean DBA check that checked nothing. The finding text must not imply the name is registered anywhere — there is no DBA filing in the required set, so this compares what documents display and nothing more.",
       "release": "v1"
     },
     {
@@ -871,6 +877,7 @@
       ],
       "not_evaluable_when": [
         "fewer_than_two_sources",
+        "routing_directory_unavailable",
         "routing_number_not_extracted"
       ],
       "release": "v1",
@@ -1182,7 +1189,8 @@
       ],
       "not_evaluable_when": [
         "no_processing_statements",
-        "processing_statements_not_provided"
+        "processing_statements_not_provided",
+        "stated_figure_absent"
       ],
       "release": "v1"
     },
@@ -1211,7 +1219,8 @@
       ],
       "not_evaluable_when": [
         "no_processing_statements",
-        "processing_statements_not_provided"
+        "processing_statements_not_provided",
+        "stated_figure_absent"
       ],
       "release": "v1"
     },
@@ -1239,7 +1248,8 @@
       ],
       "not_evaluable_when": [
         "high_ticket_not_itemized",
-        "processing_statements_not_provided"
+        "processing_statements_not_provided",
+        "stated_figure_absent"
       ],
       "release": "v1"
     },
@@ -1269,7 +1279,8 @@
       ],
       "not_evaluable_when": [
         "chargebacks_not_itemized",
-        "processing_statements_not_provided"
+        "processing_statements_not_provided",
+        "stated_figure_absent"
       ],
       "release": "v1"
     },
@@ -1322,8 +1333,7 @@
         "pass"
       ],
       "not_evaluable_when": [
-        "document_not_readable",
-    "either_side_unreadable",
+        "either_side_unreadable",
         "processing_statements_not_provided"
       ],
       "release": "deferred"

@@ -67,6 +67,22 @@ export const FIELDS: readonly FieldSpec[] = [
     formHints: ['dba', 'doingbusinessas', 'tradename', 'fictitiousname'],
   },
   {
+    /**
+     * The application's "DBA same as legal name" box.
+     *
+     * A field of its own rather than an inference from an empty `dba_name`, because those are two
+     * different observations: a merchant who declared they have no trading name, and a form we
+     * could not read. C-02 turns on exactly that difference — the first is `no_dba_declared`, the
+     * second is a comparison we failed to make and must not report as clean.
+     */
+    id: 'dba_same_as_legal',
+    kind: 'text',
+    repeated: false,
+    readBy: ['C-02'],
+    labels: ['dba same as legal name', 'same as legal name', 'dba same as legal', 'no dba'],
+    formHints: ['dbasameaslegal', 'sameaslegalname', 'nodba', 'dbasame'],
+  },
+  {
     id: 'ein',
     kind: 'digits',
     repeated: false,
