@@ -4385,3 +4385,70 @@ append-only table is written for good, and "I will clean it up afterwards" is no
 design.
 
 Frank's full-loop test starts from a fresh scan, so the run that reaches IQwallet is unaffected.
+
+---
+
+## D-073 — The corroboration block is removed
+**2026-08-24 · Frank's ruling · reverses D-050**
+
+*"Findings that describe the same observation"* is gone from the report.
+
+### Why it was built, and why that reason has thinned
+
+D-050 built it for the GATE-002 / GATE-004 case: two rules whose findings rest on the same
+observation, where a reader seeing both might count one fact twice. That was a real problem when
+the report had little else to orient a reader with.
+
+Three things have been added since, each of which addresses a piece of what it was for:
+
+- the **requirement column** (D-041), which states what each rule asks, so two findings on one
+  observation now visibly answer different questions
+- the **four-column coverage breakdown** (D-044), which accounts for every finding
+- the **participation record** (D-063), which is where a reader now looks first for context
+
+Against those, it has not earned its space. **0.2 pages measured**, which is not the point — the
+point is that it is a fourth orienting device on a document that already has three, and each one a
+reader has to learn costs more than its own height.
+
+### It can come back
+
+Recorded rather than deleted silently, because the case that justified it has not become wrong —
+only less pressing. If a merchant produces a pairing that genuinely misleads, this returns.
+
+**The engine keeps `pairSameObservation` and the `sameObservation` field.** The pairing rule is
+the hard part and it is tested; the display was ten lines of JSX. Removing the engine half would
+mean rebuilding and re-testing D-050's logic to restore a block, and the field costs nothing on
+paper. **Say if that is the wrong call** — the alternative is deleting it and accepting the rebuild.
+
+---
+
+## D-074 — The participation record names what was answered, not what was not
+**2026-08-24 · Frank's ruling**
+
+> A bare list of codes is a lookup table, not information — it tells an underwriter to go hunting.
+
+It listed every unanswered finding by rule code, exhaustively. Two things wrong with that, and the
+second is the one that matters.
+
+**It was the wrong direction.** What a reader wants before weighing a response is *which
+observations were addressed* — a handful of items on a 97-finding report. What was not addressed is
+the other ninety-odd, and printing them is printing the report again in miniature.
+
+**It was coded rather than named.** `GATE-002` means nothing without the document open at the right
+page. It now reads *"Products hidden until an account exists"*, which can be read on its own.
+
+The count of unanswered stays in the line above. **The count is the fact; the enumeration was the
+lookup table.**
+
+The header material is unchanged and was right: who identified themselves, when the report was first
+opened, how many of the findings open for response were answered.
+
+### Measured
+
+The participation record went from **2.0 pages to 0.2**. Together with D-073 the export fell from
+**51 pages to 48** without captures — the artifact Frank received was 76 with them.
+
+`loop-check` was updated with it, and the cross-check kept its shape: every rule the merchant
+commented on must be **named** in the list, the list must hold nothing else, and it must contain no
+rule code at all. Matched against finding titles from the report and comment rows from the database
+— still two independent sources.

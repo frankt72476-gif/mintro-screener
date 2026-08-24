@@ -28,17 +28,8 @@ import { formatStamp } from '../lib/format.js';
 
 export function ParticipationRecord({
   participation,
-  print = false,
 }: {
   readonly participation: Participation;
-  /**
-   * In print the unanswered list is open, never collapsed.
-   *
-   * A `<details>` cannot be opened by a stylesheet, so this has to be a prop. An exported document
-   * that hid which findings went unanswered would hold less than the screen it claims to
-   * reproduce, and it is the copy that reaches the underwriter (D-042).
-   */
-  readonly print?: boolean;
 }): JSX.Element {
   const { invited, sentTo, firstOpenedAt, visits, offered, answered, unanswered } = participation;
 
@@ -57,7 +48,7 @@ export function ParticipationRecord({
     );
   }
 
-  const unansweredList = participation.findings.filter((finding) => !finding.answered);
+  const answeredList = participation.findings.filter((finding) => finding.answered);
 
   return (
     <div className="card partic">
@@ -124,20 +115,35 @@ export function ParticipationRecord({
         </dd>
       </dl>
 
-      {unansweredList.length > 0 && (
-        <details className="partic-list" open={print}>
-          <summary>Findings open for response with none given ({unansweredList.length})</summary>
+      {answeredList.length > 0 && (
+        <div className="partic-list">
+          {/*
+            What they responded to, **named** (D-074).
+
+            This listed the unanswered findings by rule code, exhaustively. A bare list of codes is
+            a lookup table, not information: it tells an underwriter to go hunting through
+            ninety-seven findings to learn what it means, and the answer is already printed beside
+            each one.
+
+            The useful direction is the short one. Which observations the merchant actually
+            addressed is a handful of items, it is what a reader wants before deciding how much
+            weight the responses carry, and naming them means the list can be read on its own.
+
+            The unanswered count stays in the line above. **The count is the fact; the enumeration
+            was the lookup table.**
+          */}
+          <span className="partic-list-head">Responded to</span>
           <ul>
-            {unansweredList.map((finding, index) => (
+            {answeredList.map((finding, index) => (
               <li key={`${finding.ruleId}-${finding.ordinal ?? 'x'}-${index}`}>
-                <span className="partic-rule">{finding.ruleId}</span> {finding.title}
+                {finding.title}
                 {finding.ordinal !== undefined && (
                   <span className="partic-qual"> — page {finding.ordinal + 1}</span>
                 )}
               </li>
             ))}
           </ul>
-        </details>
+        </div>
       )}
     </div>
   );

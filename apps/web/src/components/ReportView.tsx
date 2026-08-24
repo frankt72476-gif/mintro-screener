@@ -200,9 +200,7 @@ export function ReportView({
         )}
       </div>
 
-      {participation !== undefined && (
-        <ParticipationRecord participation={participation} print={print} />
-      )}
+      {participation !== undefined && <ParticipationRecord participation={participation} />}
 
       {commentaryNote !== undefined && (
         <div className="card cnote">
@@ -214,7 +212,6 @@ export function ReportView({
       <VerdictBanner report={report} />
       <TickStrip report={report} />
       <CoverageBreakdown report={report} />
-      <SameObservation report={report} />
 
       {print ? <Coverage report={report} /> : <Filters filter={filter} onChange={setFilter} report={report} />}
 
@@ -412,50 +409,6 @@ function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element
   );
 }
 
-/**
- * Findings that describe the same observation (D-050).
- *
- * Two findings, side by side, each quoting what it observed. **Nothing here says what the pair
- * means.** An earlier draft ended each entry with a sentence naming what the two had in common —
- * "both concern whether an account is required" — and that is Mintro drawing a conclusion from a
- * pair. Adjacency conveys it without us saying it (D-001).
- *
- * The heading is deliberately not "corroborating", which would assert that the findings support
- * each other. They are shown together because the rule set says they look at one thing; whether
- * that strengthens anything is IQwallet's call.
- *
- * Pairs come from the report, which reads them from `corroborates` in the rule set. Nothing is
- * inferred here.
- */
-function SameObservation({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
-  const pairs = report.sameObservation;
-  if (pairs === undefined || pairs.length === 0) return null;
-
-  return (
-    <div className="same-obs">
-      <div className="eyebrow">Findings that describe the same observation</div>
-      {pairs.map((pair) => (
-        <div className="same-obs-pair" key={pair.ruleIds.join('|')}>
-          {pair.findings.map((finding, index) => (
-            <div className={`same-obs-item ${stateClass(finding.state)}`} key={`${finding.ruleId}-${index}`}>
-              <span className="same-obs-head">
-                <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
-                <span className="same-obs-title">
-                  {finding.title} <span className="mono same-obs-id">{finding.ruleId}</span>
-                </span>
-              </span>
-              <p className="same-obs-note">
-                {finding.state === 'not_evaluable'
-                  ? (finding.notEvaluableReason ?? finding.note)
-                  : finding.note}
-              </p>
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /**
  * Whose limitation each gap is, said directly (D-049).

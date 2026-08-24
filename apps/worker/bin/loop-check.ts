@@ -34,6 +34,9 @@ import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase
 
 const WEB_ROOT = process.env['WEB_ROOT'] ?? 'apps/web/dist';
 
+/** `GATE-001` and friends. The list must name observations, not print codes (D-074). */
+const RULE_CODE = new RegExp('[A-Z]{3,4}-' + '[0-9]{3}');
+
 interface Row {
   readonly [column: string]: unknown;
 }
@@ -201,28 +204,47 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     check(lower.includes('self-declared'), 'says the addresses are self-declared and unverified');
 
-    // ---- the unanswered list, cross-checked both ways ----------------------------------------
-    console.log('\n  the unanswered list');
+    // ---- what they responded to, cross-checked both ways -------------------------------------
+    console.log('');
+    console.log('  what they responded to');
     const listed = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('.partic-list li .partic-rule'), (n) => n.textContent ?? ''),
+      Array.from(document.querySelectorAll('.partic-list li'), (n) => n.textContent ?? ''),
     );
-    const answeredRules = new Set(comments.map((c) => String(c['rule_id'])));
 
     /*
       Both directions, and neither recomputes "invited".
 
-      Recomputing it would ask `participationFor` whether it agrees with `participationFor`. These
-      compare the rendered list against the rows the merchant's own actions wrote.
+      D-074 turned the list around — it names what was responded to rather than enumerating what
+      was not — and the discipline is unchanged. Recomputing would ask `participationFor` whether
+      it agrees with `participationFor`; these compare the rendered list against the rows the
+      merchant's own actions wrote, matched by finding title now that the list is named.
     */
-    const wronglyListed = listed.filter((rule) => answeredRules.has(rule));
+    const titlesOf = (ruleId: string): string[] =>
+      report.categories
+        .flatMap((category) => category.findings)
+        .filter((finding) => finding.ruleId === ruleId)
+        .map((finding) => finding.title);
+
+    const answeredRules = [...new Set(comments.map((c) => String(c['rule_id'])))];
+    for (const rule of answeredRules) {
+      const titles = titlesOf(rule);
+      check(
+        titles.some((title) => listed.some((item) => item.includes(title))),
+        `${rule} is named in the list, not left to a lookup`,
+        titles[0] ?? '',
+      );
+    }
+
     check(
-      wronglyListed.length === 0,
-      'lists nothing the merchant answered',
-      wronglyListed.length === 0 ? '' : `wrongly listed: ${wronglyListed.join(', ')}`,
+      listed.length === answeredRules.length,
+      'lists exactly what they responded to and nothing else',
+      `document lists ${listed.length}, database has ${answeredRules.length}`,
     );
 
-    const wronglyOmitted = [...answeredRules].filter((rule) => listed.includes(rule));
-    check(wronglyOmitted.length === 0, 'and the reverse holds too');
+    check(
+      !RULE_CODE.test(listed.join(' ')),
+      'names observations rather than printing rule codes',
+    );
 
     const counted = /(\d+) of (\d+) findings open for response were answered/.exec(text);
     check(counted !== null, 'states how many were answered');
