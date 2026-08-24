@@ -619,6 +619,19 @@ Two further limits are properties of what the crawl can see, and each finding st
   permanently `review_only`; only someone reading the article can tell rigorous chemistry from a
   dosing guide (D-020).
 
+### Keeping the document short is a check, not a habit
+
+`npm run compose-check` asserts that a printed report does not occupy materially more pages than
+its content fills, across five real storefronts and two synthetic shapes. A document printing well
+beyond its content height means something is forcing page breaks it should not - which is what
+`break-inside: avoid` on every finding row was doing, at 27% of the printed document (D-075).
+
+`npm run page-budget -- <run-id>` measures one run by section and separates content from air. That
+is the tool for finding *which* rule is wrong once `compose-check` says one is.
+
+**Do not raise the ceiling to make `compose-check` pass.** It is set to separate two measured
+states rather than to sit above today's number, and it was verified failing before being trusted.
+
 ### What `loop-check` does and does not tell you
 
 `npm run loop-check -- <run-id>` answers one question: **did the document IQwallet received carry

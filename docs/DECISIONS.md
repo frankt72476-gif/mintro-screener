@@ -4415,10 +4415,24 @@ reader has to learn costs more than its own height.
 Recorded rather than deleted silently, because the case that justified it has not become wrong —
 only less pressing. If a merchant produces a pairing that genuinely misleads, this returns.
 
-**The engine keeps `pairSameObservation` and the `sameObservation` field.** The pairing rule is
-the hard part and it is tested; the display was ten lines of JSX. Removing the engine half would
-mean rebuilding and re-testing D-050's logic to restore a block, and the field costs nothing on
-paper. **Say if that is the wrong call** — the alternative is deleting it and accepting the rebuild.
+**The engine keeps `pairSameObservation` and the `sameObservation` field.** Frank's ruling. The
+pairing rule is the hard part and it is tested; the display was ten lines of JSX. Deleting tested
+logic to remove ten lines means rebuilding and re-testing it if the block returns, and an unused
+field costs nothing on paper.
+
+### Why this is not inconsistent with deleting resolveRunSelection
+
+Worth stating, because the two look alike and were decided the other way.
+
+`resolveRunSelection` went when the run picker went (D-047), and that was right: **it existed only
+for that control.** It selected a run from a dropdown's value, it had no other caller and no other
+meaning, and keeping it would have been keeping a function about a thing that no longer existed —
+which is also where the D-045 bug had lived.
+
+`pairSameObservation` is not about the block. It answers *do these two findings rest on the same
+observation?*, which is a question about the rule set, and it stays true whether or not anything
+renders the answer. **The test is whether the logic has meaning without the control**, not whether
+it currently has a caller.
 
 ---
 
@@ -4452,3 +4466,96 @@ The participation record went from **2.0 pages to 0.2**. Together with D-073 the
 commented on must be **named** in the list, the list must hold nothing else, and it must contain no
 rule code at all. Matched against finding titles from the report and comment rows from the database
 — still two independent sources.
+
+---
+
+## D-075 - Whitespace, measured the way D-047 was
+**2026-08-24 - Frank's ruling - numbered 075, not 074**
+
+> Frank asked for this as D-074. That number is taken (the participation record naming what was
+> answered), and identifiers here are never reused. Same flag as D-071.
+
+D-047 shortened this document by measuring rather than estimating, and its table of options is what
+made the decision reviewable. Four legitimate additions have grown it since - the requirement
+column, the four-column coverage breakdown, the participation record, and merchant response blocks.
+**Accumulation, not regression.** The same method applies again.
+
+### What was spent, and what it bought
+
+Measured with `npm run page-budget`, swisschems at 97 findings. Layout-only figures exclude
+captures, which the measuring browser is not served; the with-captures number is the artifact an
+underwriter actually receives.
+
+    D-047 settled at                                              67 pages
+    + requirement column, coverage breakdown, participation
+      record, merchant responses                                  76 pages   (before)
+
+    - corroboration block removed (D-073)                        -0.2 pages of content
+    - participation record: enumeration to named list (D-074)    -1.8 pages of content
+    - finding rows may break across pages                          -4 pages
+    - print-only spacing on requirement pairs and responses        -1 page
+                                                                  59 pages   (after)
+
+    layout only, for comparison:      51 -> 48 -> 44 -> 43 pages
+
+**Seventeen pages, and no content removed.** No smaller type, no shorter text, and no change to
+capture size - that trade was measured and settled at D-047 and is not re-litigated blind.
+
+### The largest saving was a rule, not a section
+
+`break-inside: avoid` on every finding row cost **12.8 pages, 27% of the printed document**. A row
+that does not fit pushes to the next page and leaves the rest of the current one blank; that was a
+small tax when a page held three findings, and it is paid ninety-seven times now that a page holds
+twelve.
+
+Two things still must not split, and they are **named rather than implied**:
+
+- **the evidence slip**, so a capture is never separated from what it is evidence of
+- **a finding carrying a merchant response**, so their words never land overleaf from the
+  observation they answer
+
+The second is Frank's, and the reasoning is the ordinal bug's (D-026, D-068): attribution that
+appears against the wrong finding is worse than no attribution, and **layout can do that as surely
+as data can.** A reader turning a page to a quotation with no observation above it has to work out
+what it refers to, and may work it out wrong.
+
+### Evidence slips are the largest component and were left alone
+
+16.6 pages, the biggest single thing inside the findings - and **the one whose composition is
+unmeasured**. How much is reserved space for captures against the captures themselves is not known,
+because the measuring browser is not served evidence.
+
+Reducing it on an assumption is exactly the trade D-047 ruled out. It needs measuring on a run with
+evidence served; then it is a decision rather than a guess. **Left as a known gap, deliberately.**
+
+### One run is the wrong unit for a rule
+
+Frank's question, and it is the right one: every screening is shaped differently, so what does
+measuring swisschems establish?
+
+For finding *which rule was wrong*, one run was enough - and necessary. Without it the guess would
+probably have landed on capture size. But the fix changes **generation rules**, not this document,
+and a rule that behaves at 97 findings can misbehave at 12: a fixed block that is 3% of a long
+report is 30% of a short one.
+
+So `npm run compose-check` asserts a property rather than a fact:
+
+> A printed report must not occupy materially more pages than its content fills.
+
+Across five real storefronts, a synthetic short report and a synthetic long one:
+
+    with break-inside: avoid on every row     27-30%   five of six informative shapes fail
+    with it on slips and responses only       19-21%   all pass
+    ceiling                                      26%   chosen to sit in the gap
+
+A ceiling at 30% caught one shape in seven and would have read as noise. The number is set to
+separate the two states, and **verified failing** by restoring the old rule.
+
+Reports under 20 findings are **reported but not asserted**: the header, verdict, tick strip,
+coverage and participation record are a fixed cost that dominates a short document, so its ratio
+describes the preamble rather than the rules. Both the good and the bad rule measure ~25% there,
+which is a check that cannot fail. Printed with the reason rather than skipped - *this number does
+not tell you anything here* and *this number is fine* are different statements (D-036).
+
+That is the difference between *we fixed this document* and *the document composes well at any
+size*, which is what was actually being asked for.

@@ -210,7 +210,9 @@ async function main(): Promise<number> {
         quoteFont: getComputedStyle(quote).fontFamily,
         particFont: getComputedStyle(partic).fontFamily,
         head: block.querySelector('.mr-head')?.textContent ?? '',
-        listOpen: document.querySelector('.partic-list')?.hasAttribute('open') ?? false,
+        // D-074 replaced the collapsed unanswered enumeration with a named list of what *was*
+        // responded to. There is no longer a `<details>` to be open, and nothing is hidden.
+        listHidden: document.querySelector('.partic-list') === null,
       };
     });
 
@@ -224,7 +226,7 @@ async function main(): Promise<number> {
       ['the two faces differ, so the voices do', style.quoteFont !== style.particFont],
       ['their block carries an amber rule', style.rule !== 'rgba(0, 0, 0, 0)'],
       ['every block names its source', style.head === 'Merchant response'],
-      ['the unanswered list is open in print', style.listOpen],
+      ['what was responded to is listed, not collapsed', !style.listHidden],
     ];
 
     console.log('');
