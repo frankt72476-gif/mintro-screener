@@ -34,6 +34,7 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { createEvidenceAccess } from '../lib/evidence.js';
+import { clearVisit, readVisit, writeVisit } from '../lib/visitStore.js';
 import {
   NOTHING_OBSERVED_ID,
   nothingObservedCount,
@@ -148,11 +149,15 @@ function OpenReport({
   const [comments, setComments] = useState<readonly MerchantComment[]>(opened.comments);
 
   /*
-    Who is here (D-063).
+    Who is here (D-063), remembered for the length of the tab (D-071).
 
     The link is forwardable and goes to the agent as often as to the merchant, so whoever lands
-    says who they are before they can write. Held for this visit only: nothing is stored in the
-    browser, because the next person to open this link on a shared machine is a different person.
+    says who they are before they can write.
+
+    Held in `sessionStorage`, which survives a refresh and dies with the tab. Not `localStorage`:
+    the next person to open this link on a shared machine is a different person, and letting their
+    words be attributed to someone else's address would break the one mechanism that makes this
+    document useful to an underwriter.
   */
   const [identity, setIdentity] = useState<{ readonly visitId: string; readonly email: string } | null>(
     null,
@@ -197,6 +202,26 @@ function OpenReport({
     });
   };
 
+  /*
+    Restore, and note what it deliberately does not do (D-071).
+
+    **It writes no `comment_visits` row.** A visit is a fact about someone arriving and saying who
+    they are; a refresh is neither, and a row per reload would tell an underwriter that someone
+    identified themselves six times when they identified themselves once and pressed F5.
+
+    The stored visit id is reused, so anything written after a refresh binds to the original visit —
+    which is true: same person, same sitting.
+  */
+  useEffect(() => {
+    if (identity !== null) return;
+
+    const stored = readVisit(opened.runId);
+    if (stored !== null) setIdentity({ visitId: stored.visitId, email: stored.email });
+    // `identity` is read but intentionally not a dependency: this restores once per opened report,
+    // and re-running it after someone changes their address would undo the change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened.runId]);
+
   const invited = useMemo(
     () =>
       opened.report.categories
@@ -236,7 +261,23 @@ function OpenReport({
     }
 
     setIdentity({ visitId: payload.visitId, email });
+
+    // Convenience for the writer, never evidence: `submit_merchant_comment` reads the address from
+    // the visit row server-side, so what a comment is attributed to is what the database holds.
+    writeVisit({ visitId: payload.visitId, email, runId: opened.runId });
     return null;
+  };
+
+  /**
+   * Someone else is writing now, or the same person under a different address.
+   *
+   * Forgets the stored identity and asks again. **It deletes nothing** — the visit that was
+   * recorded happened, and anything written under it stays attributed to it. The next
+   * identification writes a new visit, because a new declaration is a new fact (D-071).
+   */
+  const forgetIdentity = (): void => {
+    clearVisit();
+    setIdentity(null);
   };
 
   const submit = async (finding: ReportFinding, ordinal: number | undefined, body: string) => {
@@ -252,6 +293,14 @@ function OpenReport({
 
     const payload = data as { ok?: boolean; reason?: string } | null;
     if (error !== null || payload?.ok !== true) {
+      /*
+        The server validates the visit against *this link*, not merely this run (0016). A stored
+        visit from a different link — a second invitation opened in the same tab — is refused here.
+
+        Clearing it and asking again is the honest recovery. What they typed is untouched: the box
+        keeps its text on failure, so nothing they wrote is lost to a re-identification.
+      */
+      if (payload?.reason?.includes('email address is needed') === true) forgetIdentity();
       return payload?.reason ?? 'That could not be saved just now. Please try again.';
     }
 
@@ -324,7 +373,7 @@ function OpenReport({
           of contact at Mintro, or the agent who sent this to you.
         </p>
 
-        <Identify identity={identity} onIdentify={identify} />
+        <Identify identity={identity} onIdentify={identify} onForget={forgetIdentity} />
 
         {/*
           The report as the analyst and IQwallet see it — the same component, the same evidence.
@@ -439,9 +488,18 @@ export function NothingObservedCallout({
 function Identify({
   identity,
   onIdentify,
+  onForget,
 }: {
   readonly identity: { readonly email: string } | null;
   readonly onIdentify: (email: string) => Promise<string | null>;
+  /**
+   * Someone else is writing now, or the same person under a different address (D-071).
+   *
+   * Required, not optional: an address a merchant cannot change is one that will eventually be
+   * attached to somebody else's words. Nothing already written is affected — each comment keeps
+   * the address held when it was written.
+   */
+  readonly onForget: () => void;
 }): JSX.Element {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -450,8 +508,18 @@ function Identify({
   if (identity !== null) {
     return (
       <div className="card ident ident-done">
-        Responding as <strong>{identity.email}</strong>. Each response below is recorded against
-        this address.
+        <span>
+          Responding as <strong>{identity.email}</strong>. Each response below is recorded against
+          this address.
+        </span>
+        {/*
+          Stated as "someone else", not "log out". Nobody logged in — and the likeliest reason to
+          press it is that the agent has handed the laptop to the merchant, which is the case the
+          whole per-comment attribution model exists for (D-063).
+        */}
+        <button className="ident-change" onClick={onForget}>
+          Someone else responding?
+        </button>
       </div>
     );
   }

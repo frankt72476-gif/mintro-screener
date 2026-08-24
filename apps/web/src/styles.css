@@ -1346,6 +1346,26 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .cbox-input::placeholder { color: var(--slate); opacity: 0.65; }
 
+/* "Someone else responding?" — the address is changeable, because an address a merchant cannot
+   change is one that will eventually be attached to somebody else's words (D-071). Quiet: it is
+   an escape hatch for the handed-over laptop, not a call to action. */
+.ident-done { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+
+.ident-change {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--slate);
+  text-decoration: underline;
+}
+
+.ident-change:hover { color: var(--ink); }
+
 /* -- The merchant's comment box (D-063, restyled D-067) -------------------------------------
    A textarea and a button. No character counter and no formatting controls.
 

@@ -454,3 +454,32 @@ still generates avoidable noise in the human queue.
   to locate yields `not_evaluable` for the affected scope.
 - **OFFS-003** — collects social links by platform domain. Collection only; asserts nothing about
   compliance, and its note already states that off-site content was not examined.
+
+## A dependency's warning about our own misuse is a defect report
+
+**Standing practice, from D-070.**
+
+Chrome printed **"Multiple GoTrueClient instances detected in the same browser context"** on every
+load of the merchant page, including the loads that worked, for two days. supabase-js emits that
+line precisely because a second instance *produces undefined behaviour* — which is exactly what was
+happening: a client rebuilt on every render, a React effect keyed on its identity, and three
+concurrent copies of the same request racing to set the page state.
+
+It took a network trace to find. It had been on the console the whole time.
+
+> **A warning nobody reads is a test nobody runs.**
+
+So the practice:
+
+- A console warning from a dependency **about our own usage** is a defect report, not noise. The
+  library author wrote it because they know a failure mode we are currently in.
+- **The response is a test, not a dismissal.** Not a filter, not a suppression comment, not "known
+  and benign". Something that fails when the misuse returns — `clientIdentity.test.ts` asserts the
+  anon client is one instance, because the identity *is* the contract.
+- **An expected warning is worse than a loud one.** A line everybody reads past is a line nobody
+  notices changing, so the goal is a clean console rather than a familiar one. That is why the
+  merchant route no longer constructs the analyst client at all: it was harmless in itself and it
+  was keeping that warning alive.
+
+This is the same discipline the rest of the project applies to `not_evaluable`: a signal that
+something could not be established is worth nothing if it renders identically to everything else.

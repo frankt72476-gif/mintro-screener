@@ -4230,3 +4230,81 @@ correctly, but identity is held in memory only, so a merchant must re-identify t
 The tension is real and is D-063's: *the next person to open this link on a shared machine is a
 different person*, and every response is attributed to the address given when it was written. See
 the note to Frank; it is his ruling to make.
+
+---
+
+## D-071 — Identity survives a refresh, and dies with the tab
+**2026-08-24 · Frank's ruling · numbered 071, not 066**
+
+> Frank asked for this as D-066. That number is taken (*Nothing on the merchant page acts on
+> Mintro's behalf*), and rule 1 of this document is that identifiers are stable and never reused.
+> Recorded here instead; say if it should be folded into another entry.
+
+The report now reloads correctly (D-070), but identification was held in memory only, so a merchant
+had to re-introduce themselves on every reload. **A link valid for thirty days that loses your place
+on refresh is not usable**, and Frank's own test hit it twice.
+
+`sessionStorage`. Survives a refresh — the actual complaint — and dies with the tab.
+
+### Why not `localStorage`, in Frank's words
+
+> Option 3 would let one person's address attach to another person's words on a shared machine, and
+> attribution is the whole mechanism by which this document is useful to an underwriter — **that is
+> a correctness question, not a friction one.**
+
+The link is forwardable by design (D-063). A merchant and their agent may be at the same desk, and
+every response is attributed to the address held when it was written. A stored address outliving the
+person who gave it does not make the page more convenient; it makes the document wrong.
+
+### A restore is not an arrival
+
+The first constraint, and the reasoning for the choice made. **Restoring writes no
+`comment_visits` row.** The stored visit id is reused, so anything written after a refresh binds to
+the original visit.
+
+A visit is a fact about someone arriving and saying who they are. A reload is neither. A row per
+reload would tell an underwriter that someone identified themselves six times when they identified
+themselves once and pressed F5 — inflating the participation record with an event that did not
+happen, which is the failure this whole feature exists to avoid in the other direction.
+
+**Changing the address does write a new visit**, because a new declaration is a new fact.
+
+### The stored address is a convenience, never evidence
+
+The second constraint, and the database already guarantees it: `submit_merchant_comment` reads
+`identified_as` from the **visit row**, server-side. What a comment is attributed to is what the
+database holds when it is written, never what a browser remembered.
+
+So a merchant who changes their address mid-session has their later comments attributed to the
+later address, automatically — and their earlier ones stay with the earlier address. Changing
+forgets locally and **deletes nothing**: the visit happened, and what was written under it stays
+attributed to it.
+
+That required an affordance the page did not have. *"Someone else responding?"* — stated that way
+rather than "log out", because nobody logged in, and the likeliest reason to press it is that the
+agent has handed the laptop to the merchant. Which is the case the per-comment attribution model
+exists for.
+
+### A stored identity belongs to one report
+
+Offered back only when the run matches. A tab is shared across whatever someone opens in it, and a
+name given while reading one merchant's report must not appear on another's.
+
+The server is stricter still: a visit must belong to **that exact link**, not merely that run. A
+stored visit from a second invitation opened in the same tab is refused at submit time, and the page
+clears it and asks again rather than looping. Nothing typed is lost — the box keeps its text on
+failure.
+
+### The second client is gone
+
+`useAuth` ran before the merchant-route check, so the merchant page constructed the analyst's
+Supabase client on every load. Harmless in itself, and it was the reason
+*"Multiple GoTrueClient instances detected"* kept printing.
+
+**A warning that is expected is one nobody will notice changing** — which is precisely how that line
+survived two days of failures it was describing. `App` now routes to one of three applications
+before any client exists, and the standing practice is in `docs/ARCHITECTURE.md`.
+
+A comment beside the old check claimed it returned "before `useAuth` decides anything". It did not:
+a hook cannot be skipped by a return below it. The comment described the intent and the code did
+something else, which is worth noting on its own.

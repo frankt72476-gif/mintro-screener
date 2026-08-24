@@ -96,6 +96,61 @@ function injectedPrint(): InjectedPrint | null {
 }
 
 /**
+ * Which of three applications this is.
+ *
+ * A printed document, a merchant holding a link, or an analyst. They share components and share
+ * almost nothing else — different credentials, different audiences, different things they are
+ * allowed to do — so the choice is made here, before anything is constructed.
+ */
+export function App(): JSX.Element {
+  /*
+    Routing, before any client exists (D-071).
+
+    `useAuth` used to run on the line above this check, so the merchant route constructed the
+    analyst's Supabase client on every load — which is why Chrome printed *"Multiple GoTrueClient
+    instances detected"* on a page that has no account and never will. The comment beside it
+    claimed this returned "before `useAuth` decides anything"; it did not, because a hook cannot be
+    skipped by a return below it.
+
+    Harmless in itself. The reason it is worth splitting: **a warning that is expected is one
+    nobody will notice changing.** That console line had been printing through every failure of the
+    last two days while everyone read past it (D-070).
+  */
+  const injected = useMemo(() => injectedPrint(), []);
+  const token = useMemo(() => commentToken(), []);
+
+  // The worker's print path: everything the page needs was handed to it, so there is no session to
+  // establish and nothing to fetch.
+  if (injected !== null) return <PrintOnly injected={injected} />;
+
+  /*
+    The merchant's route (D-063).
+
+    A merchant has no account and never will. Their credential is the token in the link, and the
+    two database functions it can call are the whole of what it reaches.
+  */
+  if (token !== null) return <MerchantRoute token={token} />;
+
+  return <AnalystApp />;
+}
+
+function MerchantRoute({ token }: { readonly token: string }): JSX.Element {
+  const client = anonymousClient();
+
+  if (client === null) {
+    return (
+      <div className="shell">
+        <main className="main">
+          <div className="empty">This report cannot be loaded: the site is not configured.</div>
+        </main>
+      </div>
+    );
+  }
+
+  return <CommentPane client={client} token={token} />;
+}
+
+/**
  * The gate.
  *
  * Nothing renders until an active analyst is signed in — no report, no merchant list, not even a
@@ -107,35 +162,8 @@ function injectedPrint(): InjectedPrint | null {
  * would still read nothing. The gate exists so the app says so plainly rather than showing an
  * empty report.
  */
-export function App(): JSX.Element {
+function AnalystApp(): JSX.Element {
   const { state } = useAuth();
-
-  /*
-    The merchant's route, before the sign-in gate (D-063).
-
-    A merchant has no account and never will. Their credential is the token in the link, and the
-    two database functions it can call are the whole of what it reaches — so this returns before
-    `useAuth` decides anything.
-  */
-  const token = useMemo(() => commentToken(), []);
-
-  // The worker's print path: everything the page needs was handed to it, so there is no session
-  // to establish and nothing to fetch.
-  const injected = useMemo(() => injectedPrint(), []);
-  if (injected !== null) return <PrintOnly injected={injected} />;
-
-  if (token !== null) {
-    const client = anonymousClient();
-    return client === null ? (
-      <div className="shell">
-        <main className="main">
-          <div className="empty">This report cannot be loaded: the site is not configured.</div>
-        </main>
-      </div>
-    ) : (
-      <CommentPane client={client} token={token} />
-    );
-  }
 
   if (state.status === 'loading') {
     return (
