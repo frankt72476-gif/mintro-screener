@@ -6739,6 +6739,60 @@ is not one.
 
 ---
 
+## D-124 — A sent report carries no covering note
+**2026-08-24 · Frank's ruling**
+
+The operator types an address. There is no note field, and `document_report_sends` has no column
+for one.
+
+### Why not, when Site Check has one
+
+Site Check's send carries an analyst note, audited for directive language under D-029. That is a
+reasonable design there and the wrong one here, and the difference is not squeamishness about prose.
+
+**D-085 makes this report machine output.** Same run in, byte-identical report out — a property
+something can assert, and the reason D-079 fixed the reason enumerations in the first place. A note
+is not a function of the run. It is a function of whoever was sending, on the day they sent it.
+
+Put the two in one email and the note **borrows the report's credibility without inheriting its
+constraints**. Every sentence in the document has been through a copy audit, is derived from a
+finding with evidence behind it, and can be regenerated and compared. The note sits beside all of
+that, in the same message, under the same sender, and none of it is true of the note. A reader has
+no way to tell which half is which, and the half with weaker guarantees is the one they read first.
+
+That is the same argument D-085 makes about annotation on a finding, one layer out. Annotation was
+refused there because an analyst's gloss is indistinguishable in weight from the observation it
+attaches to. An email note is indistinguishable in weight from the report it attaches to.
+
+### The send is an operator action, not an authored message
+
+Worth separating, because it is what makes the omission cost nothing. Sending is an event (D-083):
+a person decides this report should go to this address now. That decision needs a recipient and a
+click. It does not need composition, and treating it as authorship is what creates a place for a
+determination to be typed.
+
+**And a text field is found.** A box on a modal labelled anything at all will eventually hold *"this
+one looks fine to me"* — a compliance conclusion, in Mintro's message, forwarded under Mintro's
+name (constraint 7, D-067). The control that prevents it is the absence of the box, not a policy
+about what to type in it.
+
+If a note is genuinely wanted later, it needs a column and a decision. That friction is correct for
+this boundary: it makes adding one a thing somebody argued for, rather than a field a developer
+added because the modal looked empty.
+
+### Recorded alongside
+
+**Refusals are logged, not only deliveries (0029).** `document_report_sends` carries `outcome` and
+`error`, with the error required exactly on a rejection. "We tried to send this to the underwriter
+and the provider refused it" is the fact a dispute turns on, and 0028 had nowhere to put it — a log
+of successes answers the half nobody asks about, while looking perfectly healthy.
+
+**The dry-run mailer is a separate implementation**, and `mailer` is a column value rather than a
+flag. A test send and a delivered report are different rows, distinguishable for ever, without
+anyone having to remember which environment was configured at the time.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 
