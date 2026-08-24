@@ -4156,3 +4156,77 @@ know whether an element existed. Not a list of known anchors either — there is
 so a link added tomorrow is checked tomorrow.
 
 Recorded in D-026 with the other three, and with the two ways this test was wrong first.
+
+---
+
+## D-070 — Three concurrent opens per page load
+**2026-08-24 · found by Frank in first real use of the response path**
+
+> Entered a note, saved, refreshed → "This link cannot be opened / The report could not be loaded
+> just now." Went back to the email, eventually got in, entered another note, refreshed → harder to
+> get back in.
+
+### Diagnosed before touched, on Frank's instruction
+
+His reasoning ruled out the obvious answer before I looked: *intermittent and worsening is not the
+signature of a lost session — that would fail consistently. And the message is the generic
+read-failure path, not an auth path.* Both were right, and the second is the one that mattered: the
+copy distinguishing "could not be read" from "not a valid link" (D-036) is what made the failure
+diagnosable at all. A page that said *"this link is not valid"* would have sent me to the token.
+
+He also named the trap: **a cookie would mask a resource leak that would later surface as merchant
+responses silently failing to save.** That is exactly what a session would have done here.
+
+Four questions, four answers:
+
+- **What does the failing request return?** Sometimes HTTP 400, sometimes the transport refuses the
+  stream (`ERR_HTTP2_SERVER_REFUSED_STREAM`). Never 401. Never 429.
+- **Server or client?** Client. Eight consecutive server-side calls against a diagnostic token: all
+  200, ~180 ms, identical 107 KB. No degradation, nothing accumulating.
+- **Fresh browser?** Reproduces immediately, with no analyst session and no cookies. So it is
+  **per page load** — not per token, not per client state.
+- **Rate limited?** No. Nothing returned 429: not the anon key, not the RPC, not PostgREST.
+
+### The cause
+
+`anonymousClient()` built a **new `SupabaseClient` on every call**, and it is called from a render
+body. `CommentPane`'s load effect is keyed on that client, so it refired on every render — three
+times during mount — firing **three concurrent copies of a 107 KB RPC**.
+
+Whichever resolved last set the page state. When a duplicate lost its HTTP/2 stream, the merchant
+saw the read-failure message on a report that had loaded fine on another of the three.
+
+That is the intermittency: **it is a race, so it is a coin toss.** And the worsening is the payload
+growing with every comment — three concurrent larger responses trip the stream limit more often.
+
+> A value handed to a hook dependency array **is** part of the interface.
+
+`createClient` looks like a constructor and behaves like one; nothing about the call site suggests
+that returning an equal-but-new object changes program behaviour. It changes it completely.
+
+### The console had been saying so
+
+Chrome printed **"Multiple GoTrueClient instances detected in the same browser context"** on every
+load, including the ones that worked. supabase-js emits it precisely because a second instance
+produces undefined behaviour, which is what this was.
+
+**A warning nobody reads is a test nobody runs.** It cost a merchant-facing failure that took a
+network trace to find, and it had been on the console the entire time.
+
+### The guard
+
+`apps/web/test/clientIdentity.test.ts` asserts reference equality across repeated calls — the
+contract is the identity, so the identity is what is asserted. Reverting the singleton fails it.
+
+Verified on the deployed page as well as in the suite: one request, one 200, and no further traffic
+over twenty-five seconds. Before the fix the same probe showed three.
+
+### Still open: whether identification should survive a refresh
+
+**Not decided here.** Frank is right that a link valid for thirty days which loses your place on
+refresh is not usable, and that is now a separate question rather than a bug — the report reloads
+correctly, but identity is held in memory only, so a merchant must re-identify to write again.
+
+The tension is real and is D-063's: *the next person to open this link on a shared machine is a
+different person*, and every response is attributed to the address given when it was written. See
+the note to Frank; it is his ruling to make.
