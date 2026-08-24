@@ -70,3 +70,36 @@ export {
   type Tier,
   type UrlScope,
 } from './vocabulary.js';
+
+// Documents Check slot definitions. Seeded from CHECK-INVENTORY §3/§4 for M1; M2 replaces the
+// loader with a read of rules/documents.templates.json (D-101), and nothing outside that module
+// changes.
+export {
+  NOT_PROVIDED_REASONS,
+  REASON_LABELS,
+  DEFAULT_PROCESSOR,
+  DEFAULT_GRACE_DAYS,
+  WAIVED_REASONS,
+  loadSlotTemplate,
+  slotDefinition,
+  slotsForPackage,
+  type NotProvidedReason,
+  type PackageFacts,
+  type SlotDefinition,
+  type SlotTemplate,
+  type WaivedReason,
+} from './slotTemplate.js';
+
+// Documents Check rule files (D-101). A second loader and validator in this package, not a second
+// package: same discipline, same test harness, same refuse-to-load-on-a-defect behaviour.
+export {
+  DocumentsValidationError,
+  checksInRelease,
+  parseDocumentsRules,
+  processorTemplate,
+  type DocumentsDefect,
+  type DocumentsFile,
+  type DocumentsRules,
+} from './documents/load.js';
+export { CHECKS_PATH, TEMPLATES_PATH, loadDocumentsRules } from './documents/loadFile.js';
+export type { CatalogEntry, ChecksFile, DocumentCheck, Processor, TemplateSlot, TemplatesFile } from './documents/schema.js';

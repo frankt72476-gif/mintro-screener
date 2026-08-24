@@ -199,6 +199,8 @@ function Screener({
 }): JSX.Element {
   const analystEmail = analyst.email;
   const printDomain = useMemo(() => printRequest(), []);
+  /** `?package=<uuid>`, read once. M1 has no package picker; see the Documents pane. */
+  const openPackageId = useMemo(() => new URLSearchParams(window.location.search).get('package'), []);
   const [pane, setPane] = useState<Pane>('scan');
   const [stage, setStage] = useState<Stage>('input');
   const [report, setReport] = useState<ScreeningReport | null>(null);
@@ -647,7 +649,12 @@ function Screener({
         </section>
 
         <section className={`pane ${pane === 'docs' ? 'on' : ''}`}>
-          <DocumentsPane />
+          {/*
+            No package picker in M1 — creating a package is not built, so this renders the
+            "no package open" state until one exists. The id comes from the URL so a package can
+            be opened directly while the picker is outstanding.
+          */}
+          <DocumentsPane client={client} analystId={analyst.id} packageId={openPackageId} />
         </section>
       </main>
 

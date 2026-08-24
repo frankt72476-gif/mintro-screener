@@ -1,0 +1,23 @@
+{
+  "name": "@mintro/extraction",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Document extraction: bytes in, provenanced values out. Pure functions; no database, no HTTP server, no storage layer.",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.10.38"
+  }
+}

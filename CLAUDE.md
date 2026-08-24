@@ -132,10 +132,14 @@ Documents Check is a later phase. Leave the nav item and route stubbed. Do not b
   a pattern, a tier, a scope, a new rule — all of them. A ruling that reaches the data but not
   `docs/DECISIONS.md` is unreviewable six months out. See D-025.
 - All timestamps UTC, ISO 8601, stored as `timestamptz`.
+- Dates in `docs/DECISIONS.md` are UTC. Where a session clock disagrees, the file's convention wins.
 - Check handlers are pure where possible: given a page context and rule params, return a
   finding. Side effects (storage writes) happen in the runner, not the handler.
-- Tests: every check type needs a fixture-based test. Fixtures live in `fixtures/`, are
-  saved HTML from real storefronts, and are committed.
+- Tests: every check type needs a fixture-based test. **A fixture is committed when a reviewer can
+  read it and see what it tests** — saved HTML from real storefronts is the case this was written
+  for, and it stays. **Where the artifact is opaque, the generator is the reviewable thing and it is
+  what gets committed**, and it must be deterministic: a fixture whose bytes change per run cannot
+  test anything content-addressed. See D-106.
 
 ## When you are unsure
 

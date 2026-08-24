@@ -1,0 +1,1322 @@
+{
+  "$comment": "Documents Check capability. OURS — this file changes when what we can do changes, never when a processor is added; per-processor requirements live in documents.templates.json (D-101). Transcribed from docs/CHECK-INVENTORY.md sections 3, 5 and 6. Section 1's seventh property, evidence_tier, is deliberately absent: section 2 defines a finding's tier as the weaker of the documents actually read, so it is a runtime fact derivable from reads plus catalog.typical_tier and cannot be declared per check. See the build report.",
+  "version": "1.0.0",
+  "catalog": [
+    {
+      "key": "application",
+      "title": "Pre App / Existing App",
+      "examined": true,
+      "typical_tier": "character",
+      "yields": [
+        "legal_name",
+        "dba_name",
+        "ein",
+        "business_address",
+        "entity_type",
+        "formation_state",
+        "formation_date",
+        "routing_number",
+        "account_number",
+        "bank_name",
+        "account_holder_name",
+        "owner_name",
+        "owner_ownership_pct",
+        "owner_dob",
+        "signer_name",
+        "processor_name",
+        "domain_name",
+        "stated_monthly_volume",
+        "stated_average_ticket",
+        "stated_high_ticket",
+        "stated_chargeback_rate"
+      ]
+    },
+    {
+      "key": "ein_letter",
+      "title": "EIN Letter (CP-575 / 147C)",
+      "examined": true,
+      "typical_tier": "page",
+      "yields": [
+        "ein",
+        "legal_name",
+        "business_address"
+      ],
+      "markers": [
+        "CP-575",
+        "147C",
+        "Internal Revenue Service"
+      ]
+    },
+    {
+      "key": "articles_of_incorporation",
+      "title": "Articles of Incorporation / Organization",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "legal_name",
+        "entity_type",
+        "formation_state",
+        "formation_date",
+        "owner_name",
+        "signer_name"
+      ]
+    },
+    {
+      "key": "dba_filing",
+      "title": "DBA / fictitious name filing",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "dba_name",
+        "legal_name",
+        "formation_state"
+      ]
+    },
+    {
+      "key": "voided_check",
+      "title": "Voided Check",
+      "examined": true,
+      "typical_tier": "page",
+      "yields": [
+        "routing_number",
+        "account_number",
+        "account_holder_name",
+        "bank_name"
+      ]
+    },
+    {
+      "key": "bank_statement",
+      "title": "Bank Statement",
+      "examined": true,
+      "typical_tier": "character",
+      "yields": [
+        "statement_period",
+        "account_number",
+        "routing_number",
+        "account_holder_name",
+        "bank_name",
+        "bank_deposits"
+      ]
+    },
+    {
+      "key": "processing_statement",
+      "title": "Processing Statement",
+      "examined": true,
+      "typical_tier": "character",
+      "yields": [
+        "statement_period",
+        "processing_volume",
+        "processing_average_ticket",
+        "processing_high_ticket",
+        "processing_transaction_count",
+        "chargeback_count",
+        "chargeback_amount",
+        "processor_name"
+      ]
+    },
+    {
+      "key": "owner_photo_id",
+      "title": "Owner Photo ID",
+      "examined": true,
+      "typical_tier": "page",
+      "yields": [
+        "owner_name",
+        "owner_dob",
+        "expiry_date",
+        "business_address"
+      ]
+    },
+    {
+      "key": "w9",
+      "title": "W-9",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "legal_name",
+        "dba_name",
+        "ein",
+        "entity_type"
+      ]
+    },
+    {
+      "key": "w8ben",
+      "title": "W-8BEN",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "legal_name",
+        "business_address"
+      ]
+    },
+    {
+      "key": "business_license",
+      "title": "Business License",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "legal_name",
+        "formation_state",
+        "expiry_date"
+      ]
+    },
+    {
+      "key": "proof_of_business_address",
+      "title": "Proof of Business Address",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "business_address",
+        "legal_name"
+      ]
+    },
+    {
+      "key": "proof_of_domain",
+      "title": "Proof of domain name ownership",
+      "examined": true,
+      "typical_tier": "mixed",
+      "yields": [
+        "domain_registrant",
+        "domain_name"
+      ]
+    },
+    {
+      "key": "fulfillment_policy",
+      "title": "Fulfillment Policy Document",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "product_service_description",
+      "title": "Product/Service Description Document",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "irs_501c_letter",
+      "title": "501(c) Letter",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "third_party_fulfillment_agreement",
+      "title": "Third-Party Fulfillment Agreement (Executed)",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "other_fulfillment_agreements",
+      "title": "Other Shipping/Fulfillment Agreements (Executed)",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "additional_document",
+      "title": "Additional Document",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    },
+    {
+      "key": "coa",
+      "title": "COAs",
+      "examined": false,
+      "typical_tier": null,
+      "yields": []
+    }
+  ],
+  "reasons": {
+    "not_provided": [
+      {
+        "key": "new_business_no_processing_history",
+        "label": "New business — no prior processing history"
+      },
+      {
+        "key": "prior_processing_cash_or_check_only",
+        "label": "Prior processing was cash or check only"
+      },
+      {
+        "key": "prior_processor_will_not_release",
+        "label": "Prior processor will not release statements"
+      },
+      {
+        "key": "account_closed_records_unavailable",
+        "label": "Account closed — records no longer available"
+      },
+      {
+        "key": "does_not_exist_for_entity_type",
+        "label": "Document does not exist for this entity type"
+      },
+      {
+        "key": "issuing_authority_will_not_reissue",
+        "label": "Issuing authority will not reissue"
+      },
+      {
+        "key": "lost_or_destroyed_cannot_reissue",
+        "label": "Lost or destroyed, cannot be reissued"
+      },
+      {
+        "key": "provided_directly_to_processor",
+        "label": "Provided directly to processor outside this package"
+      },
+      {
+        "key": "merchant_declines",
+        "label": "Merchant declines to provide"
+      }
+    ],
+    "waived": [
+      {
+        "key": "processor_confirmed_not_required",
+        "label": "Processor confirmed not required"
+      },
+      {
+        "key": "not_applicable_to_entity_type",
+        "label": "Not applicable to this entity type"
+      },
+      {
+        "key": "superseded_by_another_document",
+        "label": "Superseded by another document in this package"
+      },
+      {
+        "key": "provided_under_prior_package",
+        "label": "Provided under a prior package for this merchant"
+      }
+    ]
+  },
+  "external_sources": [
+    {
+      "key": "frb_routing_directory",
+      "label": "Federal Reserve E-Payments routing directory",
+      "note": "Public download, no vendor cost. Confirms a routing number resolves to a real institution and names it; confirms nothing about the account."
+    }
+  ],
+  "not_evaluable_conditions": [
+    "chargebacks_not_itemized",
+    "date_not_extracted",
+    "either_side_unreadable",
+    "expiry_not_extracted",
+    "fewer_than_two_sources",
+    "high_ticket_not_itemized",
+    "no_marker_set_for_type",
+    "no_processing_statements",
+    "ownership_section_not_extracted",
+    "page_numbering_absent",
+    "periods_not_extracted",
+    "predicate_inputs_not_extracted",
+    "processing_statements_not_provided",
+    "refunds_not_itemized",
+    "required_count_unknown",
+    "routing_number_not_extracted",
+    "signature_block_not_located",
+    "slot_not_resolved_to_not_provided"
+  ],
+  "checks": [
+    {
+      "id": "A-01",
+      "title": "Document yields readable content by at least one path",
+      "reads": {
+        "documents": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "structure",
+        "subject": "readability"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [],
+      "release": "v1",
+      "note": "Never not_evaluable: the read was attempted and the attempt is the observation. Unreadability is a fact we established, so it is a fail here and a named not_evaluable cause for every downstream check."
+    },
+    {
+      "id": "A-02",
+      "title": "Declared page range complete (\"page N of M\")",
+      "reads": {
+        "documents": [
+          "*"
+        ],
+        "fields": [
+          "page_marker"
+        ]
+      },
+      "compares": {
+        "kind": "structure",
+        "subject": "declared_page_range"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "page_numbering_absent"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "A-03",
+      "title": "PDF not password-protected",
+      "reads": {
+        "documents": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "structure",
+        "subject": "encryption"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [],
+      "release": "v1"
+    },
+    {
+      "id": "A-04",
+      "title": "Document carries markers of its declared type",
+      "reads": {
+        "documents": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "structure",
+        "subject": "type_markers"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "no_marker_set_for_type"
+      ],
+      "release": "v1",
+      "note": "Deliberately weak. No classifier exists. It confirms a document filed in the EIN Letter slot carries CP-575 or 147C markers, which catches a W-9 in the wrong slot. It does not catch a forgery and must never be described as if it does."
+    },
+    {
+      "id": "A-05",
+      "title": "Required signature and date present",
+      "reads": {
+        "documents": [
+          "*"
+        ],
+        "fields": [
+          "signature_date"
+        ]
+      },
+      "compares": {
+        "kind": "presence",
+        "subject": "signature_and_date"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "signature_block_not_located"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "A-06",
+      "title": "Expiry date after run date",
+      "reads": {
+        "documents": [
+          "owner_photo_id",
+          "business_license"
+        ],
+        "fields": [
+          "expiry_date"
+        ]
+      },
+      "compares": {
+        "kind": "date_against_run",
+        "field": "expiry_date",
+        "relation": "after"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "expiry_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "A-07",
+      "title": "Issue or statement date within slot window",
+      "reads": {
+        "documents": [
+          "bank_statement",
+          "processing_statement"
+        ],
+        "fields": [
+          "statement_period",
+          "issue_date"
+        ]
+      },
+      "compares": {
+        "kind": "window",
+        "subject": "slot_coverage_window"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "date_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "B-01",
+      "title": "Every required slot resolved",
+      "reads": {
+        "slots": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "presence",
+        "subject": "slot_resolution"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [],
+      "release": "v1"
+    },
+    {
+      "id": "B-02",
+      "title": "Slot count satisfied",
+      "reads": {
+        "slots": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "count",
+        "subject": "slot_required_count"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "required_count_unknown"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "B-03",
+      "title": "Period documents consecutive, no gaps",
+      "reads": {
+        "slots": [
+          "bank_statement",
+          "processing_statement"
+        ],
+        "fields": [
+          "statement_period"
+        ]
+      },
+      "compares": {
+        "kind": "sequence",
+        "subject": "required_months"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "periods_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "B-04",
+      "title": "Most recent period within coverage window at run",
+      "reads": {
+        "slots": [
+          "bank_statement",
+          "processing_statement"
+        ],
+        "fields": [
+          "statement_period"
+        ]
+      },
+      "compares": {
+        "kind": "window",
+        "subject": "required_months"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "periods_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "B-05",
+      "title": "Conditional slot predicates resolved",
+      "reads": {
+        "slots": [
+          "*"
+        ]
+      },
+      "compares": {
+        "kind": "presence",
+        "subject": "conditional_predicate_inputs"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "predicate_inputs_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-01",
+      "title": "Legal name",
+      "reads": {
+        "documents": [
+          "application",
+          "ein_letter",
+          "articles_of_incorporation",
+          "bank_statement",
+          "voided_check",
+          "w9"
+        ],
+        "fields": [
+          "legal_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "legal_name",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-02",
+      "title": "DBA name",
+      "reads": {
+        "documents": [
+          "application",
+          "dba_filing",
+          "bank_statement",
+          "voided_check"
+        ],
+        "fields": [
+          "dba_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "dba_name",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-03",
+      "title": "EIN digits",
+      "reads": {
+        "documents": [
+          "application",
+          "ein_letter",
+          "w9"
+        ],
+        "fields": [
+          "ein"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "ein",
+        "exactness": "exact"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-04",
+      "title": "Business address",
+      "reads": {
+        "documents": [
+          "application",
+          "ein_letter",
+          "articles_of_incorporation",
+          "proof_of_business_address",
+          "bank_statement"
+        ],
+        "fields": [
+          "business_address"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "business_address",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-05",
+      "title": "Entity type",
+      "reads": {
+        "documents": [
+          "application",
+          "articles_of_incorporation",
+          "w9"
+        ],
+        "fields": [
+          "entity_type"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "entity_type",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-06",
+      "title": "State of formation",
+      "reads": {
+        "documents": [
+          "application",
+          "articles_of_incorporation"
+        ],
+        "fields": [
+          "formation_state"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "formation_state",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-07",
+      "title": "Formation date",
+      "reads": {
+        "documents": [
+          "application",
+          "articles_of_incorporation"
+        ],
+        "fields": [
+          "formation_date"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "formation_date",
+        "exactness": "exact"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-08",
+      "title": "Routing number",
+      "reads": {
+        "documents": [
+          "application",
+          "voided_check",
+          "bank_statement"
+        ],
+        "fields": [
+          "routing_number"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "routing_number",
+        "exactness": "exact"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-09",
+      "title": "Account number",
+      "reads": {
+        "documents": [
+          "application",
+          "voided_check",
+          "bank_statement"
+        ],
+        "fields": [
+          "account_number"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "account_number",
+        "exactness": "exact"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-10",
+      "title": "Routing number resolves to a bank, name agrees",
+      "reads": {
+        "documents": [
+          "voided_check",
+          "bank_statement"
+        ],
+        "fields": [
+          "routing_number",
+          "bank_name"
+        ],
+        "external": [
+          "frb_routing_directory"
+        ]
+      },
+      "compares": {
+        "kind": "external_lookup",
+        "field": "routing_number",
+        "against": "bank_name",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources",
+        "routing_number_not_extracted"
+      ],
+      "release": "v1",
+      "note": "The only external check in v1, and it is free. It confirms the routing number names a real institution; it confirms nothing about the account."
+    },
+    {
+      "id": "C-11",
+      "title": "Account holder name matches legal name or DBA",
+      "reads": {
+        "documents": [
+          "voided_check",
+          "bank_statement",
+          "application"
+        ],
+        "fields": [
+          "account_holder_name",
+          "legal_name",
+          "dba_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_against_either",
+        "field": "account_holder_name",
+        "against": [
+          "legal_name",
+          "dba_name"
+        ],
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-12",
+      "title": "Owner names on IDs match app ownership section",
+      "reads": {
+        "documents": [
+          "owner_photo_id",
+          "application"
+        ],
+        "fields": [
+          "owner_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "owner_name",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-13",
+      "title": "ID count matches owners at or above 25%",
+      "reads": {
+        "documents": [
+          "owner_photo_id",
+          "application"
+        ],
+        "fields": [
+          "owner_ownership_pct",
+          "owner_name"
+        ]
+      },
+      "compares": {
+        "kind": "count",
+        "subject": "owner_photo_id_against_qualifying_owners"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources",
+        "ownership_section_not_extracted"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-14",
+      "title": "Ownership percentages sum to no more than 100",
+      "reads": {
+        "documents": [
+          "application"
+        ],
+        "fields": [
+          "owner_ownership_pct"
+        ]
+      },
+      "compares": {
+        "kind": "arithmetic",
+        "expression": "sum(owner_ownership_pct) <= 100"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "ownership_section_not_extracted"
+      ],
+      "release": "v1",
+      "note": "Not subject to the two-source rule, and the exception is deliberate. This is arithmetic within one document rather than a comparison across documents, so one source is all it can ever have — see the build report on section 6's blanket claim that all of family C is subject to it."
+    },
+    {
+      "id": "C-15",
+      "title": "Signer appears as owner or officer",
+      "reads": {
+        "documents": [
+          "application",
+          "articles_of_incorporation"
+        ],
+        "fields": [
+          "signer_name",
+          "owner_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_against_either",
+        "field": "signer_name",
+        "against": [
+          "owner_name"
+        ],
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-16",
+      "title": "Owner DOB matches ID",
+      "reads": {
+        "documents": [
+          "owner_photo_id",
+          "application"
+        ],
+        "fields": [
+          "owner_dob"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "owner_dob",
+        "exactness": "exact"
+      },
+      "states": [
+        "fail",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-17",
+      "title": "Domain registrant matches legal name or DBA",
+      "reads": {
+        "documents": [
+          "proof_of_domain",
+          "application"
+        ],
+        "fields": [
+          "domain_registrant",
+          "legal_name",
+          "dba_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_against_either",
+        "field": "domain_registrant",
+        "against": [
+          "legal_name",
+          "dba_name"
+        ],
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-18",
+      "title": "Stated prior processor matches statement letterhead",
+      "reads": {
+        "documents": [
+          "application",
+          "processing_statement"
+        ],
+        "fields": [
+          "processor_name"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "processor_name",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "C-19",
+      "title": "Not-provided reason consistent with other evidence",
+      "reads": {
+        "documents": [
+          "application",
+          "bank_statement"
+        ],
+        "slots": [
+          "processing_statement"
+        ],
+        "fields": [
+          "processor_name",
+          "bank_deposits"
+        ]
+      },
+      "compares": {
+        "kind": "consistency_with_slot_reason",
+        "slot": "processing_statement"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "slot_not_resolved_to_not_provided"
+      ],
+      "release": "v1",
+      "note": "If the recorded reason is 'new business — no prior processing history' but the application names a prior processor, or the statements show card-processor deposits, that is a discrepancy worth surfacing. Both sides are already in hand."
+    },
+    {
+      "id": "C-20",
+      "title": "Owner residential address matches ID",
+      "reads": {
+        "documents": [
+          "owner_photo_id",
+          "application"
+        ],
+        "fields": [
+          "business_address"
+        ]
+      },
+      "compares": {
+        "kind": "field_across_documents",
+        "field": "owner_residential_address",
+        "exactness": "fuzzy"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "fewer_than_two_sources"
+      ],
+      "release": "deferred",
+      "note": "Deferred: people move, and the residential address on an ID is stale often enough that the finding would be noise more often than signal."
+    },
+    {
+      "id": "D-01",
+      "title": "Derived monthly volume against stated",
+      "reads": {
+        "documents": [
+          "processing_statement",
+          "application"
+        ],
+        "fields": [
+          "processing_volume",
+          "stated_monthly_volume"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "processing_volume",
+        "stated": "stated_monthly_volume"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "no_processing_statements",
+        "processing_statements_not_provided"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "D-02",
+      "title": "Derived average ticket against stated",
+      "reads": {
+        "documents": [
+          "processing_statement",
+          "application"
+        ],
+        "fields": [
+          "processing_volume",
+          "processing_transaction_count",
+          "stated_average_ticket"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "processing_average_ticket",
+        "stated": "stated_average_ticket"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "no_processing_statements",
+        "processing_statements_not_provided"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "D-03",
+      "title": "Derived high ticket against stated",
+      "reads": {
+        "documents": [
+          "processing_statement",
+          "application"
+        ],
+        "fields": [
+          "processing_high_ticket",
+          "stated_high_ticket"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "processing_high_ticket",
+        "stated": "stated_high_ticket"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "high_ticket_not_itemized",
+        "processing_statements_not_provided"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "D-04",
+      "title": "Derived chargeback rate against stated",
+      "reads": {
+        "documents": [
+          "processing_statement",
+          "application"
+        ],
+        "fields": [
+          "chargeback_count",
+          "chargeback_amount",
+          "processing_transaction_count",
+          "stated_chargeback_rate"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "chargeback_rate",
+        "stated": "stated_chargeback_rate"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "chargebacks_not_itemized",
+        "processing_statements_not_provided"
+      ],
+      "release": "v1"
+    },
+    {
+      "id": "D-05",
+      "title": "Derived refund rate",
+      "reads": {
+        "documents": [
+          "processing_statement"
+        ],
+        "fields": [
+          "processing_volume"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "refund_rate",
+        "stated": null
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "refunds_not_itemized",
+        "processing_statements_not_provided"
+      ],
+      "release": "deferred"
+    },
+    {
+      "id": "D-06",
+      "title": "Bank deposits reconcile to processing net deposits",
+      "reads": {
+        "documents": [
+          "bank_statement",
+          "processing_statement"
+        ],
+        "fields": [
+          "bank_deposits",
+          "processing_volume"
+        ]
+      },
+      "compares": {
+        "kind": "derived_vs_stated",
+        "derived": "bank_deposits",
+        "stated": "processing_net_deposits"
+      },
+      "states": [
+        "review",
+        "pass"
+      ],
+      "not_evaluable_when": [
+        "either_side_unreadable",
+        "processing_statements_not_provided"
+      ],
+      "release": "deferred"
+    }
+  ]
+}

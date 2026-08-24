@@ -96,6 +96,55 @@ export interface CopyAudit {
   readonly clean: boolean;
 }
 
+/**
+ * Words that claim an authority Mintro does not have.
+ *
+ * Distinct from `DIRECTIVE_TERMS`, which catches telling the reader what to do. These catch
+ * *asserting a conclusion*: that a document is genuine, that a number was confirmed against the
+ * world, that a merchant is sound. Findings report observations and the reader draws the
+ * conclusion (D-001, hard constraint 7).
+ *
+ * D-076 is why "verified" is here. A consistency check compares three pieces of paper the merchant
+ * supplied; "EIN verified" invites an underwriter to infer somebody queried the IRS, and nobody
+ * did. The name states the method — "EIN consistent across application, EIN letter, W-9".
+ *
+ * The forgery terms are A-04's. That check confirms a document carries the markers of its declared
+ * type, which catches a W-9 filed in the EIN Letter slot. It cannot detect a forgery, and no
+ * finding it produces may read as though it could.
+ *
+ * Same file as `DIRECTIVE_TERMS` on purpose. One place, three consumers — a second copy would
+ * drift, and the surface it guards is the one that matters most.
+ */
+export const DETERMINATION_TERMS: readonly string[] = [
+  'verified',
+  'verify',
+  'unverified',
+  'authentic',
+  'authenticated',
+  'genuine',
+  'forged',
+  'forgery',
+  'fraudulent',
+  'fraud',
+  'falsified',
+  'legitimate',
+  'trustworthy',
+  'creditworthy',
+  'high risk',
+  'low risk',
+  'risky',
+  'approved',
+  'denied',
+  'rejected',
+  'passes underwriting',
+  'confirms the merchant',
+  'proves',
+  'proven',
+];
+
+/** Everything a generated finding is audited against. */
+export const FINDING_TERMS: readonly string[] = [...DIRECTIVE_TERMS, ...DETERMINATION_TERMS];
+
 /** Finds directive language in a piece of text. */
 export function auditCopy(text: string, terms: readonly string[] = DIRECTIVE_TERMS): CopyAudit {
   const lower = text.toLowerCase();

@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       '@mintro/ruleset': src('ruleset'),
       '@mintro/engine': src('engine'),
+      '@mintro/extraction': src('extraction'),
     },
   },
   test: {

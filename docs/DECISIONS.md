@@ -4559,3 +4559,1919 @@ not tell you anything here* and *this number is fine* are different statements (
 
 That is the difference between *we fixed this document* and *the document composes well at any
 size*, which is what was actually being asked for.
+
+---
+
+## D-076 — A check names its method, not its subject
+**2026-08-24 · Frank's ruling**
+
+> Not "EIN verified". "EIN consistent across application, EIN letter, W-9."
+
+The report also carries an explicit section naming what was **not** externally verified.
+
+**"Verified" is a claim about the world; "consistent" is a claim about three pieces of paper.**
+What we did was compare documents the merchant gave us. If all three say the same wrong number, a
+consistency check passes and nothing about reality has been established. An underwriter reading
+"EIN verified" reasonably infers someone queried the IRS. Nobody did, and nothing in this system
+ever will.
+
+This is constraint 7 arriving earlier than usual. The body copy of a finding can be scrupulous and
+the name still does the misleading, because **a name is the part that gets skimmed** — it appears in
+the run summary, the tick strip, the PDF contents page, the email subject. It travels further than
+the finding it belongs to and arrives without its qualifications.
+
+**The not-externally-verified section is the other half, and it is not optional.** Silence is not a
+boundary. A reader cannot tell from an absent claim whether the IRS was checked and matched or never
+consulted; both render as nothing. Stating the boundary is the same instrument as the architecture's
+non-goals list — coverage a reader might reasonably assume must be denied explicitly rather than
+merely not asserted (D-018).
+
+---
+
+## D-077 — Two completeness models, and field completeness is not one of them
+**2026-08-24 · Frank's ruling**
+
+**Package completeness** is required document slots present. It is countable, and it is a real state.
+
+**Field completeness is not a completeness concept.** A blank field on a source document yields
+`not_evaluable` with a stated reason. Never `fail`.
+
+**Because we cannot see intent.** A blank "DBA name" might mean the form was abandoned half-finished
+or that the business has no DBA. Both produce identical bytes on the page. Reporting `fail` asserts
+we know which, and we do not — precisely the assertion constraint 2 forbids. Note which direction it
+fails in, too: the merchant who correctly leaves the field blank because they have no DBA is the one
+who gets marked incomplete.
+
+**The exception is narrow, and it is structural rather than interpretive.** Where the same form makes
+a field conditionally required by other answers *on that form* — "Do you use a third-party
+fulfillment center? ☑ Yes" with the company-name field beneath it empty — the document contradicts
+itself. That contradiction is observable on the page without inferring anything about why. The
+evidence is the two fields together, and it is a finding about the document, not about the merchant.
+
+**The boundary has to hold at "same form."** A field our template wants, blank on their form, is a
+slot — package completeness, D-078's states. Only the form's own internal logic qualifies. Widening
+this to "a field any reasonable application would require" would re-import the guesswork the rule
+exists to exclude.
+
+**Downstream consequence, stated because it constrains the extractor.** A `null` cannot carry a
+reason. An extraction schema that returns null for every unfilled field has destroyed the
+distinction this decision depends on, at the only point where it existed. See the D-086 amendment.
+
+---
+
+## D-078 — Five slot states, and three of them are not "missing"
+**2026-08-24 · Frank's ruling**
+**Amended by D-107 — there are six. `missing` is unchanged.**
+
+`satisfied`, `not_provided`, `waived`, `superseded`, `missing`. **`missing` is the unresolved default
+and the only state meaning "chase this."**
+
+These are different facts and they read differently to an underwriter:
+
+- **`not_provided`** — the requirement stands and the document does not exist. A startup has no
+  processing statements. Nobody removed the requirement; it cannot be met.
+- **`waived`** — the requirement was removed. A person decided it does not apply, and that person is
+  accountable for the decision.
+- **`superseded`** — a newer version replaced it. The slot is satisfied and the history is part of the
+  record (D-091's supersedes chain).
+- **`missing`** — nobody has said anything yet.
+
+**Collapsing these into have-it / don't-have-it makes "we asked and it does not exist" indistinguishable
+from "we forgot to ask."** The first is finished work. The second is an open task. An underwriter
+weighing a package needs to know which, and merging the states removes the information at the point
+it is recorded, where no downstream care recovers it.
+
+**`missing` as the default is the load-bearing part.** A new slot starts unresolved and stays on the
+chase list until someone acts on it. A default of `not_provided` or `waived` would let a slot resolve
+itself by never being touched — constraint 9's shape exactly: a state meaning *we have not
+established this* must never render as a state meaning *settled*.
+
+---
+
+## D-079 — Waiver and not-provided reasons come from enumerations
+**2026-08-24 · Frank's ruling**
+
+Fixed enumerations. Not free text.
+
+**A reason typed by a person is not reproducible.** D-085 makes the report a pure function of a run;
+free text makes it a function of a run plus whoever happened to be typing. Two analysts over
+identical evidence produce different documents, and there is then nothing to assert about the report
+at all.
+
+**Enumerated reasons are countable across packages.** "Waived — covered by parent entity filing"
+appearing forty times is a template problem worth finding. Nobody finds that pattern in prose.
+
+**And free text is where determinations get in.** A box labelled "reason" invites *"this looks fine to
+me"* — a compliance conclusion, in Mintro's document, forwarded under Mintro's name (constraint 7,
+D-067). An enumeration cannot express one, which is a property of the control rather than a matter of
+discipline.
+
+**What must still be true.** An enumeration that does not fit gets picked around, and a wrong-but-close
+option is worse than a missing one. A reason with no matching value is a signal to extend the list
+under a decision number (D-025), never to add a free-text escape hatch.
+
+---
+
+## D-080 — Slots carry a count and a coverage window, not one slot per period
+**2026-08-24 · Frank's ruling**
+
+> "Bank Statement, count 3, most recent 3 consecutive periods ending within N days" — not Month 1 /
+> Month 2 / Month 3.
+
+Periods are read off the document.
+
+**Three ways the per-period model fails, all of them ordinary:**
+
+- **Merchants combine periods into one PDF.** Per-period slots then face one file that satisfies three
+  slots, or two empty slots beside one holding everything.
+- **Billing cycles are not calendar months.** A statement running the 12th to the 11th does not belong
+  to "Month 2", and forcing it there makes the slot label a lie about the document in it.
+- **Continuity and recency cannot be expressed at all.** Three statements from last year fill Month 1,
+  2 and 3 exactly as well as three recent ones. Consecutiveness has no representation in the model —
+  **the property that matters most is the one the structure cannot hold.**
+
+A count plus a window states the requirement as what it actually is: *this many, covering this span,
+ending this recently.*
+
+**Periods are read off the document**, not from the upload date and not from the filename. That makes
+the coverage window a claim about what the documents say, so it needs provenance like any other value
+(D-087) — and where a period cannot be read, the slot is `not_evaluable` rather than assumed from
+whatever order the files arrived in.
+
+---
+
+## D-081 — Conditionals fire on structural impossibility only
+**2026-08-24 · Frank's ruling**
+
+A sole proprietorship has no Articles of Incorporation. A domestic entity files W-9, not W-8BEN. A
+for-profit has no 501(c) letter. **A document that is merely absent stays in the template and is
+resolved explicitly.**
+
+Package creation asks three questions that drive this: **entity type**, **existing processor yes/no**,
+**US-domiciled yes/no**.
+
+**The two ways to remove a slot look identical downstream and are not the same thing.** "Cannot exist"
+is a fact about the entity type. "Does not have one" is a fact about this merchant today, and it
+belongs in the record as `not_provided` with a reason (D-078, D-079), so an underwriter can see it was
+asked and answered.
+
+**A template that quietly drops slots produces a shorter checklist that looks complete.** That is the
+silent false-pass signature in a new setting: the absence of a slot reads as nothing to chase, and
+nobody audits a list for the items that were never on it.
+
+**Processing Statements is the worked example.** It is default-on for every package including
+startups. A startup has no statements — but "startup" is not structural impossibility; plenty of new
+merchants have processing history under another entity. So the slot stays and resolves via
+`not_provided`. The report then says *we asked, and there are none*, instead of never mentioning
+processing history at all.
+
+**Three questions, and adding a fourth needs an argument.** Each must map to a genuine structural
+impossibility. A question that merely predicts what a merchant probably has is a question that will
+drop slots it should have kept.
+
+---
+
+## D-082 — Every slot is examined or collected_only
+**2026-08-24 · Frank's ruling**
+
+Collected-only documents report as **"present, not examined."**
+
+**Otherwise an underwriter cannot tell whether a document was read.** A slot showing `satisfied` with
+no findings against it could mean it was examined and clean, or filed and never opened. Same
+rendering, opposite meanings — the presentation half of constraint 9, and the same defect D-047 found
+in a control that could not distinguish two records a user might plausibly hold.
+
+**It also protects the checks that did run.** Findings on examined documents carry more weight when it
+is visible which documents were in scope. Without the distinction, a clean report is ambiguous across
+its whole surface rather than at the specific places where nothing was looked at.
+
+The specific per-slot assignment is **deferred to the check inventory**. Recorded now because the
+field has to exist from the start: retrofitting it would leave every slot created before it ambiguous,
+and there is no way to backfill a fact about what was done.
+
+---
+
+## D-083 — A report is pinned to a run; sending is an event
+**2026-08-24 · Frank's ruling**
+
+A report belongs to a run, not to a package. **Sending is a logged event, not a state transition.** A
+sent report never changes. New documents produce a new run and a new report. Every report after the
+first carries a diff against the last sent report: slots newly satisfied, findings resolved, findings
+newly appeared.
+
+**This is D-002 for Documents Check.** A report that changes after it was sent means the copy in an
+underwriter's inbox and the copy in our database disagree, and the disagreement is invisible from
+both ends.
+
+**Sending as an event rather than a state is what makes a second send ordinary.** A state transition
+implies a report is sent once; a second send is then either forbidden or an edit to the first. As an
+event, each send records what was sent and when, and there may be five of them.
+
+**The diff is what makes report five readable.** Without it the recipient re-reads forty slots to find
+the three that moved. It is computed between two immutable runs — a derived view, never stored
+mutable state, so it cannot drift from the reports it summarizes.
+
+**"Findings resolved" is a statement about two runs, not about a merchant fixing something.** A finding
+present in run 1 and absent in run 2 is what we observed. Why it is absent is not ours to say
+(constraint 7), and the wording must not quietly award credit.
+
+---
+
+## D-084 — Retention: 30 days, configurable, restarting on reopen
+**2026-08-24 · Frank's ruling**
+**Superseded in part by D-097 — see below.**
+
+30 days after a package is submitted or cancelled. **Configurable rather than constant.** The clock
+restarts on reopen. Operator notice at day 23. At archival, purge document binaries and retain the
+findings ledger, extracted field metadata and run history indefinitely.
+
+**These are the most sensitive artifacts the system will ever hold** — SSNs, bank account and routing
+numbers, tax IDs, photographs of government ID. The exposure of holding them is continuous; their
+value collapses once the package is decided. Retention is the only control that *reduces* that
+exposure rather than fencing it.
+
+**Configurable, because 30 days is a starting position.** A constant would need a code change to move.
+This is a policy dial, and it is deliberately unlike the guarantees in constraint 5, which are
+unmovable on purpose.
+
+**The clock restarts on reopen** because a reopened package is live work, and deleting its documents
+mid-review would be a data-loss bug wearing a policy's clothes.
+
+**Day 23 gives seven days' warning**, and it is a notice rather than a hold. A deletion that waits for
+someone to acknowledge it never runs.
+
+**What survives is what keeps the record defensible**: what was observed, from which document version,
+at which page, with the verbatim snippet (D-087). The ledger outlives the binaries.
+
+### Superseded in part — the purge is withdrawn, see D-097
+
+The tension flagged here was ruled on the same day. **The binary purge is withdrawn** (D-097).
+Document bodies are retained, and nothing in a package is deleted by application code.
+
+**What survives from this entry:** the 30-day clock, its configurability, the restart on reopen, and
+the day-23 operator notice. What they govern has changed — the boundary at 30 days is now between
+open and restricted access, not between existence and deletion, and the day-23 notice announces that
+access change rather than an impending purge.
+
+**What does not survive:** the purge itself, and the sentence above that says the ledger outlives the
+binaries. The binaries outlive everything.
+
+The paragraphs above are left standing as written. This entry reasoned from a real privacy exposure,
+reached a defensible-sounding answer, and paid for it with the thing constraint 3 exists to protect.
+The file is more useful showing that than showing a decision that was always right.
+
+---
+
+## D-085 — No analyst annotation on findings
+**2026-08-24 · Frank's ruling**
+
+> Same run in, byte-identical report out.
+
+The report is machine output. Internal notes may exist on the package and do not render.
+
+**An annotated finding is a Mintro opinion attached to a Mintro observation, in a document forwarded to
+an underwriter.** That is a determination however carefully it is hedged, and determinations are
+IQwallet's (constraint 7, D-001, D-067). There is no phrasing that makes an analyst's gloss on a
+finding into an observation.
+
+**The purity requirement is also what makes the report testable.** "Same run in, byte-identical report
+out" is a property something can assert. Every check in the D-036 family depends on being able to
+regenerate a report and compare it. Annotation makes a report a function of a run *plus an editing
+history*, and there is then nothing left to check.
+
+**It also protects the merchant-response channel.** Merchant words render because they are the
+merchant's and are attributed as such (D-063, D-067). Analyst words rendering in the same document
+would be indistinguishable in weight from the merchant's and attributable to nobody the underwriter
+can question.
+
+Analysts need somewhere to think, and internal notes are legitimate. They attach to the package, never
+to a finding, and they never render.
+
+---
+
+## D-086 — No reuse of the mintro-intake-lite text harvester
+**2026-08-24 · Frank's ruling**
+
+Three independent disqualifiers. Each one is sufficient on its own.
+
+**1 — No provenance below document level.** The candidate record is
+`{value, source_type, source_document_request_id, source_file_url, extracted_at, confidence,
+source_filename, matched_label}`. No page, no location, no snippet. `matched_label` looks like
+provenance and is not — it holds the label string the scraper matched on, which is a fact about the
+scraper. Measured instance: `matched_label: "Merchant Name"` against `value: "Merchant Address"`, a
+wrong pairing preserved faithfully with no way to see where either came from. D-087 makes such a value
+not a candidate at all.
+
+**2 — It derives its own configuration by reading its own source.** `deriveStrictValidatedFieldKeys`
+calls `Function.prototype.toString()` on `isFieldValueValid` and regex-matches `field === "..."` out of
+the resulting text to build its validation key set. Observed: 29 keys, `sane = true`. Any bundler,
+minifier, transpiler, or refactor to a lookup table changes that source text — and the failure is
+silent by design, disabling vision escalation rather than raising. **Code that reads its own source
+cannot be relocated.** That is not a defect to repair on arrival; it is a property of the design, and
+the property is "does not move."
+
+**3 — The field vocabulary is that app's catalog.** Candidate keys are `document_requests.title`
+strings: `"who was your last processor/bank?"`, `"owner 1 ownership %"`. Adopting the harvester adopts
+the merchant-application form it was written to fill, and our field names become theirs.
+
+**Rebuilding costs less than retrofitting**, and this is a measurement rather than a preference. The
+harvester is ~500 lines of label-adjacency scraping declared inside a ~1,700-line function inside a
+44,908-line file, exporting nothing. Lifting it is not a move; it is a rewrite that carries the
+original's assumptions across intact. And what it produces when it is working correctly is the subject
+of D-088.
+
+---
+
+## D-087 — No candidate without provenance
+**2026-08-24 · Frank's ruling**
+
+Every extracted value carries **document version, page, location within the page, and a verbatim
+snippet**. An extraction that cannot supply these is **not a low-confidence candidate — it is not a
+candidate.**
+
+**This is constraint 3 reaching the extractor.** A finding carries the capture its kind requires, and
+for a documentary finding the capture is what the document said and where it said it. A value without
+that backing is an assertion, and constraint 3's answer to an unbacked assertion is `not_evaluable`,
+never a bare claim.
+
+**The strictness is the mechanism, not emphasis.** "Low confidence" is a dial, and dials get turned
+when a release is late. Making unprovenanced values *not candidates* means nothing downstream has to
+decide how much provenance is enough, and there is no threshold available to relax. Same instrument as
+constraint 4's review tier: a category, not a score (D-009).
+
+### What per-page rasterization settles, and what it does not
+
+D-095 makes page attribution a property of the request rather than a claim by the model, which settles
+**document version and page**. It does not settle **location within the page** or **the snippet** — a
+vision call over a rendered page returns values, not coordinates, unless the schema and prompt require
+them.
+
+**Per-page routing is necessary for this decision and not sufficient**, and mistaking it for sufficient
+is the most likely way this gets violated: the page number will be present, the record will look
+provenanced, and two of the four required elements will be missing. Where the location and snippet
+cannot be produced, the extraction is not a candidate — the same as if the page were unknown.
+
+D-089's form-field path is the one place all four arrive without effort: a value read from an AcroForm
+field carries its field name, its page, and its widget rectangle directly.
+
+---
+
+## D-088 — Confidence never gates a state, and nothing auto-applies
+**2026-08-24 · Frank's ruling**
+
+There is no auto-apply concept in Documents Check.
+
+### The measurement
+
+The surveyed app's own committed fixture: a four-page merchant processing application carrying **67
+filled AcroForm fields**. Extracted text: the blank template. The harvest returned
+
+    business_legal_name  =  "Merchant Address"           0.90
+    dba_name             =  "(Doing Business As) Name"   0.94
+    bank_name            =  ", Fresno, CA."              0.94
+
+— the last a fragment of an ISO disclosure line. **The true values are absent from the extracted text
+entirely.** That app's auto-apply threshold is 0.90; the `dba_name` value clears every gate including
+the noise filter, and would be written into the record with no human seeing it.
+
+The confidence was 0.92 adjusted for *how the match was shaped* — same line or next line, generic
+label or specific. **It never looked at the value.** It cannot be evidence about correctness because
+it is not computed from anything that could be wrong.
+
+### Why this is worse for a consistency check than for a form-filler
+
+A wrong pre-filled form field is one wrong field, and the next human to look at it may catch it.
+Documents Check **compares documents**. Two documents run through one extractor with one blind spot
+fail the same way — an application and a W-9 both yielding a label fragment where the legal name
+belongs produce **agreement**.
+
+The check then reports "consistent across two documents," and the agreement is an artifact of the
+extractor rather than a property of the paperwork.
+
+> **Manufactured corroboration reported as a clean result is the worst output this feature can
+> produce.** Not a wrong value — a wrong value has a chance of looking wrong. Two independent-looking
+> sources appearing to confirm each other invites acceptance.
+
+It is D-011's shape with an extra hazard, and the surveyed app reached the same conclusion from the
+other direction: it discards a text harvest when a document escalates to vision, because junk sitting
+beside real values from a second extractor "is precisely the shape a reconciler reads as
+CORROBORATION."
+
+**Consistent with D-009: confidence, like severity, does not touch state.** A model's self-reported
+confidence may be recorded as an observation about the extraction. It may not decide anything.
+
+---
+
+## D-089 — Read the form fields first, and dispatch on magic bytes
+**2026-08-24 · Frank's ruling**
+
+AcroForm fields are read **before** text extraction is attempted. File type comes from **magic bytes**,
+never from the filename extension.
+
+**Form fields first, because the values are already structured and nothing was reading them.** The
+measured case: 67 filled AcroForm fields present in the file, and the text layer holding the blank
+template. `pdf-lib` reads those fields and is already a dependency in the surveyed app — used only
+ever to *write* them, never once to read an upload.
+
+**Form field names are provenance for free.** A value from a field named `"BusinessCorporate Name as
+shown on your Income Tax Return"` arrives with its own label, its own page, and its own coordinates
+from the widget rectangle. No adjacency guessing, no model, no inference. On a filled application this
+is the strongest provenance available anywhere in the pipeline and the cheapest to obtain — it is the
+one path that satisfies all four of D-087's elements without asking anything of a model.
+
+**Magic bytes, because extension is merchant-supplied metadata about content.** The surveyed app
+dispatches on `path.extname`: a PDF saved as `.txt` is skipped, an HTML error page saved as `.pdf`
+reaches the PDF parser and throws, a `.heic` from an iPhone is dropped without a record. Trusting the
+extension is establishing the content from something adjacent to it rather than from the content —
+constraint 9's error in miniature. It also feeds D-092: a wrong extension is one of the routes by
+which a file reaches no outcome at all.
+
+---
+
+## D-090 — Text density per page, separators stripped, routing per page
+**2026-08-24 · Frank's ruling**
+**Reasoning corrected — see below.**
+
+Measure text density **per page**, with page-separator artifacts stripped. Route **per page**.
+
+**Why stripped.** Measured: `pdf-parse`'s default page joiner appends `-- N of M --` after every page's
+text. A pure-image PDF therefore measures **12 characters at one page, 26 at two, 149 at ten**, against
+the surveyed app's 20-character floor — so its documented "image-only PDFs route to vision" rule fires
+**only on single-page files**. Every longer scan is classified as having a text layer on the strength
+of the parser's own furniture.
+
+> A threshold that is measuring its own tooling's output is measuring nothing.
+
+Note how it fails: the error **scales with page count**. It is correct on the one-page document and
+wrong on everything larger, which is the worst possible direction — it degrades exactly as documents
+get longer and more consequential.
+
+**Why per page.** Hybrid documents are the ordinary case rather than the edge: a typed application with
+a photographed page inserted, a signature page scanned back in, a bank letter appended to a form. **A
+per-document routing decision must pick one answer for a file that has two**, and is therefore wrong
+about part of every hybrid it meets.
+
+Per page the question is also stable in a way the aggregate is not: a page with no text has no text,
+regardless of how many other pages the file contains.
+
+### Corrected reasoning — the separators are not in the PDF
+
+**The ruling stands unchanged. The mechanism above describes a defect this stack does not inherit.**
+
+`-- N of M --` is `pdf-parse`'s `pageJoiner`, appended by the library after each page's text. It was
+never PDF content. Measured while building M0: read through pdfjs directly, **an image-only page
+returns zero text items**. The 12 / 26 / 149 characters cited above are the surveyed app's tooling
+describing itself, and no reader we use produces them.
+
+So the specific inflation that broke the surveyed app's threshold cannot happen here at all, and a
+reader coming to this entry cold would otherwise go looking for separators to strip and find none.
+
+**What survives the library change is the reasoning that was underneath it:**
+
+> Count only glyphs the document is making a claim with.
+
+A scanner that stamps `Page 3 of 12` onto an otherwise blank scan reproduces the same failure from a
+different source — a page that is an image, measured as a page with text, because something wrote a
+number on it. That is not a `pdf-parse` artifact and no change of library removes it. Stripping runs
+for that reason rather than for the one originally given, and `stampedScanPdf` is the fixture that
+holds it.
+
+**A second correction, and it matters more than the first.** The obvious regression test for this
+ruling does not test it. A *pure*-image PDF measures zero glyphs whether you total the document or
+read it page by page, so it passes under both designs — verified by reverting the M0 extractor to an
+aggregate threshold, which left every image-only assertion green. The case that discriminates is a
+scan whose **first page carries a text header** and whose remaining pages are images: aggregated,
+the header licenses the text route for the whole file and pages 2–n come back empty, which is
+indistinguishable from pages that had nothing on them.
+
+The general form is the one this project keeps relearning: **ask what the assertion does when the
+thing it guards is broken, and check by breaking it.** An assertion that passes either way is not
+evidence about the design it appears to be defending.
+
+---
+
+## D-091 — SHA-256 on ingest; the hash is document identity
+**2026-08-24 · Frank's ruling**
+
+Every file is hashed on arrival. The content hash **is** the document's identity — it drives
+deduplication and the supersedes chain D-002 requires.
+
+**Filenames are not identity.** The same statement arrives as `scan.pdf`, `Scan 1 (2).pdf` and
+`bank feb.pdf`; three unrelated documents arrive as `document.pdf` three times over. Content is what a
+document is, and it is the only thing about a document that cannot be restated.
+
+**Deduplication matters because merchants re-send.** The surveyed app has two rows pointing at one
+stored object and needed a URL-prefix normalizer to notice they were the same file — path comparison
+standing in for identity, which works until a second code path writes the path differently.
+
+**The supersedes chain is the D-002 half.** A replacement is a new document; the old one is not
+overwritten. The slot moves to `superseded` (D-078) and both records remain, joined by the chain. Runs
+stay immutable, and a report issued last week keeps pointing at the bytes it actually read.
+
+One value doing three jobs, none of them extra work: identity here, the evidence record's integrity
+proof under constraint 3, and the cache key in D-096.
+
+---
+
+## D-092 — Silent skip is prohibited
+**2026-08-24 · Frank's ruling**
+
+Every ingested file resolves to a **recorded outcome**. Nothing is marked processed without a
+**persisted result**.
+
+### What was observed
+
+The surveyed app stamps `extracted_at` — the mark that removes a document from scope — in three cases
+where nothing was extracted:
+
+- **unsupported file types**, reached by an `else { continue; }` that records no error at all
+- **escalation nominees that lost** the one-per-invocation contest
+- **harvests that produced zero candidates**
+
+All three are then filtered out of every subsequent run and never looked at again. The per-document
+diagnostic record that would explain any of it exists only in one HTTP response body and is never
+persisted.
+
+### Why this is the D-026 shape
+
+A document nobody could read and a document read and found empty become the same thing: a slot with
+nothing in it and no record of why. **The failure is in the direction nobody checks** — a missing
+finding does not appear anywhere to be questioned, and the run reports as complete. Nothing
+distinguishes a thorough read of a clean document from a file that was never opened.
+
+### Two rules, and the second is the one that gets broken
+
+1. **Every file gets an outcome.** Not an absence of error — an outcome, named and stored.
+2. **The outcome is persisted before the file is marked done**, and a file is never marked done on the
+   strength of having been *attempted*.
+
+The surveyed app knew the second rule for candidates and says so in its own ordering comment — write
+results, then stamp, because a crash between them costs redundant work while the reverse costs the
+harvest permanently. It then lost the rule in exactly the cases where there were no results to write.
+
+**The permitted outcomes are states this project already has.** A file that could not be read is
+`not_evaluable` with the attempts evidenced (constraint 3). A file type we do not handle is a recorded
+outcome naming the type, not a `continue`. D-096's terminal failure state is the bounded-retry case of
+this same rule.
+
+---
+
+## D-093 — Vision extraction is approved; metered model calls are not vendor spend
+**2026-08-24 · Frank's ruling**
+
+> References resolved the same day: D-076 through D-092 were ruled in this session and inserted
+> above, after D-093 through D-096 had already been written — a sequencing error, recorded here
+> rather than tidied away.
+
+Documents Check may call the Anthropic API to read documents. This is approved for the release.
+
+**The no-budget constraint was about data vendors, and this is not one.** A data vendor is a new
+commercial relationship — contract, procurement, a recurring line nobody has agreed to. Metered
+model calls run on an account Mintro already holds and already pays. The two were never the same
+category; treating them as one would refuse a capability on the strength of a rule aimed at
+something else.
+
+**Without it there is no observation to report.** There is no OCR in this stack and none is being
+added. A photographed owner ID, a phone snap of a voided check, a scanned EIN letter — none has a
+text layer. Nothing reads them. This is not "extraction is worse for photo-native documents"; it is
+that nothing happens at all.
+
+Follow that through the four states. A rule that cannot be observed returns `not_evaluable`
+(constraint 2), and a `not_evaluable` finding must evidence why. So a Documents Check without vision
+does not fail loudly or cheaply — it produces a correct, well-evidenced report that says *we could
+not read this document* for every merchant who photographed their paperwork, which the survey's
+working log identifies as the highest-frequency real case. The EIN consistency check and the
+bank-detail consistency check are comparisons; with one side unreadable they have nothing to compare
+and return `not_evaluable` too. Two of the checks the phase exists for, dark, on the merchants most
+likely to need screening.
+
+**What is actually dangerous about metered calls is repetition, not unit price.** The surveyed app
+has no budget guard, no spend ceiling, and one documented failure mode — a document whose call times
+out is never marked done, so it is re-read and re-charged on every subsequent run, indefinitely. The
+unit cost was never the problem there. The unbounded loop was.
+
+So this approval is not standalone. It holds because D-095 bounds what a call reads and D-096 bounds
+how many times the same bytes can be read. **Approved with those two, not before them.**
+
+---
+
+## D-094 — Extraction is a queued job on the worker, never a serverless function
+**2026-08-24 · Frank's ruling**
+
+Document extraction runs on the Fly worker, through the existing Postgres job queue. It does not run
+in a Netlify function, and none of the surveyed app's pacing constraints are inherited.
+
+**Three of that app's oddest rules are not extraction decisions.** They are shapes pressed into it
+by a ~26s serverless proxy cap, and the code says so in its own comments:
+
+- a **12-second budget** for the whole document loop, derived in-comment from the proxy cap minus the
+  worst-case retry chain
+- a **four-document ceiling per click**, which is that budget divided by the measured ~3.5s per
+  document — an eight-document package therefore needs two clicks *by design*
+- **one vision escalation per invocation**, to keep a single request inside the same envelope
+
+Read as extraction policy these are bizarre. Read as timeout accounting they are sensible. We deploy
+the worker on Fly precisely so we do not have to do timeout accounting — the same ruling the
+architecture already makes for the crawler, applied to the second long-running workload rather than
+rediscovered for it.
+
+**The cap is not merely awkward; it manufactures a false clean.** The survey measured what the
+one-escalation rule does when several documents need vision in the same run: the losers commit an
+empty result, record no error, are marked processed, and drop out of scope permanently. A document
+nothing could read is indistinguishable from a document that was read and held nothing — produced by
+a timeout, not by anything about the document. That is the D-026 signature, and inheriting the cap
+would inherit it.
+
+**So the rules here are the absence of those rules.** No wall-clock budget on the loop. No cap on how
+many documents may reach the model in one execution. No package that requires a human to click again
+to finish. A run reads every document it was given, or it fails visibly with the failure recorded.
+
+**What must still be true.** Extraction produces results attached to a run, and a run stays immutable
+(D-002, constraint 8). Re-reading a merchant's documents creates a new run; it never edits an old
+one. The worker already needs a real process and a filesystem for D-095's rasterization, which is a
+second reason this work cannot live in a Lambda even if the clock allowed it.
+
+---
+
+## D-095 — Rasterize per page; a whole-PDF call has no page to attribute to
+**2026-08-24 · Frank's ruling**
+
+Pages are rasterized and sent to the vision model individually. A PDF is never sent whole as a
+document block.
+
+**A whole-PDF call destroys page attribution before the model answers.** The surveyed app sends the
+file as a single `document` block, the vendor rasterizes server-side, and what comes back is a flat
+object of field values. There is nowhere for a page number to come from. Not because the schema
+forgot one — because by the time the model replies, the only party who knew which page anything was
+on was the vendor's renderer, and it does not report.
+
+The only recovery is to ask the model where it saw each value. **That is not provenance; it is the
+model attesting to its own provenance.** It is a claim we would be transcribing into a report as
+though it were a capture, and it fails D-087 for exactly the reason D-087 exists.
+
+Per page, the page number is a property of the *request*. The caller knows it before the model
+answers and the model cannot be wrong about it. The capture is the rasterized page; the attribution
+is the fact that we sent that page. This is constraint 9's rule in a different setting — establish
+the surface structurally, rather than deriving it from the thing being measured.
+
+**A per-page decision also cannot fail the way a whole-document threshold failed.** The surveyed
+app decides text-layer-versus-vision by measuring the *whole file's* extracted text against a
+20-character floor. The survey measured what that does to a pure-image scan: the PDF library's own
+per-page separators (`-- 1 of 4 --`) are text, so a scan with no readable content at all measures 12
+characters at one page, 26 at two, 149 at ten. Only a single-page scan is ever recognised as
+textless. Every longer scan is classified as having a text layer, on the strength of the parser's
+own furniture.
+
+Asked per page the question has no such failure: a page with no text has no text, whatever the rest
+of the file contains. It also answers correctly for the ordinary mixed document — a typed
+application with one photographed page inserted — where any whole-file verdict must be wrong about
+part of it.
+
+**With D-090, per-page is not the expensive option.** Only pages that need vision incur a call. A
+twelve-page application with two photographed inserts costs two calls, against one call carrying
+twelve rendered pages of tokens.
+
+**The cost of this ruling, recorded so it is not rediscovered.** A page-scoped read cannot see across
+a page break. A label at the foot of page 3 whose value sits at the head of page 4, or a table
+spanning both, will not be read as one thing. That is a real loss and it is accepted, because of
+which direction it fails in: the page-scoped read does not find the value, and not finding a value
+produces `not_evaluable`, not a wrong one. If a class of document turns out to straddle breaks
+routinely, this ruling is the thing to revisit — not the evidence requirement it exists to serve.
+
+---
+
+## D-096 — Results are cached on content; attempts are bounded and terminate
+**2026-08-24 · Frank's ruling**
+
+Extraction results are cached on `(sha256, extractor_version)` per D-091. Extraction attempts on a
+single document are bounded, and exhausting the bound produces a recorded terminal failure.
+
+### Why the cache is a correctness requirement, not an optimisation
+
+Documents Check re-runs whenever a merchant sends anything. On the fourth upload round, three
+rounds' worth of documents are unchanged, already read, and about to be read again. Uncached, the
+bill for a merchant is not the number of documents — it is documents multiplied by rounds, and the
+multiplier is set by how disorganised the merchant is.
+
+**The key has to carry the extractor, not only the content.** `sha256` alone says the bytes are the
+same; it says nothing about whether the thing that read them still exists. A prompt revision or a
+schema change must invalidate, or a report cites results produced by an extractor no longer in the
+codebase and nobody can tell by looking.
+
+**The hash is already required.** Constraint 3 makes SHA-256 part of the evidence record for a
+documentary finding. The cache key is a byproduct of evidence we must keep regardless, not a new
+artifact to maintain.
+
+**What the cache may not become.** It serves extraction results *into* a run. It is an input, like
+the ruleset version. It never reaches backwards: a finding belongs to the run that recorded it, with
+its own evidence, and a later run producing the same value from a cache hit records that value
+afresh (D-002, constraint 8). "Cached" must never come to mean "shared between runs."
+
+### Why attempts terminate
+
+The surveyed app's carry-forward, quoted in its own commit message: a document that escalates and
+times out "is never stamped, contributes nothing, and re-bills on each click," and the fix — "a
+terminal state (attempt counter, stamp after N)" — is described as still outstanding.
+
+Their reasoning for not marking a failure done is correct as far as it goes. Marking it done is a
+silent permanent skip, which is the worse error. But those are not the only two options, and the
+third one is the one this project is built around:
+
+| | Cost | What the report says |
+|---|---|---|
+| Retry forever | unbounded, invisible | nothing — the document is perpetually pending |
+| Mark done on failure | bounded | nothing — reads identically to a clean document |
+| **Terminate and record** | **bounded** | **`not_evaluable`, with what was attempted** |
+
+The third row is not extra machinery. **Constraint 3 already requires it**: a `not_evaluable`
+finding must evidence *why*, with the requests attempted and what they returned. The attempt ledger
+that bounds the retries is the same ledger that evidences the outcome. Bounding cost and satisfying
+the evidence rule are one piece of work, and skipping the bound does not save the bookkeeping — it
+just means the bookkeeping never terminates.
+
+**Unbounded retry is not resilience. It is an unpriced failure mode**, and one that grows fastest on
+exactly the documents least likely to ever succeed.
+
+---
+
+## D-097 — The binary purge is withdrawn; archival restricts access, not existence
+**2026-08-24 · Frank's ruling · amends D-084**
+
+D-084's binary purge is withdrawn. Document bodies are retained under hard constraint 3 and
+constraint 5's append-only rule, alongside the findings ledger, extracted field metadata and run
+history. **Nothing in a package is deleted by application code.**
+
+### The purge traded away exactly what constraint 3 exists to protect
+
+D-084 reasoned from privacy exposure. The exposure is real and the reasoning was sound as far as it
+went — but what it spent to reduce that exposure was defensibility, and constraint 3 is not a
+preference that a sufficiently good reason can outweigh. **It is the refusal of that specific
+trade.** It says so in its own words: store the artifact body, not only its hash, because a hash
+"does not let anyone read what the document said."
+
+The architecture doc reaches the same conclusion about the append-only triggers, and the sentence
+transfers intact: *a guarantee that yields to a good reason is not a guarantee.* The purge had a good
+reason. That is what made it dangerous, not what made it acceptable — a retention policy nobody could
+justify would never have been written.
+
+### A snippet answers the question a check asked
+
+> A retained snippet is evidence for a finding we thought to make. It cannot answer a question no
+> check asked.
+
+That is the question that actually arrives: a processor, six weeks after submission, asking not
+*"what did this check find"* but *"what does this statement say about X"* — where X is something no
+rule in the ruleset addressed. The snippet cannot answer it. It lets someone re-read the fragment we
+already quoted, which is the part nobody is disputing.
+
+Generalised, because it will recur: **an evidence store holding only what the checks looked at is
+complete with respect to the ruleset at the time of the run, and incomplete with respect to every
+question asked afterwards.** Runs are immutable (D-002) precisely because later questions are
+expected. Keeping the run and discarding what it was computed from preserves the answer and destroys
+the ability to check it.
+
+### The privacy interest is real, and is met a different way
+
+At archival the package moves to **restricted access**:
+
+- document bodies remain
+- retrieval requires an explicit operator action
+- every retrieval is logged against the package
+
+The 30-day window from D-084 survives as the boundary between open access and restricted access,
+rather than between existence and deletion. The day-23 operator notice survives unchanged in purpose:
+it announces the access change, not an impending purge.
+
+This is constraint 6's move applied to retention — the requirement restated as a **property** rather
+than a mechanism. The property wanted is *bodies are not casually reachable, and every reach is
+recorded*. Deletion was one mechanism for that, and the mechanism was in conflict with a hard
+constraint while the property is not.
+
+**The trade should be named rather than presented as free.** Access control is a weaker protection
+against a full compromise than data that does not exist; deletion is genuinely the stronger privacy
+control, and this project cannot afford it. What restricted access buys back is accountability a
+purge cannot offer: under deletion, the last reads before the data went are invisible and the record
+of who wanted it goes with it. Under this rule every retrieval leaves a trace against the package.
+
+### Consequence for D-002 and constraint 5
+
+With no deletion path, the supersedes chain (D-078, D-091) is **complete for the life of the
+package**. A superseded document version remains readable, so *"what did the first version of this
+statement say"* is answerable. Under D-084 it was not.
+
+Worth naming the shape of what that would have been: a purge at 30 days would have left superseded
+entries pointing at bytes that no longer existed — **a chain that looks intact and resolves to
+nothing.** A reader following it would find structure where there was no longer any content, and
+nothing in the chain itself would say so. That is this project's recurring defect wearing a retention
+policy, and it is the second reason to refuse the purge independent of the first.
+
+### "By application code" is the operative phrase
+
+The rule is not *we will not delete*. It is that **no code path exists that can**, which is
+constraint 5's form and the same distinction the architecture doc draws between what RLS decides and
+what triggers decide. A constraint aimed at us cannot be enforced by a mechanism we hold the keys to.
+
+Where that enforcement lives is an architecture question and is not settled here. What is settled is
+the property it has to produce: **a retention job with a delete path is not permitted to exist**, and
+neither is an operator override on one.
+
+---
+
+## D-098 — The two-source rule: one source is not a comparison
+**2026-08-24 · Frank's ruling**
+
+A consistency check with one source present returns `not_evaluable`, **never `pass`**. This applies
+to every check in family C.
+
+**A consistency check is a comparison, and one value is not a comparison — it is a reading.** `pass`
+means *these agree*. A single value cannot agree with itself.
+
+**Why `pass` is tempting here, which is the part worth writing down.** The lone value is usually
+well-formed: a nine-digit EIN, correctly shaped, sitting on the application. It looks like a
+satisfied check. But well-formedness is a property of the string, and the check's question is
+whether the merchant's documents agree about it. **Format validation answers an easier question,
+and answering the easier question is how the false pass gets in.**
+
+**This is constraint 9 one layer up.** The constraint says a check that locates its subject by
+matching the compliant form is blind to every non-compliant instance. The same structure applies to
+comparison: **a check that confirms a lone value is blind to every disagreement it never saw.** In
+both cases the set of things the check cannot see is exactly the set it exists to find.
+
+### The scoring consequence, which is the one an underwriter feels
+
+Merchant A supplies the application, the EIN letter and a W-9. The three disagree, and C-03 reports
+it. Merchant B supplies the application alone. Under a `pass`-on-one-source rule, C-03 comes back
+clean.
+
+> **The less evidence you provide, the cleaner you look.**
+
+That is a perverse incentive written directly into the report, and it would be invisible — a clean
+report is a clean report, and nothing on the page would say that the cleanliness came from thinness.
+
+### The missing source is already reported, in the family whose job it is
+
+Worth being clear that this does not let a thin package off. A missing second source is usually a
+missing slot, and family B reports slot state. So the absence surfaces twice, correctly:
+
+- **Family B** — this required document was not supplied, in one of D-078's states with a D-079
+  reason.
+- **Family C** — this comparison could not be made.
+
+Two facts, two places, neither one pretending to be the other. What is forbidden is the third
+rendering, where C says `pass` and the reader infers the comparison happened.
+
+### What must still be true
+
+The `not_evaluable` **names which source was present and which were absent**, from the check's
+enumerated `not_evaluable_when` conditions. A generic "insufficient data" is the same failure in
+smaller type: it does not let a reader tell an unsupplied EIN letter from an unreadable one. Where
+the absent source has a recorded `not_provided` reason, that reason carries through to the report
+(D-078, D-102) — "not evaluated: no processing statements, new business" is a complete observation.
+
+---
+
+## D-099 — `fail` versus `review` is exactness of comparison, not importance of field
+**2026-08-24 · Frank's ruling**
+
+**`fail`** — the comparison is exact and a mismatch cannot be innocent: digit strings, dates against
+a threshold, slot presence, arithmetic.
+
+**`review`** — the comparison is fuzzy and a mismatch is often innocent: names, addresses, derived
+figures set against stated ones.
+
+**Importance cannot be the criterion, because D-009 forbids severity from touching state.**
+"Importance" is severity wearing a different word. If *the routing number matters more than the
+address* could set state, the state would encode our judgement of consequence — and a state that
+encodes consequence is a determination, arrived at by arithmetic instead of by sentence.
+
+So the criterion has to be a property of the **comparison**, not of the field. Exactness is that
+property, and the question it asks is: *can a mismatch here be innocent?*
+
+- **It cannot, for digit strings.** There is no formatting convention under which `071000013` and
+  `071000014` are the same routing number. Two nine-digit strings match or they do not.
+- **It very often can, for names and addresses.** "Acme Foods LLC" and "Acme Foods, L.L.C." are one
+  company. A suite line written two ways is one address. A derived monthly volume a few percent off
+  a stated one is a rounding difference or a different period boundary. A `fail` here would be wrong
+  more often than right, and constraint 4's reasoning governs: false positives destroy trust in the
+  tool faster than absent checks do.
+
+### The asymmetry is intentional and looks wrong at a glance
+
+A routing number off by one digit `fail`s. A legal name off by a comma goes to `review`. Read as
+importance that is absurd — a name is at least as identifying as an account routing number.
+
+Read as exactness it is exactly right. **The state describes what the comparison can support, not
+what the mismatch means.** An underwriter reading `fail` on C-08 learns one specific thing: two
+documents disagree in a way that cannot be a formatting difference. That is a fact about the
+documents. Whether it is a typo, a stale voided check, or something else is theirs to decide
+(D-001).
+
+### Normalization is what makes the fuzzy tier tractable
+
+Names and addresses are normalized before comparison, and **the normalization is shown in the
+evidence**. Raw differs, normalized matches → `pass`, with both forms displayed. Normalized still
+differs → `review`. Showing the normalization is what keeps the finding an observation rather than a
+conclusion: the reader can see what we treated as equivalent and disagree with it.
+
+### What must still be true
+
+**A check's tier is a property of the check, declared in data — not chosen per instance.** A check
+declared `review` returns `review` however large the discrepancy looks, and a check declared `fail`
+does not soften because the difference seems like an obvious typo. This is constraint 4's rule for
+`review_only` rules applied to the same problem: the moment a state can be talked up or down on the
+facts of one instance, it stops being a property of the comparison and becomes a judgement about the
+merchant.
+
+---
+
+## D-100 — Two evidence tiers, and the weaker one governs a mixed check
+**2026-08-24 · Frank's ruling**
+
+Following from D-087's four required elements:
+
+| Tier | Source | Supplies |
+|---|---|---|
+| **character** | AcroForm fields (D-089), PDF text layer | all four — version, page, location, verbatim snippet |
+| **page** | vision (D-093, D-095) | document version and page only |
+
+**A check whose inputs span both tiers reports at the weaker tier.** The report states which tier
+each observation rests on.
+
+**Page tier cannot be improved, and the reason is structural rather than budgetary.** Location and a
+verbatim snippet would have to come from the model, and D-095 already ruled that a model reporting
+where it looked is a claim rather than a capture. Asking a vision model for a bounding box is asking
+it to attest to its own provenance, which is the thing D-095 refuses. No prompt fixes this; it is a
+property of the instrument.
+
+### This qualifies D-087, and the qualification should be visible
+
+D-087 says an extraction that cannot supply all four elements "is not a low-confidence candidate — it
+is not a candidate," and its own closing section says a vision value with no location or snippet is
+not a candidate. Read strictly, that bans vision outright — which is the outcome D-093 examined and
+refused, because it leaves every photographed document unreadable and the consistency checks with
+nothing to compare.
+
+So the reconciliation, stated plainly rather than left to be inferred: **D-087's absolute
+prohibition is on the *unmarked* value** — provenance silently absent, a page-tier reading presented
+in the same shape as a character-tier one. A page-tier observation that is **marked as such**, at a
+stated tier, with the page and version it does have, is admitted. What is never admitted is unequal
+evidence rendered as equal.
+
+That distinction is the whole ruling. Marking is not a caveat attached to a weaker finding; it is
+what makes the weaker finding honest rather than false.
+
+### Why the weaker side governs a mixed check
+
+An EIN comparison between an AcroForm application and a photographed EIN letter is **page tier**.
+The observation is a statement about both documents, and it is only as good as its weakest side.
+Reporting it as character tier because one input was strong would overstate the pair, which is
+constraint 3's rule about evidence appropriate to the surface — and the surface of a comparison is
+its weakest input.
+
+### The tier belongs in the finding, not in a footnote
+
+An underwriter weighing a disagreement needs to know whether a value was read from a named form
+field or from a photograph. Two findings that render identically while resting on different
+qualities of evidence is precisely the presentation defect D-047 found: a control that cannot
+distinguish two records a reader might plausibly hold.
+
+**Practical shape, worth stating because it is counter-intuitive.** The anchor document is usually an
+AcroForm, so the application side of most comparisons is character tier. It is the merchant's
+*supporting* documents — photographed IDs, voided checks, scanned EIN letters — that pull
+observations down to page tier. The stronger the merchant's paperwork looks to a human, the more
+often it is the weaker evidence in our terms.
+
+---
+
+## D-101 — Documents Check rules live in two new files
+**2026-08-24 · Frank's ruling**
+
+Not in `rules/ruleset.json`. Two new files:
+
+- **`rules/documents.checks.json`** — the checks, the document catalog with `examined` /
+  `collected_only` flags, and the D-079 reason enumerations.
+- **`rules/documents.templates.json`** — per-processor required slot sets and the D-081 conditionals.
+
+`packages/ruleset` gains a **second loader and validator**, not a second package.
+
+### Why not `ruleset.json`
+
+That file is the Site Check program ruleset and it has its own schema: check types, scopes, tiers,
+`expect`, `threshold`. Documents Check has a different shape — slots, counts, coverage windows,
+cross-document comparisons, evidence tiers. **Forcing both shapes into one schema produces a schema
+that fits neither**: every field optional, every invariant conditional on which kind of rule it is,
+and the closed-schema property gone.
+
+That property is not theoretical. D-010 records the schema catching two malformed rules the author's
+own audit had passed over — the case for closed schemas is empirical here, and an open schema is
+what a merged file would force.
+
+**Constraint 1 requires the rules be data. It does not require one file.**
+
+### Why two files rather than one
+
+They change on different clocks, for different reasons, and by different hands.
+
+`documents.checks.json` changes when **capability** changes: a check is written, a document type
+moves from collected to examined, an enumeration gains a value. Rare, and every such change is
+adjacent to code.
+
+`documents.templates.json` changes when **a processor is added or a requirement shifts**. Frequent,
+operational, and **the file most likely to be hand-edited by someone who is not an engineer.**
+
+Splitting on rate of change and on who edits is the point: a file edited routinely by a non-engineer
+should not also contain the check definitions. **The blast radius of a bad edit should match how
+routine the edit is.**
+
+### The test this design has to pass
+
+> **Adding a processor is one entry in one file. No code, no schema change.**
+
+That is what constraint 1 is for, and it is also the check to apply if this ever feels wrong: if
+adding a processor requires touching a handler, the split is in the wrong place.
+
+### One package, two loaders
+
+A second package would duplicate the test harness, the CLI, and the exit-1-on-malformed behaviour in
+order to hold a second JSON schema. `packages/ruleset`'s job is *load and validate rule data*; it now
+does that for two shapes.
+
+### What must still be true
+
+**D-025 extends to both files.** Any change to either carries a decision number in the same commit,
+exactly as `ruleset.json` does. A ruling that reaches the data but not this document is unreviewable
+six months out whichever file the data lives in.
+
+**The validator must catch cross-file dangling references.** This is new and it is where the first
+real bug will be: a template naming a slot or a check that no catalog entry defines. Two files means
+ids crossing a file boundary, and an id that resolves to nothing is a requirement that silently does
+not exist — a template that looks complete and enforces less than it says. Validate it the way the
+loader already validates a rule referencing a missing target rule.
+
+**Note:** `docs/CHECK-INVENTORY.md` names a single `rules/documents.json` in its opening. This
+decision supersedes that; the inventory's content is accepted (D-102), its filename is not.
+
+---
+
+## D-102 — Document catalog and reason enumerations accepted; three items stay open
+**2026-08-24 · Frank's ruling**
+
+`docs/CHECK-INVENTORY.md` §3 and §5 are accepted as drafted: **13 examined document types, 7
+collected-only, 9 `not_provided` reasons, 4 waiver reasons.** Counts verified against the inventory
+at acceptance.
+
+**The counts are recorded because the enumerations are fixed under D-079.** A decision that accepts
+"the list as drafted" without a number cannot detect a later silent addition, and a fixed list that
+grows quietly is not fixed. The number is the checkable part.
+
+### Three items remain open, and are recorded rather than defaulted
+
+**1 — The statement freshness window.** 45 days is a placeholder in §4 and may vary by processor.
+It is load-bearing rather than cosmetic: B-04 and B-06 both key on it, and B-06 re-evaluates at
+report generation, so this number is what decides whether a package that sat on someone's desk turns
+into a `fail` on its way out the door. **A placeholder that ships becomes the rule by inertia**, and
+nobody afterwards can tell it was a guess.
+
+**2 — "Applied for, not yet issued."** It genuinely does not fit D-078's five states. The document
+will exist, so `not_provided` is wrong. The slot is still actionable, so it belongs in `missing`. But
+`missing` carries no reason field, and an agent reading `missing` against a licence filed last week
+will chase something already in motion. The inventory names three ways out — a sixth state, a reason
+field on `missing`, or accept the noise. **This is a workflow question, so it is not one to settle by
+reasoning from the data model.**
+
+**3 — Whether a DBA filing slot is added.** The document type is in the examined catalog; the slot is
+not in §4's table.
+
+### The consequence of the third, stated precisely
+
+The inventory's §8 says that without a DBA filing, C-02 "can only compare the application to itself
+on the DBA side." **That overstates it, and the correction matters for the two-source rule.** C-02
+reads the application, the DBA filing, the bank statement and the voided check. Without the filing it
+still has three sources, and D-098 is satisfied whenever the bank statement or the voided check
+carries a DBA — so C-02 does not collapse to `not_evaluable`.
+
+What is lost is the **anchor**. The filing is the only one of the four that is an authoritative
+record *of* the DBA rather than a downstream *use* of it. Agreement among the application, the bank
+statement and the voided check establishes that the merchant uses the name consistently. It does not
+establish that the name is registered, and the report must not be worded as though it did.
+
+### What must still be true
+
+These three are recorded here so that they are not resolved by implementation. **A build that picks
+45 days because it was in the draft has made a business ruling in a commit**, which is exactly what
+D-025 exists to prevent.
+
+---
+
+## D-103 — pdf-lib and pdfjs-dist are approved for packages/extraction
+**2026-08-24 · Frank's ruling**
+
+Both are approved dependencies of `packages/extraction`. `packages/engine/src/pdf.ts` — the
+hand-rolled zlib content-stream extractor — is unaffected and stays.
+
+**The architecture doc's ruling against PDF libraries governs report *generation*.** Its subject is
+producing the report: the worker already has a browser, `page.pdf()` is the whole mechanism, and
+adding Puppeteer or wkhtmltopdf or a React-PDF layer would duplicate a rendering stack we already
+carry. A hand-rolled writer there keeps output deterministic, and determinism is the property that
+ruling protects.
+
+**Reading positioned text is a different problem with a different answer.** D-087 requires location
+within the page. Location requires glyph positions. Glyph positions require a text-matrix
+interpreter, font encodings and CID handling — and that is not a thing anyone should hand-roll at a
+sensible cost, nor a thing whose failures would be visible if they got it slightly wrong. A
+mis-mapped glyph produces a *wrong value carrying complete provenance*, which is worse than no
+value (D-088).
+
+`packages/engine/src/pdf.ts` already anticipated this split, in its own words: the generation ruling
+"is about generation and does not cover reading, so this is a new decision rather than a departure
+from an old one." This is that decision, made explicitly rather than left as a comment.
+
+**Division of labour, so neither reader drifts into the other's job:**
+
+| Reader | Reads | For |
+|---|---|---|
+| `pdf-lib` | the AcroForm — names, values, page, widget rectangles | D-089's form route |
+| `pdfjs-dist` | the page content stream — positioned text items | D-087's location provenance |
+| `packages/engine/src/pdf.ts` | flat text from content streams, no positions | COA rules (D-057), unchanged |
+
+The engine's extractor is not deprecated by this and must not be replaced with a call into
+`packages/extraction`. It answers a narrower question for a different surface and its limits are
+documented where they are relied upon.
+
+---
+
+## D-104 — HEIC is converted at ingest, not refused
+**2026-08-24 · Frank's ruling**
+
+HEIC is converted to JPEG at ingest on the Fly worker, and **the original is retained under
+constraint 3**. `packages/extraction` stays format-pure and never receives HEIC. **M1 scope.**
+
+**Refusing it puts a decode on an operator's desk and calls it a policy.** HEIC is the iPhone
+camera default, and photographed owner IDs and voided checks are the two most-photographed types in
+the catalog — so a refusal at upload is not an edge case, it is the ordinary path for the documents
+this feature most needs to read. Nothing about the merchant's submission is wrong; we simply cannot
+decode a container. That is our problem to solve, not theirs to work around.
+
+**The original is retained, and that is the constraint-3 half.** Converting produces a derivative,
+and a report that cites a value must be able to point at what was actually submitted. Keeping only
+the JPEG would mean the artifact behind a finding is one we manufactured. Both are kept, the HEIC is
+the original, and the supersedes chain is not involved — this is a rendering of one document, not a
+replacement of it (D-091).
+
+**M0's behaviour was correct and is not the end state.** Recording HEIC as `unsupported` with a
+reason naming the conversion is exactly what D-092 asks of a file that cannot be handled: an
+outcome, a reason, and a chaseable record rather than a silent skip. It stops being right the moment
+the conversion exists, and this decision is what stops "unsupported, with a good reason" hardening
+into the answer.
+
+**`packages/extraction` stays format-pure.** The conversion belongs at ingest, not in the extractor.
+Putting a codec inside a package defined as pure functions over bytes would give it a native
+dependency and a platform surface, and every consumer would inherit both. The extractor's contract
+stays *these bytes are a PDF or one of four image types*; making that true is the ingest layer's
+job.
+
+### Verification attempted 2026-08-24 — the sample was not HEIC
+
+**D-104's implementation is NOT closed.** A file was supplied to close it and it did not test what
+it needed to.
+
+Two files, both from an iPhone 17 Pro, both **local to the working tree and deliberately not
+committed** — they are real photographs, and merchant-adjacent sample material does not belong in
+the repository. `.gitignore` is root-anchored against them so `git add .` cannot take them.
+
+    2026-08-24 11.07.17.jpg    9.68 MB   camera original
+    2026-08-24-11.07.17.heic  10.73 MB   re-saved, renamed
+
+**Both are JPEG.** The second carries a `.heic` name and JPEG bytes.
+
+Read before it was tested against, which is the only reason this was caught:
+
+    first bytes   ff d8 ff e0 … 'JFIF'      JPEG SOI + APP0
+    last bytes    ff d9                     JPEG EOI
+    ftyp box      absent throughout          not an ISO-BMFF container at all
+    sniff()       'jpeg'
+    EXIF          4284 x 5712, orientation 1 (normal), Apple iPhone 17 Pro
+
+So it is **neither HEVC-in-HEIF nor AVIF-in-HEIF**. It is a plain JPEG carrying a `.heic` filename —
+iOS converts on export to most share targets, and the name survives the conversion.
+
+**`libheif-js` remains unexercised against real HEIC.** The `HeicConverter` port is never reached by
+this file: ingest dispatches on magic bytes, sees `jpeg`, and goes straight to the image route. What
+was measured earlier stands unchanged — sharp's prebuilt binary links libheif with `aom` only and
+cannot decode HEVC-in-HEIF, and `libheif-js` ships `_de265_*` symbols and therefore should. *Should*
+is where it still sits. Closing this needs a file whose bytes begin with an `ftyp` box.
+
+### Parked, 2026-08-24, after one bounded search
+
+`node_modules` was searched for a HEVC-in-HEIF fixture to close this without asking for another
+file: by extension, by `ftyp` magic bytes across every non-source file under 30 MB, and in the two
+packages that would plausibly carry one. **Nothing.** No `.heic`, no `.heif`, no `.avif`, no
+ISO-BMFF file of any kind. The earlier `--no-save` probes of `libheif-js` and `sharp` are gone too,
+pruned by a later `npm install` — so neither the codec nor a sample is present.
+
+**No dependency was added to go looking for a test file.** That would be installing a package to
+justify installing a package.
+
+**So HEIC stays unsupported-with-reason, and that behaviour is correct.** A `.heic` upload is
+detected by magic bytes, stored, and recorded as a document version with `outcome: 'unsupported'`
+and a reason naming the conversion — visible on the upload page, chaseable by an operator, and
+never a silent skip (D-092). It is the M0 behaviour this decision already described as right until
+the conversion exists. What has changed is only that we now know it is still the live behaviour.
+
+**Closing it needs two things, in this order:**
+
+1. **A file whose bytes begin with `ftyp` and a `heic`/`heix`/`mif1` brand** — a photograph
+   transferred off an iPhone by a route that does not transcode. AirDrop to a Mac, or Finder/`ifuse`
+   copy, preserve it; sharing to most apps does not, which is what produced two JPEGs.
+2. **Then** the `libheif-js` decode, verified end to end against that file — output is a valid
+   JPEG, dimensions and EXIF orientation survive, and it runs through `packages/extraction`.
+
+Until step 1 exists there is nothing to verify, and a decode that has only been reasoned about is
+exactly what this section already records once.
+
+### What the sample did establish, being real
+
+**D-089 works on a file whose extension lies.** This is the case that decision exists for, arriving
+by accident with a genuine artifact rather than a fixture. Detected `jpeg`, routed to vision as one
+page, page-tier provenance with no location or snippet (D-100). The filename changed nothing, which
+is the whole point of not reading it.
+
+### And one defect, found only because the file was real
+
+**A directly-uploaded photograph is sent to the model at full size.** Nothing downscales it.
+
+    stored          10.2 MB   4284 x 5712
+    base64 in JSON  13.6 MB
+    vendor cap       5 MB per image
+
+Two times over the limit, so the call would be **rejected outright** — not degraded, rejected. Under
+the bounded-attempt rule that becomes a terminal failure with a recorded reason (D-096), so it is
+visible rather than silent, but it means **no photographed ID or voided check from a modern iPhone
+can be read**, and those are the two most-photographed types in the catalog.
+
+The asymmetry with the PDF path is the tell: `TARGET_LONG_EDGE` downscales a rendered page to
+1500 px precisely because the vendor discards more (D-108), and an uploaded image bypasses that
+entirely on its way to the same model. The fix belongs beside the HEIC conversion — both are ingest
+normalising bytes so the extractor's contract is true — and neither is built.
+
+Not fixed in this pass: this was a verification task, and reaching for the fix would have buried the
+finding in a diff.
+
+---
+
+## D-105 — Label-anchored extraction is same-line only
+**2026-08-24 · Frank's ruling**
+
+No next-line fallback. A label-above-value layout yields nothing on the text route.
+
+**It is the mechanism that produced the surveyed app's worst measured value.** Finding nothing after
+a label, it took the next line — and on a form where captions stack vertically the next line is the
+following caption. Measured: `business_legal_name = "Merchant Address"`, matched from the label
+`Merchant Name`, at confidence 0.90, above that app's auto-apply threshold.
+
+**Yielding nothing is the correct outcome, not a gap.** The honest recovery for a label-above-value
+layout is the form route (D-089), which reads the widget and its rectangle, or vision (D-095), which
+reads the rendered page where the pairing is visible. A text-layer guess is the one instrument that
+cannot tell a value from the caption below it.
+
+And the two directions are not symmetric. **A missed value is `not_evaluable` downstream** under the
+two-source rule (D-098) — survivable, visible, and it names what it could not compare. **A wrong
+value manufactures agreement**, which D-088 identifies as the worst output this feature can produce:
+two documents mis-read the same way report as consistent, and the agreement is an artifact of the
+extractor rather than a property of the paperwork.
+
+### Provenance makes a value checkable, not true
+
+Worth stating separately, because it is the thing most likely to be forgotten once every value in
+the system carries a page and a rectangle.
+
+Two values found while testing M0 had **complete D-087 provenance and were nonsense**:
+
+    owner_name  = "1"      from the caption "Owner 1 Ownership %:"
+    page_marker = "03/14"  from "Date of this notice: 03/14/2026"
+
+Both named a page, a rectangle and a verbatim snippet. Both were wrong. Provenance answers *where
+did this come from* and lets a human check it; it says nothing whatever about whether the thing is a
+value at all.
+
+> **Plausibility gates and provenance are separate mechanisms, and neither substitutes for the
+> other.** Provenance without a gate is well-documented nonsense. A gate without provenance is an
+> assertion nobody can check.
+
+The gates that caught these two — a free-text value must contain a word, and a page marker's slash
+form must carry the literal word "page" — are not decoration on top of the provenance requirement.
+They are the other half of it.
+
+---
+
+## D-106 — Fixtures are committed when a human can review them
+**2026-08-24 · Frank's ruling**
+
+Committed when the artifact is reviewable. Generated when it is not.
+
+**`CLAUDE.md`'s existing convention was written for saved storefront HTML**, and for HTML it is
+right: the file *is* the evidence, a reviewer opens it and sees the markup a check runs against, and
+regenerating it would lose the fidelity to a real site that makes it worth having.
+
+**A binary PDF inverts the property the convention rests on.** Nobody can tell a filled AcroForm
+from a flattened one by looking at the bytes — and that is the exact distinction two of the M0
+fixtures exist to draw. A committed blob would be unreviewable in precisely the dimension under
+test, while the generator that builds it reads as a description of what the fixture *is*.
+
+So the convention is amended to state its discriminator rather than its format:
+
+> **A fixture is committed when a reviewer can read it and see what it tests. Where the artifact is
+> opaque, the generator is the reviewable thing and it is what gets committed.** Generated fixtures
+> must be deterministic — a fixture whose bytes change per run cannot test anything
+> content-addressed (D-091, D-096).
+
+The determinism clause is not incidental. The M0 fixture builder pins document creation and
+modification dates to the epoch, because `PDFDocument.create()` otherwise stamps the current time
+and the resulting bytes hash differently on every run — which would make the cache tests pass
+vacuously while appearing to assert something.
+
+---
+
+## D-107 — A sixth slot state: `not_evaluable`
+**2026-08-24 · Frank's ruling · amends D-078**
+
+D-078 named five slot states. There are six:
+
+    satisfied · not_provided · waived · superseded · missing · not_evaluable
+
+`missing` remains the unresolved default and **still the only state meaning chase this**. That part
+of D-078 is untouched and is what the new state exists to protect.
+
+### Why five was not enough
+
+Owner Photo ID takes its required count from the application's ownership section. Until that
+section is read, the count is **unknown** — and unknown is not zero and not one.
+
+Under five states the slot would have to be `missing`, and `missing` is an assertion: it says a
+required document is absent and someone should go and get it. We do not know that. We do not know
+how many IDs to expect, so we cannot say any are absent. Reporting `missing` would be a verdict
+resting on a count nobody established, which is constraint 9's shape in a new place.
+
+`not_evaluable` says the true thing: *we could not work out what this slot requires*. It also
+matches what the rest of the system already does — the four finding states have carried exactly
+this distinction since M0, and a slot that could not be evaluated should not have to borrow a state
+that means something else.
+
+### The state is narrow on purpose
+
+`0020_slots.sql` ties it to its one cause, in both directions:
+
+```sql
+constraint not_evaluable_means_the_count_is_unknown check (
+  (state = 'not_evaluable') = (required_count is null)
+)
+```
+
+A known count cannot be `not_evaluable`, and an unknown count cannot be `satisfied`. Without the
+first half the new state becomes a general "we would rather not say", and `missing` is what that is
+for. Without the second, a slot with no idea how many documents it needs could report as complete.
+
+### What did not change
+
+- **`missing` is still the default and still the only chase-this signal.** A new slot starts
+  unresolved and stays on the list until someone acts (D-078).
+- **`not_provided` and `waived` remain operator decisions carrying an enumerated reason** (D-079),
+  and ingest never sets or clears them: a waived slot that receives a document stays waived. That
+  is a conversation, not a state transition.
+- **"Applied for, not yet issued" is still open.** D-102 item 2 records three ways out and calls it
+  a workflow question. Adding one state for a measured, structural cause does not settle a
+  different one by proximity, and bundling them would have been the tidier-looking mistake.
+
+---
+
+## D-108 — The rasterizer is pdfjs inside the Chromium we already run
+**2026-08-24 · Frank's ruling**
+
+`packages/extraction` declares a `Rasterizer` port and ships no implementation. The worker's
+implementation renders with pdfjs inside Playwright's Chromium. No new runtime dependency, and no
+change to the container.
+
+### Measured, not estimated
+
+The survey's warning was a 75-second bound sized against an estimate for a 10-page PDF that had
+never run. So these are measurements, against generated fixtures:
+
+| candidate | 1 page | 40pp text | 40pp scan, 13.7 MB | peak RSS | adds |
+|---|---|---|---|---|---|
+| pdfjs + `@napi-rs/canvas` | — | — | — | — | **does not work** |
+| **pdfjs in Chromium** | 66 ms | 33 ms/pp · 1.31 s | **34 ms/pp · 1.35 s** | **146 MB** | nothing |
+| poppler `pdftoppm` | not measured | | | | `apt-get` in the image |
+
+**`@napi-rs/canvas` is not a candidate.** pdfjs 4.10 calls `ctx.fill(path)` with a `Path2D`, and
+that binding throws ``Value is none of these types `String`, `Path` `` on the first glyph of the
+first page. It failed before it rendered anything.
+
+**poppler would mean maintaining system packages** in a container built from the Playwright image
+precisely so we do not. Chromium is already there, already version-locked to the client by the
+Dockerfile, and already exercised by every scan. 34 ms/page is not a number a system tool improves
+on by enough to buy that.
+
+Cold start is 215 ms to launch plus 78 ms to set up, paid once — the rasterizer is a resource the
+caller opens and closes, not a function, because a browser per document would make launch most of
+the cost of a short one.
+
+### The DPI question has a ceiling, and it is the vendor's
+
+Anthropic downsamples an image to ~1568 px on the long edge. Rendering above that is discarded
+before the model sees it, so fidelity here is **a target to hit, not an axis to climb**.
+`TARGET_LONG_EDGE` is 1500.
+
+Measured cost of ignoring that: the same 40 pages at 2200 px took 45 ms/page instead of 34 and
+produced 498 KB JPEGs instead of 293 KB. Roughly 35% more time and 70% more bytes, for pixels
+nothing downstream will ever look at.
+
+### Known, measured, and not fixed
+
+Handing the PDF into the page as base64 costs **458 ms for a 13.7 MB file** and grows linearly. It
+is once per document rather than per page. Serving the bytes over the same intercepted origin the
+library comes from would remove it. Recorded rather than optimised: D-094 gives this job no time
+ceiling, so 458 ms is a number to know, not yet a problem to solve.
+
+### The failure this must never have
+
+A rasterizer that returns a **blank page** is worse than one that throws. It produces a well-formed
+JPEG, the vision call succeeds, the model correctly reports that it saw nothing, and the document is
+recorded as read and empty. Every layer behaves and the answer is wrong.
+
+So the tests assert on **ink**, not on the call completing, and the renderer paints white before
+drawing — a PDF page is transparent where nothing is drawn, and a transparent JPEG becomes black,
+which reads to a model as an unreadable scan.
+
+One implementation note worth keeping, because it cost five 30-second timeouts with an empty
+console: **an `about:blank` document has an opaque origin and cannot import a module over
+`file://`.** Three things need a real origin — the pdfjs module, its worker, and
+`standardFontDataUrl` — and each fails differently without one, the font fetch most quietly of all.
+All three are served from a single Playwright-intercepted origin.
+
+---
+
+## D-109 — One clock: coverage evaluates against the run timestamp
+**2026-08-24 · Frank's ruling**
+
+Coverage windows are measured against **the run's timestamp**, and nothing else. There is one
+clock, and a run carries it.
+
+**B-06 is not a second evaluation.** Reading it as "freshness gets recomputed at report generation"
+implies two evaluations that could disagree, and invites a stored verdict that a later pass
+refreshes. What B-06 actually requires is narrower and stronger:
+
+> A report is generated from a run created at send time, never from a stale one.
+
+The freshness of a package is a property of *when it was screened*. If the answer needs to be
+current, the thing that must be current is the run — not a field inside an old one. That is already
+how the rest of the system works: a report is pinned to a run (D-083), and a run is immutable once
+finished (D-002), so a report that needs today's answer needs today's run.
+
+**A stored freshness verdict is stale the moment it is written**, and it is stale silently. It was
+right when computed and it stays in the row looking exactly as authoritative afterwards, which is
+the defect D-047 found in a control that could not distinguish a deliberate value from one that had
+gone out of date. So the slot stores the **rule** — how many months, what grace — and the verdict is
+computed wherever it is read, from the run's timestamp.
+
+**B-06 keeps its id and its report line.** It is not absorbed into B-04 and it is not deleted. What
+it checks is a different thing from what B-04 checks: B-04 asks whether the periods supplied cover
+the required months, and B-06 asks whether the run this report is being generated from is the right
+run to be answering that question. A package that sat on a desk for eight weeks fails B-06 not
+because its statements aged but because nobody re-screened it, and those are different sentences to
+put in front of an underwriter.
+
+---
+
+## D-110 — Slot state and count satisfaction are orthogonal
+**2026-08-24 · Frank's ruling**
+
+A slot is `satisfied` only when its required count is met. Below that it is `missing`.
+
+**State carries the action; count carries the numbers.** `missing` is the only state meaning chase
+this (D-078), and one-of-three is chase this — so a slot holding one bank statement of three is
+`missing`, and the fact that it holds one is reported alongside as a count, not folded into the
+state.
+
+The alternative is a `partial` state, and it fails on both halves. It splits the chase-this signal
+in two, so a reader scanning for what to do has to know that two states mean the same action. And
+it puts a number into an enum: `partial` cannot say whether one of three or two of three is in hand,
+so the count has to be reported next to it anyway — at which point the state is carrying nothing the
+count was not already carrying.
+
+Keeping them separate also means the count can be **unknown** without disturbing the state machine.
+That is what the sixth state is for (D-107): where the required count is null the slot is
+`not_evaluable`, and it is the count's unavailability that produces it rather than a special case
+inside the state logic.
+
+**What this rules out**, so it is not rediscovered: state is never derived from a percentage,
+never rounded, and never softened because a slot is "nearly there". Two of three is `missing`, and
+so is zero of three. What separates them is the pair of numbers printed beside the state.
+
+---
+
+## D-111 — W-9 and W-8BEN are two slots, not one row accepting either
+**2026-08-24 · Frank's ruling**
+
+CHECK-INVENTORY §4 lists them on one line. They are two slot definitions with opposite predicates:
+`w9` where the entity is US-domiciled, `w8ben` where it is not. Confirms what M1 built.
+
+**A single slot cannot express structural impossibility, which is the only thing D-081 lets a
+conditional fire on.** One slot accepting either form would be satisfied by whichever arrived — so a
+domestic entity that uploaded a W-8BEN would satisfy its tax-form requirement, and the document that
+*cannot exist for this entity* would be recorded as the document that does.
+
+Two slots with opposite predicates say the true thing in the data: for a domestic merchant the
+`w8ben` slot is **not seeded at all**, because a domestic entity has no W-8BEN to give. Its absence
+is the statement. There is no slot to satisfy by accident, and nothing for a mis-filed document to
+land in.
+
+This is D-081's own example — "a domestic entity files W-9, not W-8BEN" — and it only works as an
+example if the two are separable. Collapsing them to one row turns a structural impossibility into
+a merely-absent document, which is the exact substitution D-081 exists to forbid.
+
+---
+
+## D-112 — No variable-count slots; instances instead
+**2026-08-24 · Frank's ruling**
+
+CHECK-INVENTORY §4 gives Business License a count of `0..n`. There are no variable-count slots. It
+is **off by default**, and an operator adds **named instances**, each with a count of 1, carrying
+the `added` origin. Confirms the `slot_key` + nullable `instance_label` shape M1 built; the origin
+is made explicit in the same change.
+
+**`0..n` cannot distinguish the two answers that matter.** A slot with a count of zero is satisfied
+by nothing at all — so "this merchant needs no licence" and "this merchant has supplied no licence"
+produce the same row, showing the same state, with nothing to tell them apart. That is the
+false-clean shape: an unmet requirement rendering exactly like an absent one.
+
+**No slot versus a missing slot is obvious.** A merchant with no licensing requirement has no
+licence slot on the package — there is nothing on the checklist and nothing to chase. A merchant who
+needs two has two slots, each named, each `missing` until its document arrives, each satisfiable on
+its own. An operator reading the list can see which licence is outstanding, which a single `0..n`
+row can never say.
+
+**Origin is recorded, not inferred.** A slot is `template` or `added`. The distinction matters
+because the two answer to different rules: a template slot came from the processor's required set
+and its absence would be a template change, while an added slot came from an operator's judgement
+about this merchant. A named instance is always `added` — an operator adding an unlabelled one would
+produce "Business License: satisfied" on a package with two licences, which is §3's complaint about
+Additional Document in another costume.
+
+---
+
+## D-113 — Statement freshness is the last complete calendar month
+**2026-08-24 · Frank's ruling**
+
+Not a day count. **Supersedes the 45-day placeholder in CHECK-INVENTORY §4 and closes the third
+open item from D-102.**
+
+    required month = the last calendar month ending on or before (run date − grace)
+    grace           = 10 days, configurable
+
+Worked, because the arithmetic is the ruling:
+
+| run date | run − grace | last month ending on or before | asks for |
+|---|---|---|---|
+| 3 May | 23 Apr | March (31 Mar ≤ 23 Apr) | **March** |
+| 15 May | 5 May | April (30 Apr ≤ 5 May) | **April** |
+
+Three consecutive periods work backward from there: a run on 3 May asks for March, February and
+January; a run on 15 May asks for April, March and February.
+
+### Why a day count was the wrong instrument
+
+A day count measures from an instant that has nothing to do with how statements are produced.
+Statements come out on a cycle, and **the grace period exists because they are not issued the
+moment a cycle closes** — a merchant whose April cycle ended on the 30th does not have an April
+statement on 1 May, and a rule that asks for one is asking for a document that does not exist yet.
+
+Under 45 days the same merchant is compliant or not depending on which day of the month they happen
+to apply, and the boundary moves through the middle of a cycle. "The last complete calendar month"
+is a sentence a merchant can act on and an underwriter can check. It is also stable: the answer
+changes once a month, on a knowable date, rather than every day.
+
+### Cycles are not calendar months, so overlap decides
+
+A statement running 12 March – 11 April is not "an April statement" or "a March statement" by its
+label; it is 31 days of which 20 fall in March. **A period satisfies a required month when a
+majority of its own days fall in that month.** That period satisfies March, and a run asking for
+March accepts it.
+
+The majority test is on the period's days rather than the month's, and the difference is not
+academic: a short period wholly inside a month would fail a majority-of-the-month test while
+plainly belonging to it. Where no month holds a majority — an unusually long period straddling
+three — the period satisfies nothing, and the honest answer is that the required month is
+uncovered rather than that some month was picked for it (D-080's discipline: periods are read off
+the document, and what cannot be read off it is not inferred).
+
+### The grace figure is mine, not Frank's
+
+**10 days is my number.** It is a plausible interval between a cycle closing and a statement being
+available, and it makes the two worked examples above come out where they should. It is not
+measured, and I have no data on when processors and banks actually issue.
+
+It is configurable per slot for that reason, and it is the first thing to move if measurement
+disagrees. Flagged here rather than left to be discovered as a constant nobody questioned — which
+is exactly what happened to the 45 days this replaces.
+
+---
+
+## D-114 — One gate: everything the model sees is normalised at one point
+**2026-08-24 · Frank's ruling**
+
+Every image that reaches the vision client — a rendered PDF page and an uploaded photograph
+alike — comes out of a single port: long edge to `TARGET_LONG_EDGE`, EXIF orientation applied,
+JPEG. `Rasterizer` becomes **`PageImager`**, and `extract()` no longer builds an image content
+block anywhere.
+
+### What was wrong, and why it was invisible
+
+There were two producers of one thing. A PDF page went through `rasterize()`, which capped it at
+1500 px because D-108 measured that the vendor discards more. An uploaded image was wrapped inline
+in `extract()` and sent at whatever the camera produced.
+
+Measured on a real iPhone photograph:
+
+    stored          10.2 MB   4284 x 5712
+    base64 in JSON  13.6 MB
+    vendor cap       5 MB per image
+
+Twice over, so the call is **rejected outright** rather than degraded — and no photographed ID or
+voided check from a modern phone could be read at all. Those are the two most-photographed types in
+the catalog (D-104).
+
+**The constraint existed. It was attached to one of the two paths.** That is the whole defect, and
+it is not a special case: a rule that lives on a route rather than on a destination is enforced for
+whoever takes that route. The second route was added later, by someone who had no reason to look at
+the first one's size handling.
+
+### The rename is part of the ruling
+
+`rasterize` described one of the two inputs. That framing is what made a second path look
+reasonable — you do not "rasterize" a JPEG, so a JPEG plainly needed different handling, so it got
+some. `PageImager` names the *output*: page N of this document, as the image the model will see.
+There is nothing a caller can be holding that does not go through it.
+
+**Consequence, accepted:** an image now requires a `PageImager`. Previously it needed only a vision
+client. Without one it records `route: 'none'` with a reason (D-092) rather than being sent
+unnormalised, which is the correct trade — an image nobody can normalise is one we should not be
+sending.
+
+### The original is retained at full size
+
+The downscale is **for the model, not for storage**. Constraint 3 wants the artifact a finding
+points at, and a report citing a value must be able to show what the merchant actually submitted —
+not a rendering we made to fit a vendor's limit. `PageImager` produces a transient input to a call;
+it never touches what ingest stored.
+
+### What the tests do and do not prove, stated because the first version proved nothing
+
+The first downscale test fed in an image the PDF path had **already capped at 1500 px**. So
+`scale = min(1, 1500/1500) = 1`, and deleting the downscale entirely left it green. It asserted
+"≤ 1500" against an input that was already 1500 — a test that could not fail. Rebuilt against a
+3000 × 2000 fixture generated in its own Chromium, and verified failing two ways: with the scale
+removed, and with images bypassing the gate as they originally did.
+
+The EXIF test is weaker and is labelled as such in the file. It was written expecting
+`imageOrientation: 'from-image'` to be the mechanism. **It is not** — this Chromium applies EXIF
+regardless, and setting `'none'` explicitly changes nothing; both were tried and the test stayed
+green. So it is a **characterisation test of Chromium**, not a guard on our own code. Worth keeping,
+because the normalisation rests on that behaviour and a runtime that stopped doing it would be
+caught. Not worth mistaking for a regression guard on the option, which is why the comment beside it
+says so.
+
+> A rotated ID is the silent failure here. Nothing downstream can tell a bad read from a sideways
+> page, so the only place it can be caught is before the call.
+
+---
+
+## D-115 — The Documents Check rule files, and a loader that refuses
+**2026-08-24 · Frank's ruling**
+
+`rules/documents.checks.json` and `rules/documents.templates.json`, loaded and validated by a second
+loader in `packages/ruleset` — a second loader, not a second package (D-101).
+
+### Refusing, not warning
+
+Cross-file validation **refuses to load**. There is no warning tier and no partial load.
+
+The case it is built around: a template naming a `slot_key` the catalog does not define. That is not
+a missing requirement — it is **a requirement that silently does not exist**. The package renders
+with one fewer thing to chase, and a checklist with an item quietly absent is indistinguishable from
+a checklist that never needed it. Nobody audits a list for the entries that were never on it.
+
+> A startup warning is a line nobody reads in a log nobody opens.
+
+Ten conditions refuse, and each is a way one file can lie about the other or about itself:
+
+| | |
+|---|---|
+| a template names a slot the catalog does not define | the requirement that does not exist |
+| a check reads a document absent from the catalog | a check that can never run |
+| a check reads a `collected_only` document | a contradiction inside one file (D-082) |
+| a `not_evaluable` condition outside the enumeration | §1 requires these be named |
+| a reason outside the `not_provided` / `waived` enumerations | D-079 |
+| a check id whose family prefix is not a family | the id is the only place family is declared |
+| a duplicate id — check, catalog key, external source, reason, processor | |
+| a slot appearing twice in one processor | |
+| a predicate on anything but the three creation questions | D-081 |
+| a check declaring both `fail` and `review` | D-099 — exactness is a property of the comparison |
+
+**Every defect names the offending id and the file it came from**, and all defects are reported in
+one pass rather than the first one found. Two files that reference each other make the file half of
+that non-negotiable: `unknown slot 'bank_statment'` without a filename sends you to whichever
+document you happened to have open.
+
+### Verified discriminating, not merely present
+
+The refusals were checked by removing the thing they guard. With cross-file validation disabled,
+**exactly the ten refusal tests go red and the twenty round-trip tests stay green.** A guard nobody
+has watched fail is a guard nobody has established works, and this project has shipped three of
+those before.
+
+### D-101's claim is a test, not an intention
+
+> Adding a processor is an entry in the templates file and nothing else.
+
+Proven rather than asserted: a second processor is added to the templates document alone — the
+checks document passed through as the *same object*, not a copy — and it produces a different
+required set. No code, no schema change, no migration. If that ever stops being true, a test says so
+on the commit that broke it rather than on the day someone tries to onboard a processor.
+
+### The seam M1 left was the right one
+
+`loadSlotTemplate()` was hard-coded from CHECK-INVENTORY §4 in M1 specifically so this would be a
+body swap, and it was. The exported types, `slotsForPackage`, `slotDefinition` and every caller are
+untouched; only where the data comes from changed.
+
+The join is what makes the cross-file validation load-bearing rather than tidy: **the template says
+what is required, the catalog says what a document is** — its title, and whether it is examined or
+collected-only. Neither file can build a slot alone, which is why a key present in one and absent
+from the other has to stop the load.
+
+---
+
+## D-116 — `evidence_tier` is not a property of a check
+**2026-08-24 · Frank's ruling · amends CHECK-INVENTORY §1**
+
+§1 listed seven per-check properties. There are six. `evidence_tier` is removed, and `typical_tier`
+moves to the catalog.
+
+### Why it could not be declared
+
+§2 already defines a finding's tier as **the weaker of the documents actually read**. §3 marks
+several document types `mixed` — Articles, W-9, W-8BEN, business licence, proof of address. So a
+check reading the application (character), the EIN letter (page) and a W-9 (mixed) has no static
+answer that is true:
+
+- `character` is false whenever the EIN letter arrives scanned, which is the usual case.
+- `page` is false whenever it arrives as a text-layer PDF, and it would understate every finding
+  that check ever produces.
+
+**Redundant where derivable, false where not.** Where every input has a fixed tier the value is
+already computable from `reads` plus the catalog; where an input is `mixed` there is nothing to
+compute it from until a document exists. Either way the field earns nothing and can mislead.
+
+### Where the tier belongs
+
+**On the document, because a document has one.** `typical_tier` sits in the catalog beside the
+title and the `examined` flag — a statement about what an EIN letter usually is, which is a real and
+stable fact.
+
+**And on the finding, computed.** That is what §2 always specified. Nothing changes about how a
+report renders a tier; what changes is that the checks file no longer carries a field claiming to
+know it in advance.
+
+The general form, since it will recur: **a value that varies with the input is not a property of the
+thing that consumes the input.** Declaring it there produces a number that is right until the first
+interesting case.
+
+### Related: the two-source rule binds comparisons, not arithmetic
+
+§6 says family C is "all subject to the two-source rule" (D-098). **C-14 is not, and cannot be.**
+
+C-14 sums the ownership percentages on the application and checks the total is no more than 100.
+That is arithmetic **within one document**. There is no second source, there never will be, and
+requiring one would make the check permanently `not_evaluable` — a rule that can never fire, which
+is worse than an absent rule because it looks like coverage.
+
+It carries `ownership_section_not_extracted` instead, which is the honest condition: the check
+cannot run when the thing it counts was not read.
+
+**A principled exception, not a carve-out**, and the principle is what D-098 actually says. Its
+reasoning is about *comparison*: a check that confirms a lone value is blind to every disagreement
+it never saw, because the set it cannot see is exactly the set it exists to find. C-14 is not
+comparing a value across sources; it is testing a constraint on one document's own numbers, and a
+second copy of the application would tell it nothing. The rule binds where its reasoning reaches.
+
+C-19 is the other family C check without the condition, for a different reason: it compares a
+recorded slot reason against evidence, so what it needs present is the resolved slot, not two
+document sources.
+
+---
+
+## D-117 — B-06 is withdrawn; a stale run is a report property, not a check
+**2026-08-24 · Frank's ruling · amends CHECK-INVENTORY §4, §6**
+
+B-06 is withdrawn. Family B is B-01 through B-05. §6 now reads **38 checks, 35 in v1**.
+
+### Why it stopped being a distinct check
+
+B-06 was specified when freshness was going to be evaluated twice — once when the package was
+assembled, once again when the report was generated — and the second evaluation was its whole
+reason to exist. D-109 removed that shape. There is one clock now: coverage evaluates against the
+run's timestamp, and the verdict is computed wherever it is read rather than stored.
+
+Strip the second evaluation out and what B-06 can still ask at engine time is: was any statement
+period read, and does the newest one fall inside the month D-113 requires. That is B-04. Not
+adjacent to B-04 — the same question, put to the same slots, against the same clock, arriving at
+the same answer. The M3 build made this concrete rather than theoretical: `b06()` and `b04()` both
+resolved through `monthlySlots()` and `evaluateCoverage()`, and the only way to keep their notes
+from being duplicates was to have B-06 speak about the run while B-04 spoke about the documents —
+a difference in phrasing, not in fact.
+
+Two findings on one fact is a cost paid by the reader. A report already carries thirty-eight
+checks; every one of them has to be worth the line it occupies, and a line that restates the line
+above it teaches the reader to skim. Worse, the two could disagree under a future edit to one of
+them and nothing would catch it, because there is no fact for them to disagree *about*.
+
+### What B-06 protected, and where it lives now
+
+The real hazard was never that the engine would compute freshness wrongly. It was that a report
+could be **sent** from a run assembled weeks earlier — statements fresh when the run was created,
+stale when the underwriter read the PDF. That hazard is real and it survives this withdrawal.
+
+But it is a property of report generation, not an observation about documents. Nothing the engine
+can see distinguishes a run generated a minute ago from one generated in March; the run's
+timestamp is the same value in both, and it is the *report* that has aged, not the run. A check
+that cannot observe its own subject has no business returning a state about it — that is exactly
+constraint 2's failure mode, and a `pass` from it would be the worst kind: correct-looking and
+uninformed.
+
+So it becomes a gate in M5: a report may not be generated from a stale run. The remedy is a new
+run, which the immutability rule (D-002) already requires and already supports. This is a
+precondition on sending, enforced once, in the one place that knows when sending is happening.
+
+### Recorded here rather than in a decision of its own
+
+**`ein_letter` carries `markers`.** The catalog entry now holds
+`["CP-575", "147C", "Internal Revenue Service"]`, so A-04 has something to match. This satisfies
+D-025 for that ruleset edit.
+
+A-04 is deliberately weak and §6 says so. It catches a W-9 uploaded into the EIN Letter slot. It
+detects nothing whatsoever about whether the document is genuine, and no finding text it produces
+may imply otherwise. Marker sets for other types are added as they are needed; a type with no
+marker set yields `no_marker_set_for_type` and the check is `not_evaluable`. That is the correct
+answer and not a gap to be closed — the alternative, matching against an empty set and passing, is
+the false `pass` constraint 2 exists to prevent.
+
+**A-05's `fail` branch is unreachable today.** Extraction cannot locate a signature block, so every
+input reaches `signature_block_not_located`. The check stays declared `["fail", "pass"]`. The
+ruleset describes what a check *is*, not what extraction currently supports; trimming the declared
+state would make the data track a temporary implementation gap, and the gap would then be invisible
+in the one file anyone reads to learn what the system checks. Closing it needs signature block
+location in `packages/extraction`.
+
+---
+
+## D-086 amendment — the transport is adopted; the prompts and schemas are not
+**2026-08-24 · Frank's ruling**
+
+> Parent resolved the same day: D-086 is now in place above. This amendment was written before it
+> through the same sequencing error, and stays here at the end rather than beside its parent so that
+> record survives.
+
+The survey found three genuinely portable extraction services in `mintro-intake-lite` — no imports,
+pure functions over bytes, roughly a thousand lines between them. Portable is not the same as
+adoptable, and the split runs straight through the middle of each file.
+
+**Adopted: the transport.** The Messages API call shape, the headers and `anthropic-version`,
+`temperature: 0`, the retry ladder (one retry on transient and 5xx, one further retry with a stricter
+JSON-only reminder on a parse failure), the per-call and per-document timeout bounding, and the
+structured `{ ok, … } | { ok: false, error }` return that never throws raw at its caller. This is the
+part that took them several iterations and a production incident to get right, and it carries no
+assumption about what a document is.
+
+**Not adopted: the prompts and the field schemas.** Two reasons, and the second is disqualifying.
+
+**They are keyed to that app's vocabulary.** The intake schema is ~70 keys shaped as
+`document_requests` titles — `"who was your last processor/bank?"`, `"owner 1 ownership %"` — because
+its job is pre-filling a merchant application form. Documents Check reads documents against a rule
+set. Importing the schema would import that app's requirements catalog through the back door and
+bind our field names to their form.
+
+**They collapse absence to null, which D-077 forbids.** Every one of those prompts instructs the
+model to "use null for any field the document does not show." One value then stands for *not present*,
+*present and blank*, *present and illegible*, *present and the model declined to read it*, and
+*present and the model missed it*.
+
+The survey measured where that ends up. In the surveyed app an absent key in the candidate store
+means any of seven distinct things, and nothing downstream can separate them, because **the
+distinction was destroyed at the only point where it existed.** No amount of care in the consuming
+code recovers information the prompt threw away. That is precisely the failure constraint 2 is drawn
+around — an unobservable thing must be reported as unobserved, never as a value.
+
+**The test, so this does not drift back in.** If a prompt instruction or a schema field can be traced
+to a `document_requests` title, to that app's intake form, or to a null-for-anything-missing rule, it
+does not belong here. Prompts and schemas are authored fresh against our rule set, and they carry
+absence as a state rather than as a value.

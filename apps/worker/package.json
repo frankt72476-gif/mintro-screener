@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mintro/engine": "*",
+    "@mintro/extraction": "*",
     "@mintro/ruleset": "*",
     "@supabase/supabase-js": "^2.47.0",
     "playwright": "^1.49.0"

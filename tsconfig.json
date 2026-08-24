@@ -5,6 +5,9 @@
       "path": "./packages/ruleset"
     },
     {
+      "path": "./packages/extraction"
+    },
+    {
       "path": "./packages/engine"
     },
     {

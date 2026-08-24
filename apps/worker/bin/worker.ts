@@ -47,6 +47,10 @@ import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
+import { claimNextUpload, runUpload } from '../src/uploadJob.js';
+import { createIngestStore } from '../src/store/ingestStore.js';
+import { openRasterizer, type RasterizerHandle } from '../src/rasterize.js';
+import { createAnthropicVisionClient } from '@mintro/extraction';
 import { addressesFor, type MailAddresses } from '../src/addresses.js';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
@@ -162,6 +166,10 @@ async function main(argv: readonly string[]): Promise<number> {
 
   console.log(once ? 'draining the queue' : 'polling for scan requests');
 
+  // Opened on first use and shared: the rasterizer reuses one page across documents, and 215ms of
+  // browser launch per upload would be most of the cost of a short one (D-108).
+  let rasterizer: RasterizerHandle | undefined;
+
   try {
     while (!stopping) {
       if (keys !== undefined) await drainDeposits(supabase, keys);
@@ -187,6 +195,25 @@ async function main(argv: readonly string[]): Promise<number> {
         continue;
       }
 
+      // Document uploads sit with the render jobs. An upload is work an operator is watching, and
+      // it holds Chromium only for the pages that route to vision — but a queued *scan* is an
+      // observation not yet made, so it still goes first.
+      const upload = await claimNextUpload(supabase, STALE_CLAIM_MS);
+      if (upload !== null) {
+        rasterizer ??= await openRasterizer({ browser });
+        await runUpload(supabase, upload, {
+          store: createIngestStore(supabase),
+          pageImage: rasterizer.pageImage,
+          // Only constructed when there is something to read. A worker with no key still ingests:
+          // pages that would route to vision record `route: 'none'` with a reason (D-092), which
+          // is visible on the upload page rather than silent.
+          ...(process.env['ANTHROPIC_API_KEY'] === undefined
+            ? {}
+            : { vision: createAnthropicVisionClient() }),
+        });
+        continue;
+      }
+
       // Invitations last. They need no browser and take a second; putting them behind the jobs
       // that hold Chromium keeps an analyst pressing Send from delaying a queued scan.
       const invite = await claimNextInvite(supabase);
@@ -200,6 +227,7 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     return 0;
   } finally {
+    if (rasterizer !== undefined) await rasterizer.close();
     await browser.close();
   }
 }
