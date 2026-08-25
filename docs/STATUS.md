@@ -17,7 +17,7 @@ and the received document verified against what the merchant actually did.
 | **Merchant commentary** | Built and verified (D-063). One forwardable link per report, self-declared identity, per-comment attribution, five distinguishable commentary states. |
 | **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
 | **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
-| **Documents Check** | **M0 and M1 built and verified end to end against live Supabase.** `packages/extraction`, the data model (`0019`–`0024`), ingest, the rasterizer (D-108), calendar-month coverage (D-113), the upload queue. M2 (checks) has not started. |
+| **Documents Check** | **M0 through M5 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, and send-to-agent. Migrations `0019`–`0032`. Eight items are carried rather than done — see below, and one of them is an input Mintro owes rather than a build task. |
 
 ### What "verified" means here, because it is not the usual thing
 
@@ -324,6 +324,74 @@ individually; a grouped export would quietly hold less than the run produced.
 
 ---
 
+## Documents Check — M0 through M5
+
+Built and verified live against the **test project** (`mintro-screener-test`), never against
+production. An analyst opens a package, uploads documents, the worker reads them, the engine checks
+them, and the report goes to an agent as a PDF.
+
+| Milestone | What it is | Verified live |
+|---|---|---|
+| **M0** | `packages/extraction` — bytes in, provenanced values out. AcroForm first, per-page routing, vision for scanned pages. No confidence anywhere (D-088). | Fixture-based; one real Anthropic call at M5 — 2,364 in / 144 out, $0.00925. |
+| **M1** | Data model, ingest, the rasterizer (D-108), calendar-month coverage (D-113), the upload page. | 8/8 against live Supabase, including that no unauthenticated path returns document bytes. |
+| **M3** | The check engine, families A and B, and persistence. Findings are append-only under a trigger, not RLS — `service_role` bypasses RLS. | D-002 proven: a re-run creates a new run and leaves the prior run's findings byte-identical. |
+| **M4** | Families C and D — twenty cross-document checks and six derived figures. The two-source rule (D-098) binds every family C check except C-14. | 94 findings across nine document types; every planted discrepancy found. |
+| **M5** | The report as a pure function of a run (D-085), the stale-run gate (D-117), the PDF, and send-to-agent with its queue. | 20-page PDF printed from the report route, queued by an operator and drained by the polling worker. |
+
+### What is enforced rather than remembered
+
+Worth knowing before changing anything here, because several of these look like conventions and are
+not:
+
+- **Four states, always.** A check that could not run returns `not_evaluable` with a **named reason
+  the check itself declares** — the constructor refuses an undeclared one, and the database refuses
+  a `not_evaluable` row without a reason.
+- **No finding text may assert a determination.** Audited at construction and thrown on. The report
+  audits every string it renders, not only finding notes.
+- **Tier is computed, never declared** (D-116) — the weaker of the documents actually read, and
+  `null` where a finding rests on none.
+- **A run records what it read** (D-123) and **who it rendered under** (D-126). Without those the
+  report is a function of the run *and the clock*, and D-085 is unachievable rather than unenforced.
+- **Runs, findings and sends are append-only**, by trigger. Verified against `service_role`.
+
+---
+
+## Documents Check — carried, not done
+
+None of this is finished work. Each item is either a decision taken, a measurement not made, or an
+input the system has not been given.
+
+| Carried | Decision | What it actually means |
+|---|---|---|
+| **HEIC** | D-127 | **Deferred indefinitely**, not pending verification. The conversion path exists behind a port, unwired. A HEIC upload resolves to `unsupported` with a reason — recorded and chaseable (D-092), so an operator asks for a resend. Reopening needs evidence merchants send HEIC *and* a file whose bytes begin with `ftyp`; two samples have already turned out to be JPEGs. |
+| **A rotated ID is a silent failure** | — | **Nothing distinguishes a bad read from a sideways page.** A photograph taken in landscape extracts as poorly as an unreadable one, and both surface as thin or absent values with no signal that orientation was the cause. An operator sees a document that "did not read well" and has no reason to suspect it would read perfectly rotated 90°. |
+| **`MATERIAL_GAP` = 0.2** | D-122 | **Unmeasured.** It decides `pass` against `review` on every family D derived-versus-stated finding. Both figures and the derivation render either way, so it hides nothing — but it is a judgement, and it must be set from real packages or not at all. Do not tune it against the verification package; that fits it to numbers this repository invented. |
+| **A-05's `fail` branch is unreachable** | D-117 | Extraction can read a signature *date* and cannot locate a signature *block*, so every input reaches `signature_block_not_located`. The check stays declared `fail / pass` because the ruleset describes what a check is, not what extraction currently supports. Closing it needs signature-block location in `packages/extraction`. |
+| **C-20, D-05, D-06** | §6 | **Deferred by design**, and the engine filters to `v1` before any handler sees them. C-20 (owner residential address) because people move and an ID is stale often enough to be noise; D-05 and D-06 because nobody has agreed to ship them. |
+| **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
+| **Nothing has run against production** | — | Migrations `0019`–`0032` exist **only on the test project**. Production has `0001`–`0018`. No package, run, finding or send has ever been written to the production database, and the CLI's link state is no longer tracked in the repo, so nothing points a deploy at it by accident. |
+
+### The processor template is an input Mintro owes, not a build task
+
+**This is the item that decides whether any of the above is useful to a real processor**, and it is
+last because it is the only one that cannot be closed by writing code.
+
+`rules/documents.templates.json` contains **one processor, `default`** — twenty slots with their
+counts, coverage rules and D-081 conditionals. It was drafted from a screenshot of a requirements
+list. It is not IQwallet's actual required set, or any other processor's, and nobody has said it is.
+
+The engine is indifferent to this: the template is data, adding a processor never touches code
+(hard constraint 1), and the loader already refuses a malformed one. So there is nothing to build.
+What is missing is **the requirements themselves** — for each processor Mintro screens for, which
+documents are required, how many, over what window, and which are conditional on what.
+
+Until that arrives, every slot table, every `missing` state and every family B finding is measured
+against a set somebody guessed at. The checks would be correct and the thing they check against
+would be fiction — which is the failure mode hardest to see from inside the system. Nothing errors,
+the report looks complete, and it is complete against the wrong list.
+
+---
+
 ## The five storefronts, as they stand today
 
 Scanned 21 August 2026, rule set v2.4.0, public crawl.
@@ -429,15 +497,17 @@ taken or a measurement that has not been made, and each says which.
 
 | Open | Decision | Waits on |
 |---|---|---|
-| **Documents Check — M2** | D-076 – D-113 | **Not started.** M1 is built but has never run against a live Supabase: the `documents` bucket must exist and `0019`–`0024` must be applied. There is no package-creation UI, so the upload page opens on `?package=<uuid>` and otherwise says so. M2 is the checks and the two rule files (D-101). |
+| **Documents Check — the processor's required set** | D-101 | **An input, not a build task.** One `default` template, drafted from a screenshot. See *Documents Check — carried, not done* above: the engine is indifferent, the requirements are what is missing, and without them every slot table is measured against a guess. |
+| **Documents Check — no package-creation UI** | — | The upload page opens on `?package=<uuid>` and otherwise says so. A package is created by inserting a row; nothing in the interface does it. |
 | **Rule set page** | scoped, deferred | Scoped and deliberately held behind Layer 3, which is now complete — so this is unblocked and awaiting a decision to start rather than a dependency. |
 | **Multi-vertical rule sets** | scoping only | Scoping exists; nothing is built. The rule set is already data rather than code (hard constraint 1), so a second vertical is a data and validation question, not an engine one. |
 | **Evidence slip composition** | D-075 | **Unmeasured.** 16.6 pages, the largest component of the printed report, and how much is reserved space versus the captures themselves is not known — the measuring browser is not served evidence. Needs a run measured with evidence served. Reducing the largest thing in the document on an assumption is the trade D-047 ruled out. |
 | **PDF byte-level verification** | known limit | `loop-check` reads the rendered DOM, which is what `page.pdf()` prints and the honest authority on content. It does **not** read the PDF's bytes: `extractPdfText` cannot decode Chromium's subset-embedded fonts (D-057) and returns a shifted alphabet on our own output. Proving the file on disk says what the page said needs a real PDF parser, and is a separate decision. |
 | **`report_date` and the program document** | D-041, and the questions section below | `report_date` was renamed on an *interpretation* of the program document rather than a ruling from its owner. That and the other open questions are listed under **Questions for whoever owns the program document** — they are answerable only by that person, not by reading the rules harder. |
 
-Frank has signed off on the screening loop. Documents Check has now been scoped and its design
-accepted; building it is a separate decision that has not been taken.
+Frank has signed off on the screening loop. Documents Check is built through M5 and verified
+against the test project; what remains is listed above as carried rather than open, because none
+of it is waiting on a decision nobody has taken.
 
 ---
 
