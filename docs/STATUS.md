@@ -360,7 +360,8 @@ not:
 ## Documents Check — carried, not done
 
 None of this is finished work. Each item is either a decision taken, a measurement not made, or an
-input the system has not been given.
+input the system has not been given — except the last, which is a correction: this file described
+production's state wrongly, and the row now says what is actually there.
 
 | Carried | Decision | What it actually means |
 |---|---|---|
@@ -370,7 +371,7 @@ input the system has not been given.
 | **A-05's `fail` branch is unreachable** | D-117 | Extraction can read a signature *date* and cannot locate a signature *block*, so every input reaches `signature_block_not_located`. The check stays declared `fail / pass` because the ruleset describes what a check is, not what extraction currently supports. Closing it needs signature-block location in `packages/extraction`. |
 | **C-20, D-05, D-06** | §6 | **Deferred by design**, and the engine filters to `v1` before any handler sees them. C-20 (owner residential address) because people move and an ID is stale often enough to be noise; D-05 and D-06 because nobody has agreed to ship them. |
 | **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
-| **Nothing has run against production** | — | Migrations `0019`–`0033` exist **only on the test project**. Production has `0001`–`0018`. No package, run, finding or send has ever been written to the production database, and the CLI's link state is no longer tracked in the repo, so nothing points a deploy at it by accident. |
+| **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0033` are the outstanding ones; `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
 
 ### The default set has not been validated against what a processor actually asks for
 
