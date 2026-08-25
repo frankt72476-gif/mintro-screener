@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { toRunRecord } from '../src/documentsRunRecord.js';
+import { toRetentionState, toRunRecord } from '../src/documentsRunRecord.js';
 
 const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: 'run-1',
@@ -84,5 +84,55 @@ describe('findings map field for field', () => {
     const record = toRunRecord(row(), []);
     expect(record.slots).toEqual([{ slotId: 's-1', state: 'satisfied' }]);
     expect(record.documents).toEqual([{ versionId: 'v-1', outcome: 'extracted' }]);
+  });
+});
+
+describe('the report’s second input, from a purge row', () => {
+  const purgeRow = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: 'purge-1',
+    objects_planned: 4,
+    package_purge_completions: [{ completed_at: '2027-08-20T10:00:00.000Z' }],
+    package_purge_approvals: [{ export_id: 'e3a91b77-1111-2222-3333-444444444444' }],
+    ...over,
+  });
+
+  it('reads as not purged when there is no purge row', () => {
+    // Every package today. This is the value that must leave the report byte-identical.
+    expect(toRetentionState(undefined)).toEqual({ purged: false, purgedAt: null, objects: 0, exportRef: null });
+  });
+
+  it('carries the count, the date and somewhere to look', () => {
+    expect(toRetentionState(purgeRow())).toEqual({
+      purged: true,
+      purgedAt: '2027-08-20T10:00:00.000Z',
+      objects: 4,
+      exportRef: 'e3a91b77',
+    });
+  });
+
+  it('reports a purge with no completion as purged, with no date', () => {
+    /*
+      The interrupted case, and the direction it has to be wrong in.
+
+      `begin_package_purge` names the objects before they go, so by the time a purge row exists the
+      bytes are gone or going. A report calling them retrievable would send somebody looking for a
+      file that is not there; one saying they are gone with no date is merely incomplete.
+    */
+    const state = toRetentionState(purgeRow({ package_purge_completions: [] }));
+    expect(state.purged).toBe(true);
+    expect(state.purgedAt).toBeNull();
+  });
+
+  it('accepts the embedded row as an object as well as an array', () => {
+    // PostgREST returns one or the other depending on the relationship it infers, and a mapping
+    // that assumed the array would silently produce a purged report with no date and no export.
+    expect(toRetentionState(purgeRow({
+      package_purge_completions: { completed_at: '2027-08-20T10:00:00.000Z' },
+      package_purge_approvals: { export_id: 'e3a91b77-1111-2222-3333-444444444444' },
+    }))).toEqual(toRetentionState(purgeRow()));
+  });
+
+  it('does not invent an export reference when the approval has none', () => {
+    expect(toRetentionState(purgeRow({ package_purge_approvals: null })).exportRef).toBeNull();
   });
 });

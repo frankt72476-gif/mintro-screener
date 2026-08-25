@@ -353,3 +353,31 @@ describe('project references cover the workspace imports', () => {
     expect(gaps, gaps.join('; ')).toEqual([]);
   });
 });
+
+/*
+  The send job passes the report its second input (D-130, P5).
+
+  Checked as text, which is weaker than checking behaviour and is the strongest thing available
+  here. Dropping the argument is observable only for a **purged** package, and producing one in a
+  unit test means writing a purge row, which means the purge machinery — so a behavioural test of
+  this line would be a test of everything else.
+
+  It is a one-word deletion that would leave every purged package's report claiming its documents
+  are still held, in the PDF that goes to an underwriter. That is worth a text check.
+*/
+describe('the documents send job resolves retention where it loads the run', () => {
+  const source = readFileSync('apps/worker/src/documentsSendJob.ts', 'utf8');
+
+  it('loads the retention state', () => {
+    expect(source).toContain('loadRetentionState(client, request.packageId)');
+  });
+
+  it('and passes it to the report builder', () => {
+    expect(source).toMatch(/buildDocumentsReport\(record, rules, previous, retention\)/);
+  });
+
+  it('has exactly one call to the report builder, so there is one place to get it wrong', () => {
+    // Two call sites is how one of them keeps the argument and the other quietly does not.
+    expect(source.match(/buildDocumentsReport\(/g) ?? []).toHaveLength(1);
+  });
+});

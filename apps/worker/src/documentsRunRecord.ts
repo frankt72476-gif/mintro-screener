@@ -94,3 +94,66 @@ export async function loadRunRecord(
   const asRow = row as unknown as RunRow;
   return { record: toRunRecord(asRow, findings as unknown as Record<string, unknown>[]), row: asRow };
 }
+
+/**
+ * Whether this package's document bodies are still retrievable (D-130, P5).
+ *
+ * Here, beside `loadRunRecord`, because that is where the report's inputs are gathered — and
+ * because a view that looked this up itself would make the screen and the PDF answer it separately
+ * (D-125). One resolution, passed in.
+ *
+ * A purge that was **begun and not completed** reports as purged with a null date. That is the
+ * honest reading: `begin_package_purge` names the objects before they go, so by the time this row
+ * exists the bytes are either gone or going, and a report that called them retrievable would be
+ * wrong in the direction that matters. The missing completion is why the date is null rather than
+ * invented.
+ */
+export async function loadRetentionState(
+  client: SupabaseClient,
+  packageId: string,
+): Promise<documents.RetentionState> {
+  const { data } = await client
+    .from('package_purges')
+    .select('id, objects_planned, package_purge_completions(completed_at), package_purge_approvals!inner(export_id)')
+    .eq('package_id', packageId)
+    .order('purged_at', { ascending: false })
+    .limit(1);
+
+  return toRetentionState((data ?? [])[0] as Record<string, unknown> | undefined);
+}
+
+/**
+ * One purge row (or none) as the report's second input.
+ *
+ * Separate from the read so it can be tested without a database — the query uses PostgREST's
+ * embedded selects, which no local Postgres can answer, so a combined function would be provable
+ * only against the live project. Extracted after a deliberate break of this mapping turned nothing
+ * red.
+ *
+ * The embedded shapes arrive as an object or a one-element array depending on the relationship
+ * PostgREST infers, so both are handled rather than one being assumed.
+ */
+export function toRetentionState(row: Record<string, unknown> | undefined): documents.RetentionState {
+  if (row === undefined) {
+    // No purge row at all — every package today. The report renders exactly as it did before this
+    // input existed.
+    return { purged: false, purgedAt: null, objects: 0, exportRef: null };
+  }
+
+  const one = <T>(value: unknown): T | null =>
+    (Array.isArray(value) ? (value[0] as T | undefined) : (value as T | null)) ?? null;
+
+  const completed = one<{ completed_at: string }>(row['package_purge_completions']);
+  const exportId = one<{ export_id: string }>(row['package_purge_approvals'])?.export_id ?? null;
+
+  return {
+    purged: true,
+    // Null where the purge was begun and never completed. `begin_package_purge` names the objects
+    // before they go, so by the time this row exists the bytes are gone or going — calling them
+    // retrievable would be wrong in the direction that matters, and inventing a date would be worse.
+    purgedAt: completed?.completed_at ?? null,
+    objects: Number(row['objects_planned'] ?? 0),
+    // Short enough to read aloud and long enough to find the row. The full id is in the database.
+    exportRef: exportId === null ? null : exportId.slice(0, 8),
+  };
+}

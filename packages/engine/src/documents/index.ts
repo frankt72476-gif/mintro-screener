@@ -7,6 +7,8 @@
  * the discipline that a state is decided in one place.
  */
 
+export type { RetentionState } from './report.js';
+
 export { runDocumentChecks, tally, type RunOptions } from './run.js';
 export {
   DeterminationError,

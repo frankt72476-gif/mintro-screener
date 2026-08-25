@@ -47,8 +47,8 @@ const run = (over: Partial<RunRecord> = {}): RunRecord => ({
   slots: [slot()], documents: [document_()], findings: [finding()], ...over,
 });
 
-function render(record: RunRecord, previous?: RunRecord): string {
-  const report = documents.buildDocumentsReport(record, RULES, previous);
+function render(record: RunRecord, previous?: RunRecord, retention?: documents.RetentionState): string {
+  const report = documents.buildDocumentsReport(record, RULES, previous, retention);
   return renderToStaticMarkup(
     createElement(DocumentsReportView, {
       report,
@@ -323,5 +323,72 @@ describe('section 05 renders in full from the rule file', () => {
     }
     expect(count(html, 'class="nc-row"')).toBe(RULES.checks.not_checked.items.length);
     expect(html).toContain(RULES.checks.not_checked.external_verification);
+  });
+});
+
+describe('a purged package says so at the top of the page', () => {
+  const PURGED: documents.RetentionState = {
+    purged: true, purgedAt: '2027-08-20T10:00:00.000Z', objects: 4, exportRef: 'e3a91b77',
+  };
+
+  /*
+    The hazard, restated because it is easy to read this as cosmetic.
+
+    The report reads no document body. After a purge it regenerates byte-identically and gives no
+    sign the files are gone — a page that looks complete and rests on nothing retrievable. There is
+    no broken page to prevent here; there is a perfect-looking one.
+  */
+  it('renders nothing at all before a purge', () => {
+    const html = render(run());
+    expect(html).not.toContain('no longer held');
+    expect(html).not.toContain('class="purged"');
+    expect(html).not.toContain('notheld');
+  });
+
+  it('is byte-identical to a render with no retention input', () => {
+    // The whole population, today. If a second input moved these bytes, every report in the system
+    // would change the day it shipped.
+    expect(render(run(), undefined, { purged: false, purgedAt: null, objects: 0, exportRef: null }))
+      .toBe(render(run()));
+  });
+
+  it('states it in the masthead, before any finding', () => {
+    const html = render(run(), undefined, PURGED);
+    const masthead = html.slice(0, html.indexOf('</header>'));
+    // A reader skimming the first page should know before they read an observation.
+    expect(masthead).toContain('no longer held here');
+    expect(masthead).toContain('4 files were exported and removed');
+  });
+
+  it('gives the reader somewhere to look rather than a dead end', () => {
+    const html = render(run(), undefined, PURGED);
+    expect(html).toContain('to export e3a91b77');
+    expect(html).toContain('on 2027-08-20');
+  });
+
+  it('says the observations were made while the documents were held', () => {
+    // Not a caveat on the findings. They were made against documents that existed, and the page has
+    // to say that rather than leave a reader wondering what the report was computed from.
+    expect(render(run(), undefined, PURGED)).toContain('made while they were held');
+  });
+
+  it('marks each document group as well, for a reader who arrives at one finding', () => {
+    const html = render(run(), undefined, PURGED);
+    expect(html).toContain('data-purged="true"');
+    expect(html).toContain('Not held');
+  });
+
+  it('omits the date when the purge was begun and never completed', () => {
+    const html = render(run(), undefined, { ...PURGED, purgedAt: null });
+    expect(html).toContain('no longer held here');
+    // Rather than inventing one. The missing completion row is why there is no date to print.
+    expect(html).not.toContain('on 2027-08-20');
+  });
+
+  it('describes what happened and tells nobody what to do (D-001)', () => {
+    const masthead = render(run(), undefined, PURGED);
+    for (const directive of ['please ', 'you should', 'do not', 'contact ', 'must be']) {
+      expect(masthead.toLowerCase(), `report copy carries "${directive}"`).not.toContain(directive);
+    }
   });
 });

@@ -138,6 +138,25 @@ export function DocumentsReportView(props: DocumentsReportViewProps): JSX.Elemen
         <div className="eyebrow">Mintro · Documents Check</div>
         <h1>{merchantName}</h1>
         {dba === null ? null : <p className="dba">DBA {dba}</p>}
+        {/*
+          In the masthead, not only beside the documents (D-130).
+
+          After a purge this report regenerates byte-identically — it reads no body — so without
+          this it is a page that looks complete and rests on nothing retrievable. A reader skimming
+          the first page should know before they read a finding, and the export reference is what
+          turns "the documents are gone" into somewhere to look.
+
+          Descriptive, never an instruction (D-001): it says what happened and where the copy is.
+        */}
+        {report.retention === null ? null : (
+          <p className="purged" data-objects={report.retention.objects}>
+            The documents this run read are no longer held here. {report.retention.objects} file
+            {report.retention.objects === 1 ? '' : 's'} were exported and removed
+            {report.retention.purgedAt === null ? '' : ` on ${report.retention.purgedAt.slice(0, 10)}`}
+            {report.retention.exportRef === null ? '' : `, to export ${report.retention.exportRef}`}. The
+            observations below were made while they were held.
+          </p>
+        )}
         <div className="meta">
           <div>
             <span>Package</span>
@@ -281,12 +300,20 @@ export function DocumentsReportView(props: DocumentsReportViewProps): JSX.Elemen
         </p>
 
         {report.documents.map((group) => (
-          <div className="docgroup" key={group.versionId} data-version={group.versionId}>
+          <div
+            className="docgroup"
+            key={group.versionId}
+            data-version={group.versionId}
+            data-purged={report.retention === null ? undefined : 'true'}
+          >
             <h3>
               {group.title}
               <span className={group.tier === 'page' ? 'tier page' : 'tier'} data-tier={group.tier}>
                 {group.tier === 'page' ? 'Page tier' : 'Character tier'}
               </span>
+              {/* Per document as well as in the masthead: somebody reading one finding in isolation
+                  should not have to remember the top of the page. */}
+              {report.retention === null ? null : <span className="tier notheld">Not held</span>}
             </h3>
             {group.findings.map((f) => (
               <Finding finding={f} key={`${group.versionId}-${f.checkId}`} />

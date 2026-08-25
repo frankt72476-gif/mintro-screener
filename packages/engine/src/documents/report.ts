@@ -121,6 +121,44 @@ export interface ReportIdentity {
   readonly dba: string | null;
 }
 
+/**
+ * Whether the documents this run read are still retrievable (D-130).
+ *
+ * **A second input, not part of the run.** A run is immutable and a purge happens afterwards, so
+ * this cannot travel in the `RunRecord` — and it must not be looked up by the view, because then
+ * the screen and the PDF would each answer it separately (D-125). It is resolved once, where the
+ * run record is loaded, and passed in.
+ *
+ * ## Why the report has to say it at all
+ *
+ * `buildDocumentsReport` reads no body. After a purge it regenerates **byte-identically**, with no
+ * sign the documents are gone — a page that looks complete and rests on nothing retrievable, which
+ * is D-097's *chain that resolves to nothing* one level up. There is no broken page to prevent;
+ * there is a perfect-looking one.
+ *
+ * ## What this does to D-085
+ *
+ * *Same run in, byte-identical report out* now holds **only within a purge state**. The same run
+ * renders differently before and after, which is correct — the document is making a true statement
+ * about retrievability at render time — and it means a regenerated PDF will not match the
+ * `pdf_sha256` in the send log for a purged package. That is stated in D-130 rather than left to be
+ * discovered by whoever writes the integrity check.
+ */
+export interface RetentionState {
+  readonly purged: boolean;
+  /** When, or `null` when the purge was begun and never completed. */
+  readonly purgedAt: string | null;
+  /** How many objects went. Shown so "purged" is a quantity rather than an adjective. */
+  readonly objects: number;
+  /**
+   * The export the bodies were written to before they were removed.
+   *
+   * The point of printing it: a reader who needs a document has somewhere to look. Without it the
+   * page says the bodies are gone and stops, which is the dead end this was arranged against.
+   */
+  readonly exportRef: string | null;
+}
+
 export interface DocumentsReport {
   readonly runId: string;
   readonly packageId: string;
@@ -136,6 +174,11 @@ export interface DocumentsReport {
   readonly diff: ReportDiff | null;
   readonly externalVerification: string;
   readonly notChecked: readonly NotCheckedItem[];
+  /**
+   * `null` where nothing has been purged — and rendered as nothing, so a pre-purge report is
+   * byte-identical to one built before this field existed.
+   */
+  readonly retention: RetentionState | null;
 }
 
 /** What the builder needs, all of it read off one run. */
@@ -274,6 +317,7 @@ export function buildDocumentsReport(
   run: RunRecord,
   rules: DocumentsRules,
   previous?: RunRecord,
+  retention?: RetentionState,
 ): DocumentsReport {
   const titles = new Map(rules.checks.catalog.map((c) => [c.key, c.title]));
   const checkTitles = new Map(rules.checks.checks.map((c) => [c.id, c.title]));
@@ -344,6 +388,13 @@ export function buildDocumentsReport(
     documents,
     packageFindings: packageLevel.map(asFinding),
     diff: previous === undefined ? null : diffRuns(previous, run),
+    /*
+      Absent and not-purged collapse to the same `null`.
+
+      A `RetentionState` with `purged: false` is a package nobody has purged, which is what every
+      report said before this existed — so it renders as nothing and the bytes do not move.
+    */
+    retention: retention === undefined || !retention.purged ? null : retention,
     externalVerification: rules.checks.not_checked.external_verification,
     notChecked: rules.checks.not_checked.items,
   };

@@ -18,7 +18,9 @@ import { createDocumentRunStore } from './store/documentRunStore.js';
 import { renderDocumentsReportPdf } from './documentsPdf.js';
 import { documentsMailerFor, sendDocumentsReport } from './documentsSend.js';
 import { assertRunIsCurrent, packageDigest, StaleRunError, type DigestInput } from './documentsReportGate.js';
-import { loadRunRecord, toRunRecord, RUN_RECORD_COLUMNS, type RunRow } from './documentsRunRecord.js';
+import {
+  loadRetentionState, loadRunRecord, toRunRecord, RUN_RECORD_COLUMNS, type RunRow,
+} from './documentsRunRecord.js';
 
 export interface ClaimedSend {
   readonly id: string;
@@ -206,7 +208,16 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       previous = (await loadRunRecord(client, store, lastSentRunId))?.record;
     }
 
-    const report = documents.buildDocumentsReport(record, rules, previous);
+    /*
+      The second input (D-130, P5).
+
+      Resolved here, where the run's other inputs are gathered, so the PDF and the screen cannot
+      disagree about whether the bodies are still held. A package that has not been purged resolves
+      to `purged: false`, the report carries `retention: null`, and the document is byte-identical
+      to one built before this existed.
+    */
+    const retention = await loadRetentionState(client, request.packageId);
+    const report = documents.buildDocumentsReport(record, rules, previous, retention);
     const sentBefore = sends.filter((s) => s.outcome === 'accepted');
 
     const rendered = await renderDocumentsReportPdf(deps.browser, {
