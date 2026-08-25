@@ -225,7 +225,7 @@ describe('only an approver approves', () => {
     const packageId = await seedPackage();
     const approvalId = await approved(packageId);
     await db.query(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(await versionOf(packageId))],
     );
     const [row] = await db.query<{ approved_by: string; purged_by: string }>(
@@ -315,7 +315,7 @@ describe('the digest binds the approval to a package that has not moved', () => 
     const packageId = await seedPackage();
     const approvalId = await approved(packageId, DIGEST(1));
     const error = await db.attempt(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(2), OBJECTS(await versionOf(packageId))],
     );
     // Re-checked at purge and not only at approval: an approval can sit for a week, and the
@@ -330,12 +330,12 @@ describe('one approval, one purge', () => {
     const approvalId = await approved(packageId);
     const versionId = await versionOf(packageId);
     expect(await db.attempt(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(versionId)],
     )).toBeNull();
 
     const again = await db.attempt(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(versionId)],
     );
     // A unique constraint rather than a `consumed` flag, because this table is append-only and a
@@ -343,16 +343,16 @@ describe('one approval, one purge', () => {
     expect(again).toMatch(/package_purges_approval_id_key|duplicate key/);
   });
 
-  it('refuses a purge that removed nothing', async () => {
+  it('refuses a purge that names nothing', async () => {
     const packageId = await seedPackage();
     const approvalId = await approved(packageId);
     const error = await db.attempt(
-      `select public.record_package_purge($1, $2, '[]'::jsonb)`,
+      `select public.begin_package_purge($1, $2, '[]'::jsonb)`,
       [approvalId, DIGEST(1)],
     );
     // A reconciliation that found nothing is an executor bug. Recording it would put a row in the
     // ledger saying bodies went when they are still there.
-    expect(error).toMatch(/at least one removed object/);
+    expect(error).toMatch(/at least one object/);
   });
 });
 
@@ -362,7 +362,7 @@ describe('the purge record resolves the supersedes chain to a location', () => {
     const versionId = await versionOf(packageId);
     const approvalId = await approved(packageId);
     await db.query(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(versionId)],
     );
 
@@ -384,28 +384,28 @@ describe('the purge record resolves the supersedes chain to a location', () => {
     });
   });
 
-  it('derives the totals from the rows, so summary and detail cannot disagree', async () => {
+  it('derives the planned totals from the rows, so summary and detail cannot disagree', async () => {
     const packageId = await seedPackage();
     const approvalId = await approved(packageId);
     await db.query(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(await versionOf(packageId))],
     );
-    const [row] = await db.query<{ objects_deleted: number; bytes_deleted: string; actual: string }>(
-      `select p.objects_deleted, p.bytes_deleted,
+    const [row] = await db.query<{ objects_planned: number; bytes_planned: string; actual: string }>(
+      `select p.objects_planned, p.bytes_planned,
               (select count(*) from public.purged_objects where purge_id = p.id) as actual
          from public.package_purges p where p.approval_id = $1`,
       [approvalId],
     );
-    expect(Number(row?.objects_deleted)).toBe(Number(row?.actual));
-    expect(Number(row?.bytes_deleted)).toBe(2148);
+    expect(Number(row?.objects_planned)).toBe(Number(row?.actual));
+    expect(Number(row?.bytes_planned)).toBe(2148);
   });
 
   it('refuses an object whose reference does not match its kind', async () => {
     const packageId = await seedPackage();
     const approvalId = await approved(packageId);
     const error = await db.attempt(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), JSON.stringify([
         // A body with no version to hang off: the chain would resolve to a row that cannot say
         // which document it belonged to.
@@ -427,7 +427,7 @@ describe('the purge record resolves the supersedes chain to a location', () => {
       [packageId, slot!.id, `${packageId}/staging/abc`, analyst],
     );
     const error = await db.attempt(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), JSON.stringify([
         { kind: 'upload_staging', upload_id: upload!.id, storage_key: `${packageId}/staging/abc`, bytes: 10 },
         { kind: 'report_pdf', storage_key: 'run/report.pdf', bytes: 20 },
@@ -450,7 +450,7 @@ describe('every row in the gate is append-only', () => {
     const packageId = await seedPackage();
     const approvalId = await approved(packageId);
     await db.query(
-      `select public.record_package_purge($1, $2, $3::jsonb)`,
+      `select public.begin_package_purge($1, $2, $3::jsonb)`,
       [approvalId, DIGEST(1), OBJECTS(await versionOf(packageId))],
     );
 
@@ -581,5 +581,88 @@ describe('the record cannot overstate what was checked', () => {
     // Otherwise the weakest method can present itself as the most thorough one, in the same column
     // a reader would use to tell them apart.
     expect(error).toMatch(/a_declared_hash_checks_nothing/);
+  });
+});
+
+describe('the intent is written before anything is deleted', () => {
+  /*
+    The window P4 left open: delete, then record. A crash between them left the bytes gone and no
+    row saying which — so the only account was an error message somebody had to have been watching
+    for, and the `alreadyPurged` resumption depended on the step that failed.
+
+    0039 splits it. `begin_package_purge` names the objects; the deletion happens outside the
+    database; `complete_package_purge` says it finished. The interrupted state is a purge with no
+    completion, and it is readable rather than reconstructed.
+  */
+  async function begun(packageId: string): Promise<{ purgeId: string; approvalId: string }> {
+    const approvalId = await approved(packageId);
+    const [row] = await db.query<{ begin_package_purge: string }>(
+      `select public.begin_package_purge($1, $2, $3::jsonb) as begin_package_purge`,
+      [approvalId, DIGEST(1), OBJECTS(await versionOf(packageId))],
+    );
+    return { purgeId: row!.begin_package_purge, approvalId };
+  }
+
+  it('names every object before any deletion could have happened', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    const objects = await db.query<{ storage_key: string }>(
+      `select storage_key from public.purged_objects where purge_id = $1 order by storage_key`,
+      [purgeId],
+    );
+    expect(objects.map((o) => o.storage_key)).toEqual(['p/body.pdf', 'r/report.pdf']);
+    // And nothing says it finished.
+    expect(await db.query(`select 1 from public.package_purge_completions where purge_id = $1`, [purgeId]))
+      .toEqual([]);
+  });
+
+  it('an interrupted purge is readable as begun-and-not-complete', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    const [row] = await db.query<{ planned: number; completions: number }>(
+      `select p.objects_planned as planned,
+              (select count(*) from public.package_purge_completions c where c.purge_id = p.id)::int as completions
+         from public.package_purges p where p.id = $1`,
+      [purgeId],
+    );
+    // The state recovery looks for. Two rows and a missing third, rather than a person's memory.
+    expect(row).toEqual({ planned: 2, completions: 0 });
+  });
+
+  it('completing it records who and how many', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    expect(await db.attempt(`select public.complete_package_purge($1, 2)`, [purgeId])).toBeNull();
+    const [row] = await db.query<{ objects_removed: number; completed_by: string }>(
+      `select objects_removed, completed_by from public.package_purge_completions where purge_id = $1`,
+      [purgeId],
+    );
+    expect(row).toEqual({ objects_removed: 2, completed_by: analyst });
+  });
+
+  it('refuses to complete a purge that removed fewer than it named', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    // A completion row would say it finished. The intent row stays, which is what resumption reads.
+    expect(await db.attempt(`select public.complete_package_purge($1, 1)`, [purgeId]))
+      .toMatch(/named 2 object\(s\) and removed 1/);
+  });
+
+  it('completes once and only once', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    await db.query(`select public.complete_package_purge($1, 2)`, [purgeId]);
+    expect(await db.attempt(`select public.complete_package_purge($1, 2)`, [purgeId]))
+      .toMatch(/package_purge_completions_purge_id_key|duplicate key/);
+  });
+
+  it('and a completion cannot be rewritten or removed', async () => {
+    const packageId = await seedPackage();
+    const { purgeId } = await begun(packageId);
+    await db.query(`select public.complete_package_purge($1, 2)`, [purgeId]);
+    expect(await db.attempt(`update public.package_purge_completions set objects_removed = 0`))
+      .toMatch(/append-only|not permitted/);
+    expect(await db.attempt(`delete from public.package_purge_completions where true`))
+      .toMatch(/append-only|not permitted/);
   });
 });

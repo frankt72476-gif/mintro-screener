@@ -209,7 +209,13 @@ export async function reconcile(
   const found = await listPrefixRecursively(deps.storage, packageId);
   const foundByKey = new Map(found.map((f) => [f.key, f.bytes]));
 
-  // What a previous attempt already removed, on the record. The only absence this accepts.
+  /*
+    What a previous attempt named for removal, on the record. The only absence this accepts.
+
+    These rows are written *before* the deletion (0039), so an attempt interrupted at any point
+    leaves them — the exception no longer depends on the interrupted attempt having succeeded at
+    the step that failed.
+  */
   const { data: priorRows } = await deps.client
     .from('purged_objects')
     .select('storage_key, package_purges!inner(package_id)')
@@ -293,38 +299,64 @@ export async function executePurge(
   if (plan.refusals.length > 0) throw new PurgeRefused(plan);
   if (!options.confirm) return { plan, purgeId: null };
 
+  /*
+    Intent first, then delete, then completion.
+
+    A crash between the first two leaves a row naming exactly what was about to be removed, so a
+    resumed purge reads the database rather than an error message somebody had to have been
+    watching for. `alreadyPurged` reads those same rows, which is why it now works whether or not
+    the interrupted attempt got any further.
+
+    Reconstruction by hand is a backstop, not a design — the same discipline as export-before-purge,
+    one level down.
+  */
+  const objects = plan.targets.map((t) => ({
+    kind: t.kind,
+    document_version_id: t.documentVersionId,
+    upload_id: t.uploadId,
+    storage_key: t.storageKey,
+    sha256: t.sha256,
+    bytes: t.bytes,
+  }));
+
+  const begun = await deps.client.rpc('begin_package_purge', {
+    p_approval_id: approvalId,
+    p_package_digest: options.packageDigest,
+    p_objects: objects,
+  });
+  if (begun.error !== null) {
+    // Nothing has been deleted. The gate refused before anything irreversible happened, which is
+    // the whole reason the intent is written first.
+    throw new Error(`the purge could not be begun, and nothing was deleted: ${begun.error.message}`);
+  }
+  const purgeId = String(begun.data);
+
   await deps.storage.remove(plan.targets.map((t) => t.storageKey));
 
   const still = new Set((await listPrefixRecursively(deps.storage, plan.packageId)).map((f) => f.key));
   const survivors = plan.targets.filter((t) => still.has(t.storageKey)).map((t) => t.storageKey);
   if (survivors.length > 0) {
+    // A remove that reports success and leaves the object. The intent row stays and no completion
+    // is written, which is exactly the resumable state.
     throw new Error(
       `storage accepted the removal and ${survivors.length} object(s) are still there: ` +
-        `${survivors.slice(0, 5).join(', ')}. Nothing has been recorded, because a purge row saying ` +
-        'these are gone would be false.',
+        `${survivors.slice(0, 5).join(', ')}. Purge ${purgeId} is begun and not complete; its ` +
+        'objects are recorded and it can be resumed.',
     );
   }
 
-  const { data, error } = await deps.client.rpc('record_package_purge', {
-    p_approval_id: approvalId,
-    p_package_digest: options.packageDigest,
-    p_objects: plan.targets.map((t) => ({
-      kind: t.kind,
-      document_version_id: t.documentVersionId,
-      upload_id: t.uploadId,
-      storage_key: t.storageKey,
-      sha256: t.sha256,
-      bytes: t.bytes,
-    })),
+  const done = await deps.client.rpc('complete_package_purge', {
+    p_purge_id: purgeId,
+    p_objects_removed: plan.targets.length,
   });
-  if (error !== null) {
-    // The bytes are gone and the record failed. Loud, and named as the specific situation it is:
-    // the objects are listed here so a person can write the record by hand if they must.
+  if (done.error !== null) {
+    // The bytes are gone and the completion failed — but the intent row named every one of them
+    // before they went, so this is a row to finish rather than a list to reconstruct.
     throw new Error(
-      `the objects were deleted and the purge could not be recorded: ${error.message}. ` +
-        `Deleted: ${plan.targets.map((t) => t.storageKey).join(', ')}`,
+      `the objects were deleted and the purge could not be completed: ${done.error.message}. ` +
+        `Purge ${purgeId} names all ${plan.targets.length} object(s) and can be completed.`,
     );
   }
 
-  return { plan, purgeId: String(data) };
+  return { plan, purgeId };
 }

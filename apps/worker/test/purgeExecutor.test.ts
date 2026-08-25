@@ -48,11 +48,21 @@ function client(over: {
   uploads?: Record<string, unknown>[];
   priorPurged?: Record<string, unknown>[];
   approval?: Record<string, unknown> | null;
+  beginError?: string;
   recordError?: string;
 } = {}) {
-  const rpc = vi.fn(async () => (over.recordError === undefined
-    ? { data: 'purge-1', error: null }
-    : { data: null, error: { message: over.recordError } }));
+  // Two calls now: the intent, then the completion (0039). Named separately so a test can fail
+  // exactly one of them and see which half of the window it lands in.
+  const rpc = vi.fn(async (fn: string) => {
+    if (fn === 'begin_package_purge') {
+      return over.beginError === undefined
+        ? { data: 'purge-1', error: null }
+        : { data: null, error: { message: over.beginError } };
+    }
+    return over.recordError === undefined
+      ? { data: null, error: null }
+      : { data: null, error: { message: over.recordError } };
+  });
   return {
     rpc,
     from(table: string) {
@@ -222,29 +232,55 @@ describe('executing', () => {
     expect(deps.storage.removed).toEqual([]);
   });
 
-  it('deletes, then records', async () => {
+  it('records the intent, then deletes, then completes', async () => {
     const deps = clean();
     const { purgeId } = await executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) });
     expect(deps.storage.removed).toEqual([[`${PKG}/aaa.pdf`]]);
     expect(purgeId).toBe('purge-1');
+    // The order is the guarantee. A crash after the delete leaves a row naming what went.
+    const calls = (deps.client as unknown as { rpc: { mock: { calls: [string][] } } }).rpc.mock.calls;
+    expect(calls.map((c) => c[0])).toEqual(['begin_package_purge', 'complete_package_purge']);
   });
 
-  it('refuses to record when storage reported success and the object is still there', async () => {
+  it('names every object before deleting any of them', async () => {
+    const deps = clean();
+    let namedBeforeDelete: string[] = [];
+    const realRemove = deps.storage.remove.bind(deps.storage);
+    deps.storage.remove = async (keys) => {
+      const rpc = (deps.client as unknown as { rpc: { mock: { calls: [string, Record<string, unknown>][] } } }).rpc;
+      const begin = rpc.mock.calls.find((c) => c[0] === 'begin_package_purge');
+      namedBeforeDelete = ((begin?.[1]['p_objects'] as { storage_key: string }[]) ?? []).map((o) => o.storage_key);
+      return realRemove(keys);
+    };
+    await executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) });
+    // The window this closes: at the moment of deletion the database already says which objects
+    // are going, so an interrupted purge is resumed from a row rather than reconstructed.
+    expect(namedBeforeDelete).toEqual([`${PKG}/aaa.pdf`]);
+  });
+
+  it('deletes nothing when the intent cannot be recorded', async () => {
+    const deps = { client: client({ beginError: 'the package has changed' }), storage: bucket([`${PKG}/aaa.pdf`]) };
+    await expect(executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) }))
+      .rejects.toThrow(/could not be begun, and nothing was deleted/);
+    expect(deps.storage.removed).toEqual([]);
+  });
+
+  it('points at a resumable purge when the completion fails', async () => {
+    const deps = { client: client({ recordError: 'connection reset' }), storage: bucket([`${PKG}/aaa.pdf`]) };
+    // The bytes are gone and the completion failed — but the intent row named them before they
+    // went, so this is a row to finish rather than a list to reconstruct from an error message.
+    await expect(executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) }))
+      .rejects.toThrow(/could not be completed.*Purge purge-1 names all 1 object/s);
+  });
+
+  it('leaves the purge resumable when storage keeps an object', async () => {
     const deps = { client: client(), storage: bucket([`${PKG}/aaa.pdf`]) };
-    // A remove that reports success and leaves the object is this project's recurring shape. A
-    // purge row asserting the bytes are gone while they sit in the bucket would be the most
-    // misleading row in the database.
     deps.storage.remove = async () => undefined;
     await expect(executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) }))
-      .rejects.toThrow(/still there/);
-  });
-
-  it('says exactly what was deleted when the record fails', async () => {
-    const deps = { client: client({ recordError: 'connection reset' }), storage: bucket([`${PKG}/aaa.pdf`]) };
-    // The bytes are gone and the record failed. Naming the keys is what lets a person write the
-    // record by hand rather than reconstruct it.
-    await expect(executePurge(deps, 'ap-1', { confirm: true, packageDigest: 'd'.repeat(64) }))
-      .rejects.toThrow(/deleted and the purge could not be recorded.*aaa\.pdf/s);
+      .rejects.toThrow(/begun and not complete/);
+    // No completion row, and the intent stands: exactly the state resumption reads.
+    const calls = (deps.client as unknown as { rpc: { mock: { calls: [string][] } } }).rpc.mock.calls;
+    expect(calls.map((c) => c[0])).toEqual(['begin_package_purge']);
   });
 });
 
