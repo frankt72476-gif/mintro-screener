@@ -7126,6 +7126,8 @@ which is the path D-081 already intended for a merchant with no processing histo
 ## D-130 — Purge at six months, gated on an export that has been verified
 **2026-08-25 · Frank's ruling · extends D-097 · amends D-084 and D-085 · migrations 0035 onward**
 
+**Amended by D-132 — see below.** The staged export archive is discarded on a verified copy and swept from the bucket after twenty-four hours; the download link is nulled once it lapses, leaving `download_issued_at` as the record. An export interrupted after the upload leaves an archive no row points at, which is why the sweep keys on the bucket.
+
 At **180 days from `retention_started_at`** a package surfaces as a candidate for deletion. An
 operator exports it — including the document bodies — to storage Mintro controls, verifies the
 export, and only then are the bodies purged. Findings, run history, the send log, slot states and
@@ -7392,6 +7394,98 @@ situation it exists to check, which is the same defect wearing a different hat.
 
 **A module nothing imports is not built.** Not "is untested", not "is dead code to tidy later" — it
 does not exist in the artifact, and every other signal will say it does.
+
+---
+
+## D-132 — The staged copy goes, and the link does not linger
+**2026-08-25 · Frank's ruling · amends D-130 · migration 0043**
+
+P6 gave the export a staging area and no housekeeping. Two things were left behind, and D-130 did
+not anticipate either because neither exists until an export is *built* rather than designed.
+
+**The staged archive is a second full copy of every document body**, in the bucket the purge exists
+to empty. It had a manual discard button, so an operator who downloaded and walked away left it
+there indefinitely.
+
+**The download link is a bearer credential in a row that is never deleted.** Inert after two hours
+and still a credential-shaped string travelling into every backup, every support export, and every
+schema audit that has to stop and work out whether it is live.
+
+### The failure D-130 did not anticipate
+
+An export interrupted after the upload leaves `status = 'running'`, **no `storage_key` recorded**,
+and a complete archive in the bucket that no row points at. A copy of every document body in a
+package, reachable by no control in the system, and invisible to every design that starts from the
+request table — expiry driven from the row, removal on verification, removal on discard. All three
+walk past it, because the row that would name it was never written.
+
+One was found in the test project by listing the prefix. It is the strongest reason this exists.
+
+So **the sweep keys on the bucket**, not on the rows. The same reasoning as the purge
+reconciliation: the database says what it believes is stored, and that is a different question from
+what is stored.
+
+### Two triggers, because they close different failures
+
+**Removal on verification is the primary, and it fires on evidence rather than a timer.** A matched
+`read_back` or `reupload` means the archive is on the operator's disk and has been hashed member by
+member — the staged copy is provably redundant. That is export-before-purge one level down: the
+copy goes once another one is proven.
+
+**Never on `declared`.** A typed hash proves somebody read a string. Nothing established that a file
+exists anywhere, and discarding on it would remove the only copy on the strength of an operator's
+typing. Never on a mismatch either: the copy on disk is not the archive.
+
+**The sweep is the backstop, and it is the more important half.** Verification-only leaves the copy
+forever in exactly the cases that should worry us most — the abandoned request and the interrupted
+export. It removes any object under `exports/` older than twenty-four hours, stamps the row where
+there is one, and reports the ones there were not.
+
+An object whose age cannot be read is left alone. Removing on an unparseable date would turn a bad
+clock into a deletion.
+
+### The link: record that one was issued, not the link itself
+
+`download_issued_at` is the durable fact. The URL is nulled by the same sweep once it lapses.
+
+**Not on consumption, because consumption is not observable.** Fetching a signed URL tells the
+database nothing at all — the request never reaches it. Inferring it from a verification row was the
+obvious substitute and it is wrong: it misses the operator who downloads and does not verify, which
+is precisely the person whose copy has been handed out. Expiry is the only event this side can see.
+
+`finished_exports_are_fetchable` had to move with it. It required a *live* URL on every finished
+row, which the sweep makes false the first time a link lapses. What it was really asserting is that
+a finished export was reachable at some point, so it now reads `download_issued_at` and is renamed
+`finished_exports_were_fetchable`.
+
+### The freeze is relaxed in exactly one direction
+
+`reject_finished_export_mutation` froze the download columns on a finished row. The sweep needs to
+clear them, so they may now change **to NULL and to nothing else**.
+
+The asymmetry is the whole of it: **nulling can only take a download away; repointing could send an
+operator at a different archive while the row still names the export it was taken for.** One is
+housekeeping, the other is a misdirection with a record that looks correct. `download_issued_at`
+stays frozen, because it is the record.
+
+### Two findings from building it, worth keeping
+
+**A row that violates a `NOT VALID` constraint cannot be repaired one column at a time.** The check
+runs against the whole finished row on every update, so `request_export_discard` setting
+`discard_requested_at` alone was refused on exactly the rows that needed discarding — and the only
+way out was to set both discard columns in one statement. A row can reach a state no ordinary path
+can leave. Not an argument against `not valid`; an argument for fixing the rows or knowing they are
+frozen before adding one.
+
+**Consumption of a signed URL is not observable to the database.** Worth writing down because the
+instinct is to clear a credential "once it has been used", and here there is no such event. Any
+scheme that appears to detect it is really detecting something adjacent — a verification, a page
+load — and will be wrong for whoever does the one without the other.
+
+### What this is not
+
+None of it is a purge. These are artifacts this system made hours earlier, not a merchant's
+submission, and no approval governs them. `purge_approver` is untouched and still held by nobody.
 
 ---
 

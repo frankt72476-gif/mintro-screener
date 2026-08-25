@@ -247,6 +247,9 @@ export async function runExport(request: ExportRequest, deps: ExportJobDeps): Pr
         report_hash_mismatches: built.reportHashMismatches.length,
         download_url: signed.data.signedUrl,
         download_expires_at: new Date(Date.now() + DOWNLOAD_TTL_SECONDS * 1000).toISOString(),
+        // The durable half. The URL is nulled once it lapses; that one was issued, and when, is
+        // what the row keeps (D-132).
+        download_issued_at: new Date().toISOString(),
         finished_at: new Date().toISOString(),
       })
       .eq('id', request.id);

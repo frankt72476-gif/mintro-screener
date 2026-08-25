@@ -52,6 +52,7 @@ import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
 import {
   claimNextExport, claimNextExportDiscard, runExport, runExportDiscard,
 } from '../src/exportJob.js';
+import { sweepStagedExports } from '../src/exportSweepJob.js';
 import { DOCUMENTS_BUCKET } from '../src/store/ingestStore.js';
 import {
   claimNextSend as claimNextDocumentsSend,
@@ -64,6 +65,15 @@ import { addressesFor, type MailAddresses } from '../src/addresses.js';
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
+
+/**
+ * How often the staged-export sweep runs.
+ *
+ * Hourly. It lists a bucket prefix and removes day-old artifacts, so running it every poll would be
+ * a listing call a second for a job whose deadline is measured in hours.
+ */
+const SWEEP_EVERY_MS = 60 * 60 * 1000;
+let lastSweptAt = 0;
 
 /** A claim older than this is assumed to belong to a machine that died. */
 const STALE_CLAIM_MS = 15 * 60 * 1000;
@@ -277,6 +287,34 @@ async function main(argv: readonly string[]): Promise<number> {
           });
         }
         continue;
+      }
+
+      /*
+        The sweep. Throttled, because it lists a bucket prefix and nothing about it is urgent.
+
+        It is the backstop rather than the mechanism: a verified copy already asks for its staged
+        archive to go the moment the verification matches. What this catches is what nothing else
+        can — an export interrupted after the upload, which leaves a complete archive that **no row
+        points at** (D-132). A sweep driven from the request table would walk straight past it.
+      */
+      if (Date.now() - lastSweptAt > SWEEP_EVERY_MS) {
+        lastSweptAt = Date.now();
+        try {
+          const swept = await sweepStagedExports({
+            client: supabase.client, bucket: DOCUMENTS_BUCKET, now: new Date(),
+          });
+          if (swept.archivesRemoved.length > 0 || swept.linksCleared > 0) {
+            console.log(
+              `[sweep] removed ${swept.archivesRemoved.length} staged archive(s), ` +
+                `${swept.orphansRemoved.length} of them claimed by no request; ` +
+                `cleared ${swept.linksCleared} lapsed link(s)`,
+            );
+          }
+        } catch (error) {
+          // Never fatal. A sweep that cannot list the bucket is a housekeeping pass that did not
+          // run, and taking the worker down with it would stop every job that matters more.
+          console.error('[sweep] failed:', error instanceof Error ? error.message : error);
+        }
       }
 
       // Discarding a staged archive an operator has finished with. Our own artifact, minutes old —

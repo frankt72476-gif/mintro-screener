@@ -139,7 +139,8 @@ describe('an operator may ask for an export and may not answer for one', () => {
     */
     expect(await db.attempt(
       `update public.document_export_requests
-          set status = 'done', download_url = 'https://example.test/a.tar' where id = $1`,
+          set status = 'done', download_url = 'https://example.test/a.tar',
+              download_issued_at = now() where id = $1`,
       [id],
     )).toMatch(/finished_exports_have_an_export/);
   });
@@ -200,7 +201,8 @@ describe('the staged copy is discardable and the record is not', () => {
     await db.query(
       `update public.document_export_requests
           set status = 'done', export_id = $2, storage_key = $3, bytes = 100,
-              download_url = $4, download_expires_at = now() + interval '2 hours', finished_at = now()
+              download_url = $4, download_expires_at = now() + interval '2 hours',
+              download_issued_at = now(), finished_at = now()
         where id = $1`,
       // The link the worker mints (0041). A finished request with no way to fetch the archive is
       // the defect that migration exists for, and the schema refuses one.
@@ -230,7 +232,7 @@ describe('the staged copy is discardable and the record is not', () => {
     // The row is why an operator has a copy. Rewriting which export it produced would rewrite that.
     expect(await db.attempt(
       `update public.document_export_requests set storage_key = 'exports/elsewhere.tar' where id = $1`, [id],
-    )).toMatch(/only the discard may still change/);
+    )).toMatch(/only the discard and the link may still change/);
   });
 
   it('and is never deleted', async () => {
@@ -263,17 +265,18 @@ describe('the staged copy is discardable and the record is not', () => {
   });
 });
 
-describe('a finished export has somewhere to fetch it from', () => {
-  it('refuses a done request with no download link', async () => {
+describe('a finished export was fetchable at some point', () => {
+  it('refuses a done request with no export behind it', async () => {
     const id = await queued(await seedPackage());
     await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
     // What shipped: `done`, an archive staged, and an operator with no way to reach it. The row is
     // the promise that a copy is available, so it has to be able to keep it.
     expect(await db.attempt(
       `update public.document_export_requests
-          set status = 'done', export_id = null, storage_key = $2 where id = $1`,
+          set status = 'done', export_id = null, storage_key = $2, download_issued_at = now()
+        where id = $1`,
       [id, `exports/${id}.tar`],
-    )).toMatch(/finished_exports_have_an_export|finished_exports_are_fetchable/);
+    )).toMatch(/finished_exports_have_an_export/);
   });
 
   it('allows a done request with no link once the copy is discarded', async () => {
@@ -293,5 +296,131 @@ describe('a finished export has somewhere to fetch it from', () => {
         where id = $1`,
       [id, row!.record_export_for_request, `exports/${id}.tar`],
     )).toBeNull();
+  });
+});
+
+describe('the link may be cleared and never repointed (D-132)', () => {
+  async function fetchable(): Promise<string> {
+    const packageId = await seedPackage();
+    const id = await queued(packageId);
+    await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
+    const [row] = await db.query<{ record_export_for_request: string }>(
+      `select public.record_export_for_request($1, $2, $3, 100, $4::jsonb) as record_export_for_request`,
+      [id, 'a'.repeat(64), 'b'.repeat(64), JSON.stringify(TRUE_COUNTS)],
+    );
+    await db.query(
+      `update public.document_export_requests
+          set status = 'done', export_id = $2, storage_key = $3, bytes = 100,
+              download_url = 'https://example.test/one.tar',
+              download_expires_at = now() - interval '1 hour',
+              download_issued_at = now() - interval '3 hours', finished_at = now()
+        where id = $1`,
+      [id, row!.record_export_for_request, `exports/${id}.tar`],
+    );
+    return id;
+  }
+
+  it('lets the sweep null a lapsed link', async () => {
+    const id = await fetchable();
+    expect(await db.attempt(
+      `update public.document_export_requests set download_url = null where id = $1`, [id],
+    )).toBeNull();
+  });
+
+  it('refuses a link swapped for another one', async () => {
+    const id = await fetchable();
+    // Nulling can only take a download away. Repointing would send an operator at a different
+    // archive while the row still names the export it was taken for.
+    expect(await db.attempt(
+      `update public.document_export_requests set download_url = 'https://elsewhere.test/x.tar' where id = $1`,
+      [id],
+    )).toMatch(/may be cleared, not repointed/);
+  });
+
+  it('refuses an expiry moved rather than cleared', async () => {
+    const id = await fetchable();
+    expect(await db.attempt(
+      `update public.document_export_requests set download_expires_at = now() + interval '1 day' where id = $1`,
+      [id],
+    )).toMatch(/may be cleared, not moved/);
+  });
+
+  it('keeps download_issued_at frozen, because it is the record', async () => {
+    const id = await fetchable();
+    // The URL is transient; that one was issued, and when, is what survives. Editing it would
+    // rewrite the only remaining evidence that an operator was handed a copy.
+    expect(await db.attempt(
+      `update public.document_export_requests set download_issued_at = now() where id = $1`, [id],
+    )).toMatch(/only the discard and the link may still change/);
+  });
+
+  it('still satisfies the constraint once the link is gone', async () => {
+    const id = await fetchable();
+    await db.query(`update public.document_export_requests set download_url = null where id = $1`, [id]);
+    const [row] = await db.query<{ download_url: string | null; download_issued_at: string }>(
+      `select download_url, download_issued_at from public.document_export_requests where id = $1`, [id],
+    );
+    // `finished_exports_were_fetchable` reads the durable fact, so a nulled link does not put the
+    // row in violation — which the old constraint would have.
+    expect(row?.download_url).toBeNull();
+    expect(row?.download_issued_at).not.toBeNull();
+  });
+});
+
+describe('a verified copy asks for the staged one to go (D-132)', () => {
+  async function withExport(): Promise<{ requestId: string; exportId: string }> {
+    const packageId = await seedPackage();
+    const id = await queued(packageId);
+    await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
+    const [row] = await db.query<{ record_export_for_request: string }>(
+      `select public.record_export_for_request($1, $2, $3, 100, $4::jsonb) as record_export_for_request`,
+      [id, 'a'.repeat(64), 'b'.repeat(64), JSON.stringify(TRUE_COUNTS)],
+    );
+    await db.query(
+      `update public.document_export_requests
+          set status = 'done', export_id = $2, storage_key = $3, bytes = 100,
+              download_url = 'https://example.test/one.tar',
+              download_expires_at = now() + interval '2 hours',
+              download_issued_at = now(), finished_at = now()
+        where id = $1`,
+      [id, row!.record_export_for_request, `exports/${id}.tar`],
+    );
+    return { requestId: id, exportId: row!.record_export_for_request };
+  }
+
+  const discardRequested = async (id: string): Promise<boolean> => {
+    const [row] = await db.query<{ discard_requested_at: string | null }>(
+      `select discard_requested_at from public.document_export_requests where id = $1`, [id],
+    );
+    return row?.discard_requested_at !== null;
+  };
+
+  it('asks after a matched read_back', async () => {
+    const { requestId, exportId } = await withExport();
+    await db.query(`select public.record_export_verification($1, 'read_back', repeat('b', 64), 12)`, [exportId]);
+    // Evidence rather than a timer: the archive is on the operator's disk and has been hashed
+    // member by member, so the staged copy is redundant.
+    expect(await discardRequested(requestId)).toBe(true);
+  });
+
+  it('asks after a matched reupload', async () => {
+    const { requestId, exportId } = await withExport();
+    await db.query(`select public.record_export_verification($1, 'reupload', repeat('b', 64), 12)`, [exportId]);
+    expect(await discardRequested(requestId)).toBe(true);
+  });
+
+  it('never after a declared hash', async () => {
+    const { requestId, exportId } = await withExport();
+    await db.query(`select public.record_export_verification($1, 'declared', repeat('b', 64), 0)`, [exportId]);
+    // A typed hash proves somebody read a string. Discarding on it would remove the only copy on
+    // the strength of an operator's typing.
+    expect(await discardRequested(requestId)).toBe(false);
+  });
+
+  it('never after a mismatch', async () => {
+    const { requestId, exportId } = await withExport();
+    await db.query(`select public.record_export_verification($1, 'read_back', repeat('f', 64), 3)`, [exportId]);
+    // The copy on disk is not the archive. Removing the staged one would leave nothing correct.
+    expect(await discardRequested(requestId)).toBe(false);
   });
 });

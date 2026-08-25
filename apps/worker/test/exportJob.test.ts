@@ -118,6 +118,10 @@ describe('the archive is staged where the purge will not trip over it', () => {
     // the file is unreachable — which is what shipped, and what 0041 was written for.
     expect(String(done?.['download_url'])).toContain(`${EXPORT_PREFIX}/${REQUEST.id}.tar`);
     expect(done?.['download_expires_at']).toBeDefined();
+    // And the durable half beside it. The sweep nulls the URL once it lapses (D-132), so without
+    // this the row would end up with no record that a link was ever handed out — and the
+    // constraint that a finished export was fetchable would have nothing to read.
+    expect(done?.['download_issued_at']).toBeDefined();
   });
 
   it('fails rather than finishing with an archive nobody can fetch', async () => {
