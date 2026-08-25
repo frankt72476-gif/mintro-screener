@@ -398,3 +398,70 @@ table {width:100%;border-collapse:collapse}
   .np-answers,.np-fields,.pf-answers{grid-template-columns:1fr}
   .np-impossible li{grid-template-columns:1fr;gap:2px}
 }
+
+/* ==============================================================================================
+ * Retention (D-130).
+ *
+ * Refusals are the thing worth reading on this panel, so they are the only block that carries the
+ * review colour. A dry run that would proceed looks quiet; one that would not does not.
+ * ============================================================================================== */
+
+.rt{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink);
+  border:1px solid var(--rule-2);background:var(--paper);padding:14px 16px;margin:0 0 18px;
+}
+.rt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:12px}
+.rt h3{
+  margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.rt h4{
+  margin:0;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+}
+.rt h5{
+  margin:0 0 4px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+}
+.rt-why{margin:0;font-size:12.5px;color:var(--ink-2);max-width:74ch}
+.rt-detail{font-size:12px;color:var(--ink-3)}
+.rt-none{margin:6px 0 0;font-size:12.5px;color:var(--ink-3)}
+.rt-block{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px}
+.rt-block-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.rt-list{list-style:none;margin:8px 0 0;padding:0}
+.rt-list > li{padding:6px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.rt-list > li:last-child{border-bottom:0}
+
+.rt-export-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+.rt-hash{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+
+/* The method is never abbreviated away: it is what separates a measurement from a typed string. */
+.rt-method{font-size:12.5px;color:var(--ink-2)}
+.rt-outcome{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 6px;border:1px solid var(--rule-2);color:var(--ink-3);
+}
+.rt-outcome[data-outcome="matched"]{color:var(--pass);border-color:var(--pass);background:var(--pass-bg)}
+.rt-outcome[data-outcome="mismatched"]{color:var(--review);border-color:var(--review);background:var(--review-bg)}
+
+/* An attestation is a person's statement. Quiet, italic, and never given a verified badge. */
+.rt-attest{margin-top:6px;padding-left:10px;border-left:2px solid var(--rule-2)}
+.rt-attest li{font-size:12.5px;color:var(--ink-2);font-style:italic}
+
+.rt-status{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 6px;border:1px solid var(--rule-2);color:var(--ink-3);
+}
+.rt-status[data-status="failed"]{color:var(--review);border-color:var(--review)}
+.rt-plan-head{display:flex;align-items:center;gap:8px}
+.rt-refusals{
+  margin-top:8px;padding:8px 10px;border:1px solid var(--review);background:var(--review-bg);
+  color:var(--review);font-size:12.5px;
+}
+.rt-refusals ul{margin:0;padding-left:18px}
+.rt-objects{margin-top:6px;font-size:12px;color:var(--ink-3)}
+.rt-objects code{font-family:"IBM Plex Mono",monospace;font-size:11px;word-break:break-all}
+.rt-purged{
+  margin:0 0 12px;padding:8px 10px;font-size:12.5px;
+  border:1px solid var(--rule-2);background:var(--paper);color:var(--ink-2);
+}

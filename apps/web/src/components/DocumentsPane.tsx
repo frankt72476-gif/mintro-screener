@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DocumentsSendModal } from './DocumentsSendModal';
 import { NewPackage } from './NewPackage';
 import { PackageFactsPanel } from './PackageFacts';
+import { RetentionPanel } from './RetentionPanel';
 import { createPackageCreation } from '../lib/packageCreation';
 import {
   createDocumentsSendQueue,
@@ -316,6 +317,12 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
         creation={creation.current}
         onSaved={() => void refresh()}
       />
+
+      {/*
+        Below the facts and above the grid. Retention is about the package as a whole rather than
+        about any one document, and it is the last thing that happens to one.
+      */}
+      <RetentionPanel client={client} analystId={analystId} packageId={packageId} />
 
       <p className="sub">
         Values read from these documents are not shown here. M1 records what each document is and

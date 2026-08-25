@@ -48,6 +48,8 @@ import { issueInvitation } from '../src/inviteJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
+import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
+import { DOCUMENTS_BUCKET } from '../src/store/ingestStore.js';
 import {
   claimNextSend as claimNextDocumentsSend,
   runSend as runDocumentsSend,
@@ -245,6 +247,19 @@ async function main(argv: readonly string[]): Promise<number> {
             origin: WEB_ORIGIN,
           });
         }
+        continue;
+      }
+
+      /*
+        Purge dry runs. No browser, no deletion — it lists the bucket and compares.
+
+        It sits here rather than in the browser because `authenticated` cannot list the documents
+        bucket and gets `[]` with no error, so a browser-side reconciliation would report a clean
+        plan for a package full of files (D-130, P4).
+      */
+      const purgePlan = await claimNextPurgePlan(supabase.client);
+      if (purgePlan !== null) {
+        await runPurgePlan(purgePlan, { client: supabase.client, bucket: DOCUMENTS_BUCKET });
         continue;
       }
 
