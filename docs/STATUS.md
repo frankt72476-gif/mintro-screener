@@ -18,6 +18,7 @@ and the received document verified against what the merchant actually did.
 | **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
 | **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
 | **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to production 2026-08-24, frontend deployed behind it, verified 13/13. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
+| **Retention** | **P0 through P5 built** (D-130). The clock starts, the gate refuses, the export reconciles against the database, verification checks every member, the purge is planned and refused before it is ever run, and a purged package's report says so in the masthead. Migrations `0035`–`0039`, all on production. **Nobody holds `purge_approver`, so no purge can be approved**, and the executor has never run outside a dry run. Seven items carried — see below. |
 
 ### What "verified" means here, because it is not the usual thing
 
@@ -373,29 +374,55 @@ production's state wrongly, and the row now says what is actually there.
 | **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
 | **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0034` were all applied on 2026-08-24. `0034` was applied **before** the frontend deploy, deliberately: it drops the old function signatures, so migration-first breaks package creation for one Netlify build while frontend-first would have broken the package page entirely — the new `select` names columns that would not yet exist, and PostgREST rejects an unknown column. Break a write nobody uses, not every read. Of the applied set, `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
 
-### Retention exists as schema and as nothing else
+### Retention — P0 through P5, and what each proves
 
-**D-097's restricted-access regime is unbuilt, and nothing here said so until D-130 went looking.**
-Not blocked, not deferred — absent from every list, which is exactly what D-044 caught on Layer 3.
+Frank's ruling (D-130): at 180 days a package surfaces as a candidate for deletion; an operator
+exports it, verifies the export, and only then are the bodies purged. Findings, run history, the
+send log and slot states stay forever. Only a purge approver may approve.
 
-| | State |
+It extends D-097 rather than reversing it, and the distinction is mechanical: **the bodies are
+objects in a bucket, the record is rows in Postgres, and a purge deletes objects and inserts rows.**
+No append-only trigger was relaxed, and there is no `purged_at` on `document_versions`.
+
+| | What it built | What it proves |
+|---|---|---|
+| **P0** `0035` | The retention clock | `retention_started_at` had existed since `0019` and was set by **nothing** — not the trigger, not any function, only two lines in a test. Every policy measured from it never fired, and the schema looked identical to one that worked. Also corrected `create_document_package` from an unruled `365` to D-084's `30`. |
+| **P1** `0036` | The gate | Export → verify → approve → purge, four functions that will not run out of order. The counts are computed **by the database** and a disagreement is refused; the digest binding reuses D-117 so an approval cannot outlive the package state it was given for. |
+| **P2** | The export builder | The first code in this system that reads a document body back out of storage — write-only since M1. Refuses to produce a partial export, and is checked by **reconciling against a database query** rather than against its own manifest. |
+| **P3** `0037` | Verification | Every member hashed against the manifest, not only the archive. Hop 1 is measured; hop 2 is an attestation in its own table, in its own words, and `approve_package_purge` does not read it. A declared hash records and does not open the gate. |
+| **P4** `0038` `0039` | The executor and the panel | Targets derived from the approval, never an argument. Reconciles against a **listing of the bucket**, and refuses on anything it cannot account for. Dry run first, and it stays. |
+| **P5** | Report rendering | A purged package's report says so in the masthead, with a count, a date and the export to look in. A pre-purge report is byte-identical to one built before the field existed. |
+
+**Three findings changed the design rather than being worked around.**
+
+*Every uploaded file exists in storage twice.* The browser stages at `{packageId}/staging/{uuid}`
+and nothing has ever removed it, so one copy appears in no column. A purge driven from
+`document_versions.storage_key` would have deleted the copy it knew about, left the staged one
+holding the same licence images, and reported success — liability reduced on paper and not in fact.
+
+*`authenticated` cannot list the documents bucket, and gets `[]` with no error.* The silent shape
+from the earlier grant audit, in Storage rather than PostgREST, pointed at a deletion planner. A
+browser-side dry run would find nothing unexpected in a bucket full of files and report a clean
+plan: most confident when most blind. That is why the job is in the worker.
+
+*A purged report used to regenerate byte-identically.* The report reads no body, so before P5 a
+purge left a page that looked complete and rested on nothing retrievable — D-097's *chain that
+resolves to nothing*, one level up. There was no broken page to prevent; there was a perfect-looking
+one.
+
+### Retention — carried, not done
+
+| Carried | What it actually means |
 |---|---|
-| `packages.retention_started_at` | Set by the lifecycle trigger **as of `0035`**. Before that, by nothing but a test — so every policy measured from it never fired, and the schema looked identical to one that worked. |
-| `packages.retention_days` | Written on creation. **Read nowhere.** It has never had an effect, which is why `create_document_package` writing an unruled 365 against D-084's 30 went unnoticed for two milestones. Corrected to 30 in `0035` (D-130). |
-| `document_retrievals` | Table, policy and append-only trigger. **Nothing inserts a row.** |
-| Restricted access at archival | Not built. No package has ever been archived. |
-| Reading a document body | **No path exists.** Nothing in the app has ever served `document_versions.storage_key` — bodies have been write-only since M1. |
+| **The export and verification *actions* are not wired to the panel** | The panel displays exports, verifications, attestations and dry runs, and queues a dry run. It cannot **take** an export or **run** a verification: the export builder is worker-side with no queue, and `apps/web/src/lib/exportVerification.ts` is unreferenced — tree-shaken out of the deployed bundle. So the panel reads *"No export has been taken. Bodies cannot be purged until one has"* with no control that would take one. **This is the dead end the panel was meant to avoid**, and closing it is an export-request queue plus wiring the verification controls behind it. |
+| **The partial-failure window is closed; recovery is resumption, not retry** | `begin_package_purge` names every object before any deletion, so a crash leaves a row saying what was going. It is **not automatic**: a new approval is taken and the plan reads the intent rows through `alreadyPurged`. Nothing retries on its own, and nothing should — an unattended retry of a deletion is the wrong thing to automate. |
+| **The send-job seam is a source-level guard** | That `documentsSendJob` passes retention into `buildDocumentsReport` is checked as *text*. Dropping the argument is observable only for a **purged** package, and producing one in a unit test means writing the purge machinery — so a behavioural test of that line would be a test of everything else. **The weakest thing in P5**, and a one-word deletion would leave every purged package's report claiming its documents are still held, in a PDF that goes to an underwriter. |
+| **`showSaveFilePicker` itself is unexercised** | Browser-only, and not drivable from a test. The logic above it is unit-tested against a fake whose disk contents differ from what was written — which is the assertion that matters, since hashing the in-memory buffer would pass every other test and prove nothing. The picker call itself has never run. |
+| **Converted originals are unit-tested only** | No package in the test project has a `original_storage_key`, so the HEIC-arrives-JPEG-is-stored pair (D-104) has never been exported or reconciled against real bytes. The code paths exist and are covered by fakes. |
+| **D-097's restricted-access regime is still unbuilt** | `document_retrievals` has a table, a policy and an append-only trigger, and **has never had a row**. No package has ever been archived, and there is no path that serves a document body to anyone. So today bodies are **neither restricted nor purged** — P0 built the clock and deliberately nothing else, so this ruling does not imply a regime that is not there. |
+| **Nobody holds `purge_approver`** | The column defaults to `false` and no analyst has it, so `approve_package_purge` refuses everyone. This is the correct resting state and it stays until Frank names the moment. The executor has run only as a dry run, on scratch packages, and has never removed an object. |
 
-So today document bodies are **neither restricted nor purged**. D-130 rules a purge at 180 days
-behind a verified export; `0035` starts the clock that makes 180 days arrive, and deliberately
-builds nothing else, so the ruling does not imply a regime that is not there.
-
-One consequence worth carrying into that build: the export builder will be **the first code in this
-system that reads a document body**, and it stands as the precondition for deletion. D-035 is the
-precedent — the seventh consecutive storage defect surfaced on first real use of a path four
-milestones of testing had never exercised.
-
-### What D-129 left carried
+### What D-129 left carried### What D-129 left carried
 
 **Only entity type can be confirmed from a document.** The panel shows what the application says
 and offers a button; it never applies the value (D-129). But it can only do that for entity type —
