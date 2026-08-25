@@ -4786,6 +4786,10 @@ present in run 1 and absent in run 2 is what we observed. Why it is absent is no
 
 ## D-084 — Retention: 30 days, configurable, restarting on reopen
 **2026-08-24 · Frank's ruling**
+
+**Further amended by D-130 — see below.** The 30-day figure is reaffirmed as the open→restricted
+boundary, `create_document_package`'s unruled 365 is corrected to it, and a separate 180-day purge
+candidacy is added. The clock this ruling depends on was never started by anything but a test.
 **Superseded in part by D-097 — see below.**
 
 30 days after a package is submitted or cancelled. **Configurable rather than constant.** The clock
@@ -4831,6 +4835,10 @@ The file is more useful showing that than showing a decision that was always rig
 
 ## D-085 — No analyst annotation on findings
 **2026-08-24 · Frank's ruling**
+
+**Amended by D-130 — see below.** *Same run in, byte-identical report out* now holds only within a
+purge state: a purged package's report is a function of the run **and** of whether its bodies are
+still retrievable.
 
 > Same run in, byte-identical report out.
 
@@ -5303,6 +5311,11 @@ exactly the documents least likely to ever succeed.
 
 ## D-097 — The binary purge is withdrawn; archival restricts access, not existence
 **2026-08-24 · Frank's ruling · amends D-084**
+
+**Extended by D-130 — see below.** Bodies are purged at 180 days, but only after a verified export,
+and a purge is an insert rather than a deletion of any row. **Also: the restricted-access regime
+this entry describes is unbuilt** — `document_retrievals` has never been written to and no package
+has ever been archived.
 
 D-084's binary purge is withdrawn. Document bodies are retained under hard constraint 3 and
 constraint 5's append-only rule, alongside the findings ledger, extracted field metadata and run
@@ -7107,6 +7120,219 @@ stays null: Processing Statements is default-on and resolves through `not_provid
 which is the path D-081 already intended for a merchant with no processing history.
 
 **US domicile gets "Not sure"**, on the same reasoning as the rest of this ruling.
+
+---
+
+## D-130 — Purge at six months, gated on an export that has been verified
+**2026-08-25 · Frank's ruling · extends D-097 · amends D-084 and D-085 · migrations 0035 onward**
+
+At **180 days from `retention_started_at`** a package surfaces as a candidate for deletion. An
+operator exports it — including the document bodies — to storage Mintro controls, verifies the
+export, and only then are the bodies purged. Findings, run history, the send log, slot states and
+package facts stay in the database indefinitely. A purge requires an approval that only a purge
+approver may write.
+
+### This extends D-097 rather than reversing it, and the distinction is mechanical
+
+D-097's operative sentence is *nothing in a package is deleted by application code*. That survives
+literally:
+
+**The bodies are objects in a bucket. The record is rows in Postgres. A purge deletes objects and
+inserts rows. It updates nothing and deletes no row.**
+
+Every append-only trigger stays as written. In particular there is **no `purged_at` on
+`document_versions`** — that table refuses updates, and relaxing it for one marker is exactly the
+trade D-097 declined. A purge is an insert into `document_version_purges`; *is this purged* is an
+exists-check.
+
+### D-097 had two arguments, and only one of them is answered by the export
+
+The first — *a snippet cannot answer a question no check asked* — is answered, provided the export
+carries the bodies rather than the citations. That is why the export is the condition and not a
+courtesy.
+
+The second is not answered by the ruling as stated, and is designed out here:
+
+> a purge would have left superseded entries pointing at bytes that no longer existed — a chain that
+> looks intact and resolves to nothing.
+
+That failure is still available at six months. It is closed only because the purge record carries
+the storage key, the sha256, the byte count and the **export id**, so a reader following the chain
+gets *"version 1, sha256 abc…, exported to E-0007 on 2027-02-14"* rather than a dead end. **The
+chain resolves to a location instead of to nothing.** And a purge is all-or-nothing per package,
+superseded versions included: purging the live ones and keeping the rest is the half-resolving chain
+in a different costume.
+
+### D-097 argued defensibility at six weeks and was right; it never asked about six months
+
+At six weeks, indefinite retention protects. At six months, holding SSNs, dates of birth, licence
+images and account numbers is a liability that grows rather than a protection — and the thing that
+retention was protecting, the ability to answer a later question, is preserved by the export. What
+changes is not the principle but the horizon.
+
+### Only an approver approves, and approval is an artifact
+
+`analysts.purge_approver` with `is_purge_approver()` beside `is_analyst()` — the same shape as the
+gate every other table uses. **No hardcoded identity**: it puts a person into schema, makes the
+approval path untestable anywhere but production, and buys protection only against an adversary who
+already holds the service key.
+
+Against that adversary nothing in-database is sufficient — they can drop the triggers too. **The
+export is the durability control; the gate is the accident control.** Once the order is export →
+verify → purge, a mistaken or malicious purge destroys a copy rather than the only copy. The gate
+has to be good, not perfect, and what it defends against is the realistic failure: a well-meaning
+cleanup on the wrong row.
+
+Approval is a row in `package_purge_approvals` naming the package, the approver, the export, and
+**the package digest at approval time**. The digest binding reuses D-117's stale-run mechanism: if
+the package moved between approval and purge — reopened, a document added — the approval is for a
+different thing and the purge refuses. One approval yields one purge.
+
+**Approver and executor are recorded separately** although they are the same person today. Recording
+it makes the day there are two people visible rather than silent.
+
+The gate is **advisory with respect to Storage**: deleting an object is an API call the worker makes
+with the service key, and no trigger governs it. What follows is a build rule — the purge job
+**derives its targets from the approved package and never from an argument.** A job that takes a
+list of keys can be handed the wrong list, and the gate never sees it.
+
+### The manifest is not the anchor
+
+A manifest listing twelve files against twelve present files proves only that the manifest agrees
+with itself. Completeness needs the counts **checked against the database at export time and
+recorded**, and the **manifest hash written back to the ledger that survives**. The export attests
+to itself; only the record that is never deleted can attest to the export.
+
+The export carries: document bodies **and the originals where a conversion occurred** (D-104 — "as
+uploaded" means the submission, not the derivative we stored); **superseded versions**; the
+extraction blobs, without which every provenance citation in the ledger points nowhere; the findings
+ledger; run history; the send log **with the PDFs that were actually sent**; slot states with their
+reasons and `resolved_by`; `package_slot_removals`, without which a shortened set is
+indistinguishable from a set that was always short; the upload ledger including failures **and the
+staged bytes of uploads that never became a version**; the retrieval log; the package and merchant
+rows; **the ruleset files as they were at run time**, without which the ledger is a list of opaque
+codes; and a plain README, which is report copy for D-001 purposes and describes rather than
+instructs.
+
+The sent PDFs matter for a specific reason. `document_report_sends` stores `pdf_sha256` and not the
+bytes, because the report is regenerable from the run. Regeneration requires the app, and after a
+purge it will not match anyway. Exporting the PDFs and recording that each hash matched **at export
+time** is the last moment that claim is checkable.
+
+### The export builder is the first code that reads a document body
+
+Nothing in this system has ever read `document_versions.storage_key` back out of storage. There is
+no signed-URL path for a document body — `evidence.ts` serves the crawl bucket, `pdfQueue` serves
+report PDFs, and the worker's only download is the staging object during ingest. Bodies have been
+write-only for four milestones.
+
+**D-035 is the precedent, and it is exact.** The seventh consecutive storage defect surfaced on the
+*first real use* of a write path that four milestones of testing had never exercised, and the lesson
+recorded then was that a path is proven by being used, not by being tested around. This is that
+path in the read direction, and it is standing as **the precondition for deletion** — the one place
+where "we thought it worked" is unrecoverable.
+
+So the export builder is verified by **reconciling the export against a database query**, not
+against itself, and that reconciliation happens before anything downstream trusts it. A manifest
+generated from the same traversal that wrote the archive will agree with the archive whether or not
+either is complete.
+
+### Verification is two facts and they are never merged
+
+The export goes to the operator's local drive, then to the vault by hand. Only the first hop is
+verifiable in-app.
+
+**Hop 1 is verified mechanically** by writing through a `FileSystemFileHandle` and reading the file
+back, checking **every member against the manifest's per-file hash** — not only the archive's own
+hash, because that proves the archive is intact and not that the manifest describes it. Fallback is
+a streamed re-upload, hashed and never persisted. A declared hash is recordable and **does not
+satisfy the precondition**; the method is stored, so a weak verification is visible rather than
+indistinguishable.
+
+**The manifest hash is not displayed before verification.** Showing it first is what would reduce a
+returned hash to a copy-paste. It is recorded at export time — that is the anchor — and displayed
+afterwards as a receipt.
+
+**Hop 2 is an attestation, in its own column, in its own words**, and no surface renders it as a
+verification. D-064 is the precedent: a send that reported success and wrote no row, because "the
+API returned 200" and "it went" were one fact. `send_requests.transmitted` exists because those had
+to be split, and this is the same split.
+
+### Every uploaded file exists in storage twice, and one copy is invisible
+
+The browser stages bytes at `{packageId}/staging/{uuid}`; the worker writes the content-addressed
+object at `{packageId}/{sha256}`. **Nothing ever removes the staging object.** A purge scoped to
+`document_versions.storage_key` would delete the copy the database knows about, leave the staging
+copy holding the same licence images, and report success — **liability reduced on paper and not in
+fact.**
+
+So staging copies and rendered report PDFs are in scope, and the purge **reconciles against a
+listing of the package's storage prefix** rather than trusting the columns. Anything it did not
+expect makes it **refuse**: an object we cannot account for means our model of what is stored is
+wrong, and deleting under a wrong model is the failure this whole design is arranged against.
+Reporting and continuing would delete correctly nine times and catastrophically once.
+
+### A purged package's report still renders, and that is the hazard
+
+`buildDocumentsReport` is a pure function of the stored run — slots, documents, findings and identity
+all snapshotted as jsonb, no body read. After a purge it regenerates **byte-identically, with no
+sign the bodies are gone.** There is no broken page to prevent; there is a perfect-looking page
+resting on nothing retrievable, which is D-097's sentence one level up.
+
+Purge state is therefore a **second input to the report**, resolved where the run record is loaded so
+the screen and the PDF cannot disagree (D-125), and shown **in the masthead** rather than only on
+document rows — a reader skimming should know before they read a finding.
+
+**D-085's byte-stability becomes conditional, and it is stated here rather than left to be
+discovered.** *Same run in, byte-identical report out* now holds only within a purge state. The same
+run renders differently before and after. That is correct — the document is making a true statement
+about retrievability at render time — and it means a regenerated PDF will not match the
+`pdf_sha256` in the send log. Any future *prove this is what we sent* check would report a false
+discrepancy against a purged package. The exported PDFs are where that proof moves.
+
+### No sixth lifecycle state
+
+Purge is orthogonal to lifecycle — an archived package is purged and is still archived — and
+`enforce_package_lifecycle` is a transition machine that should not be touched for something that is
+not a transition.
+
+### The three retention numbers, and a clock nothing started
+
+`retention_days` defaults to **30** (D-084) and is **read nowhere**. `create_document_package` wrote
+**365**, chosen while writing 0033 with no ruling behind it and never consulted by anything. This
+ruling adds **180 days from `retention_started_at`** for purge candidacy.
+
+Ruled: **access restricts at 30 — D-084's actual number, from which the 365 silently departed** —
+and purge eligibility at 180. The 365 is named here rather than quietly overwritten, because the
+useful fact is not the value but that a number entered the system without a ruling and nobody
+noticed for two milestones. The code is corrected to 30 in the same commit as this entry, since a
+ruling that reaches the decision file and not the code is unreviewable six months out (D-025).
+
+**And `retention_started_at` is set by nothing but a test.** `enforce_package_lifecycle` validates
+transitions and does not start the clock; the partial index over it indexes zero rows. Measured from
+that column, six months would never arrive. Starting the clock is therefore the prerequisite for
+this ruling rather than a detail of it, and it is what P0 builds.
+
+### D-097's restricted-access regime is unbuilt, and stays recorded as unbuilt
+
+`document_retrievals` has a table, a policy and an append-only trigger, and **nothing inserts a
+row**. No package has ever been archived. D-097 describes bodies that are not casually reachable and
+reaches that are recorded; neither exists in code.
+
+That is not fixed here. P0 starts the clock and nothing else, so this ruling does not imply a regime
+that is not there. Worth saying plainly what the combination means today: document bodies are
+**neither restricted nor purged**.
+
+D-097 has read as in force since M1 and now carries a marker saying otherwise. `docs/STATUS.md` did
+not misdescribe it — it did not mention retention at all, which is the failure D-044 named for
+Layer 3: *it was not blocked and not deferred; it was never written down*, and a gap that appears in
+no list is the one nobody argues about. It is listed now.
+
+### Out of scope, recorded as raised
+
+Crawl evidence (`evidence` — same append-only rule, same indefinite retention, same bodies) and the
+merchant credential store (`credentials`, `vault_entries`). The liability argument that motivates
+this ruling applies to both, and neither is addressed by it.
 
 ---
 

@@ -373,6 +373,28 @@ production's state wrongly, and the row now says what is actually there.
 | **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
 | **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0034` were all applied on 2026-08-24. `0034` was applied **before** the frontend deploy, deliberately: it drops the old function signatures, so migration-first breaks package creation for one Netlify build while frontend-first would have broken the package page entirely — the new `select` names columns that would not yet exist, and PostgREST rejects an unknown column. Break a write nobody uses, not every read. Of the applied set, `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
 
+### Retention exists as schema and as nothing else
+
+**D-097's restricted-access regime is unbuilt, and nothing here said so until D-130 went looking.**
+Not blocked, not deferred — absent from every list, which is exactly what D-044 caught on Layer 3.
+
+| | State |
+|---|---|
+| `packages.retention_started_at` | Set by the lifecycle trigger **as of `0035`**. Before that, by nothing but a test — so every policy measured from it never fired, and the schema looked identical to one that worked. |
+| `packages.retention_days` | Written on creation. **Read nowhere.** It has never had an effect, which is why `create_document_package` writing an unruled 365 against D-084's 30 went unnoticed for two milestones. Corrected to 30 in `0035` (D-130). |
+| `document_retrievals` | Table, policy and append-only trigger. **Nothing inserts a row.** |
+| Restricted access at archival | Not built. No package has ever been archived. |
+| Reading a document body | **No path exists.** Nothing in the app has ever served `document_versions.storage_key` — bodies have been write-only since M1. |
+
+So today document bodies are **neither restricted nor purged**. D-130 rules a purge at 180 days
+behind a verified export; `0035` starts the clock that makes 180 days arrive, and deliberately
+builds nothing else, so the ruling does not imply a regime that is not there.
+
+One consequence worth carrying into that build: the export builder will be **the first code in this
+system that reads a document body**, and it stands as the precondition for deletion. D-035 is the
+precedent — the seventh consecutive storage defect surfaced on first real use of a path four
+milestones of testing had never exercised.
+
 ### What D-129 left carried
 
 **Only entity type can be confirmed from a document.** The panel shows what the application says
