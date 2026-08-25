@@ -130,9 +130,17 @@ describe('an operator may ask for an export and may not answer for one', () => {
   it('and a done request has to point at something', async () => {
     const id = await queued(await seedPackage());
     await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
-    // A `done` row with no export is a request that claims success and cannot show for what.
+    /*
+      A `done` row with no export is a request that claims success and cannot show for what.
+
+      The download link is supplied so this isolates the constraint it names: without it
+      `finished_exports_are_fetchable` (0041) fires first, and the test would pass for the wrong
+      reason while saying it checked the other one.
+    */
     expect(await db.attempt(
-      `update public.document_export_requests set status = 'done' where id = $1`, [id],
+      `update public.document_export_requests
+          set status = 'done', download_url = 'https://example.test/a.tar' where id = $1`,
+      [id],
     )).toMatch(/finished_exports_have_an_export/);
   });
 });
@@ -191,9 +199,12 @@ describe('the staged copy is discardable and the record is not', () => {
     );
     await db.query(
       `update public.document_export_requests
-          set status = 'done', export_id = $2, storage_key = $3, bytes = 100, finished_at = now()
+          set status = 'done', export_id = $2, storage_key = $3, bytes = 100,
+              download_url = $4, download_expires_at = now() + interval '2 hours', finished_at = now()
         where id = $1`,
-      [id, row!.record_export_for_request, `exports/${id}.tar`],
+      // The link the worker mints (0041). A finished request with no way to fetch the archive is
+      // the defect that migration exists for, and the schema refuses one.
+      [id, row!.record_export_for_request, `exports/${id}.tar`, `https://example.test/${id}.tar`],
     );
     return id;
   }
@@ -249,5 +260,38 @@ describe('the staged copy is discardable and the record is not', () => {
     expect(await db.attempt(
       `update public.document_export_requests set discarded_at = now() where id = $1`, [id],
     )).toMatch(/discarded_exports_were_asked_to_be/);
+  });
+});
+
+describe('a finished export has somewhere to fetch it from', () => {
+  it('refuses a done request with no download link', async () => {
+    const id = await queued(await seedPackage());
+    await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
+    // What shipped: `done`, an archive staged, and an operator with no way to reach it. The row is
+    // the promise that a copy is available, so it has to be able to keep it.
+    expect(await db.attempt(
+      `update public.document_export_requests
+          set status = 'done', export_id = null, storage_key = $2 where id = $1`,
+      [id, `exports/${id}.tar`],
+    )).toMatch(/finished_exports_have_an_export|finished_exports_are_fetchable/);
+  });
+
+  it('allows a done request with no link once the copy is discarded', async () => {
+    const packageId = await seedPackage();
+    const id = await queued(packageId);
+    await db.query(`update public.document_export_requests set status = 'running' where id = $1`, [id]);
+    const [row] = await db.query<{ record_export_for_request: string }>(
+      `select public.record_export_for_request($1, $2, $3, 100, $4::jsonb) as record_export_for_request`,
+      [id, 'a'.repeat(64), 'b'.repeat(64), JSON.stringify(TRUE_COUNTS)],
+    );
+    // A discarded archive has no link and should not: there is nothing left to fetch, and the
+    // export record stays regardless.
+    expect(await db.attempt(
+      `update public.document_export_requests
+          set status = 'done', export_id = $2, storage_key = $3,
+              discard_requested_at = now(), discarded_at = now(), finished_at = now()
+        where id = $1`,
+      [id, row!.record_export_for_request, `exports/${id}.tar`],
+    )).toBeNull();
   });
 });
