@@ -18,7 +18,7 @@ and the received document verified against what the merchant actually did.
 | **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
 | **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
 | **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to production 2026-08-24, frontend deployed behind it, verified 13/13. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
-| **Retention** | **P0 through P5 built** (D-130). The clock starts, the gate refuses, the export reconciles against the database, verification checks every member, the purge is planned and refused before it is ever run, and a purged package's report says so in the masthead. Migrations `0035`–`0039`, all on production. **Nobody holds `purge_approver`, so no purge can be approved**, and the executor has never run outside a dry run. Seven items carried — see below. |
+| **Retention** | **P0 through P6 built** (D-130). The clock starts, the gate refuses, the export is queued and built and reconciled against the database, verification checks every member, the purge is planned and refused before it is ever run, and a purged package's report says so in the masthead. Migrations `0035`–`0041`, all on production; the panel is live. **Nobody holds `purge_approver`, so no purge can be approved**, and the executor has never run outside a dry run. |
 
 ### What "verified" means here, because it is not the usual thing
 
@@ -392,6 +392,7 @@ No append-only trigger was relaxed, and there is no `purged_at` on `document_ver
 | **P3** `0037` | Verification | Every member hashed against the manifest, not only the archive. Hop 1 is measured; hop 2 is an attestation in its own table, in its own words, and `approve_package_purge` does not read it. A declared hash records and does not open the gate. |
 | **P4** `0038` `0039` | The executor and the panel | Targets derived from the approval, never an argument. Reconciles against a **listing of the bucket**, and refuses on anything it cannot account for. Dry run first, and it stays. |
 | **P5** | Report rendering | A purged package's report says so in the masthead, with a count, a date and the export to look in. A pre-purge report is byte-identical to one built before the field existed. |
+| **P6** `0040` `0041` | The export queue and the wired controls | The panel could show exports and could not take one. An operator queues, the worker builds, the archive is fetched through a signed link and verified member by member on the operator's machine. Found by deployment: a module nothing imports is not built (D-131), and `authenticated` cannot download from the documents bucket. |
 
 **Three findings changed the design rather than being worked around.**
 
@@ -410,14 +411,38 @@ purge left a page that looked complete and rested on nothing retrievable — D-0
 resolves to nothing*, one level up. There was no broken page to prevent; there was a perfect-looking
 one.
 
+### A module nothing imports is not built
+
+`apps/web/src/lib/exportVerification.ts` was written, typechecked, unit-tested, reviewed and
+committed, and shipped in a bundle containing **none of it**. Nothing in the app imported it, so
+Vite removed it — a milestone reported as built, absent from production, green the whole way.
+
+The project's habit of breaking the code and watching a test go red cannot see this, because **the
+test suite is itself a caller**. Deleting the module turns its tests red; deleting the only path to
+it from the app turns nothing red, because there is no such path to delete.
+
+It also hid a second failure: `verifyExportArchive` was exported from the engine's Node entry and
+not its browser entry, so the bundler could not resolve it — and the build did not fail, because the
+importing module had already been tree-shaken away. One orphan concealed a broken package export.
+
+Two guards, D-131:
+
+- `apps/web/test/reachability.test.ts` walks the import graph from `main.tsx` and fails on any
+  unreachable source file. The allowlist is empty and belongs that way.
+- `apps/web/test/bundledControls.test.ts` builds the app and reads the output, checking every
+  control's copy and every RPC name is in the emitted JavaScript. It **builds rather than skipping**
+  when `dist` is absent — a test that skips passes in exactly the situation it exists to check.
+
 ### Retention — carried, not done
 
 | Carried | What it actually means |
 |---|---|
-| **The export and verification *actions* are not wired to the panel** | The panel displays exports, verifications, attestations and dry runs, and queues a dry run. It cannot **take** an export or **run** a verification: the export builder is worker-side with no queue, and `apps/web/src/lib/exportVerification.ts` is unreferenced — tree-shaken out of the deployed bundle. So the panel reads *"No export has been taken. Bodies cannot be purged until one has"* with no control that would take one. **This is the dead end the panel was meant to avoid**, and closing it is an export-request queue plus wiring the verification controls behind it. |
+| **The staged archive is a second full copy, and its removal is manual** | The worker stages the archive in the documents bucket so the browser can fetch it — one file holding every document body, inside the system the purge exists to remove them from. It is under `exports/` so the purge reconciliation never trips on it, and there is a **Discard the staged copy** control. Nothing removes it automatically, so an operator who downloads and walks away leaves it there until the signed link lapses and beyond. |
+| **The download link is a bearer credential with a two-hour life** | `authenticated` cannot read the documents bucket, so the worker mints a signed URL for one object and stores it on the request row. Narrower than the alternative — a select policy would give every analyst standing access to every document body, which is the inverse of D-097's unbuilt regime — and still a URL in a column that anyone who can read the row can use. Two hours is a judgement, not a measurement. |
+| **`finished_exports_are_fetchable` is `NOT VALID`** | It enforces every insert and update from `0041` onward and does not re-examine what came before. The test project holds rows from the run that found the defect — `done`, staged, and unreachable — and they are a true record of that state rather than something to rewrite. Production's table was empty when it was added, so nothing there is exempt in practice. |
 | **The partial-failure window is closed; recovery is resumption, not retry** | `begin_package_purge` names every object before any deletion, so a crash leaves a row saying what was going. It is **not automatic**: a new approval is taken and the plan reads the intent rows through `alreadyPurged`. Nothing retries on its own, and nothing should — an unattended retry of a deletion is the wrong thing to automate. |
 | **The send-job seam is a source-level guard** | That `documentsSendJob` passes retention into `buildDocumentsReport` is checked as *text*. Dropping the argument is observable only for a **purged** package, and producing one in a unit test means writing the purge machinery — so a behavioural test of that line would be a test of everything else. **The weakest thing in P5**, and a one-word deletion would leave every purged package's report claiming its documents are still held, in a PDF that goes to an underwriter. |
-| **`showSaveFilePicker` itself is unexercised** | Browser-only, and not drivable from a test. The logic above it is unit-tested against a fake whose disk contents differ from what was written — which is the assertion that matters, since hashing the in-memory buffer would pass every other test and prove nothing. The picker call itself has never run. |
+| **`showSaveFilePicker` itself is unexercised** | Browser-only, and not drivable from a test. The logic above it is unit-tested against a fake whose disk contents differ from what was written — the assertion that matters, since hashing the in-memory buffer would pass every other test and prove nothing. P6 put the call in the deployed bundle and a test now proves it is there; **nobody has clicked it**. The same is true of every control on the panel: they are in the bundle, their data paths resolve against production, and no signed-in operator has driven one. |
 | **Converted originals are unit-tested only** | No package in the test project has a `original_storage_key`, so the HEIC-arrives-JPEG-is-stored pair (D-104) has never been exported or reconciled against real bytes. The code paths exist and are covered by fakes. |
 | **D-097's restricted-access regime is still unbuilt** | `document_retrievals` has a table, a policy and an append-only trigger, and **has never had a row**. No package has ever been archived, and there is no path that serves a document body to anyone. So today bodies are **neither restricted nor purged** — P0 built the clock and deliberately nothing else, so this ruling does not imply a regime that is not there. |
 | **Nobody holds `purge_approver`** | The column defaults to `false` and no analyst has it, so `approve_package_purge` refuses everyone. This is the correct resting state and it stays until Frank names the moment. The executor has run only as a dry run, on scratch packages, and has never removed an object. |
