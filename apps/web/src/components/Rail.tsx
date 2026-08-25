@@ -12,7 +12,39 @@ import type { Ruleset } from '@mintro/ruleset';
 import { SignOutButton } from './SignIn.js';
 
 /** Panes the rail can reach. `reports` is the run library the dropdown used to stand in for. */
-export type Pane = 'scan' | 'docs' | 'reports';
+export type Pane = 'scan' | 'docs' | 'reports' | 'rules';
+
+/**
+ * The nav, as data.
+ *
+ * It was four near-identical button blocks, and **the destination lived inside a closure** — so
+ * `onPane('scan')` sitting under a label saying "Rule set" was invisible to a static render and to
+ * every test. That is exactly the state this nav was in: a dead link back to the scan pane, which
+ * reads as a bug in whatever the reader was doing rather than as an unfinished feature.
+ *
+ * As data the destination is assertable, and `data-pane` puts it in the markup where a test can see
+ * it without a DOM.
+ */
+export const NAV: readonly {
+  readonly label: string;
+  readonly items: readonly { readonly pane: Pane; readonly label: string; readonly icon: string }[];
+}[] = [
+  {
+    label: 'Screening',
+    items: [
+      { pane: 'scan', label: 'Site check', icon: '\u25CE' },
+      { pane: 'docs', label: 'Documents check', icon: '\u25A4' },
+    ],
+  },
+  {
+    label: 'Library',
+    items: [
+      // The run library (D-047), and the only way to reach an old report.
+      { pane: 'reports', label: 'Past reports', icon: '\u26C1' },
+      { pane: 'rules', label: 'Rule set', icon: '\u2699' },
+    ],
+  },
+];
 
 interface Props {
   readonly pane: Pane;
@@ -31,42 +63,23 @@ export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Elemen
         </div>
       </div>
 
-      <div>
-        <div className="nav-label">Screening</div>
-        <button
-          className="nav-item"
-          aria-current={pane === 'scan' ? 'true' : undefined}
-          onClick={() => onPane('scan')}
-        >
-          <span className="ic">◎</span>Site check
-        </button>
-        {/* Built and in production (M6). The SOON pill came off with D-129. */}
-        <button
-          className="nav-item"
-          aria-current={pane === 'docs' ? 'true' : undefined}
-          onClick={() => onPane('docs')}
-        >
-          <span className="ic">▤</span>Documents check
-        </button>
-      </div>
-
-      <div>
-        <div className="nav-label">Library</div>
-        {/* Was a dead link that returned to the scan pane. It is the run library now (D-047),
-            and the only way to reach an old report — the dropdown it duplicated is gone. */}
-        <button
-          className="nav-item"
-          aria-current={pane === 'reports' ? 'true' : undefined}
-          onClick={() => onPane('reports')}
-        >
-          <span className="ic">⛁</span>Past reports
-        </button>
-        {/* Still dead. Left as it was rather than wired to something that is not built —
-            a nav item that goes somewhere unfinished is worse than one that is honestly inert. */}
-        <button className="nav-item" onClick={() => onPane('scan')}>
-          <span className="ic">⚙</span>Rule set
-        </button>
-      </div>
+      {NAV.map((group) => (
+        <div key={group.label}>
+          <div className="nav-label">{group.label}</div>
+          {group.items.map((item) => (
+            <button
+              key={item.pane}
+              className="nav-item"
+              data-pane={item.pane}
+              aria-current={pane === item.pane ? 'true' : undefined}
+              onClick={() => onPane(item.pane)}
+            >
+              <span className="ic">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ))}
 
       {/* Who is signed in. An analyst reading a merchant's evidence should be able to see, at a
           glance, which account is doing so. */}

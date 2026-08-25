@@ -43,6 +43,7 @@ import { PastReports } from './components/PastReports.js';
 
 import type { Pane } from './components/Rail.js';
 import { DocumentsReportView, type DocumentsReportViewProps } from './components/DocumentsReportView';
+import { RuleSetPane } from './components/RuleSetPane';
 
 /**
  * `watching` is the scan the analyst just asked for, in flight. `running` is the much shorter
@@ -597,6 +598,14 @@ function Screener({
           looked exactly like a current one. Opening a run here switches to the pane the report
           renders in; nothing is pre-selected, so nothing can go stale.
         */}
+        {/*
+          What each screening checks. Reference rather than a control surface — nothing on it acts,
+          and it renders from the rule files so it cannot describe checks the system does not run.
+        */}
+        <section className={`pane ${pane === 'rules' ? 'on' : ''}`}>
+          {pane === 'rules' && <RuleSetPane ruleset={ruleset.value} />}
+        </section>
+
         <section className={`pane ${pane === 'reports' ? 'on' : ''}`}>
           {pane === 'reports' && (
             <PastReports

@@ -13,7 +13,9 @@
 
 import checks from '../../../../rules/documents.checks.json';
 import templates from '../../../../rules/documents.templates.json';
-import { parseDocumentsRules, loadSlotTemplate, type SlotTemplate } from '@mintro/ruleset';
+import {
+  parseDocumentsRules, loadSlotTemplate, type DocumentsRules, type SlotTemplate,
+} from '@mintro/ruleset';
 
 let cached: SlotTemplate | null = null;
 
@@ -21,4 +23,18 @@ let cached: SlotTemplate | null = null;
 export function browserSlotTemplate(): SlotTemplate {
   cached ??= loadSlotTemplate(parseDocumentsRules(checks, templates));
   return cached;
+}
+
+/**
+ * The parsed rule files themselves.
+ *
+ * The rule set page renders the checks rather than restating them, so it needs the checks and not
+ * only the slot template. Same parse, cached the same way — a second parse would be a second
+ * opinion about what the file contains.
+ */
+let cachedRules: DocumentsRules | null = null;
+
+export function browserDocumentsRules(): DocumentsRules {
+  cachedRules ??= parseDocumentsRules(checks, templates);
+  return cachedRules;
 }
