@@ -57,15 +57,46 @@ describe('migrations', () => {
   });
 
   it('revokes direct write access from anon and authenticated on every table', () => {
-    // Writes are the worker's, through service_role. A browser that could insert a finding could
-    // fabricate evidence, and a policy that merely omits INSERT is easier to add back by accident
-    // than an explicit REVOKE is to remove.
+    /*
+      Writes are the worker's, through service_role. A browser that could insert a finding could
+      fabricate evidence, and a policy that merely omits INSERT is easier to add back by accident
+      than an explicit REVOKE is to remove.
+
+      **This asserts which privileges, from which role**, and used to assert only that the word
+      `revoke` appeared somewhere near the table name — which `revoke insert on public.x from anon`
+      satisfies while leaving `authenticated` able to UPDATE. That gap matters more than it looks,
+      because it is the one shape in this system where a write fails *silently*:
+
+      | | What the client sees |
+      |---|---|
+      | Grant revoked | `42501 permission denied`. Loud, and supabase-js puts it in `error`. |
+      | Grant present, no RLS policy for that command | `204`, zero rows, `error` null. Indistinguishable from success. |
+
+      Supabase's bootstrap grants `authenticated` everything on `public`, so a table is safe only
+      because a `revoke` line was written. The schema tier cannot see this — PGlite has no such
+      bootstrap, so `authenticated` starts with nothing there and every table looks safe whether or
+      not anyone revoked. The text is the only place the invariant is visible.
+
+      Audited against production 2026-08-24: seven privileges held, all INSERT, all with a matching
+      policy. No UPDATE or DELETE on any table.
+    */
     const problems: string[] = [];
 
     for (const { file, sql } of files) {
       for (const table of tablesCreatedIn(sql)) {
-        const revoked = new RegExp(`revoke[\\s\\S]{0,80}on\\s+public\\.${table}\\s+from`, 'i').test(sql);
-        if (!revoked) problems.push(`${file}: public.${table} does not revoke writes`);
+        const taken = new Set<string>();
+        for (const m of sql.matchAll(/revoke\s+([\s\S]*?)\s+on\s+public\.(\w+)\s+from\s+([^;]*);/gi)) {
+          if (m[2] !== table || !/\bauthenticated\b/i.test(m[3]!)) continue;
+          for (const priv of m[1]!.split(',')) taken.add(priv.trim().toLowerCase());
+        }
+        const revoked = taken.has('all') || (taken.has('update') && taken.has('delete'));
+        if (!revoked) {
+          problems.push(
+            `${file}: public.${table} leaves authenticated able to write ` +
+              `[revoked: ${[...taken].sort().join(', ') || 'nothing'}] — it inherits Supabase's ` +
+              'default grant, so an update against it returns 204 with zero rows and no error',
+          );
+        }
       }
     }
 
@@ -125,6 +156,36 @@ describe('migrations', () => {
  * a frontend that builds cleanly and then reports "Not connected" at runtime — which reads as a
  * broken deployment rather than a missing file.
  */
+/*
+  And no browser update or delete goes through PostgREST.
+
+  A write that must happen from the browser goes through a `security definer` function, which is
+  where the authority check lives and where the affected row count is answerable (0033, 0034). The
+  upload page called `.from('slots').update(...)` from M1 until D-129 and it never once worked.
+*/
+describe('browser writes go through an RPC', () => {
+  it('has no browser update or delete left going through PostgREST', () => {
+    const web = 'apps/web/src';
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name)) {
+          const src = readFileSync(full, 'utf8');
+          for (const m of src.matchAll(/\.from\((['"`])(\w+)\1\)[\s\S]{0,120}?\.(update|delete|upsert)\(/g)) {
+            offenders.push(`${full}: ${m[2]} .${m[3]}()`);
+          }
+        }
+      }
+    };
+    walk(web);
+    // A write that must happen from the browser goes through a `security definer` function, which
+    // is where the authority check lives and where the row-count is answerable (0033, 0034).
+    expect(offenders, `use an RPC instead:\n  ${offenders.join('\n  ')}`).toEqual([]);
+  });
+});
+
 describe('apps/web/.env.example', () => {
   const env = readFileSync('apps/web/.env.example', 'utf8');
 

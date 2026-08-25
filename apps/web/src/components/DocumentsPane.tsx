@@ -174,9 +174,16 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
     Setting a slot state.
 
     Through `set_slot_state` (0034), not a PostgREST update. `update` on `slots` is revoked from
-    `authenticated` and always has been, so the direct call this replaces silently affected nothing
-    — it returns success with zero rows matched, which is what a revoked update looks like from the
-    client. No operator has ever managed to mark a slot not-provided.
+    `authenticated` and always has been, so the direct call this replaces could never affect a row.
+    No operator has ever managed to mark a slot not-provided.
+
+    **It failed loudly, not silently.** A revoked grant raises `42501 permission denied for table
+    slots`, supabase-js puts that in `error`, and the code below already surfaced it. Worth stating
+    because the opposite was assumed and is the more dangerous shape: a revoked *grant* raises,
+    while a *present* grant whose RLS policy filters the row returns 204 with zero rows and no
+    error. Nothing in this schema is in the second shape — `authenticated` holds no UPDATE or
+    DELETE grant on any table, verified against production — so there is no silent write path
+    here. The bug was a visible error nobody had exercised, which is a different problem.
 
     The function also records `resolved_by`. Every state change from this page is `'operator'` by
     construction: a person clicked it. `'fact'` belongs to `set_package_facts` alone.

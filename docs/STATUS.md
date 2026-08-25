@@ -17,7 +17,7 @@ and the received document verified against what the merchant actually did.
 | **Merchant commentary** | Built and verified (D-063). One forwardable link per report, self-declared identity, per-comment attribution, five distinguishable commentary states. |
 | **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
 | **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
-| **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to the test project, **not yet to production**. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
+| **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to production 2026-08-24, frontend deployed behind it, verified 13/13. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
 
 ### What "verified" means here, because it is not the usual thing
 
@@ -371,7 +371,7 @@ production's state wrongly, and the row now says what is actually there.
 | **A-05's `fail` branch is unreachable** | D-117 | Extraction can read a signature *date* and cannot locate a signature *block*, so every input reaches `signature_block_not_located`. The check stays declared `fail / pass` because the ruleset describes what a check is, not what extraction currently supports. Closing it needs signature-block location in `packages/extraction`. |
 | **C-20, D-05, D-06** | §6 | **Deferred by design**, and the engine filters to `v1` before any handler sees them. C-20 (owner residential address) because people move and an ID is stale often enough to be noise; D-05 and D-06 because nobody has agreed to ship them. |
 | **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
-| **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0033` were applied on 2026-08-24; **`0034` has not been, and the deployed frontend still calls the pre-`0034` function signatures**, so this is a migration and a deploy that go together. Of the applied set, `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
+| **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0034` were all applied on 2026-08-24. `0034` was applied **before** the frontend deploy, deliberately: it drops the old function signatures, so migration-first breaks package creation for one Netlify build while frontend-first would have broken the package page entirely — the new `select` names columns that would not yet exist, and PostgREST rejects an unknown column. Break a write nobody uses, not every read. Of the applied set, `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
 
 ### What D-129 left carried
 
@@ -395,6 +395,38 @@ and no predicate reads it, so it is null on every package. It is kept rather tha
 the template's `predicate_inputs` still admits it and a future conditional could use it — and
 because B-05 now reports only on the answers a set's conditionals actually turn on, a permanently
 null column costs nothing. If it is still empty in six months, that is the argument for dropping it.
+
+### A revoked grant is loud; the silent shape is a grant that was never revoked
+
+Stated because the first account of the `set_slot_state` defect got it backwards, and the wrong
+version is the one that would have sent somebody looking in the wrong place.
+
+The upload page called PostgREST `update` on `slots` from M1 until D-129. It never worked. But
+`update` was **revoked** from `authenticated`, and a revoked grant raises `42501 permission denied
+for table slots` — an error supabase-js returns and the page already displayed. The defect was a
+visible failure on a path nobody had walked, not a write that vanished.
+
+The genuinely silent shape is the other one:
+
+| | What the client sees |
+|---|---|
+| **Grant revoked** | `42501 permission denied` in `error`. Loud. |
+| **Grant present, no RLS policy for that command** | `204 No Content`, zero rows matched, `error` is null. **Indistinguishable from success.** |
+
+The second is reachable in Supabase because its bootstrap grants `authenticated` everything on
+`public` by default — so a table is in the dangerous shape unless a migration explicitly revokes.
+
+**Audited against production, and nothing is in that shape.** `authenticated` holds seven
+privileges in total, all `INSERT`, all with a matching policy: `comment_invites`,
+`credential_deposits`, `document_send_requests`, `document_uploads`, `pdf_requests`,
+`scan_requests`, `send_requests`. **No `UPDATE` or `DELETE` grant on any table.** Every browser
+write is one of those seven inserts, and an insert is never silent either — an RLS violation on
+insert raises rather than filtering.
+
+The thing to keep checking is not the code but the migrations: **a new table with no explicit
+`revoke` inherits the default grant**, and the first `.update()` written against it would be the
+first silent write this system has had. The `revoke` line belongs in the same migration as the
+`create table`, which is where every existing one is.
 
 ### The default set has not been validated against what a processor actually asks for
 
