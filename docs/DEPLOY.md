@@ -120,14 +120,23 @@ recorded, so a link generated for `localhost` is useless on a machine in a demo.
 
 **Authentication → URL Configuration**:
 
-- **Site URL**: the Netlify URL from step 2 — `https://<your-site>.netlify.app`
+- **Site URL**: the origin the app is actually served from. For this project that is
+  `https://screener.gomintro.com`; on a fresh deployment it is the Netlify URL from step 2.
 - **Redirect URLs**: add all of these, one per line:
 
-      https://<your-site>.netlify.app/**
-      https://deploy-preview-*--<your-site>.netlify.app/**
+      https://screener.gomintro.com/**
+      https://mintro-screener.netlify.app/**
+      https://deploy-preview-*--mintro-screener.netlify.app/**
       http://localhost:5173/**
 
-The middle one keeps pull-request previews working; the last keeps local development working.
+The second is kept rather than replaced: the `.netlify.app` host still serves the app and still
+works, and removing it would break an in-flight magic link and anybody's bookmark. The third keeps
+pull-request previews working; the last keeps local development working.
+
+**Only the Site URL affects sign-in today.** `signInWithOtp` is called without an `emailRedirectTo`,
+so a magic link goes wherever the Site URL points — the allow-list is consulted only for an explicit
+redirect, which nothing passes. Password sign-in involves no redirect at all and works from any
+origin the app is served from.
 Come back and do this after step 2, when the Netlify URL exists. Magic link is kept as a
 secondary route, so this still matters — but nothing in a demo depends on it.
 
@@ -382,7 +391,7 @@ makes the send log the only record of what went out and when.
 
 ### Secrets and settings this needs on Fly
 
-    fly secrets set       WEB_ORIGIN="https://mintro-screener.netlify.app"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       --app mintro-screener-worker
+    fly secrets set       WEB_ORIGIN="https://screener.gomintro.com"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       --app mintro-screener-worker
 
 `WEB_ORIGIN` has **no default**. Everything else here does, because a wrong guess costs a retry; a
 wrong guess in `WEB_ORIGIN` puts a dead link in a merchant's inbox under Mintro's name, carrying the

@@ -291,7 +291,7 @@ describe('internal vocabulary stays internal', () => {
 describe('the merchant invitation', () => {
   const invitation = composeInvitation({
     merchantDomain: 'shop.example',
-    link: 'https://mintro-screener.netlify.app/comment/TOKEN',
+    link: 'https://screener.gomintro.com/comment/TOKEN',
     expiresAt: new Date('2026-09-22T00:00:00.000Z'),
     openForComment: 50,
     nothingObserved: 12,
