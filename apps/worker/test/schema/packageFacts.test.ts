@@ -301,3 +301,49 @@ describe('the operator DBA', () => {
     expect(columns.map((c) => c.column_name)).not.toContain('dba');
   });
 });
+
+describe("the worker's own slot write still satisfies the new constraint", () => {
+  /*
+    `ingestStore.setSlotState` updates `{ state, reason }` and never touches `resolved_by`, so 0034
+    could have made ingest fail on any slot carrying a reason. It does not, and the reason is worth
+    pinning rather than re-deriving: the worker passes back the reason it just read, so the pair on
+    the row stays whatever it already was.
+
+    `resolveSlotState` is what makes that safe. It returns `not_provided` and `waived` unchanged —
+    reason and all — and every other branch is only reachable from a state whose reason was already
+    null. The worker therefore never introduces, changes or clears a reason.
+
+    This is a guard against somebody making it do so later. `service_role` bypasses RLS and does not
+    bypass a CHECK, so the failure would be a broken ingest job in production rather than a test.
+  */
+  async function slotWithReason(): Promise<string> {
+    const packageId = await newPackage();
+    const [slot] = await db.query<{ id: string }>(
+      `select id from public.slots where package_id = $1 and slot_key = 'ein_letter'`,
+      [packageId],
+    );
+    await db.query(`select public.set_slot_state($1, 'not_provided', 'merchant_declines', 'operator')`, [slot!.id]);
+    return slot!.id;
+  }
+
+  it('writing back the same reason is accepted', async () => {
+    const slotId = await slotWithReason();
+    // The exact shape of the worker's update: state and reason, resolved_by untouched.
+    const error = await db.attempt(
+      `update public.slots set state = 'not_provided', reason = 'merchant_declines', updated_at = now() where id = $1`,
+      [slotId],
+    );
+    expect(error).toBeNull();
+  });
+
+  it('and clearing the reason without clearing the author is refused', async () => {
+    const slotId = await slotWithReason();
+    const error = await db.attempt(
+      `update public.slots set state = 'satisfied', reason = null, updated_at = now() where id = $1`,
+      [slotId],
+    );
+    // The narrow race: an operator clears the reason between the worker's read and its write. It
+    // fails loudly and the ingest job reports it, which is the survivable direction.
+    expect(error).toMatch(/resolved_by_present_exactly_when_a_reason_is/);
+  });
+});
