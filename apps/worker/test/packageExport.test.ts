@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { buildPackageExport, ExportError, type ExportPorts, type ExportRows } from '../src/export/packageExport.js';
 import { reconcileExport, type ExpectedContents } from '../src/export/reconcile.js';
-import { readTar, writeTar, TarError } from '../src/export/tar.js';
+import { readTar, writeTar, TarError } from '@mintro/engine';
 
 const bytes = (s: string): Uint8Array => new TextEncoder().encode(s);
 const hash = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex');

@@ -22,6 +22,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { loadDocumentsRules } from '@mintro/ruleset';
@@ -30,6 +31,9 @@ import { reconcileExport } from '../../apps/worker/dist/src/export/reconcile.js'
 import { readTar } from '../../apps/worker/dist/src/export/tar.js';
 import { DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/store/ingestStore.js';
 import { packageDigest } from '../../apps/worker/dist/src/documentsReportGate.js';
+import { createSentReportRenderer } from '../../apps/worker/dist/src/export/sentReports.js';
+import { startReportServer } from '../../apps/worker/dist/src/reportServer.js';
+import { verifyExportArchive, sha256Hex } from '@mintro/engine';
 import { ensureAnalyst, analystClient } from './setup.mjs';
 import { banner, assertTestProject } from './guard.mjs';
 
@@ -114,6 +118,41 @@ const rows = {
     retrievals: await one('document_retrievals', '*'),
   },
 };
+
+/** The same row read, for any package — so the sent-package case is not a second assembly. */
+const one2 = async (table, columns, id, key = 'package_id') => {
+  const { data, error } = await service.from(table).select(columns).eq(key, id);
+  if (error) throw new Error(`${table}: ${error.message}`);
+  return data ?? [];
+};
+
+async function rowsFor(id) {
+  const [row] = await one2('packages', '*', id, 'id');
+  const { data: m } = await service.from('merchants').select('*').eq('id', row.merchant_id).single();
+  const sl = await one2('slots', '*', id);
+  const vs = await one2('document_versions', '*', id);
+  const us = await one2('document_uploads', '*', id);
+  const rs = await one2('document_runs', '*', id);
+  const { data: fs } = await service.from('document_findings').select('*')
+    .in('run_id', rs.length ? rs.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000']);
+  const sn = await one2('document_report_sends', '*', id);
+  return {
+    packageId: id,
+    merchantName: m.legal_name ?? m.domain,
+    versions: vs,
+    uploads: us,
+    sends: [],
+    rulesetDeclared: [...new Set(rs.map((r) => r.ruleset_version))],
+    tables: {
+      packages: [row], merchants: [m], slots: sl,
+      slot_removals: await one2('package_slot_removals', '*', id),
+      documents: await one2('documents', '*', id),
+      document_versions: vs, document_uploads: us, document_runs: rs,
+      document_findings: fs ?? [], report_sends: sn,
+      retrievals: await one2('document_retrievals', '*', id),
+    },
+  };
+}
 
 const rulesetFiles = () => ({
   version: loadDocumentsRules().templates.version,
@@ -265,14 +304,109 @@ try {
 check('an unreadable body stops the export rather than being skipped', refused,
   'a gap here becomes a purge that deletes the only copy');
 
-// ── what this run did not exercise ────────────────────────────────────────────────────────────
-console.log('\nnot exercised by this run:');
-console.log('  report PDFs — re-rendering needs a browser and the report route, and the piece of');
-console.log('                documentsSendJob that builds the report record is not exported. The port is');
-console.log('                defined and unit-tested; wiring it is P3 work. Until then the database');
-console.log('                refuses any export of a package that has ever been sent, which is the');
-console.log('                correct failure and is asserted above.');
-console.log(`  originals   — this package has ${versions.filter((v) => v.original_storage_key).length} converted file(s).`);
+// ── 5 — the case the database used to refuse: a package that has been sent ────────────────────
+if (sentPackageId) {
+  const server = await startReportServer({ webRoot: 'apps/web/dist', mounts: {} });
+  const browser = await chromium.launch();
+  try {
+    const sentRows = { ...(await rowsFor(sentPackageId)) };
+    sentRows.sends = (await one2('document_report_sends', '*', sentPackageId)).map((r) => ({
+      id: r.id, pdf_sha256: r.pdf_sha256,
+    }));
+
+    const withRenderer = {
+      readObject,
+      rulesetFiles,
+      renderSentReport: createSentReportRenderer({
+        client: service, browser, origin: server.origin, packageId: sentPackageId,
+      }),
+    };
+
+    const sentExport = await buildPackageExport(sentRows, withRenderer, new Date().toISOString());
+    check('a package that has been sent now exports, PDFs and all', true,
+      `${sentExport.entries.length} entries, ${sentRows.sends.length} report PDF(s)`);
+
+    const sentMembers = readTar(sentExport.archive);
+    check('every send has its report PDF in the archive',
+      sentRows.sends.every((snd) => sentMembers.some((m) => m.path === `reports/${snd.id}.pdf`)),
+      sentRows.sends.map((snd) => `reports/${snd.id}.pdf`).join(', '));
+
+    check('and the re-rendered PDF is a PDF',
+      sentMembers.filter((m) => m.path.startsWith('reports/'))
+        .every((m) => new TextDecoder().decode(m.bytes.slice(0, 5)) === '%PDF-'),
+      'magic bytes');
+
+    // D-130 asks for this to be recorded at export time — the last moment it is checkable at all.
+    console.log(`         re-render hash ${sentExport.reportHashMismatches.length === 0 ? 'matches the send log' : `differs for ${sentExport.reportHashMismatches.length} send(s)`}`);
+
+    const { data: sentExportId, error: sentError } = await asAnalyst.rpc('record_package_export', {
+      p_package_id: sentPackageId,
+      p_package_digest: 'c'.repeat(64),
+      p_manifest_sha256: sentExport.manifestSha256,
+      p_bytes: sentExport.archive.length,
+      p_counts: sentExport.counts,
+    });
+    check('record_package_export now accepts it, because nothing is missing', !sentError && Boolean(sentExportId),
+      sentError ? sentError.message : `export ${String(sentExportId).slice(0, 8)}…`);
+
+    // ── 6 — hop 1, over the real archive ──────────────────────────────────────────────────────
+    const verified = await verifyExportArchive(sentExport.archive, sentExport.manifestSha256);
+    check('the archive verifies member by member', verified.ok,
+      verified.ok ? `${verified.membersChecked} members hashed against the manifest` : verified.problems.join('; '));
+
+    const truncated = await verifyExportArchive(
+      sentExport.archive.slice(0, Math.floor((sentExport.archive.length - 1024) / 512) * 512),
+      sentExport.manifestSha256,
+    );
+    check('and refuses the same archive truncated on a block boundary', !truncated.ok,
+      truncated.problems[0]?.slice(0, 90) ?? 'ACCEPTED — a truncated archive verified');
+
+    const { data: outcome, error: vErr } = await asAnalyst.rpc('record_export_verification', {
+      p_export_id: sentExportId, p_method: 'read_back',
+      p_observed_sha256: verified.manifestSha256, p_members_checked: verified.membersChecked,
+    });
+    check('the verification records as matched', !vErr && outcome === 'matched',
+      vErr ? vErr.message : String(outcome));
+
+    // ── 7 — declared records and does not open the gate ───────────────────────────────────────
+    const { data: dOut } = await asAnalyst.rpc('record_export_verification', {
+      p_export_id: sentExportId, p_method: 'declared',
+      p_observed_sha256: sentExport.manifestSha256, p_members_checked: 0,
+    });
+    check('a declared hash records as matched', dOut === 'matched', String(dOut));
+
+    const { error: overstated } = await asAnalyst.rpc('record_export_verification', {
+      p_export_id: sentExportId, p_method: 'declared',
+      p_observed_sha256: sentExport.manifestSha256, p_members_checked: 9,
+    });
+    check('and cannot claim to have examined anything',
+      /a_declared_hash_checks_nothing/.test(overstated?.message ?? ''),
+      overstated ? overstated.message.slice(0, 90) : 'ACCEPTED — a declared hash claimed 9 members');
+
+    // ── 8 — hop 2 is its own fact ─────────────────────────────────────────────────────────────
+    const { error: aErr } = await asAnalyst.rpc('record_vault_attestation', {
+      p_export_id: sentExportId,
+      p_destination: 'Mintro vault (m7 live run — no file was actually moved)',
+      p_statement: 'Recorded by scripts/live/m7-export-live.mjs to exercise the attestation path.',
+    });
+    check('an attestation records against the export', !aErr, aErr ? aErr.message : 'recorded');
+
+    const { error: approvalError } = await asAnalyst.rpc('approve_package_purge', {
+      p_package_id: sentPackageId, p_export_id: sentExportId, p_package_digest: 'c'.repeat(64),
+    });
+    check('and approval still refuses, because nobody holds purge_approver',
+      /only a purge approver/.test(approvalError?.message ?? ''),
+      approvalError ? approvalError.message.slice(0, 90) : 'APPROVED — the gate is open');
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}
+
+console.log(`\nnot exercised by this run:`);
+console.log(`  originals   — the packages here have ${versions.filter((v) => v.original_storage_key).length} converted file(s).`);
+console.log('  the file picker — showSaveFilePicker is browser-only; the logic above it is unit-tested');
+console.log('                    against a fake whose disk contents differ from what was written.');
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

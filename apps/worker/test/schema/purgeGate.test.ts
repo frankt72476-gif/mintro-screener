@@ -88,8 +88,9 @@ const recordExport = (packageId: string, counts: object = TRUE_COUNTS, digest = 
 
 const verify = (exportId: string, method = 'read_back', observed = HASH(9)) =>
   db.query<{ record_export_verification: string }>(
-    `select public.record_export_verification($1, $2, $3, 12) as record_export_verification`,
-    [exportId, method, observed],
+    // Zero for `declared`, because nothing was examined and the schema refuses any other claim.
+    `select public.record_export_verification($1, $2, $3, $4) as record_export_verification`,
+    [exportId, method, observed, method === 'declared' ? 0 : 12],
   );
 
 /** Export, verify, approve — the happy path, as a setup step for tests about what comes after. */
@@ -464,5 +465,121 @@ describe('every row in the gate is append-only', () => {
       expect(await db.attempt(`delete from public.${table} where true`), `${table} delete`)
         .toMatch(/append-only|not permitted/);
     }
+  });
+});
+
+describe('hop 2 is an attestation, and the gate does not consult it', () => {
+  it('records who said what, and where they say they put it', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    const error = await db.attempt(
+      `select public.record_vault_attestation($1, $2, $3)`,
+      [ex!.record_package_export, 'Mintro vault, offline drive 2', 'Copied and confirmed it opens.'],
+    );
+    expect(error).toBeNull();
+
+    const [row] = await db.query<{ destination: string; statement: string; attested_by: string }>(
+      `select destination, statement, attested_by from public.package_vault_attestations where export_id = $1`,
+      [ex!.record_package_export],
+    );
+    expect(row?.destination).toBe('Mintro vault, offline drive 2');
+    expect(row?.attested_by).toBe(analyst);
+  });
+
+  /*
+    The separation, asserted rather than trusted to naming.
+
+    An attestation is a person saying they moved a file. D-064 is the precedent for why it can never
+    stand in for a check: a send returned 200, wrote no row, and one report reached a real recipient
+    with nothing behind it, because "the mailer accepted it" and "it was transmitted" were one
+    field. Here the two facts are two tables, and this is the test that says the gate reads only one.
+  */
+  it('does not let an attestation stand in for a verification', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    await db.query(
+      `select public.record_vault_attestation($1, 'the vault', 'It is in the vault.')`,
+      [ex!.record_package_export],
+    );
+
+    await db.actAs(approver);
+    const error = await db.attempt(
+      `select public.approve_package_purge($1, $2, $3)`,
+      [packageId, ex!.record_package_export, DIGEST(1)],
+    );
+    expect(error).toMatch(/no verified copy/);
+    await db.actAs(analyst);
+  });
+
+  it('is append-only like everything else in the gate', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    await db.query(`select public.record_vault_attestation($1, 'v', 's')`, [ex!.record_package_export]);
+    expect(await db.attempt(`update public.package_vault_attestations set destination = 'elsewhere'`))
+      .toMatch(/append-only|not permitted/);
+    expect(await db.attempt(`delete from public.package_vault_attestations where true`))
+      .toMatch(/append-only|not permitted/);
+  });
+});
+
+describe('a declared hash is recorded and does not open the gate', () => {
+  it('writes a row that says exactly what happened', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    // The manifest hash typed back correctly. The database compares two strings and says `matched`,
+    // which is true and is not the same as anybody having looked at an archive.
+    const [v] = await verify(ex!.record_package_export, 'declared', HASH(9));
+    expect(v?.record_export_verification).toBe('matched');
+
+    const [row] = await db.query<{ method: string; outcome: string; members_checked: number }>(
+      `select method, outcome, members_checked from public.package_export_verifications where export_id = $1`,
+      [ex!.record_package_export],
+    );
+    expect(row).toEqual({ method: 'declared', outcome: 'matched', members_checked: 0 });
+  });
+
+  it('and the approval still refuses, even though the row says matched', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    await verify(ex!.record_package_export, 'declared', HASH(9));
+    await db.actAs(approver);
+    const error = await db.attempt(
+      `select public.approve_package_purge($1, $2, $3)`,
+      [packageId, ex!.record_package_export, DIGEST(1)],
+    );
+    // This is the concrete meaning of "it must not be a checkbox". The weakest method exists so the
+    // record is honest about what an operator did, and it does not authorise a deletion.
+    expect(error).toMatch(/a declared hash is not one/);
+    await db.actAs(analyst);
+  });
+
+  it('and a strong verification on the same export does open it', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    await verify(ex!.record_package_export, 'declared', HASH(9));
+    await verify(ex!.record_package_export, 'read_back', HASH(9));
+    await db.actAs(approver);
+    // Both rows stand. The declared one is not deleted or overridden — it is a record of something
+    // that happened, and the gate simply reads the other one.
+    const error = await db.attempt(
+      `select public.approve_package_purge($1, $2, $3)`,
+      [packageId, ex!.record_package_export, DIGEST(1)],
+    );
+    expect(error).toBeNull();
+    await db.actAs(analyst);
+  });
+});
+
+describe('the record cannot overstate what was checked', () => {
+  it('refuses a declared verification claiming it examined members', async () => {
+    const packageId = await seedPackage();
+    const [ex] = await recordExport(packageId);
+    const error = await db.attempt(
+      `select public.record_export_verification($1, 'declared', $2, 12)`,
+      [ex!.record_package_export, HASH(9)],
+    );
+    // Otherwise the weakest method can present itself as the most thorough one, in the same column
+    // a reader would use to tell them apart.
+    expect(error).toMatch(/a_declared_hash_checks_nothing/);
   });
 });

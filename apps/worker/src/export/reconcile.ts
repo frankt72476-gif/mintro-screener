@@ -26,7 +26,7 @@
  * presence only, and the report says so rather than implying otherwise.
  */
 
-import { readTar } from './tar.js';
+import { readTar } from '@mintro/engine';
 import { sha256 } from './manifest.js';
 
 /** What the database says should be in the archive. Read fresh, not carried from the export. */

@@ -265,3 +265,18 @@ export {
 // Documents Check engine (M3). Separate namespace: the two engines share no code, and a
 // caller should have to say which one it wants.
 export * as documents from './documents/index.js';
+
+/*
+  Export archives (D-130).
+
+  Here rather than in the worker because **both halves need them**: the worker writes the archive
+  and the browser verifies it, and a second tar reader for the frontend would be a second opinion
+  about what the archive says.
+*/
+export { readTar, writeTar, TarError, type TarEntry } from './export/tar.js';
+export {
+  verifyExportArchive,
+  sha256Hex,
+  type ManifestMember,
+  type VerificationResult,
+} from './export/verify.js';

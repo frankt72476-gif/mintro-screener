@@ -18,6 +18,7 @@ import { createDocumentRunStore } from './store/documentRunStore.js';
 import { renderDocumentsReportPdf } from './documentsPdf.js';
 import { documentsMailerFor, sendDocumentsReport } from './documentsSend.js';
 import { assertRunIsCurrent, packageDigest, StaleRunError, type DigestInput } from './documentsReportGate.js';
+import { loadRunRecord, toRunRecord, RUN_RECORD_COLUMNS, type RunRow } from './documentsRunRecord.js';
 
 export interface ClaimedSend {
   readonly id: string;
@@ -151,7 +152,7 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
   try {
     const { data: row } = await client
       .from('document_runs')
-      .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents, package_digest, merchant_name, merchant_domain')
+      .select(RUN_RECORD_COLUMNS)
       .eq('id', request.runId)
       .single();
     if (row === null) {
@@ -183,67 +184,26 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       throw error;
     }
 
-    const findings = await store.findingsOf(request.runId);
     const previousRuns = await store.runsOf(request.packageId);
     const sends = await store.sendsOf(request.packageId);
     const lastSentRunId = sends.length === 0 ? null : sends[sends.length - 1]!.run_id;
 
-    const record = {
-      id: String(row['id']),
-      packageId: String(row['package_id']),
-      // Off the run, not off the merchant row: a rename after the run must not change its masthead.
-      identity: {
-        merchantName: String(row['merchant_name'] ?? ''),
-        merchantDomain: String(row['merchant_domain'] ?? ''),
-        dba: null,
-      },
-      runAt: String(row['run_at']),
-      rulesetVersion: String(row['ruleset_version']),
-      engineVersion: String(row['engine_version']),
-      slots: (row['slots'] as never) ?? [],
-      documents: (row['documents'] as never) ?? [],
-      findings: findings.map((f) => ({
-        checkId: f.check_id,
-        state: f.state as never,
-        notEvaluableReason: f.not_evaluable_reason,
-        note: f.note,
-        subjectKind: f.subject_kind as never,
-        slotId: f.slot_id,
-        documentVersionId: f.document_version_id,
-        tier: f.tier as never,
-        readVersionIds: f.read_versions ?? [],
-        evidence: f.evidence ?? [],
-        evidenceNote: f.evidence_note,
-        ordinal: f.ordinal,
-      })),
-    };
+    // One derivation, shared with the export builder (D-125). The row is already in hand from the
+    // staleness check above, so only the findings are read here.
+    const record = toRunRecord(row as unknown as RunRow, (await store.findingsOf(request.runId)) as never);
 
     // The diff is against the last run that was *sent*, not merely the previous run: D-083 answers
     // "what changed since the recipient last saw this", and a run nobody was shown is no baseline.
+    /*
+      The baseline, read as its own run rather than assembled from this one.
+
+      It used to be `{ ...record, id, runAt, slots, documents, findings }`, which carried the
+      current run's identity and versions under the previous run's id. Nothing rendered them, so it
+      was invisible — and it was a record describing one run while labelled another.
+    */
     let previous;
     if (lastSentRunId !== null && lastSentRunId !== request.runId) {
-      const { data: prior } = await client
-        .from('document_runs')
-        .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents, merchant_name, merchant_domain')
-        .eq('id', lastSentRunId)
-        .maybeSingle();
-      if (prior !== null) {
-        const priorFindings = await store.findingsOf(lastSentRunId);
-        previous = {
-          ...record,
-          id: String(prior['id']),
-          runAt: String(prior['run_at']),
-          slots: (prior['slots'] as never) ?? [],
-          documents: (prior['documents'] as never) ?? [],
-          findings: priorFindings.map((f) => ({
-            checkId: f.check_id, state: f.state as never, notEvaluableReason: f.not_evaluable_reason,
-            note: f.note, subjectKind: f.subject_kind as never, slotId: f.slot_id,
-            documentVersionId: f.document_version_id, tier: f.tier as never,
-            readVersionIds: f.read_versions ?? [], evidence: f.evidence ?? [],
-            evidenceNote: f.evidence_note, ordinal: f.ordinal,
-          })),
-        };
-      }
+      previous = (await loadRunRecord(client, store, lastSentRunId))?.record;
     }
 
     const report = documents.buildDocumentsReport(record, rules, previous);

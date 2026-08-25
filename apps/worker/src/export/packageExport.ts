@@ -25,7 +25,7 @@
 
 import { buildManifest, buildReadme, canonicalJson, sha256 } from './manifest.js';
 import type { ManifestCounts, ManifestEntry } from './manifest.js';
-import { writeTar, type TarEntry } from './tar.js';
+import { writeTar, type TarEntry } from '@mintro/engine';
 
 /** A stored version, as the export needs it. */
 export interface VersionRow {
