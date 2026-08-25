@@ -5703,6 +5703,9 @@ documented where they are relied upon.
 ## D-104 — HEIC is converted at ingest, not refused
 **2026-08-24 · Frank's ruling**
 
+**Implementation deferred indefinitely by D-127 — see below.** The ruling stands; the conversion
+path stays behind its port, and `unsupported` with a reason is the shipping behaviour.
+
 HEIC is converted to JPEG at ingest on the Fly worker, and **the original is retained under
 constraint 3**. `packages/extraction` stays format-pure and never receives HEIC. **M1 scope.**
 
@@ -6878,6 +6881,59 @@ another. That is precisely what D-125 refuses: a display of a decision must come
 
 So the masthead shows a DBA only where the report data carries one, and today it carries none. An
 absent line is honest; a line assembled from a second reading of the same document is not.
+
+---
+
+## D-127 — HEIC is deferred indefinitely, not pending
+**2026-08-24 · Frank's ruling · closes D-104's implementation**
+
+The conversion path built at M1 stays behind its port, unwired and unverified. D-104's ruling is
+not overturned; its implementation is closed as **deferred** rather than left open.
+
+### Why the premise changed
+
+D-104 rested on a factual claim: HEIC is the iPhone camera default, photographed IDs and voided
+checks are the most-photographed types in the catalog, so a refusal at upload is the ordinary path
+rather than an edge case.
+
+**In practice Mintro rarely if ever receives HEIC.** Merchants send documents through channels that
+re-encode — which is the same fact that produced two false samples during verification: sharing a
+photograph to most apps hands over a JPEG, and both files that arrived for testing began `ffd8ffe0`
+with no `ftyp` box anywhere in them. The mechanism that keeps HEIC out of our inbox is the
+mechanism that kept it out of our test fixtures.
+
+An argument built on frequency does not survive the frequency being wrong.
+
+### Why deferred rather than finished
+
+The remaining work is small and the temptation is to close it out. That is the thing to resist: the
+only way to finish it now is to verify against a file we manufactured, and a conversion path proven
+against a synthetic sample is proven against our idea of the format rather than against what a
+merchant's phone produces. It would carry the appearance of verification and none of the substance
+— worse than an unwired path, because an unwired path is honest about what it is.
+
+So the code stays where it is, behind a port nothing supplies, and the fixture generator stays with
+it. Nothing is deleted; the work is not lost, it is parked.
+
+### The behaviour that ships is D-104's own interim answer
+
+A HEIC upload resolves to `unsupported` with a reason naming the format. D-104 called that
+"correct and not the end state" — this ruling says it is the end state for now, and it is a good
+one: recorded, visible on the upload page, chaseable under D-092. An operator sees the file was
+received and not read, and can ask for a resend in another format.
+
+That is a working path, not a gap. The merchant is asked once for something trivial, rather than a
+decoder being maintained for a case that does not arrive.
+
+### What reopening requires
+
+Two things, and the second is the one that has already failed twice:
+
+1. **Evidence merchants are actually sending HEIC** — a real upload, not an assumption about what
+   phones default to.
+2. **A file whose bytes begin with `ftyp`.** Not a photograph someone shared to a chat app, which
+   re-encodes to JPEG on the way. Checking the leading bytes before testing anything against them is
+   the rule that stopped the last two from passing for the wrong reason.
 
 ---
 
