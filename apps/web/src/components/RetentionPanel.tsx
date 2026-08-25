@@ -25,6 +25,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { ExportControls } from './ExportControls';
+import { createExportRequests, type ExportRequestRecord } from '../lib/exportRequests';
 import {
   createRetention,
   isVerifiedForPurge,
@@ -133,10 +135,13 @@ function Plan({ record }: { readonly record: PurgePlanRecord }): JSX.Element {
 
 export function RetentionPanel({ client, analystId, packageId }: RetentionPanelProps): JSX.Element {
   const [view, setView] = useState<RetentionView | null>(null);
+  const [requestRecords, setRequestRecords] = useState<readonly ExportRequestRecord[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const retention = createRetention(client);
+
+  const requests = createExportRequests(client);
 
   const refresh = useCallback(async () => {
     const result = await createRetention(client).load(packageId);
@@ -146,14 +151,18 @@ export function RetentionPanel({ client, analystId, packageId }: RetentionPanelP
     }
     setProblem(null);
     setView(result);
+    // Read together, because the export request and the export it produced are two halves of one
+    // row on screen: a queued request has no anchor yet, and an anchor with no request is history.
+    setRequestRecords(await createExportRequests(client).list(packageId).catch(() => []));
   }, [client, packageId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // A queued plan is a worker job; the page watches a row, the same as an upload does.
-  const pending = (view?.plans ?? []).some((p) => p.status === 'queued' || p.status === 'running');
+  // A queued plan or export is a worker job; the page watches a row, the same as an upload does.
+  const working = (r: { status: string }): boolean => r.status === 'queued' || r.status === 'running';
+  const pending = (view?.plans ?? []).some(working) || requestRecords.some(working);
   useEffect(() => {
     if (!pending) return undefined;
     const timer = setInterval(() => void refresh(), 2000);
@@ -197,8 +206,18 @@ export function RetentionPanel({ client, analystId, packageId }: RetentionPanelP
         </p>
       )}
 
+      <ExportControls
+        client={client}
+        analystId={analystId}
+        packageId={packageId}
+        requests={requests}
+        requestRecords={requestRecords}
+        exports={view.exports}
+        onChanged={() => void refresh()}
+      />
+
       <div className="rt-block">
-        <h4>Exports</h4>
+        <h4>Exports on record</h4>
         {view.exports.length === 0 ? (
           <p className="rt-none">No export has been taken. Bodies cannot be purged until one has.</p>
         ) : (

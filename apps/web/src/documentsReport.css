@@ -488,3 +488,14 @@ table {width:100%;border-collapse:collapse}
   /* Never dropped from the printed copy: the PDF is the artifact that outlives the app. */
   .documents-report .masthead .purged{break-inside:avoid}
 }
+
+/* The export controls (D-130, P6). */
+.rt-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.rt-actions .btn{padding:4px 10px;font-size:12px}
+.rt-form{
+  margin-top:8px;padding:8px 10px;border:1px solid var(--rule-2);background:var(--paper);
+  display:flex;flex-direction:column;gap:6px;max-width:52ch;
+}
+.rt-form .rt-why{margin:0}
+.rt-outcome-line{margin:10px 0 0;font-size:12.5px;color:var(--ink-2)}
+.rt-request .rt-hash{word-break:break-all}

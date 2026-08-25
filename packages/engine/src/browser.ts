@@ -91,3 +91,23 @@ export type { GateContext, PageContext, PageLink, PageRegion, StyledText } from 
  * function you could reach rather than in which key you hold.
  */
 export { seal, unseal, isSealedEnvelope, type SealedEnvelope } from './sealed.js';
+
+/*
+  Export archives (D-130).
+
+  Safe in this entry for the same reason `sealed.ts` is: `tar.ts` is bytes and `TextDecoder`, and
+  `verify.ts` hashes through `crypto.subtle`. Neither touches a Node built-in.
+
+  **They belong here as well as in the Node entry, and finding that out cost a milestone.** The
+  bundler resolves this file; `tsc` resolves `index.ts`. So `exportVerification.ts` typechecked
+  against an export that the browser build could not see — and it did not fail, because nothing
+  imported it and the module was tree-shaken away before the resolver ever looked. The build broke
+  the moment a component imported it, which is the first time anything asked the real question.
+*/
+export { readTar, writeTar, TarError, type TarEntry } from './export/tar.js';
+export {
+  verifyExportArchive,
+  sha256Hex,
+  type ManifestMember,
+  type VerificationResult,
+} from './export/verify.js';

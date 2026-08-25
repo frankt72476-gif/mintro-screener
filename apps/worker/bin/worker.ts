@@ -49,6 +49,9 @@ import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
 import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
+import {
+  claimNextExport, claimNextExportDiscard, runExport, runExportDiscard,
+} from '../src/exportJob.js';
 import { DOCUMENTS_BUCKET } from '../src/store/ingestStore.js';
 import {
   claimNextSend as claimNextDocumentsSend,
@@ -247,6 +250,40 @@ async function main(argv: readonly string[]): Promise<number> {
             origin: WEB_ORIGIN,
           });
         }
+        continue;
+      }
+
+      /*
+        Exports. Needs the browser, because every sent report is re-rendered into the archive
+        (D-130) — `document_report_sends` keeps the PDF's hash and never its bytes.
+
+        Ahead of the dry run because an operator asking for an export is waiting on a download,
+        and a dry run is a diagnostic nobody is holding a tab open for.
+      */
+      const exportRequest = await claimNextExport(supabase.client);
+      if (exportRequest !== null) {
+        if (WEB_ORIGIN === undefined) {
+          await supabase.client
+            .from('document_export_requests')
+            .update({
+              status: 'failed',
+              error: 'WEB_ORIGIN is not set on this worker, so the sent reports could not be re-rendered',
+              finished_at: new Date().toISOString(),
+            })
+            .eq('id', exportRequest.id);
+        } else {
+          await runExport(exportRequest, {
+            client: supabase.client, browser, origin: WEB_ORIGIN, bucket: DOCUMENTS_BUCKET,
+          });
+        }
+        continue;
+      }
+
+      // Discarding a staged archive an operator has finished with. Our own artifact, minutes old —
+      // not a purge, and nothing in D-097 or D-130 covers it.
+      const discard = await claimNextExportDiscard(supabase.client);
+      if (discard !== null) {
+        await runExportDiscard(discard, { client: supabase.client, bucket: DOCUMENTS_BUCKET });
         continue;
       }
 

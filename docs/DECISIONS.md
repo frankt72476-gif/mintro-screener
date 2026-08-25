@@ -7341,6 +7341,60 @@ this ruling applies to both, and neither is addressed by it.
 
 ---
 
+## D-131 — A module nothing imports is not built
+**2026-08-25 · found in deployment · guards added in P6**
+
+`apps/web/src/lib/exportVerification.ts` was written, typechecked, unit-tested, reviewed and
+committed. It shipped in a bundle that contained **none of it**. Nothing in the app imported it, so
+Vite removed it, and the deployed page had no verification flow at all.
+
+Every check was green. `tsc` compiles an unimported file. Its tests import it directly, so they
+proved the module worked and said nothing about whether anything reached it. The milestone was
+reported as built and was absent from production.
+
+### Why the usual defences all miss this one
+
+The project's habit is to break the code and watch a test go red. That habit cannot see this,
+because **the test suite is itself a caller**. Deleting the module turns its tests red; deleting the
+*only path to it from the app* turns nothing red, because there was no such path to delete.
+
+It is the D-035 shape in a new place: a path proven by being tested around rather than by being
+used. There, the first real use of a write path surfaced the seventh consecutive storage defect;
+here, the first real use was a deploy nobody could see the inside of.
+
+### And it hid a second failure behind itself
+
+`packages/engine` has two entry points: `index.ts` for Node and `browser.ts` for the bundler.
+`verifyExportArchive` was exported from the first and not the second, so the browser build could not
+resolve it — and **the build did not fail**, because the module that imported it had already been
+tree-shaken away. The error appeared the instant a component imported it, which was the first time
+anything asked the real question.
+
+One orphan concealed a broken export from a package entry. Neither was visible while the file was
+unreachable.
+
+### Two guards, because one layer is not enough
+
+**`apps/web/test/reachability.test.ts`** walks the import graph from `main.tsx` — static imports,
+re-exports and dynamic imports, the three edges a bundler follows — and fails on any source file
+under `src/` it cannot reach. It asserts the property that actually failed rather than a proxy for
+it, and the allowlist is empty. **A file that genuinely belongs outside the app graph belongs
+outside `src/`.**
+
+**`apps/web/test/bundledControls.test.ts`** builds the app and reads the output, checking that each
+control's copy and each RPC name is in the emitted JavaScript. It catches the symptom one layer
+further out, and it is what would have caught the entry-point mismatch as well.
+
+It **builds rather than skipping when `dist` is absent.** A test that skips passes in exactly the
+situation it exists to check, which is the same defect wearing a different hat.
+
+### The rule
+
+**A module nothing imports is not built.** Not "is untested", not "is dead code to tidy later" — it
+does not exist in the artifact, and every other signal will say it does.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 
