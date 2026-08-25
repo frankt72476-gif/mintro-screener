@@ -115,7 +115,7 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
 
   return (
     <div className="veil on" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="New document package">
+      <div className="modal modal-wide new-package" role="dialog" aria-modal="true" aria-label="New document package">
         <div className="modal-head">
           <h2>New document package</h2>
         </div>
@@ -209,18 +209,44 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
                 const on = isIncluded(slot.slotKey, slot.prechecked);
                 return (
                   <li key={slot.slotKey} data-origin={slot.origin} data-included={on}>
-                    <label>
+                    {/*
+                      Three grid areas: the box, the name, the metadata.
+
+                      Origin and count are facts *about* the row, not part of the document's name —
+                      so they live in their own element and their own column. As inline siblings of
+                      the name they concatenated: "Voided Checkrequired×1".
+
+                      The `{' '}` between them is deliberate and is not formatting. A grid separates
+                      the boxes visually and changes nothing about `textContent`, so without it the
+                      row still reads "Voided Checkrequired×1" to a screen reader and to anyone who
+                      copies it. The gap handles the eye; the space handles everything else.
+                    */}
+                    <label className="np-row">
                       <input
                         type="checkbox"
+                        className="np-box"
                         checked={on}
                         disabled={busy}
                         onChange={(e) => setIncluded((p) => ({ ...p, [slot.slotKey]: e.target.checked }))}
                       />
-                      <span className="np-title">{slot.title}</span>
-                      <span className="np-origin">{slot.origin}</span>
-                      {slot.requiredCount === null ? null : <span className="np-count">×{slot.requiredCount}</span>}
+                      <span className="np-name">{slot.title}</span>{' '}
+                      <span className="np-meta">
+                        <span className="np-origin" data-origin={slot.origin}>
+                          {slot.origin}
+                        </span>{' '}
+                        {slot.requiredCount === null ? (
+                          <span className="np-count np-count-unknown" title="derived from the application">
+                            ?
+                          </span>
+                        ) : (
+                          <span className="np-count">×{slot.requiredCount}</span>
+                        )}
+                      </span>
                     </label>
+
+                    {/* Attached to the row it explains, in the name's column — not a loose paragraph. */}
                     {slot.because === null ? null : <p className="np-because">{slot.because}</p>}
+
                     {on && slot.allowsInstances && (
                       <input
                         className="input np-label"
@@ -243,7 +269,7 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
                 <ul>
                   {composed.impossible.map((slot) => (
                     <li key={slot.slotKey} data-slot={slot.slotKey}>
-                      <span className="np-title">{slot.title}</span>
+                      <span className="np-name">{slot.title}</span>{' '}
                       <span className="np-because">{slot.because}</span>
                     </li>
                   ))}

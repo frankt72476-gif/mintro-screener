@@ -1,0 +1,147 @@
+/**
+ * The New Package modal.
+ *
+ * The defect these were written for: the modal referenced `.np-*` classes and `.modal-wide`, none
+ * of which existed in any stylesheet. Every row rendered as unstyled inline spans and the name ran
+ * straight into its metadata — `Pre App / Existing Apprequired×1` — which shipped to production
+ * because **no test looked at what a row renders as, and none looked at whether a class had a
+ * rule.** Both gaps are closed here.
+ *
+ * A static render cannot lay out a page, so "is it visually separated" is checked in two halves
+ * that together mean it: the name and its metadata are separate elements, and the row that holds
+ * them is a grid. Neither half alone is enough — separate elements still concatenate when they are
+ * inline, which is exactly what happened.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
+import { NewPackage } from '../src/components/NewPackage.js';
+import type { PackageCreation } from '../src/lib/packageCreation.js';
+
+const creation: PackageCreation = {
+  merchants: async () => [],
+  ensureMerchant: async () => 'merchant-1',
+  create: async () => 'package-1',
+};
+
+const html = (): string =>
+  renderToStaticMarkup(
+    createElement(NewPackage, { creation, onCreated: () => undefined, onCancel: () => undefined }),
+  );
+
+const CSS = readFileSync('apps/web/src/documentsReport.css', 'utf8');
+
+/** Text as a browser concatenates it: tags removed, nothing inserted. */
+const visibleText = (markup: string): string =>
+  markup.replace(/<[^>]+>/g, '').replace(/&times;/g, '×').replace(/&#x27;/g, "'");
+
+/** Every rule the markup asks for must exist, or it renders unstyled. */
+function classesIn(markup: string): string[] {
+  const found = new Set<string>();
+  for (const m of markup.matchAll(/class="([^"]+)"/g)) {
+    for (const c of m[1]!.split(/\s+/)) if (c.startsWith('np-') || c === 'modal-wide') found.add(c);
+  }
+  return [...found].sort();
+}
+
+describe('a document name never runs into its metadata', () => {
+  /**
+   * The exact strings from the production screenshot. If the row concatenates again, these appear
+   * again — this asserts against the symptom as reported, not against a proxy for it.
+   */
+  it('does not render the reported concatenations', () => {
+    const text = visibleText(html());
+    for (const bad of [
+      'Pre App / Existing Apprequired',
+      'Voided Checkrequired',
+      'W-9conditional',
+      'DBA / fictitious name filingadded',
+    ]) {
+      expect(text, `rendered "${bad}"`).not.toContain(bad);
+    }
+  });
+
+  /** The general form, so a slot added later is covered without anyone editing the list above. */
+  it('no row puts an origin word immediately after a letter', () => {
+    const text = visibleText(html());
+    const runOns = ['required', 'conditional', 'added']
+      .flatMap((origin) => [...text.matchAll(new RegExp(`[A-Za-z0-9)](${origin})\\b`, 'g'))].map((m) => m[0]));
+    expect(runOns, `concatenated: ${runOns.join(', ')}`).toEqual([]);
+  });
+
+  it('puts the name and the metadata in separate elements', () => {
+    const markup = html();
+    const rows = [...markup.matchAll(/<label class="np-row">([\s\S]*?)<\/label>/g)];
+    expect(rows.length).toBeGreaterThan(10);
+    for (const [, body] of rows) {
+      expect(body).toContain('class="np-name"');
+      expect(body).toContain('class="np-meta"');
+    }
+  });
+
+  /**
+   * The half a static render cannot see. Separate elements still concatenate when they are inline;
+   * the grid on `.np-row` is what actually separates them, so the rule has to exist.
+   */
+  it('lays the row out as a grid, so the separation is real and not assumed', () => {
+    const rule = /\.np-row\s*\{[^}]*\}/.exec(CSS)?.[0] ?? '';
+    expect(rule, '.np-row has no rule at all').not.toBe('');
+    expect(rule).toMatch(/display:\s*(grid|flex)/);
+    expect(rule).toMatch(/gap:/);
+  });
+});
+
+describe('every class the modal asks for has a rule', () => {
+  /**
+   * The root cause, generalised. The component named twelve classes and the stylesheets defined
+   * none of them; nothing failed, it simply rendered as unstyled text.
+   */
+  it('defines each np- class and modal-wide', () => {
+    const app = readFileSync('apps/web/src/styles.css', 'utf8');
+    const stylesheets = `${CSS}\n${app}`;
+    const missing = classesIn(html()).filter((c) => !stylesheets.includes(`.${c}`));
+    expect(missing, `no rule for: ${missing.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('the modal fits the viewport', () => {
+  it('scrolls its body instead of overflowing', () => {
+    const wide = /\.modal\.modal-wide\s*\{[^}]*\}/.exec(CSS)?.[0] ?? '';
+    // The reported symptom was the top cropped: a veil centring an over-tall box clips both edges.
+    expect(wide).toMatch(/max-height:/);
+    expect(wide).toMatch(/flex-direction:\s*column/);
+    expect(CSS).toMatch(/\.modal\.modal-wide \.modal-body\s*\{[^}]*overflow-y:\s*auto/);
+  });
+});
+
+describe('the conditional explanation belongs to its row', () => {
+  it('sits inside the list item it explains, after the row', () => {
+    const markup = html();
+    const items = [...markup.matchAll(/<li data-origin="conditional"[\s\S]*?<\/li>/g)];
+    expect(items.length).toBeGreaterThan(0);
+    for (const [item] of items) {
+      expect(item).toContain('class="np-because"');
+      expect(item.indexOf('np-because')).toBeGreaterThan(item.indexOf('np-row'));
+    }
+  });
+
+  it('is indented under the name rather than floating at the margin', () => {
+    const rule = /\.np-because\s*\{[^}]*\}/.exec(CSS)?.[0] ?? '';
+    expect(rule).not.toBe('');
+    expect(rule).toMatch(/padding-left:/);
+  });
+});
+
+describe('it reads as the same product as the report', () => {
+  it('uses the report type pairing, not the app default', () => {
+    expect(/\.new-package\s*\{[^}]*\}/.exec(CSS)?.[0] ?? '').toMatch(/IBM Plex Sans/);
+    expect(/\.np-origin\s*\{[^}]*\}/.exec(CSS)?.[0] ?? '').toMatch(/IBM Plex Mono/);
+  });
+
+  /** Dashed for conditional, as page-tier evidence is dashed in the report. One convention. */
+  it('marks a conditional origin the way the report marks a weaker claim', () => {
+    expect(CSS).toMatch(/\.np-origin\[data-origin="conditional"\]\s*\{[^}]*border-style:\s*dashed/);
+  });
+});

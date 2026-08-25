@@ -201,3 +201,23 @@ describe('origin survives for all three kinds', () => {
     expect(slots.find((s) => s.slot_key === 'owner_photo_id')?.required_count).toBeNull();
   });
 });
+
+describe('the explanations are copy an operator reads', () => {
+  /** `entityType.replace(/_/g, ' ')` gave "a llc files formation documents". */
+  it('gets the article and the casing right for every entity type', () => {
+    const seen = (['sole_proprietor', 'partnership', 'llc', 'corporation', 'non_profit', 'government'] as const)
+      .map((entityType) => composeSet(facts({ entityType }), TEMPLATE))
+      .flatMap((set) => [...set.offered, ...set.impossible])
+      .map((s) => s.because)
+      .filter((b): b is string => b !== null);
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const line of seen) {
+      expect(line, line).not.toMatch(/\ba (llc|LLC)\b/);
+      expect(line, line).not.toMatch(/\b(llc|non_profit|sole_proprietor)\b/);
+      // No general article rule: "a US-domiciled entity" is correct, because "US" is said
+      // "you-ess" — a consonant sound. A letter-based check flags right copy as wrong, which is
+      // why the article lives in ENTITY_PHRASE rather than being derived.
+    }
+  });
+});

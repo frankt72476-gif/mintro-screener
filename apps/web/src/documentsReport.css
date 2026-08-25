@@ -239,3 +239,102 @@ table {width:100%;border-collapse:collapse}
   border:1px solid #CFCFC6;color:#6B6F76;padding:1px 5px;flex:none}
 .sh-flag.sh-bad{color:#A81F16;border-color:#A81F16}
 .send-history-empty{margin:0;font-size:12.5px;color:#787D85}
+
+/* =================================================================================================
+ * The New Package modal.
+ *
+ * It shipped with markup referencing `.np-*` classes and `.modal-wide`, none of which existed —
+ * so every row rendered as unstyled inline spans and the name ran straight into its metadata:
+ * "Voided Checkrequired×1". The layout defects had the same cause.
+ *
+ * Styled in the report's language rather than the app's, because an operator composing a set and
+ * an underwriter reading the result are looking at the same document catalogue. Same IBM Plex
+ * pairing, same neutral palette, same chip treatment for metadata. The modal chrome — veil,
+ * buttons, inputs — stays the app's.
+ * ============================================================================================== */
+
+/* Wider than the app's 440px default: three sections and twenty rows do not fit a send dialog. */
+.modal.modal-wide{
+  max-width:720px;
+  /* The modal is a column so the body can scroll inside it. Without this the veil centres an
+     over-tall box and crops it at BOTH edges — the reported symptom was the top cut off. */
+  display:flex;flex-direction:column;max-height:calc(100vh - 40px);
+}
+.modal.modal-wide .modal-head,
+.modal.modal-wide .modal-foot{flex:none}
+.modal.modal-wide .modal-body{overflow-y:auto;min-height:0}
+
+.new-package{font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink)}
+.new-package .modal-head h2{font-family:"IBM Plex Sans",system-ui,sans-serif;letter-spacing:-.01em}
+
+.np-step{padding:0 0 20px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+.np-step:last-of-type{border-bottom:0;padding-bottom:0;margin-bottom:0}
+.np-step h3{
+  margin:0 0 10px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.np-why{margin:-4px 0 12px;font-size:13px;color:var(--ink-2);max-width:64ch}
+
+.np-new-merchant{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
+.np-answers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.np-answers label{
+  display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:500;color:var(--ink-2);
+}
+
+/* ---------- the slot rows ---------- */
+.np-slots{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.np-slots > li{padding:9px 0;border-bottom:1px solid var(--rule)}
+.np-slots > li[data-included="false"] .np-name{color:var(--ink-3)}
+
+/*
+  Three columns, so the name and its metadata are separate boxes rather than adjacent inline text.
+  This grid is what stops the concatenation; the gap is not decoration.
+*/
+.np-row{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0 12px;
+  cursor:pointer;
+}
+.np-box{margin:0;accent-color:var(--pass)}
+.np-name{font-size:14px;font-weight:500;min-width:0}
+.np-meta{display:flex;align-items:center;gap:8px;flex:none}
+
+.np-origin{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.08em;
+  text-transform:uppercase;padding:2px 6px;border:1px solid var(--rule-2);color:var(--ink-3);
+}
+/* A conditional is dashed, as page-tier evidence is in the report: it is here because of an
+   answer, not because the set always asks. Same convention, so the two documents read alike. */
+.np-origin[data-origin="conditional"]{border-style:dashed}
+.np-origin[data-origin="added"]{color:var(--ink-2);border-color:var(--ink-3)}
+
+.np-count{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);
+  min-width:26px;text-align:right;
+}
+/* Owner Photo ID derives its count from the application, so there is no number to show (D-107). */
+.np-count-unknown{color:var(--ink-3)}
+
+/* Attached to the row above it, aligned under the name rather than floating between items. */
+.np-because{
+  margin:3px 0 0;padding-left:28px;font-size:12px;color:var(--ink-3);max-width:70ch;
+}
+.np-label{margin:8px 0 2px 28px;width:calc(100% - 28px)}
+
+/* ---------- not applicable ---------- */
+.np-impossible{margin-top:16px;border:1px solid var(--rule-2);padding:12px 14px;background:var(--paper)}
+.np-impossible h4{
+  margin:0 0 8px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+}
+.np-impossible ul{list-style:none;margin:0;padding:0}
+.np-impossible li{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:14px;
+  padding:4px 0;font-size:12.5px;
+}
+.np-impossible .np-name{color:var(--ink-3);font-weight:500;text-decoration:line-through}
+.np-impossible .np-because{margin:0;padding:0;color:var(--ink-3)}
+
+@media (max-width:720px){
+  .np-answers,.np-new-merchant{grid-template-columns:1fr}
+  .np-impossible li{grid-template-columns:1fr;gap:2px}
+}

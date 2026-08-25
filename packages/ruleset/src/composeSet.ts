@@ -55,12 +55,28 @@ export interface ComposedSet {
   readonly impossible: readonly { readonly slotKey: string; readonly title: string; readonly because: string }[];
 }
 
+/**
+ * How an entity type reads in a sentence.
+ *
+ * `entityType.replace(/_/g, ' ')` produced "a llc files formation documents" — wrong article, wrong
+ * case, in copy an operator reads on every package. The article is part of the label because "a"
+ * and "an" depend on how the abbreviation is *said*, not on its first letter.
+ */
+const ENTITY_PHRASE: Readonly<Record<PackageFacts['entityType'], string>> = {
+  sole_proprietor: 'a sole proprietorship',
+  partnership: 'a partnership',
+  llc: 'an LLC',
+  corporation: 'a corporation',
+  non_profit: 'a non-profit',
+  government: 'a government entity',
+};
+
 /** How a conditional reads when it fires, and when it does not. */
 function explain(slotKey: string, facts: PackageFacts, fires: boolean): string {
   switch (slotKey) {
     case 'articles_of_incorporation':
       return fires
-        ? `a ${facts.entityType.replace(/_/g, ' ')} files formation documents`
+        ? `${ENTITY_PHRASE[facts.entityType]} files formation documents`
         : 'a sole proprietorship files no formation documents';
     case 'w9':
       return fires ? 'a US-domiciled entity files a W-9' : 'a non-US entity files a W-8BEN, not a W-9';
