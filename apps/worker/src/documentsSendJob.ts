@@ -107,6 +107,12 @@ export interface Identity {
   readonly processor: string;
 }
 
+/**
+ * Since D-126 the send path takes the merchant name off the **run**, not from here. This remains
+ * the place a name is resolved when one is being *captured* — at persist time — and it supplies the
+ * processor, which is a property of the package rather than of the run.
+ */
+
 export async function identityOf(client: SupabaseClient, packageId: string): Promise<Identity> {
   const { data } = await client
     .from('packages')
@@ -145,7 +151,7 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
   try {
     const { data: row } = await client
       .from('document_runs')
-      .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents, package_digest')
+      .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents, package_digest, merchant_name, merchant_domain')
       .eq('id', request.runId)
       .single();
     if (row === null) {
@@ -185,6 +191,12 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
     const record = {
       id: String(row['id']),
       packageId: String(row['package_id']),
+      // Off the run, not off the merchant row: a rename after the run must not change its masthead.
+      identity: {
+        merchantName: String(row['merchant_name'] ?? ''),
+        merchantDomain: String(row['merchant_domain'] ?? ''),
+        dba: null,
+      },
       runAt: String(row['run_at']),
       rulesetVersion: String(row['ruleset_version']),
       engineVersion: String(row['engine_version']),
@@ -212,7 +224,7 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
     if (lastSentRunId !== null && lastSentRunId !== request.runId) {
       const { data: prior } = await client
         .from('document_runs')
-        .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents')
+        .select('id, package_id, run_at, ruleset_version, engine_version, slots, documents, merchant_name, merchant_domain')
         .eq('id', lastSentRunId)
         .maybeSingle();
       if (prior !== null) {
@@ -241,8 +253,6 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       origin: deps.origin,
       inject: {
         report,
-        merchantName: identity.merchantName,
-        dba: identity.dba,
         packageRef: request.packageId.slice(0, 8),
         processor: identity.processor,
         reportNumber: `${sentBefore.length + 1} of ${sentBefore.length + 1}`,
@@ -257,7 +267,8 @@ export async function runSend(request: ClaimedSend, deps: RunSendDeps): Promise<
       from: 'reports@gomintro.com',
       sentByAnalystId: request.requestedBy,
       diffAgainstRunId: previous?.id ?? null,
-      merchantName: identity.merchantName,
+      // The same name the masthead carries, off the run — not a second live read.
+      merchantName: record.identity.merchantName,
     });
 
     const { data: recorded } = await client

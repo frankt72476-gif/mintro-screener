@@ -24,6 +24,7 @@ import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/
 import { createDocumentRunStore } from '../../apps/worker/dist/src/store/documentRunStore.js';
 import { snapshotOf } from './snapshot.mjs';
 import { packageDigest } from '../../apps/worker/dist/src/documentsReportGate.js';
+import { identityOf } from '../../apps/worker/dist/src/documentsSendJob.js';
 import { banner, assertTestProject } from './guard.mjs';
 
 banner('D-002 — a re-run leaves the prior run untouched');
@@ -39,7 +40,8 @@ if (!pkg) throw new Error('no package found — run m1-eight-steps.mjs first');
 console.log(`package ${pkg.id}\n`);
 
 const RUN_AT = new Date('2026-05-15T00:00:00Z');
-const meta = { rulesetVersion: rules.checks.version ?? 'documents-1', engineVersion: '0.1.0', families: ['A', 'B'] };
+const identity = await identityOf(service, pkg.id);
+const meta = { merchantName: identity.merchantName, merchantDomain: identity.merchantName, rulesetVersion: rules.checks.version ?? 'documents-1', engineVersion: '0.1.0', families: ['A', 'B'] };
 
 /** What a run must record about its inputs (D-123). */
 const inputsOf = (snap) => {

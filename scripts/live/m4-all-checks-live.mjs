@@ -21,6 +21,7 @@ import { createDocumentRunStore } from '../../apps/worker/dist/src/store/documen
 import { snapshotOf } from './snapshot.mjs';
 import { slotRow } from './setup.mjs';
 import { packageDigest } from '../../apps/worker/dist/src/documentsReportGate.js';
+import { identityOf } from '../../apps/worker/dist/src/documentsSendJob.js';
 import { banner, assertTestProject } from './guard.mjs';
 
 banner('M4 — all 38 v1 checks against a real package');
@@ -206,8 +207,13 @@ const runDocuments = snapshot.documents.map((d) => ({
   tier: documents.tierOf(d),
 }));
 
+// Captured now, so a later rename cannot change this run's masthead (D-126).
+const identity = await identityOf(service, pkg.id);
+
 const run = await runStore.persist({
   packageId: pkg.id,
+  merchantName: identity.merchantName,
+  merchantDomain: identity.merchantName,
   runAt: RUN_AT,
   rulesetVersion: rules.checks.version,
   engineVersion: '0.1.0',

@@ -40,10 +40,11 @@ async function seedRun(packageId: string): Promise<string> {
   // staleness gate has nothing to compare (D-117).
   const [run] = await db.query<{ id: string }>(
     `insert into public.document_runs
-       (package_id, ruleset_version, engine_version, run_at, families, slots, documents, package_digest)
-     values ($1, 'documents-1', '0.1.0', now(), array['A','B'], '[]'::jsonb, '[]'::jsonb, $2)
+       (package_id, ruleset_version, engine_version, run_at, families, slots, documents, package_digest,
+        merchant_name, merchant_domain)
+     values ($1, 'documents-1', '0.1.0', now(), array['A','B'], '[]'::jsonb, '[]'::jsonb, $2, $3, $4)
      returning id`,
-    [packageId, '0'.repeat(64)],
+    [packageId, '0'.repeat(64), 'Northwind Peptides LLC', 'northwind.example'],
   );
   return run!.id;
 }
@@ -200,7 +201,21 @@ describe('slot origin carries all three values (D-121)', () => {
   });
 });
 
-describe('a run records what it ran against (0028)', () => {
+describe('a run records what it ran against (0028) and who for (0032)', () => {
+  it('refuses a run that does not say who it renders under', async () => {
+    const pkg = await seedPackage();
+    // D-126: the masthead comes off the run, so a run with no identity would render a report headed
+    // by nothing — which reads as a rendering fault rather than as missing data.
+    await expect(
+      db.query(
+        `insert into public.document_runs
+           (package_id, ruleset_version, engine_version, run_at, families, slots, documents, package_digest)
+         values ($1, 'documents-1', '0.1.0', now(), array['A'], '[]'::jsonb, '[]'::jsonb, $2)`,
+        [pkg, '0'.repeat(64)],
+      ),
+    ).rejects.toThrow();
+  });
+
   it('refuses a run that does not say what it read', async () => {
     const pkg = await seedPackage();
     // Without the snapshot the report would be a function of the run plus whatever the slots say

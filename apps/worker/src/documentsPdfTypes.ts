@@ -17,8 +17,7 @@ type DocumentsReport = ReturnType<typeof documents.buildDocumentsReport>;
 
 export interface DocumentsReportViewProps {
   readonly report: DocumentsReport;
-  readonly merchantName: string;
-  readonly dba: string | null;
+  /** Identity is on `report.identity` (D-126), not passed alongside it. */
   readonly packageRef: string;
   readonly processor: string;
   readonly reportNumber: string;

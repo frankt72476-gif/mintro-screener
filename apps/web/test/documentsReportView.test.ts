@@ -42,6 +42,7 @@ const finding = (over: Partial<StoredFinding> = {}): StoredFinding => ({
 
 const run = (over: Partial<RunRecord> = {}): RunRecord => ({
   id: 'run-e402e078', packageId: 'pkg-1', runAt: '2026-05-15T00:00:00.000Z',
+  identity: { merchantName: 'Northwind Peptides LLC', merchantDomain: 'northwind.example', dba: null },
   rulesetVersion: '1.0.0', engineVersion: '0.1.0',
   slots: [slot()], documents: [document_()], findings: [finding()], ...over,
 });
@@ -51,8 +52,6 @@ function render(record: RunRecord, previous?: RunRecord): string {
   return renderToStaticMarkup(
     createElement(DocumentsReportView, {
       report,
-      merchantName: 'Northwind Peptides LLC',
-      dba: 'Northwind Labs',
       packageRef: 'NW-2026-0812',
       processor: 'Default',
       reportNumber: '3 of 3',
@@ -84,6 +83,33 @@ describe('the rendered report is byte-identical from the same run (D-085)', () =
       findings: [...original.findings].reverse(),
     };
     expect(render(shuffled)).toBe(render(original));
+  });
+
+  /**
+   * D-126, and the gap it closed.
+   *
+   * `merchantName` was a prop read live at render time, so the report data was pure and the page
+   * was not: renaming a merchant changed the masthead of a run that had not changed, and a sent
+   * PDF disagreed with a regenerated page while both claimed the same run id.
+   *
+   * The component now takes it off `report.identity`, so there is no path by which a later read
+   * can reach the masthead — asserted by rendering the same run twice with the merchant row
+   * conceptually renamed in between, which is what the two records represent.
+   */
+  it('renders the identity the run recorded, not one supplied at render time', () => {
+    const asRun = run({ identity: { merchantName: 'Northwind Peptides LLC', merchantDomain: 'northwind.example', dba: null } });
+    const html = render(asRun);
+    expect(html).toContain('Northwind Peptides LLC');
+
+    // The same run, rendered later, after somebody edited the merchant row. Nothing the renderer
+    // can see has changed, because the name is on the run.
+    expect(render(asRun)).toBe(html);
+  });
+
+  it('shows a DBA line only when the report carries one', () => {
+    expect(render(run())).not.toContain('class="dba"');
+    const withDba = run({ identity: { merchantName: 'Northwind Peptides LLC', merchantDomain: 'northwind.example', dba: 'Northwind Labs' } });
+    expect(render(withDba)).toContain('DBA Northwind Labs');
   });
 
   it('renders nothing derived from a clock', () => {

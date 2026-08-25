@@ -51,4 +51,5 @@ export {
   type StoredDocument,
   type StoredFinding,
   type NotCheckedItem,
+  type ReportIdentity,
 } from './report.js';

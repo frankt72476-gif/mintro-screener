@@ -6842,6 +6842,45 @@ pattern costs nothing, and it is not a faithful renderer for looking at our own 
 
 ---
 
+## D-126 — A run records the identity it rendered under
+**2026-08-24 · Frank's ruling · migration 0032**
+
+`document_runs` carries the merchant name and domain the run was rendered for. The report route
+reads them off the run, not off the merchant row.
+
+### The data was pure and the page was not
+
+D-085 held throughout: `merchantName` was a render prop, not part of `DocumentsReport`, so the
+report *data* was a function of the run alone and the byte-identical tests were true.
+
+The rendered page was a different question, and nobody had asked it. The masthead came from a live
+read of the merchant row, so renaming a merchant changed the top of a report whose run had not
+changed. **A sent PDF and a regenerated page would then disagree while both claimed the same run
+id** — which is the exact failure D-002 and D-083 are built to prevent, arriving through a prop
+rather than through the data.
+
+The lesson worth extracting: **purity of a value is not purity of the artifact.** A function can be
+pure and still be composed, at render time, with something that moves. Asking "is this a pure
+function of the run?" of the object and not of the page is how the gap survived — the tests were
+correct and were testing the wrong boundary.
+
+This is D-123 one level down. That ruling made a run record the slot table and document list it
+read; identity is also read, so it belongs in the same place for the same reason.
+
+### DBA is not stored, and not derived
+
+There is no DBA column on a merchant. The trading name is a value **extracted from the
+application**, and C-02 is the check that compares it across documents.
+
+Deriving it separately for a masthead would put a second derivation beside the check's, and the two
+could then disagree — the report heading one name while the check that examines names reports
+another. That is precisely what D-125 refuses: a display of a decision must come from the decision.
+
+So the masthead shows a DBA only where the report data carries one, and today it carries none. An
+absent line is honest; a line assembled from a second reading of the same document is not.
+
+---
+
 ## D-086 amendment — the transport is adopted; the prompts and schemas are not
 **2026-08-24 · Frank's ruling**
 

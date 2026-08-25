@@ -104,9 +104,27 @@ export interface NotCheckedItem {
   readonly why: string;
 }
 
+/**
+ * Who the run was rendered for, captured when it ran (D-126).
+ *
+ * Part of the report rather than a render prop, because the masthead is part of the document. A
+ * prop read live at render time made a renamed merchant change the top of an unchanged run — pure
+ * data composed with something that moves is not a pure page.
+ *
+ * `dba` is here because the report may one day carry one, and `null` because today it does not:
+ * the trading name is extracted from the application and C-02 compares it, so deriving a second
+ * copy for a heading is what D-125 refuses.
+ */
+export interface ReportIdentity {
+  readonly merchantName: string;
+  readonly merchantDomain: string;
+  readonly dba: string | null;
+}
+
 export interface DocumentsReport {
   readonly runId: string;
   readonly packageId: string;
+  readonly identity: ReportIdentity;
   readonly runAt: string;
   readonly rulesetVersion: string;
   readonly engineVersion: string;
@@ -124,6 +142,7 @@ export interface DocumentsReport {
 export interface RunRecord {
   readonly id: string;
   readonly packageId: string;
+  readonly identity: ReportIdentity;
   readonly runAt: string;
   readonly rulesetVersion: string;
   readonly engineVersion: string;
@@ -316,6 +335,7 @@ export function buildDocumentsReport(
   const report: DocumentsReport = {
     runId: run.id,
     packageId: run.packageId,
+    identity: run.identity,
     runAt: run.runAt,
     rulesetVersion: run.rulesetVersion,
     engineVersion: run.engineVersion,

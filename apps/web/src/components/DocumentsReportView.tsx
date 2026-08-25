@@ -27,8 +27,13 @@ type ReportSlot = DocumentsReport['slots'][number];
 
 export interface DocumentsReportViewProps {
   readonly report: DocumentsReport;
-  readonly merchantName: string;
-  readonly dba: string | null;
+  /**
+   * Who the report is for comes off `report.identity`, not from here (D-126).
+   *
+   * It was a prop, read live at render time, and a merchant renamed after a run changed the
+   * masthead of a run that had not changed. The report data was pure and the page was not — a pure
+   * value composed with something that moves is not a pure artifact.
+   */
   readonly packageRef: string;
   readonly processor: string;
   /** "3 of 3" — which send this is. Comes from the send log, not from the run. */
@@ -118,7 +123,8 @@ function Finding({ finding }: { readonly finding: ReportFinding }): JSX.Element 
 }
 
 export function DocumentsReportView(props: DocumentsReportViewProps): JSX.Element {
-  const { report, merchantName, dba, packageRef, processor, reportNumber, previousSentAt } = props;
+  const { report, packageRef, processor, reportNumber, previousSentAt } = props;
+  const { merchantName, dba } = report.identity;
   const { counts } = report;
   const total = counts.fail + counts.review + counts.pass + counts.not_evaluable;
   const pct = (n: number): string => (total === 0 ? '0%' : `${(n / total) * 100}%`);

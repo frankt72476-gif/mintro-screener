@@ -33,6 +33,7 @@ const report = documents.buildDocumentsReport(
   {
     id: 'run-abcdef12',
     packageId: 'pkg-1',
+    identity: { merchantName: 'Northwind Peptides LLC', merchantDomain: 'northwind.example', dba: null },
     runAt: '2026-05-15T00:00:00.000Z',
     rulesetVersion: '1.0.0',
     engineVersion: '0.1.0',

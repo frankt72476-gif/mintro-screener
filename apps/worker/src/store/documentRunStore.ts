@@ -34,6 +34,9 @@ export interface PersistRunInput {
   readonly slots: readonly unknown[];
   readonly documents: readonly unknown[];
   readonly packageDigest: string;
+  /** Who the run renders under, captured now so a later rename cannot change it (D-126). */
+  readonly merchantName: string;
+  readonly merchantDomain: string;
 }
 
 export interface PersistedRun {
@@ -104,6 +107,8 @@ export function createDocumentRunStore(client: SupabaseClient): DocumentRunStore
           slots: input.slots,
           documents: input.documents,
           package_digest: input.packageDigest,
+          merchant_name: input.merchantName,
+          merchant_domain: input.merchantDomain,
         })
         .select('id')
         .single();
