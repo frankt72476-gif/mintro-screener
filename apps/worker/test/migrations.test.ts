@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIR = 'supabase/migrations';
@@ -201,5 +201,34 @@ describe('.env.example', () => {
         expect(lower, `${key} looks like a secret`).toContain('anon');
       }
     }
+  });
+});
+
+/**
+ * The Dockerfile's workspace list.
+ *
+ * `npm ci` needs every workspace manifest present before it runs, so the Dockerfile enumerates them
+ * — and an enumerated list is one somebody forgets to extend. `packages/extraction` was added at M0
+ * and the list was not, which nothing caught until the first deploy after it: locally the workspace
+ * link already exists, so every test passed while the image could not resolve the package at all.
+ *
+ * This compares the list against the workspaces that actually exist. It fails in CI rather than in
+ * a deploy, which is the difference between a minute and a build.
+ */
+describe('the worker image copies every workspace manifest', () => {
+  it('has a COPY line for each one', () => {
+    const dockerfile = readFileSync('apps/worker/Dockerfile', 'utf8');
+    const root = JSON.parse(readFileSync('package.json', 'utf8')) as { workspaces: string[] };
+
+    const workspaces = root.workspaces.flatMap((pattern) => {
+      const dir = pattern.replace(/\/\*$/, '');
+      return readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && existsSync(`${dir}/${e.name}/package.json`))
+        .map((e) => `${dir}/${e.name}`);
+    });
+
+    const missing = workspaces.filter((w) => !dockerfile.includes(`COPY ${w}/package.json`));
+    expect(missing, `not copied into the image before npm ci: ${missing.join(', ')}`).toEqual([]);
+    expect(workspaces.length).toBeGreaterThan(3);
   });
 });

@@ -15,11 +15,19 @@ WORKDIR /app
 # Every workspace manifest, including apps/web, because the root package.json declares
 # `workspaces: ["packages/*", "apps/*"]` and `npm ci` refuses to run against a lockfile whose
 # workspaces it cannot find.
+#
+# **This list is enumerated, so adding a workspace means editing it.** `packages/extraction` was
+# added at M0 and this line was not, which nothing noticed until the first deploy afterwards: the
+# source arrives via `COPY packages/`, but `npm ci` has already run without the workspace, so no
+# `node_modules/@mintro/extraction` link exists and every import of it fails to resolve. The build
+# breaks loudly, which is the good version of this — but it breaks at deploy time rather than in
+# any test, because locally the link is already there.
 COPY package.json package-lock.json ./
-COPY packages/ruleset/package.json  packages/ruleset/
-COPY packages/engine/package.json   packages/engine/
-COPY apps/worker/package.json       apps/worker/
-COPY apps/web/package.json          apps/web/
+COPY packages/ruleset/package.json    packages/ruleset/
+COPY packages/engine/package.json     packages/engine/
+COPY packages/extraction/package.json packages/extraction/
+COPY apps/worker/package.json         apps/worker/
+COPY apps/web/package.json            apps/web/
 
 # `--include=dev` is explicit and load-bearing.
 #
