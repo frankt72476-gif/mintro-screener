@@ -7142,8 +7142,13 @@ inserts rows. It updates nothing and deletes no row.**
 
 Every append-only trigger stays as written. In particular there is **no `purged_at` on
 `document_versions`** — that table refuses updates, and relaxing it for one marker is exactly the
-trade D-097 declined. A purge is an insert into `document_version_purges`; *is this purged* is an
+trade D-097 declined. A purge is an insert into `purged_objects`; *is this purged* is an
 exists-check.
+
+*(Corrected at build: this entry first named the table `document_version_purges`, which cannot
+record a staging copy or a report PDF — both of which the same ruling puts in scope. One table over
+all four object classes, keyed by `kind`, because a purge record that cannot express two of the
+things it deleted is a record that reads as complete and is not.)*
 
 ### D-097 had two arguments, and only one of them is answered by the export
 
