@@ -15,11 +15,17 @@
  * would start trusting it before M4 exists to check it. What is shown instead is the *outcome* per
  * document and the *route* per page: whether we could read it, and how. An operator who cannot see
  * that a scan failed to read will not re-request it (D-092).
+ *
+ * **One named exception (D-129).** The facts panel shows what the application says the entity type
+ * is, with the page it was read from, beside a button that fills the dropdown in. That is the
+ * opposite of a field list presented as data: it is a value offered for a person to accept, and it
+ * is never applied on its own.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DocumentsSendModal } from './DocumentsSendModal';
 import { NewPackage } from './NewPackage';
+import { PackageFactsPanel } from './PackageFacts';
 import { createPackageCreation } from '../lib/packageCreation';
 import {
   createDocumentsSendQueue,
@@ -164,15 +170,28 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
     [packageId, analystId, refresh],
   );
 
+  /*
+    Setting a slot state.
+
+    Through `set_slot_state` (0034), not a PostgREST update. `update` on `slots` is revoked from
+    `authenticated` and always has been, so the direct call this replaces silently affected nothing
+    — it returns success with zero rows matched, which is what a revoked update looks like from the
+    client. No operator has ever managed to mark a slot not-provided.
+
+    The function also records `resolved_by`. Every state change from this page is `'operator'` by
+    construction: a person clicked it. `'fact'` belongs to `set_package_facts` alone.
+  */
   const setSlot = useCallback(
     async (slotId: string, state: SlotState, reason: string | null) => {
       setBusySlot(slotId);
-      const { error: updateError } = await client
-        .from('slots')
-        .update({ state, reason, updated_at: new Date().toISOString() })
-        .eq('id', slotId);
+      const { error: rpcError } = await client.rpc('set_slot_state', {
+        p_slot_id: slotId,
+        p_state: state,
+        p_reason: reason,
+        p_resolved_by: 'operator',
+      });
       setBusySlot(null);
-      if (updateError !== null) setError(updateError.message);
+      if (rpcError !== null) setError(rpcError.message);
       await refresh();
     },
     [client, refresh],
@@ -277,6 +296,19 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
         />
       )}
       {error !== null ? <p className="sub" role="alert">{error}</p> : null}
+
+      {/*
+        Above the grid, because it changes what the grid contains. An operator who answers the
+        entity type here watches documents leave the set below, which is the connection the ordering
+        has to make legible.
+      */}
+      <PackageFactsPanel
+        pkg={view.pkg}
+        slots={view.slots}
+        documents={view.documents}
+        creation={creation.current}
+        onSaved={() => void refresh()}
+      />
 
       <p className="sub">
         Values read from these documents are not shown here. M1 records what each document is and

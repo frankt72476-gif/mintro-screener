@@ -275,10 +275,18 @@ table {width:100%;border-collapse:collapse}
 }
 .np-why{margin:-4px 0 12px;font-size:13px;color:var(--ink-2);max-width:64ch}
 
-.np-new-merchant{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
-.np-answers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+/* Legal name, DBA, domain. The DBA is the operator's label for finding this package — not the
+   report's DBA, which is extracted and compared in C-02 (D-126, D-129). */
+.np-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.np-answers{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.np-field,
 .np-answers label{
   display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:500;color:var(--ink-2);
+}
+.np-field-label{display:flex;align-items:baseline;gap:6px}
+.np-optional{
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:500;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);
 }
 
 /* ---------- the slot rows ---------- */
@@ -306,6 +314,14 @@ table {width:100%;border-collapse:collapse}
    answer, not because the set always asks. Same convention, so the two documents read alike. */
 .np-origin[data-origin="conditional"]{border-style:dashed}
 .np-origin[data-origin="added"]{color:var(--ink-2);border-color:var(--ink-3)}
+/*
+  A conditional whose question nobody has answered (D-129).
+
+  Review amber, not a failure red and not the neutral grey of a settled conditional: it is an open
+  question somebody can go and close, and the report already uses this colour for exactly that —
+  something a person still has to decide.
+*/
+.np-origin[data-unresolved="true"]{color:var(--review);border-color:var(--review);background:var(--review-bg)}
 
 .np-count{
   font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);
@@ -318,6 +334,8 @@ table {width:100%;border-collapse:collapse}
 .np-because{
   margin:3px 0 0;padding-left:28px;font-size:12px;color:var(--ink-3);max-width:70ch;
 }
+/* The provisional explanation reads as a question, not a reason. */
+.np-because[data-unresolved="true"]{color:var(--review)}
 .np-label{margin:8px 0 2px 28px;width:calc(100% - 28px)}
 
 /* ---------- not applicable ---------- */
@@ -334,7 +352,49 @@ table {width:100%;border-collapse:collapse}
 .np-impossible .np-name{color:var(--ink-3);font-weight:500;text-decoration:line-through}
 .np-impossible .np-because{margin:0;padding:0;color:var(--ink-3)}
 
+/* ==============================================================================================
+ * The facts panel on the upload page (D-129).
+ *
+ * The three creation answers, answerable later. Same type pairing and palette as the modal,
+ * because it is the same three questions in a second place — an operator who learns the entity
+ * type from the EIN letter should not have to work out that this is the same control.
+ * ============================================================================================== */
+
+.pf{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink);
+  border:1px solid var(--rule-2);background:var(--paper);padding:14px 16px;margin:0 0 18px;
+}
+.pf-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:12px}
+.pf h3{
+  margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.pf-why{margin:0;font-size:12.5px;color:var(--ink-2);max-width:70ch}
+.pf-answers{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:520px}
+
+/* What the documents say, offered and never applied. */
+.pf-evidence{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px}
+.pf-evidence h4{
+  margin:0 0 8px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+}
+.pf-evidence ul{list-style:none;margin:0;padding:0}
+.pf-evidence li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:4px 0;font-size:13px}
+.pf-said{color:var(--ink)}
+/* Page number in mono, as every other citation in the report is. */
+.pf-prov{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+.pf-nomatch{font-size:12px;color:var(--ink-3)}
+.pf-use{padding:3px 9px;font-size:12px}
+
+.pf-warn{
+  margin:12px 0 0;padding:8px 10px;font-size:12.5px;
+  color:var(--review);background:var(--review-bg);border:1px solid var(--review);
+}
+.pf-outcome{margin:10px 0 0;font-size:12.5px;color:var(--pass)}
+.pf-foot{margin-top:14px}
+.pf-foot .pf-why{margin:0}
+
 @media (max-width:720px){
-  .np-answers,.np-new-merchant{grid-template-columns:1fr}
+  .np-answers,.np-fields,.pf-answers{grid-template-columns:1fr}
   .np-impossible li{grid-template-columns:1fr;gap:2px}
 }

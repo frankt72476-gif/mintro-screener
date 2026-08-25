@@ -40,13 +40,13 @@ export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Elemen
         >
           <span className="ic">◎</span>Site check
         </button>
-        {/* Stubbed on purpose — Documents Check is a later phase. */}
+        {/* Built and in production (M6). The SOON pill came off with D-129. */}
         <button
           className="nav-item"
           aria-current={pane === 'docs' ? 'true' : undefined}
           onClick={() => onPane('docs')}
         >
-          <span className="ic">▤</span>Documents check<span className="soon">SOON</span>
+          <span className="ic">▤</span>Documents check
         </button>
       </div>
 

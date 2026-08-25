@@ -17,9 +17,27 @@
  * always shorter.
  *
  * The distinction is the whole of what D-081 still decides after D-128.
+ *
+ * ## And a third case: not decided yet (D-129)
+ *
+ * A fact can be `null`, meaning nobody has established it. A conditional over an unanswered fact
+ * **does not resolve** — the slot is offered and prechecked, exactly as if the template had asked
+ * for it unconditionally, and it is never listed as impossible.
+ *
+ * This is not caution for its own sake. Removal is the destructive direction: an offered document
+ * the merchant cannot supply gets a `not_provided` reason and costs a click, while a removed
+ * document nobody asked for produces a package that looks complete and is not. So both W-9 and
+ * W-8BEN are offered when nobody knows the domicile, and Articles is offered when nobody knows the
+ * entity type.
  */
 
-import type { PackageFacts, SlotDefinition, SlotTemplate } from './slotTemplate.js';
+import type {
+  EntityType,
+  PackageFacts,
+  PredicateOutcome,
+  SlotDefinition,
+  SlotTemplate,
+} from './slotTemplate.js';
 
 /** A slot as the creation screen shows it. */
 export interface ComposableSlot {
@@ -43,6 +61,14 @@ export interface ComposableSlot {
    * `origin` column for, arriving one step earlier.
    */
   readonly because: string | null;
+  /**
+   * True where the slot is here because the question behind it is unanswered (D-129).
+   *
+   * Distinct from `because` being non-null: a conditional that *fired* is also explained. This one
+   * says the explanation is provisional, so the screen can mark it as an open question rather than
+   * a settled reason.
+   */
+  readonly unresolved: boolean;
 }
 
 export interface ComposedSet {
@@ -62,7 +88,7 @@ export interface ComposedSet {
  * case, in copy an operator reads on every package. The article is part of the label because "a"
  * and "an" depend on how the abbreviation is *said*, not on its first letter.
  */
-const ENTITY_PHRASE: Readonly<Record<PackageFacts['entityType'], string>> = {
+const ENTITY_PHRASE: Readonly<Record<EntityType, string>> = {
   sole_proprietor: 'a sole proprietorship',
   partnership: 'a partnership',
   llc: 'an LLC',
@@ -71,19 +97,37 @@ const ENTITY_PHRASE: Readonly<Record<PackageFacts['entityType'], string>> = {
   government: 'a government entity',
 };
 
-/** How a conditional reads when it fires, and when it does not. */
-function explain(slotKey: string, facts: PackageFacts, fires: boolean): string {
+/**
+ * How a conditional reads when it fires, when it does not, and when nobody has said.
+ *
+ * The unknown wording names the *question*, not a guess at the answer. "Entity type is not
+ * recorded, so this stays in the set" is a different sentence from "an LLC files formation
+ * documents", and an operator has to be able to tell which they are reading — the first is
+ * something they can go and settle, the second is not.
+ */
+function explain(slotKey: string, facts: PackageFacts, outcome: PredicateOutcome): string {
+  if (outcome === 'unknown') {
+    switch (slotKey) {
+      case 'articles_of_incorporation':
+        return 'entity type is not recorded, so this stays in the set';
+      case 'w9':
+      case 'w8ben':
+        return 'US domicile is not recorded, so both tax forms stay in the set';
+      default:
+        return 'the answer this depends on is not recorded, so it stays in the set';
+    }
+  }
   switch (slotKey) {
     case 'articles_of_incorporation':
-      return fires
-        ? `${ENTITY_PHRASE[facts.entityType]} files formation documents`
+      return outcome
+        ? `${facts.entityType === null ? 'this entity type' : ENTITY_PHRASE[facts.entityType]} files formation documents`
         : 'a sole proprietorship files no formation documents';
     case 'w9':
-      return fires ? 'a US-domiciled entity files a W-9' : 'a non-US entity files a W-8BEN, not a W-9';
+      return outcome ? 'a US-domiciled entity files a W-9' : 'a non-US entity files a W-8BEN, not a W-9';
     case 'w8ben':
-      return fires ? 'a non-US entity files a W-8BEN' : 'a US-domiciled entity files a W-9, not a W-8BEN';
+      return outcome ? 'a non-US entity files a W-8BEN' : 'a US-domiciled entity files a W-9, not a W-8BEN';
     default:
-      return fires ? 'the answers given at creation' : 'the answers given at creation';
+      return 'the answers given at creation';
   }
 }
 
@@ -111,24 +155,53 @@ export function composeSet(facts: PackageFacts, template: SlotTemplate): Compose
     };
 
     if (slot.include === 'always') {
-      offered.push({ ...base, origin: 'required', prechecked: true, because: null });
+      offered.push({ ...base, origin: 'required', prechecked: true, because: null, unresolved: false });
       continue;
     }
     if (slot.include === 'off') {
-      offered.push({ ...base, origin: 'added', prechecked: false, because: null });
+      offered.push({ ...base, origin: 'added', prechecked: false, because: null, unresolved: false });
       continue;
     }
 
-    // A conditional. Fires or it does not, and not firing removes it outright (D-081).
-    const fires = slot.include(facts);
-    if (fires) {
-      offered.push({ ...base, origin: 'conditional', prechecked: true, because: explain(slot.slotKey, facts, true) });
-    } else {
+    /*
+      A conditional. Three outcomes, not two (D-129).
+
+      Only an outright `false` removes it — an answer is on record and it says the document cannot
+      exist. `'unknown'` is offered and prechecked, and behaves exactly as a fired conditional does
+      *except* for the flag, because until somebody answers the question it is genuinely part of
+      the set.
+    */
+    const outcome = slot.include(facts);
+    if (outcome === false) {
       impossible.push({ slotKey: slot.slotKey, title: slot.title, because: explain(slot.slotKey, facts, false) });
+      continue;
     }
+    offered.push({
+      ...base,
+      origin: 'conditional',
+      prechecked: true,
+      because: explain(slot.slotKey, facts, outcome),
+      unresolved: outcome === 'unknown',
+    });
   }
 
   return { offered, impossible };
+}
+
+/**
+ * Which slot keys these answers make structurally impossible.
+ *
+ * The list `set_package_facts` waives with (0034). Derived from the same predicates `composeSet`
+ * runs, in the same file, so answering a question after creation removes exactly what answering it
+ * before creation would have — one derivation, not two that agree until a predicate changes.
+ *
+ * Unknown never appears here. A fact nobody has established cannot make anything impossible; that
+ * is the whole of D-129 stated as a return value.
+ */
+export function impossibleSlotKeys(facts: PackageFacts, template: SlotTemplate): readonly string[] {
+  return template.slots
+    .filter((slot) => typeof slot.include === 'function' && slot.include(facts) === false)
+    .map((slot) => slot.slotKey);
 }
 
 /** What the operator settled on, per slot. */
@@ -219,4 +292,4 @@ export function toRows(
   return { slots, removals };
 }
 
-export type { PackageFacts, SlotDefinition };
+export type { EntityType, PackageFacts, SlotDefinition };

@@ -241,18 +241,43 @@ function b04(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFinding[]
 /**
  * B-05 — can the conditional predicates be resolved?
  *
- * A conditional slot is in or out of the set because of one of the three questions asked at package
+ * A conditional slot is in or out of the set because of one of the questions asked at package
  * creation (D-081). If an answer is missing, the set itself is provisional — so this reports on the
  * inputs, not on the slots.
+ *
+ * **On the inputs this set actually rests on**, which is narrower than all three (D-129). No slot
+ * predicates on the existing processor, and the question was removed for that reason; counting it
+ * here would make every package with any conditional slot permanently `not_evaluable` over an
+ * answer nothing reads.
+ *
+ * A conditional slot that does not say which answer it turns on falls back to requiring all three.
+ * Absent is not the same as none: it means this snapshot cannot say, and reporting a set as settled
+ * on the strength of a field that was not there is the wrong direction to be wrong in.
  */
+const FACT_LABELS: Readonly<Record<string, string>> = {
+  entity_type: 'entity type',
+  us_domiciled: 'US-domiciled',
+  has_existing_processor: 'existing processor',
+};
+
 function b05(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFinding[] {
   const conditional = snapshot.slots.filter((s) => s.origin === 'conditional');
   if (conditional.length === 0) return [];
 
-  const missing: string[] = [];
-  if (snapshot.facts.entityType === null) missing.push('entity type');
-  if (snapshot.facts.usDomiciled === null) missing.push('US-domiciled');
-  if (snapshot.facts.hasExistingProcessor === null) missing.push('existing processor');
+  const unknownDependency = conditional.some((s) => s.predicateField === undefined || s.predicateField === null);
+  const depends = new Set<string>(
+    unknownDependency ? Object.keys(FACT_LABELS) : conditional.map((s) => s.predicateField as string),
+  );
+
+  const unanswered: Readonly<Record<string, boolean>> = {
+    entity_type: snapshot.facts.entityType === null,
+    us_domiciled: snapshot.facts.usDomiciled === null,
+    has_existing_processor: snapshot.facts.hasExistingProcessor === null,
+  };
+  // Ordered by the record above, not by set iteration, so the sentence reads the same way twice.
+  const missing = Object.keys(FACT_LABELS)
+    .filter((field) => depends.has(field) && unanswered[field] === true)
+    .map((field) => FACT_LABELS[field] as string);
 
   const subject: FindingSubject = { kind: 'package' };
   if (missing.length > 0) {
@@ -265,10 +290,12 @@ function b05(check: DocumentCheck, snapshot: PackageSnapshot): DocumentFinding[]
       ),
     ];
   }
+  const answered = [...depends].map((field) => FACT_LABELS[field] ?? field).sort();
   return [
     clean(
       check,
-      `All three creation answers are recorded, so the ${conditional.length} conditional slot(s) in this set are settled.`,
+      `${answered.join(' and ')} ${answered.length === 1 ? 'is' : 'are'} recorded, so the ` +
+        `${conditional.length} conditional slot(s) in this set are settled.`,
       subject,
     ),
   ];

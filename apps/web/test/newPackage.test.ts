@@ -24,6 +24,7 @@ const creation: PackageCreation = {
   merchants: async () => [],
   ensureMerchant: async () => 'merchant-1',
   create: async () => 'package-1',
+  setFacts: async () => 0,
 };
 
 const html = (): string =>
@@ -143,5 +144,86 @@ describe('it reads as the same product as the report', () => {
   /** Dashed for conditional, as page-tier evidence is dashed in the report. One convention. */
   it('marks a conditional origin the way the report marks a weaker claim', () => {
     expect(CSS).toMatch(/\.np-origin\[data-origin="conditional"\]\s*\{[^}]*border-style:\s*dashed/);
+  });
+});
+
+/*
+  D-129 — the three answers accept "not known yet", and that is where the modal opens.
+
+  These are about the *default* state, which is the whole ruling: a required dropdown with a
+  plausible value does not obtain an answer, it manufactures one, and a wrong entity type silently
+  removes a slot that should be present.
+*/
+describe('nothing is answered until somebody answers it', () => {
+  it('opens with entity type not known and domicile not sure', () => {
+    const markup = html();
+    // The selected option is the one React marks; a default of LLC would mark that instead.
+    const selects = [...markup.matchAll(/<select[^>]*>([\s\S]*?)<\/select>/g)].map((m) => m[1]!);
+    expect(selects.length, 'expected exactly the two questions D-129 leaves').toBe(2);
+    for (const options of selects) {
+      const selected = /<option[^>]*selected[^>]*>([^<]*)</.exec(options)?.[1] ?? '';
+      expect(['Not known yet', 'Not sure']).toContain(selected);
+    }
+  });
+
+  it('does not ask about an existing processor at all', () => {
+    // Removed entirely, not hidden: no slot predicates on it, and a question that changes nothing
+    // trains an operator to answer without reading.
+    expect(visibleText(html())).not.toMatch(/existing processor/i);
+  });
+
+  /*
+    In the *offered* list, not merely somewhere in the markup.
+
+    The first version of this asserted the two names appeared in the rendered text, and it passed
+    with the domicile answered — because a ruled-out slot is still *listed* under "Not applicable",
+    by name. A test that a document is offered has to look at where documents are offered.
+  */
+  it('offers both tax forms while the domicile is unknown', () => {
+    const offered = /<ul class="np-slots">([\s\S]*?)<\/ul>/.exec(html())?.[1] ?? '';
+    expect(offered, 'no slot list rendered').not.toBe('');
+    for (const form of ['W-9', 'W-8BEN']) {
+      expect(visibleText(offered), `${form} is not offered`).toContain(form);
+    }
+  });
+
+  it('rules nothing out, because nothing has been established', () => {
+    // The "Not applicable to this business" block is the removal path. With no answers on record
+    // there is nothing to remove, and a slot listed there is a slot the operator cannot supply.
+    expect(html()).not.toContain('np-impossible');
+  });
+
+  it('marks an unresolved conditional as an open question rather than a settled reason', () => {
+    const markup = html();
+    expect(markup).toContain('data-unresolved="true"');
+    expect(visibleText(markup)).toContain('is not recorded, so');
+    // And the marking has to be visible, not merely present in the DOM.
+    expect(CSS).toMatch(/\.np-origin\[data-unresolved="true"\]\s*\{[^}]*color:/);
+  });
+});
+
+describe('the merchant is typed, not picked', () => {
+  it('has no merchant dropdown', () => {
+    const markup = html();
+    expect(markup).not.toContain('— create a new merchant —');
+    expect(markup).not.toContain('Existing merchant');
+  });
+
+  it('asks for legal name, DBA and domain', () => {
+    const markup = html();
+    for (const field of ['Legal name', 'DBA', 'Domain']) {
+      expect(markup, `no ${field} field`).toContain(`aria-label="${field}"`);
+    }
+  });
+
+  /*
+    D-126 as amended. The operator's DBA is a label for finding a package; the report's DBA is what
+    the documents say, derived once in C-02. This asserts the modal does not promise otherwise —
+    copy that called it "trading name as it appears on the documents" would be a promise the field
+    cannot keep.
+  */
+  it('does not present the DBA as something the report will print', () => {
+    const text = visibleText(html());
+    expect(text).toMatch(/what the report\s+prints is what the documents say/);
   });
 });

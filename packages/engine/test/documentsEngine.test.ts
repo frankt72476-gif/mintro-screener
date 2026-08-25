@@ -539,6 +539,53 @@ describe('B-05 — conditional predicates resolved', () => {
   it('says nothing at all when the set has no conditional slots', () => {
     expect(of(run(snapshot(), ['B']), 'B-05')).toHaveLength(0);
   });
+
+  /*
+    D-129 narrowed this to the answers the set actually rests on.
+
+    The existing-processor question was removed entirely — no slot predicates on it — so the column
+    is null on every package created after 0034. Counting it here would make B-05 permanently
+    not_evaluable over an answer nothing reads, which is a check that is noise on every report
+    rather than a check.
+  */
+  it('ignores an unanswered fact that no conditional in the set turns on', () => {
+    const s = snapshot({
+      slots: [slot({ id: 'slot-w9', slotKey: 'w9', origin: 'conditional', predicateField: 'us_domiciled' })],
+      facts: { entityType: null, hasExistingProcessor: null, usDomiciled: true },
+    });
+    const f = one(run(s, ['B']), 'B-05');
+    // The only conditional here turns on the domicile, which is recorded. Entity type being
+    // unrecorded does not make *this* set provisional.
+    expect(f.state).toBe('pass');
+    expect(f.note).toMatch(/US-domiciled is recorded/);
+  });
+
+  it('still reports the one an in-set conditional does turn on', () => {
+    const s = snapshot({
+      slots: [
+        slot({ id: 'slot-w9', slotKey: 'w9', origin: 'conditional', predicateField: 'us_domiciled' }),
+        slot({ id: 'slot-art', slotKey: 'articles_of_incorporation', origin: 'conditional', predicateField: 'entity_type' }),
+      ],
+      facts: { entityType: null, hasExistingProcessor: null, usDomiciled: true },
+    });
+    const f = one(run(s, ['B']), 'B-05');
+    expect(f.state).toBe('not_evaluable');
+    expect(f.note).toMatch(/entity type/);
+    // And not the one nothing depends on, which is the whole narrowing.
+    expect(f.note).not.toMatch(/existing processor/);
+  });
+
+  it('falls back to requiring all three when a conditional does not say what it turns on', () => {
+    const s = snapshot({
+      slots: [conditional],
+      facts: { entityType: 'llc', hasExistingProcessor: null, usDomiciled: true },
+    });
+    const f = one(run(s, ['B']), 'B-05');
+    // A snapshot from before the field existed cannot say. Absent is not none, and reporting a set
+    // as settled on the strength of a field that was not there is the wrong direction to be wrong.
+    expect(f.state).toBe('not_evaluable');
+    expect(f.note).toMatch(/existing processor/);
+  });
 });
 
 /**

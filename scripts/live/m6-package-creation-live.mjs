@@ -16,7 +16,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { loadDocumentsRules, loadSlotTemplate, composeSet, toRows } from '@mintro/ruleset';
+import { loadDocumentsRules, loadSlotTemplate, composeSet, impossibleSlotKeys, toRows } from '@mintro/ruleset';
 import { documents } from '@mintro/engine';
 import { ingestDocument } from '../../apps/worker/dist/src/ingest.js';
 import { createIngestStore, DOCUMENTS_BUCKET } from '../../apps/worker/dist/src/store/ingestStore.js';
@@ -53,18 +53,34 @@ const asAnalyst = await analystClient(createClient, url, process.env.VITE_SUPABA
 const { data: merchantId, error: mErr } = await asAnalyst.rpc('ensure_merchant', {
   p_legal_name: 'Harborline Peptides LLC',
   p_domain: `harborline-${Date.now()}.example`,
+  // The operator's label for finding this package. NOT the report's DBA — that one is extracted
+  // and compared in C-02, and nothing here reaches the masthead (D-126, D-129).
+  p_dba: 'Harborline',
 });
 check('a merchant is created through ensure_merchant', !mErr && Boolean(merchantId),
   mErr ? mErr.message : `merchant ${String(merchantId).slice(0, 8)}...`);
 
-// The three answers. A sole proprietorship has no Articles to supply (D-081).
-const facts = { entityType: 'sole_proprietor', hasExistingProcessor: true, usDomiciled: true };
+/*
+  The three answers.
+
+  A sole proprietorship has no Articles to supply (D-081). Domicile is left **unanswered**, which
+  under D-129 is not a default but a recorded state: both tax forms stay in the set, because with
+  nobody having established the domicile neither can be called impossible. The assertion below is
+  on that, not merely on the Articles.
+*/
+const facts = { entityType: 'sole_proprietor', hasExistingProcessor: null, usDomiciled: null };
 const composed = composeSet(facts, template);
 check('a sole proprietorship is not offered Articles',
   !composed.offered.some((s) => s.slotKey === 'articles_of_incorporation')
     && composed.impossible.some((s) => s.slotKey === 'articles_of_incorporation'),
   `${composed.offered.length} offered, ${composed.impossible.length} impossible: `
     + composed.impossible.map((s) => s.slotKey).join(', '));
+
+const offeredKeys = composed.offered.map((s) => s.slotKey);
+check('an unanswered domicile leaves both tax forms in the set',
+  offeredKeys.includes('w9') && offeredKeys.includes('w8ben')
+    && !composed.impossible.some((s) => s.slotKey === 'w9' || s.slotKey === 'w8ben'),
+  `offered: ${offeredKeys.filter((k) => k === 'w9' || k === 'w8ben').join(', ') || 'neither'}`);
 
 // The operator adjusts: one default out, one named instance in.
 const { slots, removals } = toRows(composed, [
@@ -80,8 +96,22 @@ const { data: packageId, error: pErr } = await asAnalyst.rpc('create_document_pa
   p_processor_key: 'default',
   p_slots: slots,
   p_removals: removals,
+  p_entity_type: facts.entityType,
+  p_has_existing_processor: facts.hasExistingProcessor,
+  p_us_domiciled: facts.usDomiciled,
 });
 if (pErr) throw new Error(`create_document_package: ${pErr.message}`);
+
+// The answers reach the row, and the unanswered ones stay unanswered (D-129). Before 0034 they
+// were React state that produced a slot list and was then discarded, so "why is this slot here"
+// answered "because of an answer nobody recorded".
+const { data: factRow } = await service.from('packages')
+  .select('entity_type, has_existing_processor, us_domiciled, facts_set_by')
+  .eq('id', packageId).single();
+check('the answers are recorded on the package, unknown included',
+  factRow.entity_type === 'sole_proprietor' && factRow.has_existing_processor === null
+    && factRow.us_domiciled === null && factRow.facts_set_by !== null,
+  JSON.stringify(factRow));
 
 const { data: created } = await service.from('slots')
   .select('id, slot_key, origin, instance_label, state, required_count').eq('package_id', packageId);
@@ -90,6 +120,31 @@ const { data: recorded } = await service.from('package_slot_removals')
 
 const origins = new Set(created.map((s) => s.origin));
 check('origin survives to the database for all three kinds', origins.size === 3, [...origins].sort().join(', '));
+
+/*
+  Answering the domicile afterwards.
+
+  `slots_are_never_deleted` (D-097), so this is a waive: the W-8BEN row that was created while the
+  domicile was unknown stays, with `not_applicable_to_entity_type` and `resolved_by = 'fact'`. The
+  row before and after is what proves it was a transition rather than a removal.
+*/
+const w8Before = created.find((s) => s.slot_key === 'w8ben');
+const { data: waivedCount, error: fErr } = await asAnalyst.rpc('set_package_facts', {
+  p_package_id: packageId,
+  p_entity_type: 'sole_proprietor',
+  p_has_existing_processor: null,
+  p_us_domiciled: true,
+  p_waive: impossibleSlotKeys({ ...facts, usDomiciled: true }, template),
+});
+const { data: afterFacts } = await service.from('slots')
+  .select('slot_key, state, reason, resolved_by').eq('package_id', packageId).eq('slot_key', 'w8ben').single();
+check('answering the domicile waives the W-8BEN rather than deleting it',
+  !fErr && waivedCount === 1 && afterFacts.state === 'waived'
+    && afterFacts.reason === 'not_applicable_to_entity_type' && afterFacts.resolved_by === 'fact',
+  fErr ? fErr.message : `waived ${waivedCount}: ${JSON.stringify(afterFacts)}`);
+check('the W-8BEN row still exists, because slots are never deleted',
+  Boolean(w8Before) && Boolean(afterFacts) && w8Before.state === 'missing',
+  `before: ${w8Before?.state ?? 'absent'}, after: ${afterFacts?.state ?? 'absent'}`);
 
 check('the removal is recorded, not merely absent',
   recorded.length === 1 && recorded[0].slot_key === 'proof_of_domain' && recorded[0].origin === 'required'

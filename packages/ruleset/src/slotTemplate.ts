@@ -19,18 +19,46 @@
 import type { DocumentsRules } from './documents/load.js';
 import type { CatalogEntry, TemplateSlot } from './documents/schema.js';
 
-/** The three questions asked at package creation, which drive every conditional (D-081). */
+export type EntityType =
+  | 'sole_proprietor'
+  | 'partnership'
+  | 'llc'
+  | 'corporation'
+  | 'non_profit'
+  | 'government';
+
+/**
+ * The three questions asked at package creation, which drive every conditional (D-081).
+ *
+ * **`null` is "not known yet" (D-129), and it is the default.** At creation the operator often has
+ * not read the documents that carry the answer, and a required dropdown does not obtain it — it
+ * manufactures one. A wrong entity type silently removes a slot that should be present, which is
+ * the failure this system is least able to see from the inside.
+ *
+ * The same shape as `SlotDefinition.requiredCount` under D-107: unknown is not a value. An
+ * `unknown` member of the union would make it something the operator chose.
+ */
 export interface PackageFacts {
-  readonly entityType:
-    | 'sole_proprietor'
-    | 'partnership'
-    | 'llc'
-    | 'corporation'
-    | 'non_profit'
-    | 'government';
-  readonly hasExistingProcessor: boolean;
-  readonly usDomiciled: boolean;
+  readonly entityType: EntityType | null;
+  readonly hasExistingProcessor: boolean | null;
+  readonly usDomiciled: boolean | null;
 }
+
+/** Nothing answered. What a package starts as, and what the creation screen opens on. */
+export const UNKNOWN_FACTS: PackageFacts = {
+  entityType: null,
+  hasExistingProcessor: null,
+  usDomiciled: null,
+};
+
+/**
+ * Whether a conditional fires, does not fire, or **cannot be decided yet**.
+ *
+ * The third case is the whole of D-129. A predicate over an unanswered fact has no truth value, and
+ * collapsing it to `false` would remove a document because nobody had answered a question — which
+ * is indistinguishable, afterwards, from removing it because somebody said it could not exist.
+ */
+export type PredicateOutcome = true | false | 'unknown';
 
 export interface SlotDefinition {
   readonly slotKey: string;
@@ -61,7 +89,7 @@ export interface SlotDefinition {
   /** D-082. A collected-only slot reports "present, not examined" and carries no findings. */
   readonly examined: boolean;
   /** Whether the slot is seeded at all, and why when it depends on the facts. */
-  readonly include: 'always' | 'off' | ((facts: PackageFacts) => boolean);
+  readonly include: 'always' | 'off' | ((facts: PackageFacts) => PredicateOutcome);
   /**
    * True where the operator may add further named instances beside the seeded one — the
    * "state pharmacy licence" / "city business licence" case §4 asks for.
@@ -72,6 +100,17 @@ export interface SlotDefinition {
    * can say *why* a count is unknown rather than merely that it is.
    */
   readonly countDerivedFrom?: 'application_ownership_section';
+  /**
+   * Which of the three answers this conditional turns on. `null` for a non-conditional slot.
+   *
+   * The closure in `include` can *evaluate* a predicate and cannot *name* it, and B-05 needs the
+   * name: it reports whether the answers behind this set are on record, and a set whose only
+   * conditional turns on entity type is not made provisional by an unrecorded domicile. Without
+   * this the check has to assume every conditional depends on every answer, which after D-129
+   * removed the existing-processor question would make it permanently `not_evaluable` for a fact
+   * no predicate reads.
+   */
+  readonly predicateField: string | null;
 }
 
 /**
@@ -104,7 +143,7 @@ function toDefinition(slot: TemplateSlot, catalog: Map<string, CatalogEntry>): S
       ? 'always'
       : slot.origin === 'added'
         ? 'off'
-        : (facts: PackageFacts): boolean => evaluatePredicate(slot.predicate, facts);
+        : (facts: PackageFacts): PredicateOutcome => evaluatePredicate(slot.predicate, facts);
 
   return {
     slotKey: slot.slot_key,
@@ -116,6 +155,7 @@ function toDefinition(slot: TemplateSlot, catalog: Map<string, CatalogEntry>): S
     examined: entry?.examined ?? true,
     include,
     allowsInstances: slot.allows_instances,
+    predicateField: slot.predicate?.field ?? null,
     ...(slot.count_derived_from === 'application_ownership_section'
       ? { countDerivedFrom: 'application_ownership_section' as const }
       : {}),
@@ -127,10 +167,16 @@ function toDefinition(slot: TemplateSlot, catalog: Map<string, CatalogEntry>): S
  *
  * A predicate the loader has already validated: its field is one of the three, and only a
  * conditional slot carries one.
+ *
+ * The `null` guard is first and is not a convenience. Without it `String(null)` is `'null'`, which
+ * every `in` list fails to contain and every `not_in` list fails to exclude — so an unanswered fact
+ * would come out `false` for a whitelist and `true` for a blacklist, which is not one wrong answer
+ * but two, in opposite directions, depending on how the rule happened to be written (D-129).
  */
-function evaluatePredicate(predicate: TemplateSlot['predicate'], facts: PackageFacts): boolean {
+function evaluatePredicate(predicate: TemplateSlot['predicate'], facts: PackageFacts): PredicateOutcome {
   if (predicate === undefined) return true;
   const value = (facts as unknown as Record<string, unknown>)[camel(predicate.field)];
+  if (value === null || value === undefined) return 'unknown';
   if ('equals' in predicate) return value === predicate.equals;
   if ('in' in predicate) return predicate.in.includes(String(value));
   return !predicate.not_in.includes(String(value));
@@ -158,12 +204,18 @@ export function loadSlotTemplate(rules: DocumentsRules): SlotTemplate {
   };
 }
 
-/** The slots a package with these facts actually gets. Conditionals resolved (D-081). */
+/**
+ * The slots a package with these facts actually gets. Conditionals resolved (D-081, D-129).
+ *
+ * An unanswered predicate is **included**. Nothing is removed until a recorded answer establishes
+ * that it cannot exist; absent that, both W-9 and W-8BEN are in the set, because neither can be
+ * called impossible.
+ */
 export function slotsForPackage(facts: PackageFacts, template: SlotTemplate): SlotDefinition[] {
   return template.slots.filter((slot) => {
     if (slot.include === 'off') return false;
     if (slot.include === 'always') return true;
-    return slot.include(facts);
+    return slot.include(facts) !== false;
   });
 }
 

@@ -6,14 +6,23 @@
  * mapping this file had to do was what surfaced that.
  */
 
+import { loadDocumentsRules, loadSlotTemplate } from '@mintro/ruleset';
+
 /**
  * Assemble a PackageSnapshot from rows.
  *
- * `origin` is mapped back on the way out: the column allows 'template' | 'added', the engine and
- * rules/documents.templates.json use 'required' | 'conditional' | 'added'. The two vocabularies
- * disagree and that needs a ruling; this maps rather than pretending it does not.
+ * The three creation answers are **read from the package** since 0034 (D-129). They were a literal
+ * here — `entityType: 'llc'` on every snapshot, in every live script — which made B-05 pass by
+ * construction: it reports whether the conditional predicates can be resolved, and it was being
+ * handed three answers nobody had recorded. The columns exist now, so the snapshot reflects what
+ * the package actually says, including `null` for an unanswered question.
  */
 export async function snapshotOf(service, packageId, runAt) {
+  const { data: pkgRow } = await service
+    .from('packages')
+    .select('entity_type, has_existing_processor, us_domiciled')
+    .eq('id', packageId).single();
+
   const { data: slotRows } = await service
     .from('slots')
     .select('id, slot_key, instance_label, required_count, coverage_monthly, coverage_grace_days, expiry_after_run, examined, origin, state, reason')
@@ -29,10 +38,25 @@ export async function snapshotOf(service, packageId, runAt) {
 
   const slotById = new Map((slotRows ?? []).map((s) => [s.id, s]));
 
+  /*
+    Which answer each conditional slot turns on (D-129).
+
+    Not a column — it is the template's, and the template is the only thing that knows. B-05 reports
+    whether the answers *this set* rests on are recorded, and without this every conditional looks
+    like it might depend on all three, which after the existing-processor question was removed would
+    make the check permanently not_evaluable.
+  */
+  const template = loadSlotTemplate(loadDocumentsRules());
+  const predicateField = new Map(template.slots.map((d) => [d.slotKey, d.predicateField]));
+
   return {
     packageId,
     runAt,
-    facts: { entityType: 'llc', hasExistingProcessor: true, usDomiciled: true },
+    facts: {
+      entityType: pkgRow?.entity_type ?? null,
+      hasExistingProcessor: pkgRow?.has_existing_processor ?? null,
+      usDomiciled: pkgRow?.us_domiciled ?? null,
+    },
     slots: (slotRows ?? []).map((s) => ({
       id: s.id,
       slotKey: s.slot_key,
@@ -45,6 +69,7 @@ export async function snapshotOf(service, packageId, runAt) {
       origin: s.origin,
       state: s.state,
       reason: s.reason,
+      predicateField: s.origin === 'conditional' ? (predicateField.get(s.slot_key) ?? null) : null,
     })),
     documents: (versionRows ?? []).map((v) => {
       const slot = slotById.get(v.documents.slot_id);

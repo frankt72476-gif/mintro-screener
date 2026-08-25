@@ -96,11 +96,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.9)}
 .nav-item[aria-current="true"]{background:rgba(160,60,232,.26);color:#fff}
 .nav-item .ic{width:15px;text-align:center;opacity:.85;font-size:13px}
-.soon{
-  margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8.5px;
-  letter-spacing:.06em;padding:2px 5px;border-radius:4px;
-  background:rgba(245,158,66,.18);color:var(--amber);
-}
 .rail-foot{margin-top:auto;padding:0 10px;font-size:10.5px;color:rgba(255,255,255,.3);line-height:1.6}
 
 /* The PDF reads better than the screen did, and the difference was width and density, not

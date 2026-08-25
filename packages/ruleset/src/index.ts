@@ -81,11 +81,14 @@ export {
   REASON_LABELS,
   DEFAULT_GRACE_DAYS,
   WAIVED_REASONS,
+  UNKNOWN_FACTS,
   loadSlotTemplate,
   slotDefinition,
   slotsForPackage,
+  type EntityType,
   type NotProvidedReason,
   type PackageFacts,
+  type PredicateOutcome,
   type SlotDefinition,
   type SlotTemplate,
   type WaivedReason,
@@ -117,6 +120,7 @@ export function slotTemplateFromFiles(): SlotTemplateType {
 
 export {
   composeSet,
+  impossibleSlotKeys,
   toRows,
   CompositionError,
   type ComposableSlot,

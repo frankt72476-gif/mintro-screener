@@ -387,9 +387,26 @@ describe('slot invariants', () => {
     // because the merchant refused", which is two different facts wearing one label (D-078).
     expect(crossed).toMatch(/reason_matches_its_state/);
 
-    const good = await db.attempt(
+    // A reason with nobody's name against it. D-129: an operator's judgement and a structural
+    // consequence of a recorded answer produce the same row, and something has to say which.
+    const anonymous = await db.attempt(
       `insert into public.slots (package_id, slot_key, required_count, state, reason)
        values ($1, 'r4', 1, 'not_provided', 'new_business_no_processing_history')`,
+      [packageId],
+    );
+    expect(anonymous).toMatch(/resolved_by_present_exactly_when_a_reason_is/);
+
+    // And the reverse: an author against no reason, which would be a decision about nothing.
+    const authorNoReason = await db.attempt(
+      `insert into public.slots (package_id, slot_key, required_count, state, resolved_by)
+       values ($1, 'r5', 1, 'missing', 'operator')`,
+      [packageId],
+    );
+    expect(authorNoReason).toMatch(/resolved_by_present_exactly_when_a_reason_is/);
+
+    const good = await db.attempt(
+      `insert into public.slots (package_id, slot_key, required_count, state, reason, resolved_by)
+       values ($1, 'r6', 1, 'not_provided', 'new_business_no_processing_history', 'operator')`,
       [packageId],
     );
     expect(good).toBeNull();

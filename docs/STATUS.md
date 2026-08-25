@@ -17,7 +17,7 @@ and the received document verified against what the merchant actually did.
 | **Merchant commentary** | Built and verified (D-063). One forwardable link per report, self-declared identity, per-comment attribution, five distinguishable commentary states. |
 | **Live sending** | Working for both messages. The IQwallet report with its PDF, and the merchant invitation, select through one `mailersFor()` (D-064). |
 | **The full loop** | Confirmed on run `5527b180` (swisschems, 97 findings): scan, invite, respond, send, receive. `npm run loop-check -- <run-id>` re-verifies any run. |
-| **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0033`. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
+| **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to the test project, **not yet to production**. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
 
 ### What "verified" means here, because it is not the usual thing
 
@@ -371,7 +371,30 @@ production's state wrongly, and the row now says what is actually there.
 | **A-05's `fail` branch is unreachable** | D-117 | Extraction can read a signature *date* and cannot locate a signature *block*, so every input reaches `signature_block_not_located`. The check stays declared `fail / pass` because the ruleset describes what a check is, not what extraction currently supports. Closing it needs signature-block location in `packages/extraction`. |
 | **C-20, D-05, D-06** | §6 | **Deferred by design**, and the engine filters to `v1` before any handler sees them. C-20 (owner residential address) because people move and an ID is stale often enough to be noise; D-05 and D-06 because nobody has agreed to ship them. |
 | **Section numbering skips 04** | — | Cosmetic, inherited from the mockup, which numbers `01 / 02 / 03 / 05`. The report uses `02 / 03 / 04 / 05`, which is self-consistent and agrees with the mockup on `05`. Nothing depends on it. |
-| **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0033` are the outstanding ones; `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
+| **Production is at `0025`, and already holds data** | D-097 | **An earlier version of this line was wrong** and said production had `0001`–`0018` with nothing ever written. It has `0001`–`0025` — every M1 table — and one package (`processor_key` "verification", opened 2026-08-24T15:59Z), nine slots, three documents, four document versions, five upload rows and one object in the `documents` bucket. **Under D-097 none of it can be removed.** `0026`–`0033` were applied on 2026-08-24; **`0034` has not been, and the deployed frontend still calls the pre-`0034` function signatures**, so this is a migration and a deploy that go together. Of the applied set, `0026` is the only one that touches existing production rows, rewriting nine `origin='template'` values to `'required'` (D-121), which is irreversible and loses which of them were conditional. |
+
+### What D-129 left carried
+
+**Only entity type can be confirmed from a document.** The panel shows what the application says
+and offers a button; it never applies the value (D-129). But it can only do that for entity type —
+domicile is not an extracted field at all. Nothing in `packages/extraction/src/vocabulary.ts` reads
+it, and inferring it from a formation state or from the presence of a W-8BEN would be a derivation
+nobody has ruled on. So **US domicile is answered by a person or it is not answered**, and a package
+whose operator never answers it carries both tax forms indefinitely. That is the correct outcome
+under D-129 and it is also a nag nobody has been asked to live with yet.
+
+**`predicate_inputs_not_extracted` is now a misnomer.** It is B-05's `not_evaluable` reason and it
+reads as though extraction was supposed to supply these answers. D-129 rules the opposite: an
+extracted value is evidence about the answer and never the answer. The key is rule *data*, so
+renaming it is a decision-numbered change to `rules/documents.checks.json` and it would move a
+vocabulary that stored findings already use. Left alone deliberately; the note the check emits says
+"is not recorded", which is accurate.
+
+**`has_existing_processor` is a column nothing writes.** The question was removed entirely (D-129)
+and no predicate reads it, so it is null on every package. It is kept rather than dropped because
+the template's `predicate_inputs` still admits it and a future conditional could use it — and
+because B-05 now reports only on the answers a set's conditionals actually turn on, a permanently
+null column costs nothing. If it is still empty in six months, that is the argument for dropping it.
 
 ### The default set has not been validated against what a processor actually asks for
 

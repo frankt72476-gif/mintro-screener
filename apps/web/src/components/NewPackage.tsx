@@ -1,23 +1,41 @@
 /**
- * Creating a package, and composing its document set — one flow (D-128).
+ * Creating a package, and composing its document set — one flow (D-128, D-129).
  *
- * An analyst has had to insert a row by hand. This replaces that: pick or name a merchant, answer
- * the three questions, adjust the prechecked set, create.
+ * An analyst has had to insert a row by hand. This replaces that: name the merchant, answer what
+ * you know about the business, adjust the prechecked set, create.
  *
- * **The three questions are not preferences.** They resolve structural impossibility (D-081): a
- * sole proprietorship has no Articles to supply, a domestic entity files a W-9 rather than a
- * W-8BEN. What they remove is removed outright and never offered, because a checkbox an operator
- * must remember to untick is a defect waiting for a distracted afternoon. Everything else is theirs
- * to adjust.
+ * ## The questions are answerable with "not known yet", and that is the default (D-129)
  *
- * The impossible slots are still *listed*, greyed and unselectable, with the reason. An absence
- * with no explanation invites a support question; an absence that says why does not.
+ * They resolve structural impossibility (D-081): a sole proprietorship has no Articles to supply, a
+ * domestic entity files a W-9 rather than a W-8BEN. What a recorded answer rules out is removed
+ * outright and never offered, because a checkbox an operator must remember to untick is a defect
+ * waiting for a distracted afternoon.
+ *
+ * But at creation the operator often has not read the documents that carry the answer, and a
+ * required dropdown with a plausible default does not obtain it — it manufactures one. So the
+ * default is **unanswered**, an unanswered predicate does not resolve, and the slot stays in the
+ * set: both tax forms when nobody knows the domicile, Articles when nobody knows the entity type.
+ * Removal is the destructive direction, and it waits for a fact.
+ *
+ * The impossible slots are still *listed*, with the reason. An absence with no explanation invites
+ * a support question; an absence that says why does not.
+ *
+ * ## What is not asked here
+ *
+ * **Existing processor.** No slot predicates on it, and a question that changes nothing trains an
+ * operator to answer without reading. Processing Statements is default-on and resolves through
+ * `not_provided` with a reason, which is the path D-081 already intended (D-129).
+ *
+ * **The merchant, from a dropdown.** Legal name, DBA and domain are typed. The DBA is here because
+ * it is often the only name anybody remembers — and it is *the operator's label for finding this
+ * package*, not the report's DBA. That one is what the documents say, derived once, in C-02
+ * (D-125, D-126, D-129). Nothing here reaches the masthead.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { composeSet, toRows, CompositionError } from '@mintro/ruleset';
-import type { ComposedSet, PackageFacts } from '@mintro/ruleset';
-import type { MerchantOption, PackageCreation } from '../lib/packageCreation';
+import { composeSet, toRows, CompositionError, UNKNOWN_FACTS } from '@mintro/ruleset';
+import type { ComposedSet, EntityType, PackageFacts } from '@mintro/ruleset';
+import type { PackageCreation } from '../lib/packageCreation';
 import { browserSlotTemplate } from '../lib/documentsTemplate';
 
 export interface NewPackageProps {
@@ -26,7 +44,15 @@ export interface NewPackageProps {
   readonly onCancel: () => void;
 }
 
-const ENTITY_TYPES: readonly { readonly value: PackageFacts['entityType']; readonly label: string }[] = [
+/**
+ * `''` is not-known-yet, because a `<select>` value is a string and `null` is not one.
+ *
+ * It is converted at exactly one boundary — `asEntityType` below — so nothing downstream of this
+ * component ever sees the empty string. A sentinel that leaks is a sentinel that gets stored.
+ */
+const NOT_KNOWN = '';
+
+const ENTITY_TYPES: readonly { readonly value: EntityType; readonly label: string }[] = [
   { value: 'sole_proprietor', label: 'Sole proprietorship' },
   { value: 'partnership', label: 'Partnership' },
   { value: 'llc', label: 'LLC' },
@@ -35,15 +61,20 @@ const ENTITY_TYPES: readonly { readonly value: PackageFacts['entityType']; reado
   { value: 'government', label: 'Government' },
 ];
 
-export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): JSX.Element {
-  const [merchants, setMerchants] = useState<readonly MerchantOption[]>([]);
-  const [merchantId, setMerchantId] = useState<string>('');
-  const [newName, setNewName] = useState('');
-  const [newDomain, setNewDomain] = useState('');
+const asEntityType = (value: string): EntityType | null =>
+  ENTITY_TYPES.some((t) => t.value === value) ? (value as EntityType) : null;
 
-  const [entityType, setEntityType] = useState<PackageFacts['entityType']>('llc');
-  const [hasProcessor, setHasProcessor] = useState(true);
-  const [usDomiciled, setUsDomiciled] = useState(true);
+/** Three-valued, and "unsure" is the default. `''` for the same reason as above. */
+type Tristate = 'yes' | 'no' | '';
+const asBoolean = (value: Tristate): boolean | null => (value === '' ? null : value === 'yes');
+
+export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): JSX.Element {
+  const [legalName, setLegalName] = useState('');
+  const [dba, setDba] = useState('');
+  const [domain, setDomain] = useState('');
+
+  const [entityType, setEntityType] = useState<EntityType | ''>(NOT_KNOWN);
+  const [usDomiciled, setUsDomiciled] = useState<Tristate>('');
 
   /** Slot key → included. Seeded from the precheck, then owned by the operator. */
   const [included, setIncluded] = useState<Record<string, boolean>>({});
@@ -51,14 +82,14 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  useEffect(() => {
-    void creation.merchants().then(setMerchants).catch(() => setMerchants([]));
-  }, [creation]);
-
-  const facts: PackageFacts = { entityType, hasExistingProcessor: hasProcessor, usDomiciled };
+  const facts: PackageFacts = {
+    ...UNKNOWN_FACTS,
+    entityType: asEntityType(entityType),
+    usDomiciled: asBoolean(usDomiciled),
+  };
   const composed: ComposedSet = useMemo(
     () => composeSet(facts, browserSlotTemplate()),
-    [entityType, hasProcessor, usDomiciled],
+    [entityType, usDomiciled],
   );
 
   /*
@@ -86,10 +117,11 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
 
     void (async () => {
       try {
-        const id =
-          merchantId !== ''
-            ? merchantId
-            : await creation.ensureMerchant(newName.trim(), newDomain.trim() === '' ? null : newDomain.trim());
+        const merchantId = await creation.ensureMerchant({
+          legalName: legalName.trim(),
+          dba: dba.trim() === '' ? null : dba.trim(),
+          domain: domain.trim() === '' ? null : domain.trim(),
+        });
 
         const { slots, removals } = toRows(
           composed,
@@ -100,7 +132,9 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
           })),
         );
 
-        onCreated(await creation.create({ merchantId: id, processorKey: 'default', slots, removals }));
+        onCreated(
+          await creation.create({ merchantId, processorKey: 'default', slots, removals, facts }),
+        );
       } catch (error) {
         setBusy(false);
         // A CompositionError says what is wrong with the set in the operator's terms; anything else
@@ -110,8 +144,8 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
     })();
   };
 
-  const namedMerchant = merchantId !== '' || newName.trim() !== '';
   const chosenCount = composed.offered.filter((s) => isIncluded(s.slotKey, s.prechecked)).length;
+  const openQuestions = composed.offered.filter((s) => s.unresolved).length;
 
   return (
     <div className="veil on" onClick={(e) => e.target === e.currentTarget && onCancel()}>
@@ -124,57 +158,65 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
           {/* 1 — the merchant */}
           <section className="np-step">
             <h3>1 · Merchant</h3>
-            <select
-              className="input"
-              value={merchantId}
-              onChange={(e) => setMerchantId(e.target.value)}
-              disabled={busy}
-              aria-label="Existing merchant"
-            >
-              <option value="">— create a new merchant —</option>
-              {merchants.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.legalName ?? m.domain}
-                </option>
-              ))}
-            </select>
-            {merchantId === '' && (
-              <div className="np-new-merchant">
+            <p className="np-why">
+              How this package is found later. The DBA here is what you call them — what the report
+              prints is what the documents say.
+            </p>
+            <div className="np-fields">
+              <label className="np-field">
+                <span className="np-field-label">Legal name</span>
                 <input
                   className="input"
-                  placeholder="Legal name (required)"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  value={legalName}
+                  onChange={(e) => setLegalName(e.target.value)}
                   disabled={busy}
                   aria-label="Legal name"
                 />
+              </label>
+              <label className="np-field">
+                <span className="np-field-label">
+                  DBA <span className="np-optional">optional</span>
+                </span>
                 <input
                   className="input"
-                  placeholder="Domain (optional)"
-                  value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
+                  value={dba}
+                  onChange={(e) => setDba(e.target.value)}
+                  disabled={busy}
+                  aria-label="DBA"
+                />
+              </label>
+              <label className="np-field">
+                <span className="np-field-label">
+                  Domain <span className="np-optional">optional</span>
+                </span>
+                <input
+                  className="input"
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
                   disabled={busy}
                   aria-label="Domain"
                 />
-              </div>
-            )}
+              </label>
+            </div>
           </section>
 
-          {/* 2 — the three questions */}
+          {/* 2 — what is known about the business */}
           <section className="np-step">
             <h3>2 · About the business</h3>
             <p className="np-why">
-              These decide which documents can exist at all. What they rule out is not offered below.
+              Answer only what you know. An unanswered question leaves every document it touches in
+              the set — nothing is removed until there is an answer to remove it.
             </p>
             <div className="np-answers">
-              <label>
-                Entity type
+              <label className="np-field">
+                <span className="np-field-label">Entity type</span>
                 <select
                   className="input"
                   value={entityType}
-                  onChange={(e) => setEntityType(e.target.value as PackageFacts['entityType'])}
+                  onChange={(e) => setEntityType(e.target.value === NOT_KNOWN ? NOT_KNOWN : (e.target.value as EntityType))}
                   disabled={busy}
                 >
+                  <option value={NOT_KNOWN}>Not known yet</option>
                   {ENTITY_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
@@ -182,16 +224,15 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
                   ))}
                 </select>
               </label>
-              <label>
-                Has an existing processor
-                <select className="input" value={hasProcessor ? 'yes' : 'no'} onChange={(e) => setHasProcessor(e.target.value === 'yes')} disabled={busy}>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
-              <label>
-                US-domiciled
-                <select className="input" value={usDomiciled ? 'yes' : 'no'} onChange={(e) => setUsDomiciled(e.target.value === 'yes')} disabled={busy}>
+              <label className="np-field">
+                <span className="np-field-label">US-domiciled</span>
+                <select
+                  className="input"
+                  value={usDomiciled}
+                  onChange={(e) => setUsDomiciled(e.target.value as Tristate)}
+                  disabled={busy}
+                >
+                  <option value="">Not sure</option>
                   <option value="yes">Yes</option>
                   <option value="no">No</option>
                 </select>
@@ -202,13 +243,18 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
           {/* 3 — the set */}
           <section className="np-step">
             <h3>3 · Documents</h3>
-            <p className="np-why">{chosenCount} selected. Prechecked from the default set; adjust as needed.</p>
+            <p className="np-why">
+              {chosenCount} selected. Prechecked from the default set; adjust as needed.
+              {openQuestions === 0
+                ? null
+                : ` ${openQuestions} ${openQuestions === 1 ? 'is' : 'are'} here pending an answer above.`}
+            </p>
 
             <ul className="np-slots">
               {composed.offered.map((slot) => {
                 const on = isIncluded(slot.slotKey, slot.prechecked);
                 return (
-                  <li key={slot.slotKey} data-origin={slot.origin} data-included={on}>
+                  <li key={slot.slotKey} data-origin={slot.origin} data-included={on} data-unresolved={slot.unresolved}>
                     {/*
                       Three grid areas: the box, the name, the metadata.
 
@@ -231,7 +277,7 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
                       />
                       <span className="np-name">{slot.title}</span>{' '}
                       <span className="np-meta">
-                        <span className="np-origin" data-origin={slot.origin}>
+                        <span className="np-origin" data-origin={slot.origin} data-unresolved={slot.unresolved}>
                           {slot.origin}
                         </span>{' '}
                         {slot.requiredCount === null ? (
@@ -245,7 +291,11 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
                     </label>
 
                     {/* Attached to the row it explains, in the name's column — not a loose paragraph. */}
-                    {slot.because === null ? null : <p className="np-because">{slot.because}</p>}
+                    {slot.because === null ? null : (
+                      <p className="np-because" data-unresolved={slot.unresolved}>
+                        {slot.because}
+                      </p>
+                    )}
 
                     {on && slot.allowsInstances && (
                       <input
@@ -285,7 +335,11 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
           <button className="btn btn-ghost" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={create} disabled={busy || !namedMerchant || chosenCount === 0}>
+          <button
+            className="btn btn-primary"
+            onClick={create}
+            disabled={busy || legalName.trim() === '' || chosenCount === 0}
+          >
             {busy ? 'Creating…' : 'Create package'}
           </button>
         </div>

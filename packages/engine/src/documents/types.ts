@@ -40,6 +40,15 @@ export interface SlotSnapshot {
   readonly origin: 'required' | 'conditional' | 'added';
   readonly state: SlotState;
   readonly reason: string | null;
+  /**
+   * Which creation answer a conditional slot turns on (D-129). `null` for other origins.
+   *
+   * **Optional, and absent means "not known which"** — a snapshot assembled before this field
+   * existed cannot say, and B-05 falls back to requiring all three rather than assuming a
+   * conditional depends on nothing. The conservative direction is the one that reports a set as
+   * provisional when it might be, not the one that reports it as settled when it might not.
+   */
+  readonly predicateField?: string | null;
 }
 
 export interface DocumentSnapshot {

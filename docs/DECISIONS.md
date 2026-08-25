@@ -4703,6 +4703,10 @@ whatever order the files arrived in.
 ## D-081 — Conditionals fire on structural impossibility only
 **2026-08-24 · Frank's ruling**
 
+**Further amended by D-129 — see below.** A conditional whose predicate is unanswered does not
+resolve: the slot is offered rather than removed, because impossibility must be established, not
+assumed.
+
 **Amended by D-128 — see below.** The three questions still remove structurally impossible slots
 outright; everything else in the set is now adjustable by the operator per package.
 
@@ -6854,6 +6858,9 @@ pattern costs nothing, and it is not a faithful renderer for looking at our own 
 ## D-126 — A run records the identity it rendered under
 **2026-08-24 · Frank's ruling · migration 0032**
 
+**Amended by D-129 — see below.** An operator-typed DBA is now captured at package creation as a
+label for finding the merchant. It is not the report's DBA and does not reach the masthead.
+
 `document_runs` carries the merchant name and domain the run was rendered for. The report route
 reads them off the run, not off the merchant row.
 
@@ -7006,6 +7013,100 @@ I built the per-processor structure from D-101's wording without asking whether 
 existed or was expected. The file was correct against the ruling and wrong about the product, and
 nothing in the tests could have caught that — they check a template loads, not that the shape of
 the file describes something real.
+
+---
+
+## D-129 — The three answers accept "not known yet", and are recorded
+**2026-08-25 · Frank's ruling · amends D-081, D-126, D-128 · migration 0034**
+
+Entity type, existing processor and US domicile accept **not known yet**, that is the default, and
+all three are stored on the package.
+
+### They were never in the schema
+
+`packages` had thirteen columns and none of them was any of these. The answers lived as React state,
+produced a slot list, and were discarded. The package recorded the *result* — which slots, with
+which origin — and not the inputs.
+
+So *"why is this slot here"* already answered **"because of an answer nobody recorded"**, which is
+the gap D-121 was written to close. That is a defect independent of this ruling and it is fixed by
+the same three columns.
+
+Three nullable columns, and **NULL is "not known yet"**. The same shape as `slots.required_count`
+under D-107: unknown is not a value, and giving it one — an `unknown` enum member, a sentinel string
+— would make it a thing the operator chose rather than a thing nobody has established.
+
+### Forcing a guess is worse than allowing unknown
+
+At creation the operator often does not know the entity type. The answer is in the documents they
+are about to upload. A required dropdown with a plausible default does not obtain the answer; it
+manufactures one, and a wrong entity type **silently removes a slot that should be present**.
+
+So: **a conditional whose predicate is unanswered does not resolve.** The slot is offered and
+prechecked, never removed. Structural impossibility removes a document only when the fact
+establishing it is known — both W-9 and W-8BEN are offered when domicile is unknown, and Articles
+is offered when entity type is unknown, because we cannot say which is impossible.
+
+This is D-107 one level up. There the count is unknown so nothing can be called absent; here the
+fact is unknown so nothing can be called impossible. The wrong answer in both cases is the
+confident one.
+
+### Resolution after creation is a waive, not a delete
+
+An operator who learns the entity type from the EIN letter updates it, and the conditionals resolve
+then. But the slot already exists and `slots_are_never_deleted` (D-097) means it cannot be removed.
+
+It transitions to `waived` with `not_applicable_to_entity_type`, which the reason enumeration
+already carries and `reason_matches_its_state` already accepts.
+
+**And `resolved_by` records whether that was `operator` or `fact`.** Both produce the same row with
+the same reason, and they are not the same event: one is a person's judgement, the other a
+structural consequence of an answer. D-128 turns on keeping those separable — a package with an
+unusual set has two possible explanations, the facts or a person, and something has to say which.
+
+### Extraction surfaces these answers and never applies them
+
+Extraction can read entity type off the application, and C-05 already compares it across three
+documents. The data will be there. It still does not get to decide.
+
+**D-088 removed confidence from extraction deliberately.** An extracted "LLC" is a value with
+provenance and no score. That is the right shape for a finding a human reads and the wrong shape for
+a fact that silently deletes a requirement — there is no threshold to gate on, because we built
+none on purpose.
+
+**An extracted value is evidence about the answer, not the answer.** Treating a page-tier read of a
+photographed application as *known* is exactly the overreach this state exists to prevent. The
+ruling above says a document is impossible only when the establishing fact is known; a model's
+reading of a scan is not that.
+
+**And the circularity decides it.** An extracted entity type can remove the very document C-05
+compares it against. C-05 then passes on fewer sources, with nothing on the page saying why the set
+shrank. That is a report which looks complete and is not — the failure this system is least able to
+see from the inside, and the one every other ruling here is arranged against.
+
+So the build is a **one-click confirmation**: the value and its provenance, shown as
+*"the application states LLC · application p.1"*. The operator owns the answer; the system does the
+reading and the reminder. The audit then says the fact was set by a person, at a time, having been
+shown a specific document — which is a sentence worth being able to write.
+
+### Four corrections to the creation modal, ruled at the same time
+
+**The merchant dropdown is gone.** Legal name, DBA and domain are typed. The DBA is there because
+the DBA is often the name anybody actually remembers.
+
+**That DBA is not the report's DBA.** It is the operator's label for finding a merchant, entered
+before any document has been read. It does not feed C-02, which compares what the *documents* say,
+and it does not reach the report masthead — D-126 leaves that empty until the report data carries
+one. Two names that look alike and mean different things: one is how we find the package, the other
+is what the paperwork claims. Wiring the first into the second would be D-125's failure, a display
+assembled from a second derivation.
+
+**The existing-processor question is removed entirely.** No slot predicates on it, and asking a
+question that changes nothing trains an operator to answer without reading. The column stays and
+stays null: Processing Statements is default-on and resolves through `not_provided` with a reason,
+which is the path D-081 already intended for a merchant with no processing history.
+
+**US domicile gets "Not sure"**, on the same reasoning as the rest of this ruling.
 
 ---
 

@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { composeSet, toRows, CompositionError } from '../src/composeSet.js';
-import { loadSlotTemplate } from '../src/slotTemplate.js';
+import { composeSet, impossibleSlotKeys, toRows, CompositionError } from '../src/composeSet.js';
+import { loadSlotTemplate, UNKNOWN_FACTS } from '../src/slotTemplate.js';
 import { loadDocumentsRules } from '../src/documents/loadFile.js';
 
 const TEMPLATE = loadSlotTemplate(loadDocumentsRules());
@@ -219,5 +219,94 @@ describe('the explanations are copy an operator reads', () => {
       // "you-ess" — a consonant sound. A letter-based check flags right copy as wrong, which is
       // why the article lives in ENTITY_PHRASE rather than being derived.
     }
+  });
+});
+
+// --- not known yet (D-129) -----------------------------------------------------------------------
+
+/*
+  The third outcome.
+
+  Before D-129 a predicate returned a boolean and the three answers had defaults, so "nobody has
+  said" was indistinguishable from "somebody said no" — and for a `not_in` predicate it would have
+  come out the other way, indistinguishable from "somebody said yes". Two wrong answers in opposite
+  directions depending on how the rule happened to be written.
+
+  What these pin is that unknown resolves *nothing*. Not that it resolves conservatively — that it
+  does not resolve, because impossibility has to be established.
+*/
+describe('an unanswered question removes nothing', () => {
+  it('offers every conditional when all three answers are unknown', () => {
+    const set = composeSet(UNKNOWN_FACTS, TEMPLATE);
+    expect(set.impossible).toEqual([]);
+    for (const key of ['articles_of_incorporation', 'w9', 'w8ben']) {
+      expect(keys(set.offered), `${key} was not offered`).toContain(key);
+    }
+  });
+
+  it('offers both tax forms while the domicile is unknown, and neither is impossible', () => {
+    const set = composeSet(facts({ usDomiciled: null }), TEMPLATE);
+    // The pair is the clearest case: exactly one of them is genuinely impossible, and we do not
+    // know which, so neither may be removed.
+    expect(keys(set.offered)).toEqual(expect.arrayContaining(['w9', 'w8ben']));
+    expect(keys(set.impossible)).toEqual([]);
+  });
+
+  it('prechecks an unresolved conditional, exactly as a fired one', () => {
+    const set = composeSet(UNKNOWN_FACTS, TEMPLATE);
+    const w9 = set.offered.find((s) => s.slotKey === 'w9');
+    // Prechecked, not merely available. The operator has to opt *out* of a document that might be
+    // required, never opt in to one.
+    expect(w9?.prechecked).toBe(true);
+    expect(w9?.origin).toBe('conditional');
+  });
+
+  it('says the question is open rather than inventing a reason', () => {
+    const set = composeSet(UNKNOWN_FACTS, TEMPLATE);
+    const articles = set.offered.find((s) => s.slotKey === 'articles_of_incorporation');
+    expect(articles?.unresolved).toBe(true);
+    // "an LLC files formation documents" would be a claim about a business nobody has described.
+    expect(articles?.because).toBe('entity type is not recorded, so this stays in the set');
+    expect(articles?.because).not.toMatch(/LLC|proprietor/);
+  });
+
+  it('marks a conditional that actually fired as resolved', () => {
+    const set = composeSet(facts({ entityType: 'llc' }), TEMPLATE);
+    const articles = set.offered.find((s) => s.slotKey === 'articles_of_incorporation');
+    // Both are offered and prechecked; only the flag separates "settled" from "pending", so it has
+    // to discriminate or the screen cannot mark one and not the other.
+    expect(articles?.unresolved).toBe(false);
+    expect(articles?.because).toBe('an LLC files formation documents');
+  });
+
+  it('resolves one question without disturbing the other', () => {
+    const set = composeSet(facts({ entityType: null, usDomiciled: false }), TEMPLATE);
+    expect(keys(set.impossible)).toEqual(['w9']);
+    expect(set.offered.find((s) => s.slotKey === 'articles_of_incorporation')?.unresolved).toBe(true);
+    expect(set.offered.find((s) => s.slotKey === 'w8ben')?.unresolved).toBe(false);
+  });
+});
+
+describe('impossibleSlotKeys is the same derivation the screen composes with', () => {
+  /*
+    One derivation, not two that agree until a predicate changes (D-125).
+
+    `set_package_facts` waives what this returns. If it could disagree with `composeSet`, answering
+    a question after creation would remove a different set from answering it before — and the two
+    packages would look identical afterwards.
+  */
+  it('agrees with composeSet for every combination', () => {
+    const entities = [null, 'sole_proprietor', 'llc', 'corporation', 'non_profit'] as const;
+    for (const entityType of entities) {
+      for (const usDomiciled of [null, true, false]) {
+        const f = facts({ entityType, usDomiciled });
+        expect(impossibleSlotKeys(f, TEMPLATE).slice().sort(), `${entityType}/${usDomiciled}`)
+          .toEqual(keys(composeSet(f, TEMPLATE).impossible).sort());
+      }
+    }
+  });
+
+  it('returns nothing at all when nothing is known', () => {
+    expect(impossibleSlotKeys(UNKNOWN_FACTS, TEMPLATE)).toEqual([]);
   });
 });
