@@ -13,10 +13,14 @@
  * nothing can be staged without one existing. The right shape — and invisible until a live run,
  * because PGlite has no `auth` schema to have a foreign key into.
  */
+export const ANALYST_PASSWORD = 'verify-only-not-a-secret';
+
 export async function ensureAnalyst(service, email = 'verify@gomintro.com') {
   const listed = await service.auth.admin.listUsers();
   const found = (listed.data?.users ?? []).find((u) => u.email === email);
-  const user = found ?? (await service.auth.admin.createUser({ email, email_confirm: true })).data?.user;
+  const user = found
+    ? (await service.auth.admin.updateUserById(found.id, { password: ANALYST_PASSWORD })).data?.user ?? found
+    : (await service.auth.admin.createUser({ email, password: ANALYST_PASSWORD, email_confirm: true })).data?.user;
   if (!user) throw new Error(`could not create or find the auth user ${email}`);
 
   const { data, error } = await service
@@ -54,4 +58,19 @@ export function slotRow(packageId, definition) {
     examined: definition.examined,
     state: definition.requiredCount === null ? 'not_evaluable' : 'missing',
   };
+}
+
+/**
+ * A client signed in as the analyst.
+ *
+ * `service_role` has no `auth.uid()`, so it fails `is_analyst()` — which is the guard working, and
+ * also why a service-role script cannot exercise the creation functions at all. Anything testing
+ * what an *operator* may do has to hold an operator's session, not a key that bypasses the question.
+ */
+export async function analystClient(createClient, url, anonKey, service, email = 'verify@gomintro.com') {
+  await ensureAnalyst(service, email);
+  const client = createClient(url, anonKey, { auth: { persistSession: false } });
+  const { error } = await client.auth.signInWithPassword({ email, password: ANALYST_PASSWORD });
+  if (error) throw new Error(`could not sign in as ${email}: ${error.message}`);
+  return client;
 }

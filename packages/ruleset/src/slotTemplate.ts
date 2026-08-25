@@ -16,8 +16,7 @@
  * D-107's. This module resolves conditionals (D-081) and nothing else.
  */
 
-import { loadDocumentsRules } from './documents/loadFile.js';
-import { processorTemplate, type DocumentsRules } from './documents/load.js';
+import type { DocumentsRules } from './documents/load.js';
 import type { CatalogEntry, TemplateSlot } from './documents/schema.js';
 
 /** The three questions asked at package creation, which drive every conditional (D-081). */
@@ -88,18 +87,10 @@ export interface SlotDefinition {
  */
 export const DEFAULT_GRACE_DAYS = 10;
 
-/**
- * The processor whose set is used when a package does not name one.
- *
- * Per-processor sets are not yet supplied. Adding one is an entry in
- * `rules/documents.templates.json` and nothing else — no code here, no schema change. That is
- * D-101's whole claim, and `documents.test.ts` proves it rather than asserting it.
- */
-export const DEFAULT_PROCESSOR = 'default';
-
 export interface SlotTemplate {
   readonly version: string;
-  readonly processorKey: string;
+  /** One set, not a processor's (D-128). */
+  readonly label: string;
   readonly slots: readonly SlotDefinition[];
 }
 
@@ -151,31 +142,24 @@ function camel(snake: string): string {
 }
 
 /**
- * The full catalogue for a processor, including slots that are off by default.
+ * The full catalogue, including the slots that are off by default (D-128).
  *
- * Reads the files on every call. They are small, and a cached template is a file edit that does
- * not take effect until a restart — which is the wrong failure for the file a human hand-edits.
+ * Takes parsed rules rather than reading them: this module has to run in a browser, and a static
+ * import of the filesystem loader would drag `node:fs` into the frontend bundle. The Node entry
+ * wraps it with a form that reads the files, so callers there are unchanged.
  */
-export function loadSlotTemplate(processorKey: string = DEFAULT_PROCESSOR, rules?: DocumentsRules): SlotTemplate {
-  const loaded = rules ?? loadDocumentsRules();
-  const processor = processorTemplate(loaded, processorKey);
-  if (processor === undefined) {
-    const known = loaded.templates.processors.map((p) => p.key).join(', ');
-    throw new Error(
-      `rules/documents.templates.json defines no processor '${processorKey}' (it defines: ${known}). ` +
-        'Adding one is an entry in that file and nothing else.',
-    );
-  }
+export function loadSlotTemplate(rules: DocumentsRules): SlotTemplate {
+  const loaded = rules;
   const catalog = new Map(loaded.checks.catalog.map((c) => [c.key, c]));
   return {
     version: loaded.templates.version,
-    processorKey,
-    slots: processor.slots.map((slot) => toDefinition(slot, catalog)),
+    label: loaded.templates.template.label,
+    slots: loaded.templates.template.slots.map((slot) => toDefinition(slot, catalog)),
   };
 }
 
 /** The slots a package with these facts actually gets. Conditionals resolved (D-081). */
-export function slotsForPackage(facts: PackageFacts, template: SlotTemplate = loadSlotTemplate()): SlotDefinition[] {
+export function slotsForPackage(facts: PackageFacts, template: SlotTemplate): SlotDefinition[] {
   return template.slots.filter((slot) => {
     if (slot.include === 'off') return false;
     if (slot.include === 'always') return true;
@@ -183,7 +167,7 @@ export function slotsForPackage(facts: PackageFacts, template: SlotTemplate = lo
   });
 }
 
-export function slotDefinition(slotKey: string, template: SlotTemplate = loadSlotTemplate()): SlotDefinition | undefined {
+export function slotDefinition(slotKey: string, template: SlotTemplate): SlotDefinition | undefined {
   return template.slots.find((slot) => slot.slotKey === slotKey);
 }
 

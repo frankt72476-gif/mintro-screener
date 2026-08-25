@@ -19,6 +19,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DocumentsSendModal } from './DocumentsSendModal';
+import { NewPackage } from './NewPackage';
+import { createPackageCreation } from '../lib/packageCreation';
 import {
   createDocumentsSendQueue,
   type DocumentsSendQueue,
@@ -106,6 +108,8 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
   const [sendable, setSendable] = useState<Sendability | null>(null);
   const [history, setHistory] = useState<readonly PastSend[]>([]);
   const sendQueue = useRef<DocumentsSendQueue>(createDocumentsSendQueue(client, analystId));
+  const creation = useRef(createPackageCreation(client));
+  const [creating, setCreating] = useState(false);
   const packages = useRef(createPackages(client));
 
   const refresh = useCallback(async () => {
@@ -177,12 +181,26 @@ export function DocumentsPane({ client, analystId, packageId }: DocumentsPanePro
   if (packageId === null) {
     return (
       <>
-        <div className="planned">◷ No package open</div>
         <h1>Documents check</h1>
         <p className="sub">
-          Uploads attach to a package — an application attempt, not a merchant. Creating one is not
-          built yet.
+          Uploads attach to a package — an application attempt, not a merchant. Create one to begin.
         </p>
+        <div className="doc-send">
+          <button className="btn btn-primary" onClick={() => setCreating(true)}>
+            New package
+          </button>
+        </div>
+        {creating && (
+          <NewPackage
+            creation={creation.current}
+            onCancel={() => setCreating(false)}
+            // The package is opened by navigating to it, so a reload lands on the same place and
+            // the URL is shareable — the same `?package=` the upload page already reads.
+            onCreated={(id) => {
+              window.location.search = `?package=${id}`;
+            }}
+          />
+        )}
       </>
     );
   }

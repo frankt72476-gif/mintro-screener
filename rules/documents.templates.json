@@ -1,211 +1,210 @@
 {
-  "$comment": [
-    "Per-processor required document sets. THIS IS THE FILE THAT IS HAND-EDITED.",
-    "",
-    "Adding a processor is one entry in `processors` and nothing else — no code, no schema change,",
-    "no migration. That property is the whole point of splitting this from documents.checks.json",
-    "(D-101), and there is a test that proves it rather than asserting it.",
-    "",
-    "Every `slot_key` must name an entry in documents.checks.json's catalog. The loader refuses to",
-    "load if one does not — a requirement that silently does not exist is worse than a missing one,",
-    "and a warning on startup is a line nobody reads in a log nobody opens.",
-    "",
-    "Coverage is expressed in the terms D-113 already settled; it is not redefined here. `monthly`",
-    "means the required months are the last complete calendar months ending on or before",
-    "(run date − grace), counted back `required_count` times. Slot states are D-107's six.",
-    "",
-    "origin:  required     — always in the set",
-    "         conditional  — in the set unless a predicate makes it structurally impossible (D-081)",
-    "         added        — never seeded; an operator adds named instances (D-112)"
-  ],
-
+  "$comment": "Documents Check required sets. THEIRS \u2014 this file changes when what a package must contain changes (D-101). ONE default set, prechecked at package creation and adjusted per package by the operator (D-128): there is no per-processor requirement set and nothing on the back end ties a package to one. The `origin` on each slot says why it is here \u2014 required (always asked), conditional (D-081, resolved by the three creation answers), added (offered from the catalog, never prechecked).",
   "version": "1.0.0",
-
   "predicate_inputs": {
     "$comment": "The three questions asked at package creation. Nothing else may be predicated on.",
-    "entity_type": ["sole_proprietor", "partnership", "llc", "corporation", "non_profit", "government"],
+    "entity_type": [
+      "sole_proprietor",
+      "partnership",
+      "llc",
+      "corporation",
+      "non_profit",
+      "government"
+    ],
     "has_existing_processor": "boolean",
     "us_domiciled": "boolean"
   },
-
-  "processors": [
-    {
-      "key": "default",
-      "label": "Default requirement set",
-      "note": "From CHECK-INVENTORY §4. The only set supplied so far; a per-processor set is an entry beside this one.",
-      "slots": [
-        {
-          "slot_key": "application",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false
+  "template": {
+    "label": "Default document set",
+    "slots": [
+      {
+        "slot_key": "application",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "ein_letter",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "voided_check",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "bank_statement",
+        "required_count": 3,
+        "coverage": {
+          "monthly": true,
+          "grace_days": 10
         },
-        {
-          "slot_key": "ein_letter",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "processing_statement",
+        "required_count": 3,
+        "coverage": {
+          "monthly": true,
+          "grace_days": 10
         },
-        {
-          "slot_key": "voided_check",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false,
+        "note": "Default-on for every package including startups (D-081). 'Startup' is not structural impossibility \u2014 plenty of new merchants have processing history under another entity \u2014 so the slot stays and resolves to not_provided with a reason. The report then says we asked and there are none."
+      },
+      {
+        "slot_key": "owner_photo_id",
+        "required_count": null,
+        "count_derived_from": "application_ownership_section",
+        "coverage": null,
+        "expiry_after_run": true,
+        "origin": "required",
+        "allows_instances": false,
+        "note": "required_count null means unknown, and unknown is not zero. Until the ownership section is read we do not know how many to expect, so the slot is not_evaluable rather than missing (D-107)."
+      },
+      {
+        "slot_key": "proof_of_domain",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "required",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "articles_of_incorporation",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "conditional",
+        "predicate": {
+          "field": "entity_type",
+          "not_in": [
+            "sole_proprietor"
+          ]
         },
-        {
-          "slot_key": "bank_statement",
-          "required_count": 3,
-          "coverage": { "monthly": true, "grace_days": 10 },
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false
+        "allows_instances": false,
+        "note": "A sole proprietorship has no articles. Structural impossibility \u2014 D-081's first example."
+      },
+      {
+        "slot_key": "w9",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "conditional",
+        "predicate": {
+          "field": "us_domiciled",
+          "equals": true
         },
-        {
-          "slot_key": "processing_statement",
-          "required_count": 3,
-          "coverage": { "monthly": true, "grace_days": 10 },
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false,
-          "note": "Default-on for every package including startups (D-081). 'Startup' is not structural impossibility — plenty of new merchants have processing history under another entity — so the slot stays and resolves to not_provided with a reason. The report then says we asked and there are none."
+        "allows_instances": false
+      },
+      {
+        "slot_key": "w8ben",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "conditional",
+        "predicate": {
+          "field": "us_domiciled",
+          "equals": false
         },
-        {
-          "slot_key": "owner_photo_id",
-          "required_count": null,
-          "count_derived_from": "application_ownership_section",
-          "coverage": null,
-          "expiry_after_run": true,
-          "origin": "required",
-          "allows_instances": false,
-          "note": "required_count null means unknown, and unknown is not zero. Until the ownership section is read we do not know how many to expect, so the slot is not_evaluable rather than missing (D-107)."
-        },
-        {
-          "slot_key": "proof_of_domain",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "required",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "articles_of_incorporation",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "conditional",
-          "predicate": { "field": "entity_type", "not_in": ["sole_proprietor"] },
-          "allows_instances": false,
-          "note": "A sole proprietorship has no articles. Structural impossibility — D-081's first example."
-        },
-        {
-          "slot_key": "w9",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "conditional",
-          "predicate": { "field": "us_domiciled", "equals": true },
-          "allows_instances": false
-        },
-        {
-          "slot_key": "w8ben",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "conditional",
-          "predicate": { "field": "us_domiciled", "equals": false },
-          "allows_instances": false,
-          "note": "Two slots with opposite predicates, not one row accepting either (D-111). One slot would be satisfied by whichever arrived, so a domestic entity filing a W-8BEN would satisfy its tax-form requirement with a document that cannot exist for it."
-        },
-        {
-          "slot_key": "dba_filing",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false,
-          "note": "Off by default. D-102 item 3 leaves it open whether this becomes required; seeded as a definition so turning it on is a flag rather than a schema change."
-        },
-        {
-          "slot_key": "business_license",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": true,
-          "origin": "added",
-          "allows_instances": true,
-          "note": "No variable-count slots (D-112). An operator adds named instances, each with a count of 1 — 'state pharmacy licence' beside 'city business licence'. A 0..n slot could not tell 'no licence required' from 'no licence supplied'."
-        },
-        {
-          "slot_key": "proof_of_business_address",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "fulfillment_policy",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "product_service_description",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "irs_501c_letter",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "third_party_fulfillment_agreement",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "other_fulfillment_agreements",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "coa",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": false
-        },
-        {
-          "slot_key": "additional_document",
-          "required_count": 1,
-          "coverage": null,
-          "expiry_after_run": false,
-          "origin": "added",
-          "allows_instances": true,
-          "note": "Requires an operator-supplied label at the point of adding (§3). Otherwise the report line reads 'Additional Document: satisfied', which tells the reader nothing."
-        }
-      ]
-    }
-  ]
+        "allows_instances": false,
+        "note": "Two slots with opposite predicates, not one row accepting either (D-111). One slot would be satisfied by whichever arrived, so a domestic entity filing a W-8BEN would satisfy its tax-form requirement with a document that cannot exist for it."
+      },
+      {
+        "slot_key": "dba_filing",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false,
+        "note": "Off by default. D-102 item 3 leaves it open whether this becomes required; seeded as a definition so turning it on is a flag rather than a schema change."
+      },
+      {
+        "slot_key": "business_license",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": true,
+        "origin": "added",
+        "allows_instances": true,
+        "note": "No variable-count slots (D-112). An operator adds named instances, each with a count of 1 \u2014 'state pharmacy licence' beside 'city business licence'. A 0..n slot could not tell 'no licence required' from 'no licence supplied'."
+      },
+      {
+        "slot_key": "proof_of_business_address",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "fulfillment_policy",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "product_service_description",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "irs_501c_letter",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "third_party_fulfillment_agreement",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "other_fulfillment_agreements",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "coa",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": false
+      },
+      {
+        "slot_key": "additional_document",
+        "required_count": 1,
+        "coverage": null,
+        "expiry_after_run": false,
+        "origin": "added",
+        "allows_instances": true,
+        "note": "Requires an operator-supplied label at the point of adding (\u00a73). Otherwise the report line reads 'Additional Document: satisfied', which tells the reader nothing."
+      }
+    ]
+  }
 }

@@ -20,3 +20,43 @@ export {
 export { checkInvariants, checkInvariantsOn, type IndexedRule } from './invariants.js';
 export { PARAMS_BY_CHECK_TYPE } from './params.js';
 export * from './vocabulary.js';
+
+/*
+  Documents Check, browser half.
+
+  `loadDocumentsRules` and `loadSlotTemplate`'s file-reading form stay behind in the Node entry —
+  they need a filesystem. Everything below takes already-parsed values, so the browser imports the
+  two JSON files as modules and runs them through **the same parser the worker uses**. One
+  definition of a valid rule file (hard constraint 1); a second one for the frontend is how the two
+  come to disagree about what a template may contain.
+*/
+export {
+  parseDocumentsRules,
+  DocumentsValidationError,
+  slotSet,
+  checksInRelease,
+  type DocumentsRules,
+  type DocumentsDefect,
+} from './documents/load.js';
+export {
+  loadSlotTemplate,
+  slotsForPackage,
+  slotDefinition,
+  DEFAULT_GRACE_DAYS,
+  NOT_PROVIDED_REASONS,
+  WAIVED_REASONS,
+  REASON_LABELS,
+  type PackageFacts,
+  type SlotDefinition,
+  type SlotTemplate,
+} from './slotTemplate.js';
+export {
+  composeSet,
+  toRows,
+  CompositionError,
+  type ComposableSlot,
+  type ComposedSet,
+  type Choice,
+  type SlotRow,
+  type Removal,
+} from './composeSet.js';

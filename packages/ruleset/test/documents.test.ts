@@ -41,7 +41,7 @@ describe('the files load', () => {
   it('parses both together', () => {
     const rules = loadDocumentsRules();
     expect(rules.checks.checks.length).toBeGreaterThan(0);
-    expect(rules.templates.processors.length).toBeGreaterThan(0);
+    expect(rules.templates.template.slots.length).toBeGreaterThan(0);
   });
 
   /**
@@ -105,8 +105,8 @@ describe('the files load', () => {
 
 describe('it refuses rather than warns', () => {
   it('a template naming a slot the catalog does not define', () => {
-    const templates = clone(TEMPLATES) as { processors: { slots: { slot_key: string }[] }[] };
-    templates.processors[0]!.slots[3]!.slot_key = 'bank_statment';
+    const templates = clone(TEMPLATES) as { template: { slots: { slot_key: string }[] } };
+    templates.template.slots[3]!.slot_key = 'bank_statment';
 
     const error = refuses(CHECKS, templates);
     const defect = error.defects.find((d) => d.id === 'bank_statment');
@@ -188,18 +188,18 @@ describe('it refuses rather than warns', () => {
     expect(refuses(checks, TEMPLATES).defects.some((d) => d.id === 'application' && /duplicate/.test(d.message))).toBe(true);
   });
 
-  it('a slot appearing twice in one processor', () => {
-    const templates = clone(TEMPLATES) as { processors: { slots: { slot_key: string }[] }[] };
-    templates.processors[0]!.slots[1]!.slot_key = 'application';
+  it('a slot appearing twice in the template', () => {
+    const templates = clone(TEMPLATES) as { template: { slots: { slot_key: string }[] } };
+    templates.template.slots[1]!.slot_key = 'application';
     const error = refuses(CHECKS, templates);
     expect(error.defects.some((d) => d.file === 'documents.templates.json' && /appears twice/.test(d.message))).toBe(true);
   });
 
   it('a predicate on something other than the three questions (D-081)', () => {
     const templates = clone(TEMPLATES) as {
-      processors: { slots: { slot_key: string; predicate?: { field: string } }[] }[];
+      template: { slots: { slot_key: string; predicate?: { field: string } }[] };
     };
-    const conditional = templates.processors[0]!.slots.find((s) => s.predicate !== undefined)!;
+    const conditional = templates.template.slots.find((s) => s.predicate !== undefined)!;
     conditional.predicate!.field = 'merchant_seems_fine';
 
     const error = refuses(CHECKS, templates);
@@ -248,11 +248,11 @@ describe('the loadSlotTemplate swap preserves M1 behaviour', () => {
   const facts: PackageFacts = { entityType: 'llc', hasExistingProcessor: true, usDomiciled: true };
 
   it('resolves the default template to the set M1 seeded', () => {
-    expect(slotsForPackage(facts).map((s) => s.slotKey).sort()).toEqual([...M1_LLC_US].sort());
+    expect(slotsForPackage(facts, loadSlotTemplate(loadDocumentsRules())).map((s) => s.slotKey).sort()).toEqual([...M1_LLC_US].sort());
   });
 
   it('carries the same counts, coverage and flags M1 had', () => {
-    const bySlot = new Map(slotsForPackage(facts).map((s) => [s.slotKey, s]));
+    const bySlot = new Map(slotsForPackage(facts, loadSlotTemplate(loadDocumentsRules())).map((s) => [s.slotKey, s]));
 
     expect(bySlot.get('bank_statement')).toMatchObject({
       requiredCount: 3, monthly: true, graceDays: 10, examined: true, allowsInstances: false,
@@ -265,7 +265,7 @@ describe('the loadSlotTemplate swap preserves M1 behaviour', () => {
   });
 
   it('titles come from the catalog, which is the half the template does not carry', () => {
-    const bySlot = new Map(loadSlotTemplate().slots.map((s) => [s.slotKey, s]));
+    const bySlot = new Map(loadSlotTemplate(loadDocumentsRules()).slots.map((s) => [s.slotKey, s]));
     expect(bySlot.get('ein_letter')?.title).toBe('EIN Letter (CP-575 / 147C)');
     // examined/collected_only is catalog data too, and it reaches the slot through the join.
     expect(bySlot.get('coa')?.examined).toBe(false);
@@ -273,13 +273,13 @@ describe('the loadSlotTemplate swap preserves M1 behaviour', () => {
   });
 
   it('still exposes the full catalogue including slots that are off', () => {
-    expect(loadSlotTemplate().slots).toHaveLength(20);
+    expect(loadSlotTemplate(loadDocumentsRules()).slots).toHaveLength(20);
   });
 });
 
 describe('conditionals (D-081)', () => {
   const base: PackageFacts = { entityType: 'llc', hasExistingProcessor: true, usDomiciled: true };
-  const keys = (facts: PackageFacts): string[] => slotsForPackage(facts).map((s) => s.slotKey);
+  const keys = (facts: PackageFacts): string[] => slotsForPackage(facts, loadSlotTemplate(loadDocumentsRules())).map((s) => s.slotKey);
 
   it('a sole proprietorship drops Articles — it has none to give', () => {
     expect(keys({ ...base, entityType: 'sole_proprietor' })).not.toContain('articles_of_incorporation');
@@ -318,34 +318,21 @@ describe('D-101\'s claim: a processor is an entry in one file and nothing else',
    * added to the templates document alone — no code, no schema change, no touch to the checks
    * file — and it produces a different required set.
    */
-  it('adds a processor with a different set, changing nothing else', () => {
-    const templates = clone(TEMPLATES) as {
-      processors: { key: string; label: string; slots: unknown[] }[];
-    };
-    const slots = clone(templates.processors[0]!.slots) as { slot_key: string; origin: string }[];
+  /**
+   * D-128 collapsed the per-processor array to one set, so there is no second processor to
+   * distinguish and no lookup to get wrong. What is left worth pinning is that the one set loads
+   * and resolves — the two-processor case this replaced was testing a capability the product does
+   * not have.
+   */
+  it('loads the one default set and resolves its conditionals', () => {
+    const template = loadSlotTemplate(loadDocumentsRules());
+    expect(template.label).toBe('Default document set');
+    expect(template.slots.length).toBeGreaterThan(0);
 
-    // This processor does not want a domain proof and does want a DBA filing.
-    const trimmed = slots.filter((s) => s.slot_key !== 'proof_of_domain');
-    trimmed.find((s) => s.slot_key === 'dba_filing')!.origin = 'required';
-
-    templates.processors.push({ key: 'northlake', label: 'Northlake Bancorp', slots: trimmed });
-
-    // The checks file is passed through untouched — same object, not a copy.
-    const rules: DocumentsRules = parseDocumentsRules(CHECKS, templates);
-
-    const facts: PackageFacts = { entityType: 'llc', hasExistingProcessor: true, usDomiciled: true };
-    const def = slotsForPackage(facts, loadSlotTemplate('default', rules)).map((s) => s.slotKey);
-    const northlake = slotsForPackage(facts, loadSlotTemplate('northlake', rules)).map((s) => s.slotKey);
-
-    expect(def).toContain('proof_of_domain');
-    expect(northlake).not.toContain('proof_of_domain');
-    expect(northlake).toContain('dba_filing');
-    expect(def).not.toContain('dba_filing');
-  });
-
-  it('names the processors it does know when asked for one it does not', () => {
-    expect(() => loadSlotTemplate('not-a-processor')).toThrow(/defines no processor 'not-a-processor'/);
-    expect(() => loadSlotTemplate('not-a-processor')).toThrow(/it defines: default/);
+    const llc = slotsForPackage({ entityType: 'llc', hasExistingProcessor: true, usDomiciled: true }, template)
+      .map((s) => s.slotKey);
+    expect(llc).toContain('application');
+    expect(llc).toContain('articles_of_incorporation');
   });
 });
 

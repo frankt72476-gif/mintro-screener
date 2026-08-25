@@ -1,3 +1,5 @@
+import { loadSlotTemplate as buildSlotTemplate, type SlotTemplate as SlotTemplateType } from './slotTemplate.js';
+import { loadDocumentsRules as loadRulesFromFiles } from './documents/loadFile.js';
 /**
  * `@mintro/ruleset` — the loader, schema and validator for the RUO peptide program rule set.
  *
@@ -77,7 +79,6 @@ export {
 export {
   NOT_PROVIDED_REASONS,
   REASON_LABELS,
-  DEFAULT_PROCESSOR,
   DEFAULT_GRACE_DAYS,
   WAIVED_REASONS,
   loadSlotTemplate,
@@ -96,10 +97,31 @@ export {
   DocumentsValidationError,
   checksInRelease,
   parseDocumentsRules,
-  processorTemplate,
+  slotSet,
   type DocumentsDefect,
   type DocumentsFile,
   type DocumentsRules,
 } from './documents/load.js';
 export { CHECKS_PATH, TEMPLATES_PATH, loadDocumentsRules } from './documents/loadFile.js';
-export type { CatalogEntry, ChecksFile, DocumentCheck, Processor, TemplateSlot, TemplatesFile } from './documents/schema.js';
+export type { CatalogEntry, ChecksFile, DocumentCheck, SlotSet, TemplateSlot, TemplatesFile } from './documents/schema.js';
+/*
+  The filesystem-defaulting forms, for Node callers.
+
+  `slotTemplate.ts` takes parsed rules because it also runs in a browser, and a static import of the
+  file loader there would pull `node:fs` into the frontend bundle. These wrappers keep every worker
+  and script call site reading exactly as it did.
+*/
+export function slotTemplateFromFiles(): SlotTemplateType {
+  return buildSlotTemplate(loadRulesFromFiles());
+}
+
+export {
+  composeSet,
+  toRows,
+  CompositionError,
+  type ComposableSlot,
+  type ComposedSet,
+  type Choice,
+  type SlotRow,
+  type Removal,
+} from './composeSet.js';

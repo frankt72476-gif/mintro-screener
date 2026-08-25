@@ -29,11 +29,11 @@ function main(argv: readonly string[]): number {
       `  reasons    ${rules.checks.reasons.not_provided.length} not_provided, ${rules.checks.reasons.waived.length} waived`,
     );
     console.log(templatesPath);
-    for (const processor of rules.templates.processors) {
-      const required = processor.slots.filter((s) => s.origin === 'required').length;
-      const conditional = processor.slots.filter((s) => s.origin === 'conditional').length;
+    {
+      const slots = rules.templates.template.slots;
+      const of = (origin: string): number => slots.filter((s) => s.origin === origin).length;
       console.log(
-        `  ${processor.key.padEnd(12)} ${processor.slots.length} slots — ${required} required, ${conditional} conditional`,
+        `  ${slots.length} slots — ${of('required')} required, ${of('conditional')} conditional, ${of('added')} offered`,
       );
     }
     console.log('\nValid.');

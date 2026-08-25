@@ -4703,6 +4703,9 @@ whatever order the files arrived in.
 ## D-081 — Conditionals fire on structural impossibility only
 **2026-08-24 · Frank's ruling**
 
+**Amended by D-128 — see below.** The three questions still remove structurally impossible slots
+outright; everything else in the set is now adjustable by the operator per package.
+
 A sole proprietorship has no Articles of Incorporation. A domestic entity files W-9, not W-8BEN. A
 for-profit has no 501(c) letter. **A document that is merely absent stays in the template and is
 resolved explicitly.**
@@ -5545,6 +5548,9 @@ often it is the weaker evidence in our terms.
 
 ## D-101 — Documents Check rules live in two new files
 **2026-08-24 · Frank's ruling**
+
+**Amended by D-128 — see below.** The two-file split stands; `documents.templates.json` holds one
+template rather than a per-processor array, because no per-processor requirement set exists.
 
 Not in `rules/ruleset.json`. Two new files:
 
@@ -6934,6 +6940,72 @@ Two things, and the second is the one that has already failed twice:
 2. **A file whose bytes begin with `ftyp`.** Not a photograph someone shared to a chat app, which
    re-encodes to JPEG on the way. Checking the leading bytes before testing anything against them is
    the rule that stopped the last two from passing for the wrong reason.
+
+---
+
+## D-128 — One default set, adjusted per package; there is no per-processor requirement set
+**2026-08-24 · Frank's ruling · amends D-101 and D-081**
+
+There is **one** default document set. It is prechecked at package creation and the operator adds
+or removes slots for that package. Nothing ties a package to a processor's requirements, because
+no such tie exists on the back end and none is planned.
+
+`rules/documents.templates.json` is collapsed accordingly: a single `template`, not a `processors`
+array. **D-101's two-file split stands** — capability in `documents.checks.json`, required sets in
+`documents.templates.json` — and only the shape of the second file changes.
+
+### Why the structure had to go rather than sit there
+
+The array held one entry and had held one entry since it was written. Read from outside, it says
+Mintro maintains a requirement set per processor and currently has one configured. That is a claim
+about the product, made by the shape of a file, and it is false.
+
+**Unused capability is not neutral.** It is a promise nobody made: the next person reading it plans
+around a multi-processor model, `packages.processor_key` looks like a foreign key into requirements,
+and STATUS.md ends up describing per-processor sets as a thing that exists. The cost of keeping it
+is paid by every future reader; the cost of removing it is one commit, and it can be reintroduced
+under a decision if a processor ever supplies a set of their own.
+
+Collapsing was chosen over annotating for that reason. A comment saying "deliberately unused" is
+read by whoever opens the file; the structure is read by everyone who hears about it secondhand.
+
+### What `packages.processor_key` means now
+
+It stays, with a narrower meaning: **who the package is for**, not *which requirement set applies*.
+That is a real fact about a package and worth recording. It is no longer a key into anything, and
+nothing looks it up to decide what documents are required.
+
+### D-081 is amended, not withdrawn
+
+The three questions — entity type, existing processor, US-domiciled — still resolve at package
+creation and still remove slots outright. That was never about processors. It is about **structural
+impossibility**: a sole proprietorship has no Articles of Organization to supply, and a domestic
+entity files a W-9 rather than a W-8BEN. Asking for a document that cannot exist is not a
+requirement, it is a mistake, and no operator should have to decline it.
+
+What changes is the boundary. D-081 previously did the whole job of deciding a set; now it decides
+only the part an operator must not be asked about. **Everything else is adjustable**, and the
+distinction is exactly that: impossible things are removed and never offered, unwanted things are
+offered and can be unchecked.
+
+### Origin becomes more load-bearing, not less
+
+`required | conditional | added` (D-121) was already recorded per slot so that *why is this slot
+here* stays answerable. Operator adjustment makes that question more likely to be asked, not less —
+a package with an unusual set now has two possible explanations, the facts or a person, and the
+column is what separates them.
+
+And a removed default is recorded **as a removal**, not as an absence. A shorter list is
+indistinguishable from a list that was always shorter, and "the operator did not want this" is a
+different fact from "this was never asked for". The report can then say the set was adjusted rather
+than quietly showing fewer rows.
+
+### What I got wrong
+
+I built the per-processor structure from D-101's wording without asking whether a second processor
+existed or was expected. The file was correct against the ruling and wrong about the product, and
+nothing in the tests could have caught that — they check a template loads, not that the shape of
+the file describes something real.
 
 ---
 

@@ -162,7 +162,6 @@ export const templateSlotSchema = z
 
 export const processorSchema = z
   .object({
-    key: SLOT_KEY,
     label: z.string().min(1),
     note: z.string().optional(),
     slots: z.array(templateSlotSchema).min(1),
@@ -174,7 +173,14 @@ export const templatesFileSchema = z
     $comment: z.union([z.string(), z.array(z.string())]).optional(),
     version: z.string().min(1),
     predicate_inputs: z.record(z.unknown()),
-    processors: z.array(processorSchema).min(1),
+    /**
+     * One set (D-128). Not an array of processors.
+     *
+     * It held one entry and always had, and a one-element array claims a per-processor model this
+     * product does not have — a promise made by the shape of a file. Reintroducing one needs a
+     * processor who has actually supplied a set, and a decision.
+     */
+    template: processorSchema,
   })
   .strict();
 
@@ -182,5 +188,5 @@ export type CatalogEntry = z.infer<typeof catalogEntrySchema>;
 export type DocumentCheck = z.infer<typeof checkSchema>;
 export type ChecksFile = z.infer<typeof checksFileSchema>;
 export type TemplateSlot = z.infer<typeof templateSlotSchema>;
-export type Processor = z.infer<typeof processorSchema>;
+export type SlotSet = z.infer<typeof processorSchema>;
 export type TemplatesFile = z.infer<typeof templatesFileSchema>;

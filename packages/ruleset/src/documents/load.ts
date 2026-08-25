@@ -18,7 +18,7 @@ import {
   type CatalogEntry,
   type ChecksFile,
   type DocumentCheck,
-  type Processor,
+  type SlotSet,
   type TemplatesFile,
 } from './schema.js';
 
@@ -133,9 +133,6 @@ function crossFileDefects(checks: ChecksFile, templates: TemplatesFile): Documen
       defects.push({ file: 'documents.checks.json', id: dupe, path: what, message: `duplicate ${what}` });
     }
   }
-  for (const dupe of duplicates(templates.processors.map((p) => p.key))) {
-    defects.push({ file: 'documents.templates.json', id: dupe, path: 'processors', message: 'duplicate processor key' });
-  }
 
   // --- checks -----------------------------------------------------------------------------
   checks.checks.forEach((check, i) => {
@@ -210,10 +207,10 @@ function crossFileDefects(checks: ChecksFile, templates: TemplatesFile): Documen
   });
 
   // --- templates ---------------------------------------------------------------------------
-  for (const processor of templates.processors) {
+  {
     const seen = new Set<string>();
-    processor.slots.forEach((slot, i) => {
-      const path = `processors[${processor.key}].slots[${i}]`;
+    templates.template.slots.forEach((slot, i) => {
+      const path = `template.slots[${i}]`;
       // The first real bug this file will have. A slot_key with a typo is a requirement that
       // silently does not exist: the package renders with one fewer thing to chase, which looks
       // exactly like a package that did not need it.
@@ -230,7 +227,7 @@ function crossFileDefects(checks: ChecksFile, templates: TemplatesFile): Documen
           file: 'documents.templates.json',
           id: slot.slot_key,
           path,
-          message: `appears twice in processor '${processor.key}'`,
+          message: 'appears twice in the template',
         });
       }
       seen.add(slot.slot_key);
@@ -250,9 +247,9 @@ function crossFileDefects(checks: ChecksFile, templates: TemplatesFile): Documen
   return defects;
 }
 
-/** The processor's set, conditionals unresolved. `undefined` when the processor is not defined. */
-export function processorTemplate(rules: DocumentsRules, key: string): Processor | undefined {
-  return rules.templates.processors.find((p) => p.key === key);
+/** The default set, conditionals unresolved (D-128). There is one, and it is not keyed. */
+export function slotSet(rules: DocumentsRules): SlotSet {
+  return rules.templates.template;
 }
 
 /** Checks in a release. `v1` excludes the three the inventory marks deferred. */
