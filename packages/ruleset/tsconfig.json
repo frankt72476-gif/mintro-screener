@@ -6,5 +6,12 @@
     "composite": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "bin/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "bin/**/*.ts"],
+  // `test/documents.test.ts` imports @mintro/extraction to check the field vocabulary against the
+  // extractor. A reference, not just a node_modules link: without it `tsc --build` never puts
+  // extraction in this project's build graph, so its `dist` may not exist when this compiles.
+  //
+  // That is invisible locally, where a root `tsc --build` has already produced every dist. It is
+  // not invisible in a container, which starts with none — the deploy build failed here.
+  "references": [{ "path": "../extraction" }]
 }

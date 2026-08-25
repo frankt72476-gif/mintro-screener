@@ -232,3 +232,63 @@ describe('the worker image copies every workspace manifest', () => {
     expect(workspaces.length).toBeGreaterThan(3);
   });
 });
+
+/**
+ * Project references match the imports that actually exist.
+ *
+ * A workspace importing `@mintro/x` needs `x` in its tsconfig `references`, not merely a
+ * node_modules link. Without the reference, `tsc --build` leaves `x` out of that project's build
+ * graph and its `dist` may not exist when the project compiles.
+ *
+ * **This is invisible in any local run.** A root `tsc --build` has already produced every `dist`,
+ * so resolution succeeds by accident of order. A container starts with none — which is where it
+ * surfaced: `packages/ruleset/test` imported `@mintro/extraction` with no reference, and the deploy
+ * build failed on it after every one of 1304 local tests passed.
+ */
+describe('project references cover the workspace imports', () => {
+  const strip = (json: string): string => json.replace(/^\s*\/\/.*$/gm, '');
+
+  it('every @mintro import in a workspace is a reference in its tsconfig', () => {
+    const root = JSON.parse(readFileSync('package.json', 'utf8')) as { workspaces: string[] };
+    const dirs = root.workspaces.flatMap((pattern) => {
+      const base = pattern.replace(/\/\*$/, '');
+      return readdirSync(base, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && existsSync(`${base}/${e.name}/tsconfig.json`))
+        .map((e) => `${base}/${e.name}`);
+    });
+
+    const gaps: string[] = [];
+    for (const dir of dirs) {
+      const config = JSON.parse(strip(readFileSync(`${dir}/tsconfig.json`, 'utf8'))) as {
+        references?: { path: string }[];
+      };
+      const referenced = new Set(
+        (config.references ?? []).map((r) => r.path.split('/').filter(Boolean).pop()),
+      );
+
+      const sources: string[] = [];
+      const walk = (d: string): void => {
+        for (const e of readdirSync(d, { withFileTypes: true })) {
+          if (e.name === 'dist' || e.name === 'node_modules') continue;
+          if (e.isDirectory()) walk(`${d}/${e.name}`);
+          else if (e.name.endsWith('.ts') || e.name.endsWith('.tsx')) sources.push(`${d}/${e.name}`);
+        }
+      };
+      for (const sub of ['src', 'test', 'bin']) if (existsSync(`${dir}/${sub}`)) walk(`${dir}/${sub}`);
+
+      const imported = new Set<string>();
+      for (const file of sources) {
+        for (const m of readFileSync(file, 'utf8').matchAll(/['"]@mintro\/([a-z]+)['"]/g)) {
+          imported.add(m[1]!);
+        }
+      }
+      imported.delete(dir.split('/').pop()!);
+
+      for (const name of imported) {
+        if (!referenced.has(name)) gaps.push(`${dir} imports @mintro/${name} without referencing it`);
+      }
+    }
+
+    expect(gaps, gaps.join('; ')).toEqual([]);
+  });
+});
