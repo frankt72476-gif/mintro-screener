@@ -217,6 +217,27 @@ export const textMatchParams = z
     word_boundary: z.boolean().optional(),
     partial_is_review: z.boolean().optional(),
     applies_when_title_contains: nonEmptyStrings.optional(),
+    /**
+     * Match `pattern` without regard to case (D-135).
+     *
+     * **Patterns are case-sensitive by default**, because a regex means what it says. The engine
+     * used to force `i` on every one, which silently rewrote any pattern whose discrimination
+     * *was* capitalisation: PROD-002's element-symbol pattern became "three or more letters" and
+     * passed on the words *national, center, for, biotechnology, information*.
+     *
+     * Set this only where the pattern is genuinely case-agnostic — a unit like `g/mol`, which a
+     * page may print as `G/MOL`.
+     */
+    ignore_case: z.boolean().optional(),
+    /**
+     * A named test that the matched value is the kind of thing the rule names (D-135).
+     *
+     * A pattern says what a value *looks like*; some values also carry a self-check. `cas_checksum`
+     * is the case: a CAS registry number's last digit is computed from the others, so a string
+     * shaped like one can be confirmed to be one. Selected by data rather than by rule id, so
+     * adding a validator to a rule stays an edit to this file (hard constraint 1).
+     */
+    validate: z.enum(['cas_checksum']).optional(),
     note,
   })
   .strict()

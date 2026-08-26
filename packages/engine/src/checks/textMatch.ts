@@ -158,25 +158,35 @@ function patternFinding(
   rule: RuleOfType<'text_match'>,
   page: PageContext,
   region: PageRegion,
-  haystack: string,
+  _haystack: string,
 ): Finding {
   const labels = rule.params.labels ?? [];
   const expect = rule.params.expect ?? 'present';
-  let searchIn = haystack;
 
-  if (labels.length > 0) {
-    const scoped = labelledRegion(region, labels);
-    if (scoped === null) {
-      return notEvaluable(
-        rule,
-        'no region labelled ' + quote(labels) + ' was observed, so there was nothing to examine',
-        RENDERED,
-        'not_exposed',
-        pageEvidence(page),
-      );
-    }
-    searchIn = scoped;
+  /*
+    **Case is preserved here, and the pattern matches case-sensitively** (D-135).
+
+    Two faults compounded into a pass on prose. `normalise` lowercases, and the match ran with the
+    `i` flag — so `[A-Z][a-z]?`, whose entire job is to recognise an element symbol, degenerated
+    into "any letter". PROD-002 reported *national*, *center*, *for*, *biotechnology*,
+    *information* as molecular formulae, off a spec table sitting beside an NCBI credit line.
+
+    Fixing one half alone makes it worse rather than better: drop the `i` flag against
+    still-lowercased text and `C62H98N16O22` stops matching too, turning a false pass into a false
+    fail. The case and the flag move together.
+  */
+  const scoped = labels.length > 0 ? labelledRegion(region, labels) : preserveCase(region.text);
+
+  if (scoped === null) {
+    return notEvaluable(
+      rule,
+      'no region labelled ' + quote(labels) + ' was observed, so there was nothing to examine',
+      RENDERED,
+      'not_exposed',
+      pageEvidence(page),
+    );
   }
+  const searchIn = scoped;
 
   // A labels-only rule (PROD-003, PROD-004) is satisfied by the labelled region existing.
   if (rule.params.pattern === undefined) {
@@ -186,16 +196,30 @@ function patternFinding(
       : violation(rule, note, RENDERED, withMatch(page, labels.join(', ')));
   }
 
-  const matches = Array.from(searchIn.matchAll(new RegExp(rule.params.pattern, 'gi')))
+  const flags = rule.params.ignore_case === true ? 'gi' : 'g';
+  const candidates = Array.from(searchIn.matchAll(new RegExp(rule.params.pattern, flags)))
     .map((match) => match[0] ?? '')
     .filter((value) => value.trim() !== '');
+
+  /*
+    A pattern says what a value looks like. Where the rule names a validator, looking right is not
+    enough: the value has to survive its own self-check before the rule reports finding one.
+  */
+  const matches = candidates.filter((value) => passesValidator(value, rule.params.validate));
+  const rejected = candidates.filter((value) => !passesValidator(value, rule.params.validate));
   const found = matches.length > 0;
   const violates = expect === 'present' ? !found : found;
+
+  // Named, so a reader can see the check discriminated rather than found nothing at all.
+  const discarded =
+    rejected.length === 0
+      ? ''
+      : ` ${rejected.length} value(s) matched the pattern and failed its validity test: ${quote(rejected.slice(0, 3))}.`;
 
   if (!violates) {
     return satisfied(
       rule,
-      found ? 'Observed: ' + quote(matches) + '.' : 'The pattern was not observed.',
+      (found ? 'Observed: ' + quote(matches) + '.' : 'The pattern was not observed.') + discarded,
       RENDERED,
       found ? withMatch(page, matches.slice(0, 5).join(', ')) : pageEvidence(page),
     );
@@ -203,27 +227,82 @@ function patternFinding(
 
   return violation(
     rule,
-    expect === 'present' ? 'The expected value was not observed.' : 'Observed: ' + quote(matches) + '.',
+    (expect === 'present'
+      ? 'The expected value was not observed.'
+      : 'Observed: ' + quote(matches) + '.') + discarded,
     RENDERED,
     found ? withMatch(page, matches.slice(0, 5).join(', ')) : pageEvidence(page),
   );
 }
 
-/** Text of the region carrying one of the given labels. Null when no label is present. */
+/**
+ * Whitespace collapsed, case left alone.
+ *
+ * The counterpart to `normalise`, which also lowercases. Anything matching on the *shape* of a
+ * value rather than on words reads through this one.
+ */
+function preserveCase(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * A value's own self-check, where the rule names one (D-135).
+ *
+ * An unknown validator rejects rather than waving through: a rule naming a test this engine does
+ * not implement must not be reported as having found what it was looking for. The schema keeps the
+ * two in step, so reaching that branch means a rule set newer than the engine reading it.
+ */
+export function passesValidator(value: string, validator: string | undefined): boolean {
+  if (validator === undefined) return true;
+  if (validator === 'cas_checksum') return isCasNumber(value);
+  return false;
+}
+
+/**
+ * A CAS registry number, confirmed by its own check digit.
+ *
+ * The final digit is the sum of the preceding digits weighted by distance from it, modulo 10. So
+ * matching `\d{2,7}-\d{2}-\d` is not enough to call something a CAS number — a phone number, an
+ * SKU or a date range can be shaped identically, and PROD-001 searches the whole page for one.
+ *
+ * 137525-51-0 is BPC-157 and passes; 137525-51-9 is the same string with a wrong check digit and
+ * does not.
+ */
+export function isCasNumber(value: string): boolean {
+  const parts = /^(\d{2,7})-(\d{2})-(\d)$/.exec(value.trim());
+  if (parts === null) return false;
+
+  const body = `${parts[1] ?? ''}${parts[2] ?? ''}`;
+  const check = Number(parts[3]);
+  let sum = 0;
+  for (let i = 0; i < body.length; i++) {
+    sum += Number(body[body.length - 1 - i]) * (i + 1);
+  }
+  return sum % 10 === check;
+}
+
+/**
+ * Text of the region carrying one of the given labels. Null when no label is present.
+ *
+ * **Labels match case-insensitively; the text comes back with its case intact** (D-135). A label
+ * is prose and a page may print it however it likes, but the value beside it is what the pattern
+ * reads, and lowercasing that was half of what let PROD-002 pass on prose.
+ */
 function labelledRegion(region: PageRegion, labels: readonly string[]): string | null {
   const chunks: string[] = [];
 
   for (const styled of region.styledText) {
-    const text = normalise(styled.text);
-    if (labels.some((label) => text.includes(normalise(label)))) chunks.push(text);
+    const text = preserveCase(styled.text);
+    if (labels.some((label) => text.toLowerCase().includes(normalise(label)))) chunks.push(text);
   }
   if (chunks.length > 0) return chunks.join(' ');
 
   // Fall back to a window of flat text after the label, for pages whose spec tables put the
   // label and the value in separate nodes.
-  const flat = normalise(region.text);
+  const flat = preserveCase(region.text);
+  const lower = flat.toLowerCase();
   for (const label of labels) {
-    const at = flat.indexOf(normalise(label));
+    const at = lower.indexOf(normalise(label));
     if (at !== -1) return flat.slice(at, at + 200);
   }
   return null;

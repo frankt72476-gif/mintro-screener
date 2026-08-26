@@ -234,7 +234,7 @@ export {
   type ScoredUrl,
   type SuspicionReason,
 } from './suspicion.js';
-export { checkTextMatch } from './checks/textMatch.js';
+export { checkTextMatch, isCasNumber, passesValidator } from './checks/textMatch.js';
 export { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
 export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, RENDERED } from './checks/pageEvidence.js';
 

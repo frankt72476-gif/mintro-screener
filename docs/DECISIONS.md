@@ -7764,3 +7764,111 @@ all, one because the break itself was a no-op. Tests added, break rewritten, all
 discriminate.
 
 ---
+
+---
+
+## D-135 — A value reported as found must be the kind of thing the rule names
+**2026-08-26 · Frank's ruling · ruleset 2.12.0 → 2.13.0**
+
+Found reading run 730764d4's PDF end to end, page 16:
+
+```
+Molecular formula listed — PASS
+Observed: 'national', 'center', 'for', 'biotechnology', 'information'.
+```
+
+"National Center for Biotechnology Information" was reported as a molecular formula. A pass on
+prose, which is D-133's class of defect one layer further in: the check asserted it had found its
+subject when what it found was shaped nothing like it.
+
+### Two faults, and fixing either alone makes it worse
+
+`normalise()` lowercases the text before matching, and the match ran with the `i` flag. PROD-002's
+pattern is `\b(?:[A-Z][a-z]?\d{0,3}){3,}\b` — its entire discrimination *is* capitalisation,
+because that is what an element symbol looks like. Under `i` it degenerates into "three or more
+letters", so every word of six letters or more matched.
+
+The trap is the obvious one-line fix. Drop the `i` flag while the text is still lowercased and
+`C62H98N16O22` stops matching too — the false pass becomes a **false fail** on a page that plainly
+carries a formula. Measured, not reasoned:
+
+| | `national` | `C62H98N16O22` |
+|---|---|---|
+| lowercased text, `i` flag (before) | matched | matched |
+| lowercased text, no `i` | — | **lost** |
+| case preserved, no `i` (now) | — | matched |
+
+So case-preservation and the flag move together. `preserveCase` is the counterpart to `normalise`,
+and `labelledRegion` now matches labels case-insensitively while returning the region with its case
+intact — a label is prose, the value beside it is not.
+
+**Case sensitivity becomes the rule set's decision**, via `ignore_case`, defaulting to off. A regex
+means what it says; forcing a flag onto every pattern silently rewrites rules the engine never
+read. Only the unit patterns opt in, because a page may print `G/MOL`.
+
+### The shape test
+
+PROD-002's pattern gains a lookahead requiring a digit: `\b(?=[A-Za-z]*\d)(?:[A-Z][a-z]?\d{0,3}){3,}\b`.
+That is what separates `C62H98N16O22` from `ATP`, `DNA` and `HPLC`, all of which are
+element-symbol-shaped and none of which is a formula.
+
+### PROD-009: the title, not the term list
+
+Frank offered either. The term list cannot be made to work: PROD-009 is a `dom_assert` reading
+`a[href]`, and no href contains the words *National Center for Biotechnology Information*. Adding
+prose terms to an href check catches nothing — the surface is wrong, not the vocabulary.
+
+Retitled **"No links to study databases"**, which is what it reads. Prose claims about human
+benefit are PROD-008's territory and PROD-008 did fire on this page. What remains uncovered is a
+citation named in prose without a link; that is a gap, and naming the rule honestly is what makes
+it visible rather than hidden behind a title that implied coverage.
+
+### The neighbours, audited
+
+Frank named PROD-001, PROD-003 and PROD-004. All three had the defect.
+
+**PROD-003 and PROD-004 were labels-only** — no pattern at all. The rule was satisfied by the
+*words* "molecular weight" or "storage" appearing, and never looked at what followed them. A page
+reading *"Molecular weight: see datasheet"* passed a rule titled **Molecular weight listed**. Both
+now require the value the clause describes: a figure in g/mol, and a storage temperature.
+
+**PROD-001 matched a shape and called it a registry number.** `\b\d{2,7}-\d{2}-\d\b` across a whole
+page, unlabelled — a phone number, an SKU or a date range carries that shape. A CAS number's last
+digit is computed from the others, so the value can prove itself, and now must: `validate:
+"cas_checksum"`. Selected by data rather than by rule id, so adding a validator stays an edit to
+the rule file. An unknown validator **rejects** rather than waves through — a rule set newer than
+the engine reading it must not report having found what it never tested.
+
+### What the note now says
+
+A value that matches the pattern and fails its validator is named: *"2 value(s) matched the pattern
+and failed its validity test: '800261-53-7'."* A check that discriminated is more informative than
+one that appears to have found nothing.
+
+### Break matrix
+
+Fifteen deliberate regressions, all discriminating. Four came back vacuous on the first pass and
+each was a real gap rather than a bad break:
+
+- the `i` flag and the lowercasing were individually redundant against the NCBI string, because the
+  new digit requirement defeats both. Added a lowercase lot number — `b12x3y4` — which only
+  capitalisation separates from a formula.
+- `labelledRegion`'s **styled-node path** had no test at all; every fixture had `styledText: []`, so
+  only the flat fallback ran.
+- the unknown-validator branch was unreachable from the rule set, so `passesValidator` is exported
+  and tested directly.
+- one break described a line that no longer exists: the initial `searchIn` was **dead for every
+  labelled rule**, overwritten before use. Restructured to a single expression, which makes that
+  defect unwritable rather than merely untested. The remaining unlabelled path is exercised by a
+  hand-built rule, because every real unlabelled pattern rule is PROD-001, whose values are digits
+  and cannot tell case-preservation from lowercasing.
+
+### Also found, not fixed here
+
+`\b(?:[A-Z][a-z]?\d{0,3}){3,}\b` backtracks catastrophically on long non-matching input — nested
+optional quantifiers. It hung a scratch script for two minutes on one sentence. Case-sensitivity
+shrinks the search space enormously and the labelled region is bounded to 200 characters on the
+fallback path, so the live risk is much reduced, but **the styled path is unbounded** and the
+pattern shape is still the hazard. Recorded rather than silently left.
+
+---
