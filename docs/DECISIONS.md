@@ -8180,15 +8180,50 @@ A guard that fails fourteen times for reasons unrelated to its subject is a guar
 the baseline is a curated text original, regenerated from the document source that renders the PDF —
 never from the PDF, and never from the table.
 
-### What is committed today is the interim corpus, and it is the circular one
+### The committed corpus is confirmed against the document, and is canonical from here
 
-Recorded rather than glossed, because the file name will outlive the memory of how it was made.
+**Amended 2026-08-26.** The file landed generated from the clause table — the circular route above —
+and was committed that way with its provenance stated rather than glossed, on the reasoning that a
+filename outlives the memory of how it was made. That is now closed. The history stays in this entry
+rather than being tidied out of it, because *what was checked, against what, and when* is the whole
+value of a record like this one.
 
-`rules/sources/ruo-standards-v1.1.md` as committed here is **generated from the clause table**, and its
-own header says so. The text original the paragraph above calls for was not available when this landed.
-Nothing consults the file yet — the substring assertion is a `packages/ruleset` change that has not been
-written — so it creates no false guarantee today. **It would create one the moment that validator is
-wired to it.** Replace the file before writing the validator, not after.
+`rules/sources/ruo-standards-v1.1.md` has been **verified against the document source that renders the
+v1.1 PDF**. That source is held outside this repository, which is why the check could not be performed
+here and why the result is recorded here instead. Performed externally on **2026-08-26**.
+
+**All 53 clause lines are byte-identical to it.** Alongside that, the shape the check confirmed, each
+of which is re-derivable from the committed file:
+
+- 53 clause lines carrying 48 distinct clauses — four sentences are quoted by more than one rule
+  (COA-001 / COA-005 / COA-006; FULF-001 / FULF-002; OFFS-001 / OFFS-007; PROD-008 / OFFS-006).
+- Non-ASCII limited to `’` U+2019, `“` U+201C, `”` U+201D, `—` U+2014 and `°` U+00B0.
+- No straight-quote contamination anywhere in the corpus.
+
+That last one is not cosmetic. The typography is the failure mode this whole section is about: a
+normalised apostrophe is invisible on the page and fatal to a byte-exact substring check, and it is
+precisely what an editor, a copy-paste through a rich-text field, or a well-meaning linter introduces.
+
+### What the confirmation changes
+
+**The substring check now proves the rule set faithful to the standards, rather than internally
+consistent with the spec that transcribed them.** That was the open question D-041 could not answer
+from inside this repository — `requirement.test.ts` proves the report faithful to the rule set and says
+nothing about the rule set being faithful to the document — and it is the reason a baseline was wanted
+in the first place. It is answered now, so the validator can be written against this file. The scoping
+stands: `source: programme` clauses only, with Mintro-authored rules exempt by definition (D-140).
+
+**The committed corpus is canonical going forward, and the PDF is its rendering.** Not the reverse. If
+the two ever disagree, the corpus is the text and the PDF is a typesetting of it — which is the only
+ordering consistent with what the PDF's own text layer does to hyphens, parentheses and quotes.
+Regenerate the corpus from the document source if it is lost; never from the PDF, and never from the
+clause table.
+
+**One thing the confirmation does not reach**, carried so it is not mistaken for settled: the file's own
+header still describes it as generated from the clause table, which is how it was made and no longer
+what it is. The header understates the file's standing. It was left as written rather than edited in
+the same breath as the verification, because the 53 clause lines are what was checked and disturbing a
+just-verified artifact to improve its prose is the wrong order of operations.
 
 ### D-002 is why the fixtures were not rewritten, and why they had been lying
 
