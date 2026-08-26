@@ -318,11 +318,39 @@ function mapFinding(
   const used = Object.keys(map).filter((key) => haystack.includes(normalise(key)));
 
   if (used.length === 0) {
+    /*
+      **`no_check_built`, not `not_applicable`** (D-137).
+
+      The two are different claims and only one of them is true here. `not_applicable` says *the
+      rule's subject is not on this page at all* — capsule labelling on a product that is not a
+      capsule — and it counts as **resolved**, a question settled. This branch cannot settle
+      anything: the map is a list of compounds Mintro happens to have written an entry for, and its
+      silence about a page says nothing about the page.
+
+      Run 730764d4 is the case. The map holds two compounds; the catalogue is sixty-four products
+      built on LGD-4033, MK-677, YK-11, RAD-140, ostarine and cardarine. Four of five sampled pages
+      returned `not_applicable` — *the subject is not on this page* — about pages selling a
+      shorthand chemical name under exactly the shorthand this rule exists to check. Four pages
+      counted as answered when nothing was looked at, and the coverage figure overstated itself by
+      that much.
+
+      This is D-044's conflation one rule further in, and hard constraint 2's asymmetry decides the
+      direction: a rule that could not establish its subject reports the answer that claims no
+      coverage. `no_check_built` counts as outstanding and names Mintro as the limitation, which is
+      what it is — the entry is missing from our data, not from the merchant's page.
+
+      It is deliberately not narrowed to "pages that look like they carry a compound". Recognising
+      one by shape would locate the subject by guessing at it, and a page whose compound is a bare
+      word rather than a hyphenated code would still fall through. The rule cannot tell the two
+      cases apart, so it stops claiming to.
+    */
     return notEvaluable(
       rule,
-      'none of the compounds this rule names were observed on the page',
+      `this page carries none of the ${Object.keys(map).length} compound(s) this rule has entries ` +
+        `for (${quote(Object.keys(map))}), so nothing on it was compared. A compound with no entry ` +
+        `is not examined, whether or not the page carries one`,
       RENDERED,
-      'not_applicable',
+      'no_check_built',
       pageEvidence(page),
     );
   }

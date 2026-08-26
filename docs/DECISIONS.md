@@ -7975,3 +7975,64 @@ Eighteen deliberate regressions, all discriminating. Two needed work:
 - one break named a line that appears twice; targeted by line number instead.
 
 ---
+
+---
+
+## D-137 — A rule that could not check something does not report the question as settled
+**2026-08-26 · Frank's ruling · amends D-044**
+
+`mapFinding` returned `not_applicable` when no compound in its map appeared on the page.
+`not_applicable` says **the rule's subject is not on this page at all** — D-044's own example is
+capsule labelling on a product that is not a capsule — and the coverage line counts it as
+**resolved**. It now returns `no_check_built`, which counts as outstanding.
+
+### The case
+
+Run 730764d4. NAME-003's map holds two compounds, BPC-157 and TB-500. The catalogue is sixty-four
+products built on LGD-4033, MK-677, YK-11, RAD-140, ostarine and cardarine. Four of the five sampled
+pages returned *"none of the compounds this rule names were observed on the page"*, classified as
+the subject being absent — about pages selling a shorthand chemical name under exactly the shorthand
+the rule exists to check.
+
+Four pages counted as answered when nothing was looked at. The headline coverage figure overstated
+itself by that much, and the direction of the error is the one that matters: a report claiming more
+coverage than it has.
+
+Same conflation as D-044, one rule further in. The map's silence about a page is a fact about the
+map.
+
+### Why not narrowed to pages that look like they carry a compound
+
+Recognising a compound by shape — `[A-Z]{2,4}-\d{2,4}` catches LGD-4033 and RAD-140 — would locate
+the subject by guessing at it, which hard constraint 9 rules out, and would still miss a compound
+named as a bare word. The rule genuinely cannot tell *no compound here* from *a compound with no
+entry*, so it stops claiming to, including on a page that carries none. Hard constraint 2's
+asymmetry picks the direction: a check that established nothing reports the answer claiming no
+coverage.
+
+The reason says so in the finding: *"this page carries none of the 2 compound(s) this rule has
+entries for … A compound with no entry is not examined, whether or not the page carries one."*
+
+### The audit, and the one deliberately left alone
+
+Two places in the engine return `not_applicable`. They are not the same shape.
+
+**`applies_when_title_contains` (CATG-005, CATG-006) stays as it is.** That list scopes the rule to
+a product category — reconstitution solutions, capsules — rather than enumerating the subject of the
+check. On a product that is not a capsule there is genuinely nothing to check, which is precisely
+what `not_applicable` means.
+
+Its list can under-match; a merchant selling capsules under another word would be scoped out
+wrongly. That is a coverage gap in the scope list, not a misclassification, and **reclassifying
+these would be the mirror error and a worse one**: every ordinary product page would move to
+outstanding, saying Mintro failed to check capsule labelling on sixty products that are not
+capsules. That understates coverage as badly as the other overstated it.
+
+Pinned as a deliberate non-change, so a later reader does not "finish the job".
+
+### Break matrix
+
+Three regressions, all discriminating: reverting the kind, dropping the sentence that names the map
+as the limit, and reclassifying the scoped-out pages — the mirror error, which fails too.
+
+---

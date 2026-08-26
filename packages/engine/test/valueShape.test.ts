@@ -295,3 +295,78 @@ describe('PROD-009 names the surface it reads', () => {
     expect(prod009?.title).toBe('No links to study databases');
   });
 });
+
+/**
+ * A rule that could not check something must not report the question as settled (D-137).
+ *
+ * `not_applicable` and `no_check_built` are different claims, and the coverage line treats them as
+ * opposites: the first counts as **resolved**, the second as **outstanding**. Getting it wrong does
+ * not merely mislabel a row, it inflates the headline number.
+ */
+describe('NAME-003 — an unknown compound is Mintro\'s gap, not the page\'s', () => {
+  const name003 = rule('NAME-003');
+
+  /**
+   * Run 730764d4's case. The map holds two compounds; the catalogue is built on LGD-4033, MK-677,
+   * YK-11, RAD-140, ostarine and cardarine. Four of five sampled pages said *the subject is not on
+   * this page* about pages selling exactly the shorthand this rule exists to check.
+   */
+  it('does not claim the subject is absent from a page it cannot read', () => {
+    const finding = checkTextMatch(name003, productPage('LGD-4033 Ligandrol 10mg — 30ml'));
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).not.toBe('not_applicable');
+    expect(finding.notEvaluableKind).toBe('no_check_built');
+  });
+
+  it('names the limit as the map rather than as the page', () => {
+    const note = checkTextMatch(name003, productPage('MK-677 Ibutamoren')).notEvaluableReason ?? '';
+    expect(note).toContain('entries');
+    expect(note).toContain('whether or not the page carries one');
+  });
+
+  /**
+   * The rule cannot tell "no compound here" from "a compound with no entry", so it stops claiming
+   * to — including on a page that genuinely carries no shorthand. Reporting no coverage is the
+   * safe direction of hard constraint 2's asymmetry.
+   */
+  it('reports the same way on a page with no compound at all', () => {
+    const finding = checkTextMatch(name003, productPage('Bacteriostatic Water 30ml'));
+    expect(finding.notEvaluableKind).toBe('no_check_built');
+  });
+
+  it('still evaluates a compound it does have an entry for', () => {
+    const withProper = checkTextMatch(
+      name003,
+      productPage('BPC-157 (Body Protection Compound 157) 5mg'),
+    );
+    expect(withProper.state).toBe('pass');
+
+    const withoutProper = checkTextMatch(name003, productPage('BPC-157 5mg vial'));
+    expect(withoutProper.state).toBe('review');
+  });
+});
+
+/**
+ * The audit's other half, pinned as a deliberate non-change.
+ *
+ * CATG-005 and CATG-006 scope themselves with `applies_when_title_contains`, and a page outside
+ * that scope genuinely has nothing to check — capsule labelling on a product that is not a capsule
+ * is D-044's own example of `not_applicable`. Their lists can under-match, which is a coverage gap
+ * in the scope list; it is not the same defect.
+ *
+ * Reclassifying these would be the mirror error and a worse one: every ordinary product page would
+ * move into "outstanding", saying Mintro failed to check capsule labelling on sixty products that
+ * are not capsules. That understates coverage as badly as the other overstated it.
+ */
+describe('a rule scoped out of a page still does not apply', () => {
+  it('CATG-006 does not apply to a product that is not a capsule', () => {
+    const finding = checkTextMatch(rule('CATG-006'), productPage('BPC-157 5mg lyophilised vial'));
+    expect(finding.notEvaluableKind).toBe('not_applicable');
+  });
+
+  it('CATG-005 does not apply to a product that is not a reconstitution solution', () => {
+    const finding = checkTextMatch(rule('CATG-005'), productPage('BPC-157 5mg lyophilised vial'));
+    expect(finding.notEvaluableKind).toBe('not_applicable');
+  });
+});
