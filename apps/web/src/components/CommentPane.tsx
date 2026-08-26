@@ -40,6 +40,7 @@ import {
   nothingObservedCount,
   nothingObservedSection,
 } from '../lib/grouping.js';
+import { AttestationForm } from './Attestations.js';
 import { ReportView, type Filter } from './ReportView.js';
 import { formatStamp } from '../lib/format.js';
 
@@ -275,9 +276,52 @@ function OpenReport({
    * recorded happened, and anything written under it stays attributed to it. The next
    * identification writes a new visit, because a new declaration is a new fact (D-071).
    */
+  /** What this visitor has sent this session, for showing back to them. Never a source of truth. */
+  const [answers, setAnswers] = useState<
+    ReadonlyMap<string, { readonly outcome: 'answered' | 'declined'; readonly body?: string }>
+  >(new Map());
+
   const forgetIdentity = (): void => {
     clearVisit();
     setIdentity(null);
+  };
+
+  /**
+   * Answering one of the questions the crawl cannot reach (D-134).
+   *
+   * The same link, the same visit, the same identity as a comment — one channel (D-063), because a
+   * second would be a second thing to keep working and a second place for the identity rules to
+   * drift.
+   */
+  const answer = async (
+    questionId: string,
+    outcome: 'answered' | 'declined',
+    body: string | null,
+  ): Promise<string | null> => {
+    if (identity === null) return 'Please give an email address above before answering.';
+
+    const { data, error } = await client.rpc('submit_merchant_attestation', {
+      p_token: token,
+      p_question_id: questionId,
+      p_outcome: outcome,
+      p_body: body,
+      p_visit_id: identity.visitId,
+    });
+
+    const payload = data as { ok?: boolean; reason?: string } | null;
+    if (error !== null || payload?.ok !== true) {
+      // Same recovery as a comment: a stored visit from a different link is refused server-side,
+      // and asking again is the honest fix. Nothing typed is cleared on failure.
+      if (payload?.reason?.includes('email address is needed') === true) forgetIdentity();
+      return payload?.reason ?? 'That could not be saved just now. Please try again.';
+    }
+
+    setAnswers((existing) => {
+      const next = new Map(existing);
+      next.set(questionId, outcome === 'declined' ? { outcome } : { outcome, body: body ?? '' });
+      return next;
+    });
+    return null;
   };
 
   const submit = async (finding: ReportFinding, ordinal: number | undefined, body: string) => {
@@ -413,6 +457,23 @@ function OpenReport({
             />
           )}
         />
+
+        {/*
+          After the findings, in the same place the section sits in the report an underwriter
+          reads — so a merchant who later sees the document finds their answers where they left
+          them (D-134).
+
+          Rendered from the run's own snapshot of the questions rather than from the current rule
+          set: they must be asked exactly what the report will show them as having been asked.
+        */}
+        {opened.report.attestationQuestions !== undefined && (
+          <AttestationForm
+            questions={opened.report.attestationQuestions}
+            answers={answers}
+            identified={identity !== null}
+            onAnswer={answer}
+          />
+        )}
       </main>
     </div>
   );

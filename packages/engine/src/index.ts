@@ -180,6 +180,17 @@ export {
 } from './commentaryStore.js';
 
 export {
+  readRunAttestations,
+  resolveAttestations,
+  type AttestationOutcome,
+  type AttestationReader,
+  type AttestationSummary,
+  type ResolvedAttestation,
+  type RunAttestations,
+  type StoredAttestation,
+} from './attestations.js';
+
+export {
   COMMENT_PATH,
   commentLinkFor,
   commentTokenFrom,

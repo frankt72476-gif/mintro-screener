@@ -7534,7 +7534,7 @@ absence as a state rather than as a value.
 ---
 
 ## D-133 — A check reports the surface it read, in its title as well as its note
-**2026-08-26 · Frank's ruling · amends D-018 · ruleset 2.9.0 → 2.10.0**
+**2026-08-26 · Frank's ruling · amends D-018 · ruleset 2.9.0 → 2.11.0**
 
 Six rule titles are rescoped, and two handlers stop claiming more than they saw. `OFFS-003` no
 longer returns `pass` under any input.
@@ -7614,13 +7614,26 @@ Note that Table 1 of the requirements document scopes this row the same way on i
 is table 2"* — and the practice appears as a Table 2 question. The rule set had collapsed the two
 halves into one green tick.
 
-### What is deliberately not fixed here
+### The same shape over a sample, taken in the same pass
 
-`DISC-003` ("Disclaimer on every page") and `COA-001` ("COA linked on each product page") assert
-universals over a sample. Their notes scope this correctly — *"across all N sampled product
-page(s)"* — and the titles do not. That is the same shape but a different axis: crawl completeness
-rather than off-surface conduct, and it is not Table 2's territory. Left standing, named here so
-it is not mistaken for an oversight.
+`DISC-003` and `COA-001` assert universals over a sample. Their notes scope it correctly —
+*"across all N sampled product page(s)"* — and their titles did not.
+
+| Rule | Was | Now |
+|---|---|---|
+| DISC-003 | Disclaimer on every page | Disclaimer on every sampled page |
+| COA-001 | COA linked on each product page | COA linked on each sampled product page |
+
+These were first held back as out of scope: the axis is crawl completeness rather than off-surface
+conduct, and neither is Table 2's territory. Frank ruled them in, and the reason is the one that
+matters more than the axis — **a title claiming "every page" over a sample is a claim rather than
+phrasing, and leaving two of the shape in the file after ruling against it invites the next person
+to read it as acceptable.** A ruling that applies to six of eight instances is not a ruling; it is
+a preference someone will litigate again.
+
+`COA-001` is per-page rather than across the sample, so a reader sees one finding per sampled
+product page, each carrying this title. That makes the old wording worse rather than better: the
+same universal claim, repeated once per page, with the sample never named.
 
 ### Why the title guard is a list and not a rule
 
@@ -7636,5 +7649,118 @@ Five Table 2 rows have no rule of any kind behind them: shipping to gyms and cli
 support response to a dosing question, third-party brand-mention monitoring, other storefronts or
 domains, and prior terminations by an acquirer. Nothing overreaches on them because nothing exists.
 They are attestation questions, not check gaps.
+
+---
+
+---
+
+## D-134 — Merchant attestations: nineteen questions, three outcomes, no verdict
+**2026-08-26 · Frank's ruling · migration 0044 · ruleset 2.11.0 → 2.12.0**
+
+Table 2 of `peptide-requirements-tables.md` lists nineteen programme requirements a website says
+nothing about. They are now asked, recorded and rendered.
+
+### The questions are data
+
+`rules/ruleset.json` gains `attestations`: an id, the question verbatim, its authority
+(`law` / `network` / `programme`) and its severity. Adding a question is an edit to a JSON file and
+a decision number, never a code change — hard constraint 1, applied to the half of the programme
+the crawler cannot reach.
+
+Severity uses the same three values `sev` already carries on a rule, mapping the requirements
+document's shared scale onto the codebase's: **disqualifying → critical, blocking → major,
+housekeeping → minor**. One severity axis, because the document treats it as one.
+
+`not_checked` arrives in the same file, for the same reason: a boundary a reader relies on must be
+reviewable in the rule set rather than discovered by reading a `.tsx` file.
+
+Ids are kebab slugs and rule ids are `CATEGORY-NNN`. The two spaces cannot collide, in the schema
+and in the database column, so no join and no report can serve an answer where a finding belongs.
+
+### What is deliberately absent
+
+No `state`, no `expect`, no check type, no score, no verification field, and no link to the rule a
+question sits beside. **The whole boundary is a heading that says who said it and a section
+separated from the findings.** The moment this carries machinery for assessing an answer it starts
+to look like a check that passed — and a badge reading "unverified" would be worse than the plain
+statement, because it makes a statement look checked-and-flagged.
+
+The section shares no class with `.find`, shows no rule id, and uses none of the four states.
+Tested, because that is the kind of thing a later refactor removes without noticing.
+
+### Three outcomes, and only two of them are rows
+
+```
+answered   — a row with a body
+declined   — a row with no body
+unanswered — no row
+```
+
+`declined` is stored because a merchant refusing to say whether they ship to med-spas has told the
+underwriter something, and folding that into silence throws it away.
+
+`unanswered` is derived. Writing a row per question when a link is issued would make a merchant who
+never opened the report indistinguishable from one who read every question and answered none.
+
+### Unanswered is a gap, not a silence
+
+Frank's ruling, and the part that decides whether this feature is worth having.
+
+Every question here exists *because* no rule can answer it. Thirteen have a `manual` rule standing
+beside them, which declares the gap and settles nothing; five have no rule of any kind. In both
+cases an unanswered question means the same thing: **nobody has spoken to this requirement, from
+any source — not a check, not a statement.**
+
+So an unanswered row is not a blank. It reads:
+
+> Not observable by Mintro, and not answered. Nothing in this report speaks to this requirement.
+
+Both halves are needed. *Not observable* alone sounds like a tool limitation with the merchant off
+the hook; *not answered* alone sounds like the merchant ignored something Mintro had otherwise
+covered. A blank beside filled-in rows reads as *nothing to report here*, which is the opposite of
+the truth.
+
+### One channel
+
+Answers arrive through the comment link exactly as it stands (D-063): same token, same visit, same
+self-declared identity, same expiry. `submit_merchant_attestation` is the sibling of
+`submit_merchant_comment` and differs only in what it writes. No second channel, no second set of
+identity rules to drift.
+
+`merchant_attestations` is append-only like everything else — a revision is another row, and the
+report shows the current answer with what it replaced.
+
+### The questions travel with the run
+
+`attestationQuestions` and `notChecked` are snapshotted into the assembled report, for the reason
+`title` and `clause` are: a run is immutable (D-002), and a report reopened next year must say what
+was true when it was produced. Without it, a question added next month would appear on an old run
+as one the merchant ignored — manufacturing exactly the gap this decision exists to report
+honestly.
+
+It also puts them where every renderer can reach them: the PDF worker and the merchant's own page
+each hold a report and neither holds a rule set. `resolveAttestations` takes a question list rather
+than a rule set for that reason.
+
+### The bundle guard, again
+
+`attestations.ts` had to be added to `browser.ts` as well as `index.ts`. The bundler resolves the
+first and `tsc` resolves the second, and that disagreement is D-131 exactly — this time it failed
+loudly at build rather than shipping absent, because a component imported it immediately. The
+bundle test now greps for the write path, the read path, the heading, the boundary sentence, the
+unanswered sentence and two of the questions themselves.
+
+### Break matrix
+
+Twenty-two deliberate regressions, each turning the intended test red: dropping unanswered
+questions, folding `declined` into `unanswered`, blanking the unanswered sentence, removing the
+boundary line, giving the rows the finding class, un-snapshotting the questions, storing an empty
+answer, storing a declination with words, accepting a rule id as a question id, removing the
+append-only trigger, granting `anon` a direct write, and telling a caller their link was expired
+rather than invalid.
+
+Three came back vacuous on the first pass — two because nothing asserted the report snapshot at
+all, one because the break itself was a no-op. Tests added, break rewritten, all twenty-two
+discriminate.
 
 ---

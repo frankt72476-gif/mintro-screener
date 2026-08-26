@@ -10,6 +10,11 @@
  *   whole of what a scanning reader gets; and
  * - `text_match`'s `require_any` branch was the one satisfied path D-018's table never covered,
  *   so it carried no scoping sentence to escape from.
+ *
+ * Two of the pinned titles claimed a universal over a sample rather than a practice over a page.
+ * Different axis, same defect, and they are here for the reason Frank gave when he ruled them in:
+ * leaving two of the shape in the file after ruling against it invites the next person to read it
+ * as acceptable.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -91,6 +96,10 @@ describe('rescoped titles (D-133)', () => {
     ['PAY-001', 'No peer-to-peer payment methods named on public pages'],
     ['COA-003', 'Certificate states purity at or above 98%'],
     ['COA-002', 'Certificate reports a test date within 60 days'],
+    // The same shape over a sample rather than over an off-site surface. A pass on either used to
+    // read as a universal — *every* page, *each* product page — when only the sample was seen.
+    ['DISC-003', 'Disclaimer on every sampled page'],
+    ['COA-001', 'COA linked on each sampled product page'],
   ];
 
   for (const [id, title] of expected) {

@@ -22,6 +22,20 @@
       "name": "Product page content"
     }
   ],
+  "attestations": [
+    {
+      "id": "ban-list",
+      "question": "Do you maintain a permanent ban list for customers who indicate human use?",
+      "authority": "programme",
+      "sev": "critical"
+    }
+  ],
+  "not_checked": [
+    {
+      "subject": "Social media accounts",
+      "why": "Mintro crawls the storefront and does not follow the accounts it links to."
+    }
+  ],
   "rules": [
     {
       "id": "PROD1",

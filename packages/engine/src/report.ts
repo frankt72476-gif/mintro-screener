@@ -13,7 +13,7 @@
  *     no instruction attached (D-001, hard constraint 7).
  */
 
-import type { Category, Rule, Ruleset, State } from '@mintro/ruleset';
+import type { Attestation, Category, NotChecked, Rule, Ruleset, State } from '@mintro/ruleset';
 import type { Finding, NotEvaluableKind } from './findings.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
@@ -147,6 +147,31 @@ export interface ScreeningReport {
    * merchant having nothing to show.
    */
   readonly access?: ReportAccess;
+  /**
+   * What this run states it did not look at, from the rule set, verbatim (D-134).
+   *
+   * **Snapshotted into the report rather than read from the rule set at render time**, for the
+   * reason `title` and `clause` are: a run is immutable (D-002), and a report reopened next year
+   * must say what was true when it was produced. Reading today's rule set would let a boundary
+   * that widened after the fact appear on a run that never had it.
+   *
+   * Absent on runs recorded before this existed. A reader that finds it absent renders nothing
+   * rather than substituting the current list — the same rule the coverage fields follow.
+   */
+  readonly notChecked?: readonly NotChecked[];
+  /**
+   * The questions put to the merchant for this run, from the rule set, verbatim (D-134).
+   *
+   * Snapshotted for the same reason `notChecked` is, and for one more: these are what the merchant
+   * was actually asked. A question added next month must not appear on this run as though it had
+   * been put to them and ignored — which is precisely the reading an unanswered row invites.
+   *
+   * It also means the questions travel with the report to everywhere that renders one. The PDF
+   * worker and the merchant's own page both hold a report and neither holds a rule set.
+   *
+   * Absent on runs recorded before this existed; absent renders no section at all.
+   */
+  readonly attestationQuestions?: readonly Attestation[];
 }
 
 /**
@@ -260,6 +285,8 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     ),
     truncations: input.truncations ?? [],
     politeness: input.politeness,
+    notChecked: ruleset.not_checked,
+    attestationQuestions: ruleset.attestations,
     ...(input.access === undefined ? {} : { access: input.access }),
   };
 }

@@ -125,6 +125,59 @@ const statesSchema = z
     { message: `must declare exactly the four states: ${STATES.join(', ')}` },
   );
 
+/**
+ * A question put to the merchant, because no crawl can answer it.
+ *
+ * Table 2 of `peptide-requirements-tables.md`: nineteen programme requirements a website says
+ * nothing about — shipping destinations, support transcripts, ban lists, lab accreditation, prior
+ * terminations. They live here, beside the rules, because hard constraint 1 is that the rule set
+ * is data: adding a question is an edit to a JSON file and a decision number, never a code change.
+ *
+ * ## What is deliberately absent
+ *
+ * There is no `state`, no `expect`, no check type, and no link to the rule a question sits beside.
+ * An answer is the merchant's statement, and the moment this carries machinery for scoring one it
+ * has started to look like a check that passed. The whole boundary is that these render in their
+ * own section under a heading saying who said it (D-134).
+ *
+ * ## The id is a slug on purpose
+ *
+ * Rule ids are `CATEGORY-NNN` and appear beside findings. A question id that looked like one would
+ * invite a reader to take an answer for a check result, so the shapes cannot collide. Nothing
+ * renders these; they exist to join an answer to its question.
+ */
+export const attestationSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, 'must be a kebab-case slug, never a CATEGORY-NNN rule id'),
+    /** Put to the merchant verbatim. Asks what they do — never whether they comply (D-067). */
+    question: z.string().min(1),
+    /**
+     * Where the requirement comes from, which is how much negotiating room there is.
+     * `law` is statute or regulation; `network` is Mastercard BRAM or Visa VIRP; `programme` is
+     * the peptide programme's own requirement.
+     */
+    authority: z.enum(['law', 'network', 'programme']),
+    /** The same axis and the same three values `sev` carries on a rule. */
+    sev: z.enum(SEVERITIES),
+  })
+  .strict();
+
+/**
+ * Something the report states it did not look at.
+ *
+ * Data rather than component copy for the same reason the questions are: a boundary a reader
+ * relies on must be reviewable in the rule set, not discovered by reading a `.tsx` file. Rendered
+ * verbatim — a paraphrase is where a boundary softens (D-018, D-076).
+ */
+export const notCheckedSchema = z
+  .object({
+    subject: z.string().min(1),
+    why: z.string().min(1),
+  })
+  .strict();
+
 export const rulesetSchema = z
   .object({
     /** Stamped onto every run. A finding is meaningless without it — see ARCHITECTURE.md. */
@@ -138,10 +191,14 @@ export const rulesetSchema = z
     states: statesSchema,
     categories: z.array(categorySchema).min(1),
     rules: z.array(ruleSchema).min(1),
+    attestations: z.array(attestationSchema).min(1),
+    not_checked: z.array(notCheckedSchema).min(1),
   })
   .strict();
 
 export type Rule = z.infer<typeof ruleSchema>;
+export type Attestation = z.infer<typeof attestationSchema>;
+export type NotChecked = z.infer<typeof notCheckedSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type Ruleset = z.infer<typeof rulesetSchema>;
 

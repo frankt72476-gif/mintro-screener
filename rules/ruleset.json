@@ -1,5 +1,5 @@
 {
-  "version": "2.10.0",
+  "version": "2.12.0",
   "source_document": "Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf",
   "effective": "2026-05-26",
   "states": [
@@ -68,6 +68,128 @@
       "n": 10,
       "prefix": "COMM",
       "name": "Customer communications"
+    }
+  ],
+  "attestations": [
+    {
+      "id": "shipping-destinations",
+      "question": "Do you ship only within the USA, excluding PO boxes and international addresses?",
+      "authority": "programme",
+      "sev": "critical"
+    },
+    {
+      "id": "shipping-to-clinics",
+      "question": "Do you ship to gyms, med-spas, wellness clinics or weight-loss clinics?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "adult-signature",
+      "question": "Do first-time orders require an adult signature at 21+?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "packing-slip-disclaimer",
+      "question": "Does the packing slip carry the RUO disclaimer and research acknowledgement?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "ban-list",
+      "question": "Do you maintain a permanent ban list for customers who indicate human use?",
+      "authority": "programme",
+      "sev": "critical"
+    },
+    {
+      "id": "ban-list-permanence",
+      "question": "Are bans documented and permanent, with no appeal?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "support-dosing-guidance",
+      "question": "Do support staff ever provide dosing, administration or protocol guidance — by email, chat, phone or DM?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "support-dosing-response",
+      "question": "What is your standard support response to a dosing question?",
+      "authority": "law",
+      "sev": "major"
+    },
+    {
+      "id": "staff-protocol-help",
+      "question": "Do staff offer to help customers \"figure out\" protocols?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "social-account-content",
+      "question": "Do any social accounts contain human-use claims, testimonials or outcome stories?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "influencer-payment",
+      "question": "Do you pay or barter with influencers?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "social-audit-cadence",
+      "question": "How often are social channels audited, and by whom?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "brand-mention-monitoring",
+      "question": "Do you monitor third-party brand mentions and issue cease-and-desist notices?",
+      "authority": "programme",
+      "sev": "minor"
+    },
+    {
+      "id": "coa-lab-accreditation",
+      "question": "Is your COA lab independent and accredited? Which accreditation?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "coa-batch-cadence",
+      "question": "How often do you receive new batches, and how quickly are COAs updated?",
+      "authority": "programme",
+      "sev": "minor"
+    },
+    {
+      "id": "payment-channels",
+      "question": "Do you accept payment through any channel other than card processing?",
+      "authority": "network",
+      "sev": "critical"
+    },
+    {
+      "id": "related-storefronts",
+      "question": "Do you operate any other storefronts, brands or domains selling the same products?",
+      "authority": "network",
+      "sev": "critical"
+    },
+    {
+      "id": "research-field-storage",
+      "question": "Do you store the declared research field with every order?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "prior-termination",
+      "question": "Has any acquirer, processor or platform terminated you?",
+      "authority": "network",
+      "sev": "critical"
+    }
+  ],
+  "not_checked": [
+    {
+      "subject": "Social media accounts",
+      "why": "Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links to. The programme guidelines name social media as where FDA is actively looking, so nothing in this report speaks to what those accounts contain."
     }
   ],
   "rules": [
@@ -254,7 +376,7 @@
       "sev": "critical",
       "type": "dom_assert",
       "tier": "auto_fail",
-      "title": "Disclaimer on every page",
+      "title": "Disclaimer on every sampled page",
       "clause": "Must appear in the footer of every page of the website.",
       "params": {
         "surface": "all_sampled",
@@ -689,7 +811,7 @@
       "sev": "major",
       "type": "dom_assert",
       "tier": "review_only",
-      "title": "COA linked on each product page",
+      "title": "COA linked on each sampled product page",
       "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
       "params": {
         "surface": "product",

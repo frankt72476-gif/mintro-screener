@@ -20,7 +20,12 @@
  */
 
 import type { Browser } from 'playwright';
-import { readRunCommentary, type ScreeningReport } from '@mintro/engine';
+import {
+  readRunAttestations,
+  readRunCommentary,
+  resolveAttestations,
+  type ScreeningReport,
+} from '@mintro/engine';
 import { startReportServer } from './reportServer.js';
 import { renderReportPdf } from './pdf.js';
 import { attachmentName } from './send.js';
@@ -74,6 +79,22 @@ export async function renderRunPdf(
   */
   const commentary = await readRunCommentary(supabase.client, input.runId);
 
+  /*
+    And so do the merchant's statements about what no crawl can see (D-134).
+
+    Same argument, and worth stating separately because the same defect has already happened once
+    on this call site: `commentaryOf` existed, `CategoryCard` accepted it, and the print branch
+    never passed it, so the PDF that reached IQwallet carried no merchant responses at all. The
+    fix then was one call site; the guard now is a test that renders this path and looks for the
+    section.
+
+    A failed read leaves the section out rather than rendering nineteen unanswered questions,
+    which would be Mintro's read failure printed as the merchant's silence.
+  */
+  const storedAttestations = await readRunAttestations(supabase.client, input.runId);
+  const attestations =
+    storedAttestations === null ? undefined : resolveAttestations(report.attestationQuestions ?? [], storedAttestations);
+
   const server = await startReportServer({
     webRoot: input.webRoot,
     // No local mounts. Everything the page needs is injected or signed; a worker that served
@@ -85,7 +106,12 @@ export async function renderRunPdf(
     const pdf = await renderReportPdf(browser, {
       origin: server.origin,
       domain: report.merchantDomain,
-      inject: { report, evidence, commentary },
+      inject: {
+        report,
+        evidence,
+        commentary,
+        ...(attestations === undefined ? {} : { attestations }),
+      },
     });
 
     const storageKey = `${input.runId}/report/${input.requestId}.pdf`;

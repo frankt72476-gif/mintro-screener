@@ -46,6 +46,33 @@ const build = (findings: readonly Finding[]) =>
     ruleset,
   );
 
+/**
+ * The run carries its own questions and its own boundary (D-134).
+ *
+ * Snapshotted at assembly for the reason `title` and `clause` are: a run is immutable (D-002), and
+ * a report reopened next year must say what was true when it was produced. Reading today's rule
+ * set at render time would show a merchant as having ignored a question added after their run, and
+ * would print a boundary on an old report that never had one.
+ *
+ * It also puts them where every renderer can reach them. The PDF worker and the merchant's own
+ * page each hold a report and neither holds a rule set.
+ */
+describe('the report snapshots what the rule set said at the time', () => {
+  it('carries the questions this run was screened under', () => {
+    expect(build([]).attestationQuestions).toEqual(ruleset.attestations);
+  });
+
+  it('carries the not-checked list, verbatim', () => {
+    expect(build([]).notChecked).toEqual(ruleset.not_checked);
+  });
+
+  it('carries them as values rather than a reference a later edit could move', () => {
+    const report = build([]);
+    expect(report.attestationQuestions?.length).toBe(19);
+    expect(report.notChecked?.[0]?.subject).toBe('Social media accounts');
+  });
+});
+
 /** The sum of every bucket plus the evaluable count. */
 const accountedFor = (c: ReturnType<typeof computeCoverage>): number =>
   c.evaluable +

@@ -99,6 +99,41 @@ describe('every retention control reaches the bundle', () => {
   });
 });
 
+/**
+ * The attestation channel and section reach the bundle (D-134).
+ *
+ * Same guard, same reason. The merchant's page is the only place `submit_merchant_attestation` is
+ * ever called, and a component nothing imports is a feature that does not exist however green the
+ * unit tests are. `attestations.ts` also had to be added to `browser.ts` before this passed — the
+ * bundler resolves that entry, `tsc` resolves `index.ts`, and the two disagreeing is exactly the
+ * defect this file was written after.
+ */
+describe('merchant attestations are in the bundle', () => {
+  const MARKERS: readonly (readonly [string, string])[] = [
+    ['the write path', 'submit_merchant_attestation'],
+    ['the read path', 'merchant_attestations'],
+    ['the section heading', 'Stated by the merchant'],
+    ['the boundary sentence', 'was observed or verified by Mintro'],
+    ['the unanswered sentence', 'Not observable by Mintro'],
+    ['the declination', 'declined to answer'],
+    ['the merchant-side prompt', 'Prefer not to answer'],
+  ];
+
+  it.each(MARKERS)('carries %s', (_what, marker) => {
+    expect(bundle).toContain(marker);
+  });
+
+  /**
+   * The nineteen questions are data, and the whole point of that is they reach the page without
+   * anybody writing them into a component. If the rule set were tree-shaken out, the merchant would
+   * be shown an empty section and every question would render as unanswered in the report.
+   */
+  it('carries the questions themselves, from the rule set', () => {
+    expect(bundle).toContain('Has any acquirer, processor or platform terminated you?');
+    expect(bundle).toContain('Do you maintain a permanent ban list');
+  });
+});
+
 describe('nothing that could purge reaches the bundle', () => {
   const FORBIDDEN = [
     'begin_package_purge',

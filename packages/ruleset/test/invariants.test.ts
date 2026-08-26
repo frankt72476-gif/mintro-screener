@@ -19,6 +19,10 @@ function base(): Ruleset {
       { id: 'gate', n: 1, prefix: 'GATE', name: 'Access and identity gating' },
       { id: 'product', n: 2, prefix: 'PROD', name: 'Product page content' },
     ],
+    attestations: [
+      { id: 'ban-list', question: 'Do you maintain a ban list?', authority: 'programme', sev: 'critical' },
+    ],
+    not_checked: [{ subject: 'Social media accounts', why: 'The crawl does not follow them.' }],
     rules: [
       {
         id: 'GATE-001',

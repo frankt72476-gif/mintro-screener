@@ -16,6 +16,7 @@ import {
   type Participation,
   type ReportCategory,
   type ReportFinding,
+  type RunAttestations,
   type ScreeningReport,
 } from '@mintro/engine';
 import {
@@ -28,6 +29,7 @@ import {
 } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
+import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
@@ -109,6 +111,15 @@ interface Props {
   readonly onFilterChange?: (filter: Filter) => void;
   /** The merchant's own view supplies a box; nothing else does. */
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  /**
+   * What the merchant stated about requirements no crawl can observe (D-134).
+   *
+   * Rendered after the findings and never among them: these are statements, not observations, and
+   * the separation is most of what keeps the two apart. Absent when the caller has not read them,
+   * which is not the same as a merchant having said nothing — a caller that cannot read them omits
+   * the section rather than rendering nineteen questions as unanswered (D-036).
+   */
+  readonly attestations?: RunAttestations;
 }
 
 export function ReportView({
@@ -122,6 +133,7 @@ export function ReportView({
   filter: controlledFilter,
   onFilterChange,
   commentBox,
+  attestations,
 }: Props): JSX.Element {
   // Both branches read from this, so a comment keys the same way whichever view is rendering.
   const ordinals = useMemo(() => ordinalsFor(report), [report]);
@@ -289,6 +301,19 @@ export function ReportView({
           })()}
         </div>
       )}
+
+      {/*
+        After the findings, because they answer what the crawl could not reach — and outside the
+        category structure, because nothing in them is a finding (D-134).
+      */}
+      {attestations !== undefined && <AttestationSection attestations={attestations} print={print} />}
+
+      {/*
+        Read from the run rather than from today's rule set: a report reopened next year says what
+        was true when it was produced. Absent on runs recorded before it existed, and absent
+        renders nothing rather than substituting the current list (D-134).
+      */}
+      {report.notChecked !== undefined && <NotCheckedSection items={report.notChecked} />}
 
       <RunMeta report={report} access={access} />
     </div>

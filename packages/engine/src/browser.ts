@@ -62,6 +62,26 @@ export {
   type RunCommentary,
 } from './commentaryStore.js';
 
+/*
+  Merchant attestations (D-134).
+
+  Here as well as in the Node entry, and the comment two blocks down is why: the bundler resolves
+  this file and `tsc` resolves `index.ts`, so a module exported only from the latter typechecks
+  everywhere and disappears from the browser build. This one is needed on both sides — the
+  merchant's page writes answers and the analyst's report reads them — and `attestations.ts` is
+  plain data joining with no Node built-in anywhere in it.
+*/
+export {
+  readRunAttestations,
+  resolveAttestations,
+  type AttestationOutcome,
+  type AttestationReader,
+  type AttestationSummary,
+  type ResolvedAttestation,
+  type RunAttestations,
+  type StoredAttestation,
+} from './attestations.js';
+
 export {
   COMMENT_PATH,
   commentLinkFor,

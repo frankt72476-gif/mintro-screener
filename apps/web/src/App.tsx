@@ -24,10 +24,13 @@ import { invitedFindings } from './lib/grouping.js';
 import {
   commentaryFor,
   participationFor,
+  readRunAttestations,
   readRunCommentary,
+  resolveAttestations,
   type Participation,
   type FindingCommentary,
   type ReportFinding,
+  type RunAttestations,
   type RunCommentary,
 } from '@mintro/engine';
 import { CredentialModal } from './components/CredentialModal.js';
@@ -79,6 +82,14 @@ function printRequest(): string | null {
  */
 interface InjectedPrint {
   readonly report: ScreeningReport;
+  /**
+   * What the merchant stated about what no crawl can see (D-134).
+   *
+   * Here for the same reason `commentary` is: the PDF is the document that reaches IQwallet, and
+   * a screen that shows the merchant's statements beside an export that drops them is two
+   * documents. That defect has happened once already on this component.
+   */
+  readonly attestations?: RunAttestations;
   /** Evidence key → signed URL, pre-minted by the worker. */
   readonly evidence: Readonly<Record<string, string>>;
   /**
@@ -273,6 +284,8 @@ function Screener({
     of the document silently, which is exactly the substitution D-036 is about.
   */
   const [commentary, setCommentary] = useState<RunCommentary | null | undefined>(undefined);
+  /** Undefined while unread or unreadable; a resolved set once read. See the read site below. */
+  const [attestations, setAttestations] = useState<RunAttestations | undefined>(undefined);
 
   /**
    * Where runs come from.
@@ -400,6 +413,7 @@ function Screener({
     setStage('running');
     setError(null);
     setCommentary(undefined);
+    setAttestations(undefined);
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
@@ -410,6 +424,19 @@ function Screener({
       // Read after the report is on screen rather than gating it. A commentary read that is slow
       // or fails should not withhold the findings; the commentary section says which it was.
       setCommentary(await readRunCommentary(client, runId));
+
+      /*
+        Read after the report is on screen, for the reason commentary is: a slow or failing read
+        of the merchant's statements must not withhold the findings.
+
+        A failed read leaves this `undefined` and the section does not render — deliberately not
+        "nineteen questions, none answered", which would be a read failure shown as the merchant's
+        silence (D-036, D-044).
+      */
+      const stored = await readRunAttestations(client, runId);
+      // A rule set that failed to parse renders no report at all a few lines down, so there is
+      // nothing to attach statements to either.
+      if (stored !== null && ruleset.ok) setAttestations(resolveAttestations(loaded.report.attestationQuestions ?? [], stored));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStage('input');
@@ -676,6 +703,7 @@ function Screener({
                   downloading: pdfBusy,
                 }}
                 {...commentaryProps(commentary, report)}
+                {...(attestations === undefined ? {} : { attestations })}
               />
             </>
           )}
@@ -1088,6 +1116,7 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
           access={access}
           print
           {...commentaryProps(injected.commentary, injected.report)}
+          {...(injected.attestations === undefined ? {} : { attestations: injected.attestations })}
         />
       </main>
     </div>
