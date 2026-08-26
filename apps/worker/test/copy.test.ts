@@ -116,16 +116,61 @@ describe('generated report copy', () => {
    * stays descriptive.
    */
   it('quotes rule clauses verbatim, including their imperatives', () => {
-    const ruleset = loadRulesetFile('rules/ruleset.json');
-    const clauses = new Map(ruleset.rules.map((rule) => [rule.id, rule.clause]));
+    /*
+      Built from the current rule set rather than read out of `reports/`.
 
-    for (const report of reports) {
-      for (const category of report.categories) {
-        for (const finding of category.findings) {
-          expect(finding.clause).toBe(clauses.get(finding.ruleId));
-        }
-      }
+      This compared stored fixtures against `rules/ruleset.json`, which is the D-002 mistake: a
+      completed run snapshots its clauses and the rule set moves on without it. The five fixtures are
+      at rule set 2.9.0 and the file is at 3.0.0, so the comparison was asserting that an immutable
+      record tracks a mutable one.
+
+      The property itself is worth keeping — a report must carry the clause exactly as the rule set
+      states it, imperatives intact — so it is asserted where it is true: over a report assembled from
+      the rule set now loaded. `assembleReport` fills in every rule that no layer ran, so this covers
+      the whole corpus rather than whatever a particular crawl happened to reach.
+    */
+    const ruleset = loadRulesetFile('rules/ruleset.json');
+    const report = assembleReport(
+      {
+        runId: 'copy-audit',
+        merchantDomain: 'shop.example',
+        mode: 'public',
+        startedAt: '2026-08-26T00:00:00.000Z',
+        finishedAt: '2026-08-26T00:01:00.000Z',
+        findings: [] as Finding[],
+        politeness: 'none declared',
+      },
+      ruleset,
+    );
+
+    const clauses = new Map(ruleset.rules.map((rule) => [rule.id, rule.clause]));
+    const rendered = report.categories.flatMap((category) => category.findings);
+
+    for (const finding of rendered) {
+      expect(finding.clause, finding.ruleId).toBe(clauses.get(finding.ruleId));
     }
+
+    // Discriminating rather than vacuous: the point is that an imperative survives the trip. If no
+    // clause carries one, this test proves nothing about imperatives and should be read again.
+    const imperative = rendered.filter((finding) => /\b(must|never|cannot|do not)\b/i.test(finding.clause));
+    expect(imperative.length, 'no clause carries an imperative — this audit has nothing to guard').toBeGreaterThan(0);
+  });
+
+  /**
+   * The same property, on the fixtures, pointed at what is actually true of them.
+   *
+   * A stored run's clause is its own — D-002 — so there is no external text to compare it against.
+   * What still has to hold is that our audit leaves it alone: a clause quotes the standards and says
+   * "must", and sanitising it would misquote the document the merchant was screened against.
+   */
+  it('leaves the imperatives in a stored run alone', () => {
+    const withImperatives = reports.flatMap((report) =>
+      report.categories.flatMap((category) =>
+        category.findings.filter((finding) => /\b(must|never|cannot|do not)\b/i.test(finding.clause)),
+      ),
+    );
+
+    expect(withImperatives.length, 'no stored clause carries an imperative to leave alone').toBeGreaterThan(0);
   });
 });
 

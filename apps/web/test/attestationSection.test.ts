@@ -201,14 +201,22 @@ describe('what was not checked', () => {
     text(renderToStaticMarkup(createElement(NotCheckedSection, { items: RULESET.not_checked })));
 
   /**
-   * The programme's own guidelines make this one necessary: social media is where they say FDA is
-   * actively looking, and a crawl finds the links without following them. Rendered verbatim from
-   * the rule set, because a paraphrase is where a boundary softens (D-018, D-076).
+   * The published standards make this one necessary: off-site marketing is the area they treat as
+   * highest risk and the one FDA is named over, and a crawl finds the links without following them.
+   * Rendered verbatim from the rule set, because a paraphrase is where a boundary softens (D-018).
+   *
+   * **The guard is that the statement names FDA, not that it uses any particular sentence.** It used
+   * to assert `'FDA is'`, which is a fragment of the old combined guidelines' phrasing — *"where FDA
+   * is actively looking"* — and that wording is deliberately not carried into the re-based corpus. An
+   * assertion on the phrasing would either force the old sentence back or be deleted as stale on the
+   * next rewording; an assertion on the name survives both, and the name is what the boundary is for.
+   * Who a reader is told is looking at the surface Mintro does not examine is the whole point of
+   * declaring it.
    */
   it('states that Mintro does not follow or read social media accounts', () => {
     const rendered = notChecked();
     expect(rendered).toContain('does not follow or read the social media accounts');
-    expect(rendered).toContain('FDA is');
+    expect(rendered, 'the boundary must still name FDA').toContain('FDA');
   });
 
   it('renders every item in the rule set, verbatim', () => {

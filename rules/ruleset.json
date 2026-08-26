@@ -1,7 +1,7 @@
 {
-  "version": "2.15.0",
-  "source_document": "Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf",
-  "effective": "2026-05-26",
+  "version": "3.0.0",
+  "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
+  "effective": "2026-08-26",
   "states": [
     "fail",
     "review",
@@ -189,7 +189,7 @@
   "not_checked": [
     {
       "subject": "Social media accounts",
-      "why": "Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links to. The programme guidelines name social media as where FDA is actively looking, so nothing in this report speaks to what those accounts contain."
+      "why": "Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links to. FDA actively monitors social channels for claims that contradict a seller's own disclaimers, and the standards name off-site marketing as the highest-risk area, so nothing in this report speaks to what those accounts contain."
     }
   ],
   "rules": [
@@ -201,7 +201,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Age affirmation before entry",
-      "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
+      "clause": "Every visitor must be stopped at the door and affirm they are 21 or older. This happens before products can be viewed — not at checkout.",
       "source": "programme",
       "params": {
         "surface": "homepage",
@@ -227,7 +227,7 @@
       "type": "http_probe",
       "tier": "auto_fail",
       "title": "Products hidden until an account exists",
-      "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+      "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
       "source": "programme",
       "params": {
         "paths": [
@@ -253,7 +253,7 @@
       "type": "flow_probe",
       "tier": "auto_fail",
       "title": "Guest checkout disabled",
-      "clause": "Guest checkout must be disabled.",
+      "clause": "There is no anonymous path to purchase. Guest checkout must be turned off entirely.",
       "source": "programme",
       "params": {
         "flow": "add_to_cart_then_checkout",
@@ -269,7 +269,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Terms acknowledged at sign-up",
-      "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+      "clause": "The user must actively check “I Agree” against the complete Terms and Conditions. Until they do, account creation cannot proceed.",
       "source": "programme",
       "params": {
         "surface": "register",
@@ -292,7 +292,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Research field required at sign-up",
-      "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+      "clause": "When the account is established, the buyer must identify their research status. This is a required field — never optional.",
       "source": "programme",
       "params": {
         "surface": "register",
@@ -317,7 +317,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Research field stored with each order",
-      "clause": "Store the selected field with every order in your database.",
+      "clause": "The selected research field must be stored with every order in your database, not just captured at signup.",
       "source": "programme",
       "params": {
         "reason": "Order records are server-side. Requires merchant attestation."
@@ -331,7 +331,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Terms cover all required clauses",
-      "clause": "Research-only use restriction; prohibition on human consumption; not for diagnosis/treatment/prevention; indemnification of the seller; buyer is a qualified professional.",
+      "clause": "Five points, at minimum: use is restricted to research; human consumption is forbidden; the products play no part in diagnosing, treating or preventing any disease; the buyer indemnifies the seller; and the buyer confirms they are a qualified professional.",
       "source": "programme",
       "params": {
         "surface": "terms",
@@ -368,7 +368,7 @@
       "type": "computed_style",
       "tier": "auto_fail",
       "title": "Footer disclaimer is legible",
-      "clause": "In legible font, not hidden or collapsed.",
+      "clause": "It may not be hidden, shrunk past readability, or tucked inside a collapsed element.",
       "source": "programme",
       "params": {
         "target_phrases_from": "DISC-001",
@@ -386,7 +386,7 @@
       "type": "dom_assert",
       "tier": "auto_fail",
       "title": "Disclaimer on every sampled page",
-      "clause": "Must appear in the footer of every page of the website.",
+      "clause": "This sentence belongs in the footer of every single page, set in a legible size.",
       "source": "programme",
       "params": {
         "surface": "all_sampled",
@@ -403,7 +403,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "CAS number listed",
-      "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+      "clause": "The compound’s exact CAS registry number.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -421,7 +421,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Molecular formula listed",
-      "clause": "e.g. C62H98N16O22 for BPC-157.",
+      "clause": "For example, C62H98N16O22 for BPC-157.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -463,7 +463,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Storage conditions listed",
-      "clause": "e.g. 'Store at -20C, desiccated.'",
+      "clause": "For example, “Store at -20°C, desiccated.”",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -485,7 +485,7 @@
       "type": "text_cooccurrence",
       "tier": "review_only",
       "title": "No dosing information",
-      "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+      "clause": "Never publish dosing information of any kind: milligram amounts, frequency, route of administration, or injection schedules.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -520,7 +520,7 @@
       "type": "text_match",
       "tier": "auto_fail",
       "title": "No pharmaceutical brand names",
-      "clause": "Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name.",
+      "clause": "Ozempic, Wegovy, Mounjaro, Zepbound and Rybelsus are off limits, as is every other brand name.",
       "source": "programme",
       "params": {
         "surface": "all_sampled",
@@ -546,7 +546,7 @@
       "type": "text_match",
       "tier": "auto_fail",
       "title": "No route-of-administration labels",
-      "clause": "Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims.",
+      "clause": "Products cannot be labeled “injectable” or “nasal spray.” These describe how a person would take the product, which makes them administration route claims.",
       "source": "programme",
       "params": {
         "surface": "all_sampled",
@@ -569,7 +569,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "No disease or benefit claims",
-      "clause": "No references to treating, curing, preventing or diagnosing any disease or condition.",
+      "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
       "source": "programme",
       "params": {
         "surface": "all_sampled",
@@ -598,7 +598,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "No links to study databases",
-      "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+      "clause": "Research papers may not be cited or linked, and neither may off-site material of any kind, where doing so would suggest a benefit to a person or point toward human use.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -621,7 +621,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "No community abbreviations",
-      "clause": "Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc.",
+      "clause": "Refer to GLP-1 products by chemical name or internal code only — “Semaglutide,” “Tirzepatide.” Never “Sema,” “Tirz,” or similar shorthand.",
       "source": "programme",
       "params": {
         "surface": "all_sampled",
@@ -644,7 +644,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No therapeutic categories",
-      "clause": "Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'.",
+      "clause": "Products cannot be filed under categories such as “Weight Loss,” “Obesity,” “Longevity,” “Cognitive Enhancement,” “Joint Healing” or “Anti-Aging.”",
       "source": "programme",
       "params": {
         "patterns": [
@@ -672,7 +672,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No marketing terms in product names",
-      "clause": "No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc.",
+      "clause": "Names such as “Lean Stack,” “Mass,” “PCT,” “CagriLean,” “Wolverine Peptide” or “Healing Stack” are not permitted.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -699,7 +699,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Proper chemical names used",
-      "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+      "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -717,7 +717,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No needles or syringes",
-      "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
+      "clause": "Offering injection supplies next to peptides is itself evidence of intended injection.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -738,7 +738,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No alcohol wipes",
-      "clause": "Associated with injection site preparation. Prohibited.",
+      "clause": "Their obvious purpose is preparing an injection site, which places the sale in a human-injection context.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -759,7 +759,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No HCG or HGH",
-      "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
+      "clause": "Human Chorionic Gonadotropin and Human Growth Hormone both require prescriptions.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -782,7 +782,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No tablets or pills",
-      "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
+      "clause": "Oral dosage forms are not permitted.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -804,7 +804,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Reconstitution solution labelling",
-      "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+      "clause": "Bacteriostatic water is permitted when it carries the label “Reconstitution Solution for Laboratory Use.” Keep injection language off the listing, and attach no pharmaceutical brand names such as Pfizer or Hospira.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -831,7 +831,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Capsule labelling",
-      "clause": "You may sell labeled chemical names and CAS numbers only.",
+      "clause": "Capsules may be sold only where they are exclusively for research use and properly labeled, listed with chemical names and CAS numbers only. Anything short of that is prohibited.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -909,7 +909,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "COA linked on each sampled product page",
-      "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+      "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -936,7 +936,7 @@
       "type": "doc_parse",
       "tier": "auto_fail",
       "title": "Certificate reports a test date within 60 days",
-      "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
+      "clause": "Refresh COAs at least every 60 days. When a new batch arrives, update immediately rather than waiting for the cycle.",
       "source": "programme",
       "params": {
         "extract": "report_date",
@@ -952,7 +952,7 @@
       "type": "doc_parse",
       "tier": "auto_fail",
       "title": "Certificate states purity at or above 98%",
-      "clause": "98% purity for all products.",
+      "clause": "A minimum of 98% purity for all products, and every purity figure must be backed by a Certificate of Analysis.",
       "source": "programme",
       "params": {
         "extract": "purity_pct",
@@ -967,7 +967,7 @@
       "type": "doc_parse",
       "tier": "review_only",
       "title": "COA contains all required fields",
-      "clause": "COA must identify batch/lot number, testing date, compound identity, purity %, method used (HPLC preferred).",
+      "clause": "The COA must identify the batch or lot number, the testing date, the compound identity, the purity percentage, and the method used (HPLC preferred).",
       "source": "programme",
       "params": {
         "require_fields": [
@@ -988,7 +988,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Lab is accredited and independent",
-      "clause": "From an accredited independent third-party testing laboratory.",
+      "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
       "source": "programme",
       "params": {
         "reason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control."
@@ -1002,7 +1002,7 @@
       "type": "doc_parse",
       "tier": "review_only",
       "title": "Certificate links serve a readable certificate",
-      "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+      "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
       "source": "programme",
       "params": {
         "assert_served": true,
@@ -1017,7 +1017,7 @@
       "type": "text_match",
       "tier": "review_only",
       "title": "Shipping policy states USA only",
-      "clause": "Ship to USA only. No PO boxes or international addresses.",
+      "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
       "source": "programme",
       "params": {
         "surface": "shipping_policy",
@@ -1037,7 +1037,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "No PO boxes",
-      "clause": "No PO boxes or international addresses.",
+      "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
       "source": "programme",
       "params": {
         "reason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation."
@@ -1051,7 +1051,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Adult signature on first orders",
-      "clause": "All first-time customer orders must require an adult signature upon delivery (21+ confirmed).",
+      "clause": "Every first-time customer order must require an adult signature on delivery, with 21+ confirmed.",
       "source": "programme",
       "params": {
         "reason": "Carrier configuration. Requires merchant attestation."
@@ -1065,7 +1065,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Packing slip disclaimers",
-      "clause": "Include RUO disclaimer and research-professional acknowledgement in shipment.",
+      "clause": "Include the research-use-only disclaimer and the research-professional acknowledgement in the shipment itself.",
       "source": "programme",
       "params": {
         "reason": "Physical document. Requires a test order or merchant attestation."
@@ -1079,7 +1079,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Ban list maintained",
-      "clause": "Any customer who hints at human consumption must be permanently banned with no appeal option.",
+      "clause": "Keep a live ban list. A customer who so much as hints at human consumption is removed for good, with no appeal, and the reason is written down.",
       "source": "programme",
       "params": {
         "reason": "Internal record. Requires merchant attestation."
@@ -1093,7 +1093,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "title": "No affiliate or referral program URLs",
-      "clause": "No affiliate or influencer marketing program.",
+      "clause": "Do not operate an affiliate or referral program.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -1115,7 +1115,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "No testimonials or outcome stories",
-      "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+      "clause": "Do not post testimonials, before-and-after photos, recovery stories, or user reviews that describe health outcomes.",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -1131,7 +1131,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Social accounts linked from the storefront",
-      "clause": "Social media should link only to your website home page.",
+      "clause": "From social profiles and posts, link to the site’s home page and nowhere deeper.",
       "source": "programme",
       "params": {
         "surface": "homepage",
@@ -1147,7 +1147,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Social post content",
-      "clause": "Every social media post must follow the same rules as product pages.",
+      "clause": "Whatever the channel, a post lives under the product-page rules — naming, claims, categories and disclaimers all carry over.",
       "source": "programme",
       "params": {
         "reason": "Post-level review needs platform API access or a commercial listening tool. Not covered."
@@ -1161,7 +1161,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Monthly social audits",
-      "clause": "Reviews of all social media channels at minimum monthly.",
+      "clause": "Sweep every channel at least once a month, and act on any post found carrying human-use language.",
       "source": "programme",
       "params": {
         "reason": "Internal process. Requires merchant attestation."
@@ -1175,7 +1175,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Affiliate program linked from the homepage",
-      "clause": "No affiliate or influencer marketing program.",
+      "clause": "Do not operate an affiliate or referral program.",
       "source": "programme",
       "params": {
         "surface": "homepage",
@@ -1197,7 +1197,7 @@
       "type": "url_pattern",
       "tier": "review_only",
       "title": "Editorial content on therapeutic topics",
-      "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",
+      "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
       "source": "programme",
       "params": {
         "patterns": [
@@ -1236,7 +1236,7 @@
       "type": "text_match",
       "tier": "auto_fail",
       "title": "No peer-to-peer payment methods named on public pages",
-      "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
+      "clause": "To an investigator, a seller collecting through Venmo, Cash App, Zelle or PayPal Friends & Family looks like one sidestepping the fraud controls that come with a standard merchant account.",
       "source": "programme",
       "params": {
         "surface": "footer_and_public_pages",
@@ -1259,7 +1259,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Card processing through a merchant account",
-      "clause": "Acceptance of credit/debit cards through a legitimate merchant processor that conducts proper KYC.",
+      "clause": "Card payments must run through a legitimate merchant processor that performs proper KYC. How a seller collects money is read as evidence of how the business is run.",
       "source": "programme",
       "params": {
         "reason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation."
@@ -1273,7 +1273,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "title": "Refund and chargeback policy published",
-      "clause": "Clearly documented refund/chargeback policy.",
+      "clause": "Publish a refund and chargeback policy, clearly written and easy to find.",
       "source": "programme",
       "params": {
         "surface": "footer",
@@ -1292,11 +1292,11 @@
       "sev": "major",
       "type": "manual",
       "tier": "review_only",
-      "title": "Risk monitoring plugin installed",
-      "clause": "All merchants are required to use our plugin for additional risk monitoring purposes.",
-      "source": "programme",
+      "title": "Risk monitoring integration",
+      "clause": "Mintro requires the merchants it boards to install and keep active the risk monitoring integration it specifies. This is a condition of the account rather than a requirement drawn from the published standards.",
+      "source": "mintro",
       "params": {
-        "reason": "Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report."
+        "reason": "Not observable from a storefront crawl — installation is confirmed at boarding. Requires merchant attestation."
       }
     },
     {
@@ -1307,7 +1307,7 @@
       "type": "text_cooccurrence",
       "tier": "review_only",
       "title": "FAQ free of dosing or administration advice",
-      "clause": "Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance.",
+      "clause": "No dosing advice, no administration guidance, and nothing a reader could take as instruction for using a drug — in any channel, by any staff member.",
       "source": "programme",
       "params": {
         "surface": "faq",
@@ -1336,7 +1336,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Support channels free of human-use language",
-      "clause": "Including email, chat, phone, and social media direct messages.",
+      "clause": "This standard covers every channel — your FAQ and site copy, email, live chat, phone, and social media direct messages.",
       "source": "programme",
       "params": {
         "reason": "Not reachable by crawl. Sampled transcript review or mystery shopping only."
@@ -1350,7 +1350,7 @@
       "type": "manual",
       "tier": "review_only",
       "title": "Staff do not help with protocols",
-      "clause": "Don't have staff offer to help customers 'figure out' protocols.",
+      "clause": "Staff must never offer to help a customer “figure out” a protocol.",
       "source": "programme",
       "params": {
         "reason": "Internal training. Requires merchant attestation."

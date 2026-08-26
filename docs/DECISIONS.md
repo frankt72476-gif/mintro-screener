@@ -8125,3 +8125,174 @@ finding lacks the field — which is the assertion that would have caught it, ra
 at the path I happened to remember.
 
 ---
+
+## D-139 — Clause corpus re-based on the published RUO standards v1.1
+**2026-08-26 · Frank's ruling · ruleset 2.15.0 → 3.0.0**
+
+`source_document` moves off the processor's combined guidelines and onto the published standards. **53
+of the 55 clauses are replaced in one pass**, and the declared boundary in `not_checked` with them.
+
+| Field | From | To |
+|---|---|---|
+| `version` | `2.15.0` | `3.0.0` |
+| `effective` | `2026-05-26` | `2026-08-26` |
+| `source_document` | `Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf` | `RUO Peptide Program Compliance Standards, v1.1 (August 2026)` |
+
+Major rather than minor, because the requirement text **every finding quotes** changed wholesale. Two
+of the 53 replacements happen to be byte-identical to what they replace — DISC-001, which is the
+required disclaimer itself and must not move, and PROD-003, whose `Expressed in g/mol.` survived the
+rewrite unchanged. Everything else in the requirement column reads differently from this version on.
+
+Counts are untouched: 55 rules, the same ten categories at the same sizes, 16 `auto_fail` / 39
+`review_only`, 12 `manual` reasons, 19 attestations. Titles are Mintro's and stay as they are, PAY-004
+excepted (D-140).
+
+### D-041 is preserved, not relaxed
+
+The clause is still byte-identical to its source document. **The source document is what changed.**
+
+That distinction is the whole of this ruling. The screener does not paraphrase the standard it screens
+against — it quotes it, into the Program requirement column of every finding a merchant, an agent and
+IQwallet reads. A pass that "updated the wording" while leaving the quotation loose would convert
+citation into characterisation, which is a different act with different consequences. So the corpus is
+re-based against a named document, and the byte-identity guarantee travels with it.
+
+### The baseline has to be a text original, and both shortcuts to one are worse than nothing
+
+D-041 is checkable today only against the rule's own `clause` — `requirement.test.ts` proves the report
+faithful to the rule set and says nothing about the rule set being faithful to the document. Closing
+that means committing the standards text and asserting each `source: programme` clause is a byte-exact
+substring of it. **Two obvious ways to produce that file are both wrong, and both were tried.**
+
+**Generated from this spec's own clause table, the guard is circular.** It compares the clauses to
+themselves — it proves the rule set and the spec agree, and proves nothing about either agreeing with
+the document. It is the failure this project keeps renaming: *does this assertion get its expected
+value from the same place the code gets its actual value?*
+
+**Extracted from the issued PDF, the guard fails on typography rather than on wording.** The embedded
+fonts map `”` to U+02EE and `’` to U+02BC, and draw hyphen, parenthesis and plus as private-use code
+points with no ToUnicode entry — so `BPC-157` extracts as `BPC157`, `-20°C` as `20°C`, `21+` as `21`,
+`(HPLC` as `HPLC`. Measured against the issued PDF: **39 of 53 clauses match strictly, 48 after mapping
+the two confusable quotes**, with the residual five each diverging on a dropped punctuation glyph. Every
+one of the 53 is present in the document and none of the misses is a wording difference.
+
+A guard that fails fourteen times for reasons unrelated to its subject is a guard someone weakens. So
+the baseline is a curated text original, regenerated from the document source that renders the PDF —
+never from the PDF, and never from the table.
+
+### What is committed today is the interim corpus, and it is the circular one
+
+Recorded rather than glossed, because the file name will outlive the memory of how it was made.
+
+`rules/sources/ruo-standards-v1.1.md` as committed here is **generated from the clause table**, and its
+own header says so. The text original the paragraph above calls for was not available when this landed.
+Nothing consults the file yet — the substring assertion is a `packages/ruleset` change that has not been
+written — so it creates no false guarantee today. **It would create one the moment that validator is
+wired to it.** Replace the file before writing the validator, not after.
+
+### D-002 is why the fixtures were not rewritten, and why they had been lying
+
+`assembleReport` snapshots `title` and `clause` onto every finding, so a completed run keeps rendering
+the wording it was produced under. The five real runs in `reports/` are **not** regenerated against the
+new corpus, and must not be.
+
+What the re-basing exposed is that the tests around them had never been asserting what they appeared to.
+`requirement.test.ts` and `copy.test.ts` compared each stored finding's clause against whatever
+`rules/ruleset.json` currently held — an immutable record against a moving one, which is asserting
+something D-002 says is false. The fixtures were produced under **2.9.0**; the file reached **2.15.0**
+without any clause those runs exercise happening to change, so six minor versions of drift went by and
+the suite stayed green on a coincidence. 3.0.0 is simply the first bump that reworded a clause those
+runs touch.
+
+Corrected by re-pointing the comparison, not by touching the fixtures. A stored run is audited against
+its own snapshot; where a test genuinely needs current-rule-set text it builds a report from the current
+rule set rather than reading a historical fixture. Each corrected assertion was made to fail on purpose
+before being trusted.
+
+### The declared boundary, corrected twice
+
+`not_checked[].why` renders verbatim under **What was not checked**, and it took two passes to get right.
+
+The first replacement dropped the FDA reference and kept the word "programme" — so a statement whose
+entire job is to tell a reader *who is watching the surface Mintro does not examine* stopped naming the
+watcher, and simultaneously reintroduced the possessive question ("whose programme?") that the pending
+merchant-facing vocabulary ruling exists to remove. Both wrong, and the second replacement restores the
+substance without reusing the old document's phrasing:
+
+> Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links
+> to. FDA actively monitors social channels for claims that contradict a seller's own disclaimers, and
+> the standards name off-site marketing as the highest-risk area, so nothing in this report speaks to
+> what those accounts contain.
+
+`attestationSection.test.ts` now guards that the rendered boundary **names FDA** rather than that it
+contains a fragment of the old sentence. The old assertion was `toContain('FDA is')`, which pinned the
+superseded phrasing *"where FDA is actively looking"* — an assertion that would either force the old
+wording back or be deleted as stale at the next rewrite. The name survives both, and the name is the
+thing the boundary exists to convey.
+
+---
+
+## D-140 — PAY-004 is Mintro-authored, not programme-derived
+**2026-08-26 · Frank's ruling · ruleset 2.15.0 → 3.0.0**
+
+PAY-004 changes hands. `source: programme` → `source: mintro`, with a new title, clause and
+`params.reason`. **The rule survives; only its attribution changes.**
+
+| Field | From | To |
+|---|---|---|
+| `source` | `programme` | `mintro` |
+| `title` | Risk monitoring plugin installed | Risk monitoring integration |
+| `clause` | All merchants are required to use our plugin for additional risk monitoring purposes. | Mintro requires the merchants it boards to install and keep active the risk monitoring integration it specifies. This is a condition of the account rather than a requirement drawn from the published standards. |
+| `params.reason` | Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report. | Not observable from a storefront crawl — installation is confirmed at boarding. Requires merchant attestation. |
+
+`type: manual`, `tier: review_only` and `sev: major` are unchanged. A commercial condition of the
+account should never auto-fail a report that otherwise carries FDA-derived observations, and
+`review_only` already guarantees that (hard constraint 4). The rule set still holds 55 rules and the
+`payment` category still holds 4.
+
+### The requirement is real; the attribution was not
+
+Mintro enforces this at boarding, so deleting the rule would drop a real requirement out of a document
+whose purpose is to tell a merchant what they are measured against. What could not survive is a rule
+sitting among the programme-derived ones while quoting a source document that no longer contains it.
+
+**"our plugin" had no referent in a Mintro report.** The word did work in the processor's own guidelines,
+addressed by a processor to its merchants. Lifted into a Mintro document read by three parties it
+resolves differently for each: a merchant reads *Mintro's* plugin, an agent reads *the processor's*, and
+nothing in the sentence anchors either reading. A requirement whose subject the reader has to guess is
+not a requirement they can act on.
+
+The new clause fixes that by naming the party. It says *the integration it specifies* rather than *its
+integration*, which attributes the requirement without claiming Mintro wrote the software — and it says
+outright that this is a condition of the account rather than something drawn from the standards, so the
+reader is told the difference rather than left to infer it from a heading.
+
+### `source: mintro` enforces in layout what the reason had been asking for in prose
+
+The old `params.reason` ended *"Keep separate from FDA-derived findings in the report"* — an instruction
+to a future implementer, sitting in a data field, with nothing enforcing it. Under D-138 the separation
+is structural: the requirement column branches on `source`, so this rule prints under **"Mintro
+observation, not a program requirement"** and cannot be mistaken for a regulatory finding. The prose
+request comes out because the layout now does the work.
+
+The reason field says what it should have said all along, which is why the rule is `manual`: the
+integration is confirmed at boarding and no crawl of a storefront can see it.
+
+### The sponsor is deliberately unnamed
+
+Frank's call. Mintro states this as its own requirement. Naming the processor would put a third party
+into a document built to be forwarded — and the whole posture of the report is to stop implying
+relationships it cannot evidence. The merchant is correctly informed either way; the processor's name
+adds nothing they can act on.
+
+### It is the second Mintro-authored rule, and the test now says so rather than counting
+
+CATG-007 was the first (D-138), and `ruleSource.test.ts` asserted `expect(mintro).toEqual(['CATG-007'])`
+with the programme count derived as `length - 1`. Both encoded "there is exactly one", which was true
+for four days.
+
+Now `['CATG-007', 'PAY-004']`, sorted, with the remainder derived as `length - mintro.length`. Naming
+both rather than counting to two is the point: a rule quietly acquiring Mintro authorship is exactly
+what this assertion is watching for, and a count would pass on the wrong pair.
+
+---

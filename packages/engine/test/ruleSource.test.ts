@@ -9,6 +9,12 @@
  * Frank's ruling: that is worse than any overclaim already fixed here, because it fabricates the
  * authority rather than overstating the method, and wording beneath a heading cannot fix the
  * heading. So the distinction is structural and required.
+ *
+ * **PAY-004 joined it** when the clause corpus was re-based on the published standards. The risk
+ * monitoring integration is Mintro's own condition of boarding and the standards do not mention it,
+ * so it changed hands rather than being deleted — the requirement is real, its attribution was not.
+ * The assertion below names both rather than counting to one, because a rule quietly acquiring
+ * Mintro authorship is exactly what it is watching for.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -74,10 +80,12 @@ describe('every rule states whose requirement it is', () => {
    * program, which is exactly what the field exists to prevent — so the schema requires it rather
    * than defaulting it, and this asserts the data has not drifted back.
    */
-  it('everything quoting the program document says so, and only CATG-007 does not', () => {
+  it('everything quoting the published standards says so, and only CATG-007 and PAY-004 do not', () => {
     const mintro = ruleset.rules.filter((r) => r.source === 'mintro').map((r) => r.id);
-    expect(mintro).toEqual(['CATG-007']);
-    expect(ruleset.rules.filter((r) => r.source === 'programme')).toHaveLength(ruleset.rules.length - 1);
+    expect([...mintro].sort()).toEqual(['CATG-007', 'PAY-004']);
+    expect(ruleset.rules.filter((r) => r.source === 'programme')).toHaveLength(
+      ruleset.rules.length - mintro.length,
+    );
   });
 });
 

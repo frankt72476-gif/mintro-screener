@@ -15,22 +15,28 @@ const ruleset = loadRulesetFile(RULESET_PATH);
 describe('rules/ruleset.json', () => {
   it('loads and validates', () => {
     /*
-      2.9.0. Every bump here changed what a rule asks, which is why the version is stamped on
-      every run:
+      Every bump here changed what a rule asks, which is why the version is stamped on every run:
 
         2.5.0  PAY-001's surface (D-049)
         2.6.0  FULF-002 became `manual` (D-055)
         2.7.0  PAY-002 became `manual` (D-052)
         2.8.0  COA-002 extracts `report_date`, not `test_date` (D-058)
         2.9.0  COA-001's link vocabulary widened and shared with the fetch (D-059)
+        3.0.0  the clause corpus re-based on the published standards
 
-      The last two matter most to a reader comparing runs: COA-002 now asks when the certificate
+      Two of those matter most to a reader comparing runs: COA-002 now asks when the certificate
       was issued rather than when the sample was drawn, and COA-001 asked a **narrower** question
       before 2.9.0 — a merchant reported as linking no certificate under 2.8.0 may link one that
       the earlier vocabulary did not recognise.
+
+      3.0.0 is major rather than minor because the requirement text every finding quotes changed
+      wholesale: `source_document` moved off the old combined guidelines and onto the published
+      standards, so 53 clauses were replaced at once and PAY-004 changed hands to Mintro authorship.
+      Runs produced before it keep rendering the wording they were made under (D-002), which is why
+      the fixtures in `reports/` are still at 2.9.0 and are not rewritten to match this.
     */
-    expect(ruleset.version).toBe('2.15.0');
-    expect(ruleset.effective).toBe('2026-05-26');
+    expect(ruleset.version).toBe('3.0.0');
+    expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(55);
     expect(ruleset.categories).toHaveLength(10);
   });

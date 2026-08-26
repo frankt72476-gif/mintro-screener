@@ -142,6 +142,30 @@ describe('every finding an assembled report produces', () => {
   });
 });
 
+/**
+ * Stored runs, audited against themselves.
+ *
+ * **The authority for a stored run's requirement column is that run's own snapshotted clause, not
+ * today's rule set.** This block used to look the clause up in `rules/ruleset.json` and compare, and
+ * that is asserting something D-002 says is false: a completed run is immutable, `assembleReport`
+ * snapshots `title` and `clause` onto every finding, and a report reopened next year must render the
+ * wording it was produced under. The rule set is expected to move away from these fixtures.
+ *
+ * It passed for years on a coincidence. The fixtures were produced under rule set **2.9.0**; the file
+ * they were compared against reached **2.15.0** without any clause they exercise happening to change.
+ * The first version bump that actually reworded the corpus turned all five runs red — not because the
+ * reports were wrong, but because the assertion had never been true for the reason it appeared to be.
+ *
+ * So the fixtures are not rewritten (D-002), and the comparison is re-pointed.
+ *
+ * **What each half proves here, stated plainly rather than left to look symmetric.** For a stored
+ * report `finding.clause` is both the snapshot and the text the renderer prints, so the `verbatim`
+ * half is satisfied by construction — it pins the shape, not a value, and it is the observation half
+ * that has teeth on real data. The byte-identity check against the loaded rule set is not lost: it
+ * lives in `every finding an assembled report produces` above, which builds its report **from the
+ * current rule set** rather than reading a historical fixture, which is the only place that
+ * comparison is meaningful.
+ */
 describe('real runs', () => {
   const reports = storedReports();
 
@@ -150,20 +174,47 @@ describe('real runs', () => {
   });
 
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(
-    '%s quotes every clause verbatim and states observations without instructing',
+    '%s states observations without instructing, against its own snapshotted clause',
     (_domain, report) => {
-      const clauseById = new Map(ruleset.rules.map((rule) => [rule.id, rule.clause]));
-
       for (const category of report.categories) {
         for (const finding of category.findings) {
-          const audit = auditRequirement(
-            finding.note,
-            finding.clause,
-            clauseById.get(finding.ruleId) ?? finding.clause,
-          );
+          const audit = auditRequirement(finding.note, finding.clause, finding.clause);
           expect(audit.clean, `${finding.ruleId}: ${audit.problems.join('; ')}`).toBe(true);
         }
       }
+    },
+  );
+
+  /**
+   * The snapshot exists at all.
+   *
+   * What the old comparison did carry, once the wrong authority is removed from it: a finding whose
+   * clause went missing would render an empty column beside an observation. Checked against the run,
+   * because that is where the value has to be.
+   */
+  it.each(reports.map((report) => [report.merchantDomain, report] as const))(
+    '%s carries a snapshotted clause on every finding',
+    (_domain, report) => {
+      for (const category of report.categories) {
+        for (const finding of category.findings) {
+          expect(finding.clause, `${finding.ruleId} has no snapshotted clause`).not.toBe('');
+        }
+      }
+    },
+  );
+
+  /**
+   * And the run says which rule set produced it.
+   *
+   * `runs.ruleset_version` is not optional (docs/ARCHITECTURE.md § Data model) — a finding is
+   * meaningless without knowing which version of the rules produced it. It is also what makes the
+   * paragraph above checkable rather than a claim: a reader who wonders whether these fixtures should
+   * match the current rule set can read the version off the report.
+   */
+  it.each(reports.map((report) => [report.merchantDomain, report] as const))(
+    '%s records the rule set it was produced under',
+    (_domain, report) => {
+      expect(report.rulesetVersion, 'no ruleset version recorded').toBeTruthy();
     },
   );
 });
