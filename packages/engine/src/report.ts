@@ -194,9 +194,9 @@ export interface ScreeningReport {
  * unanswered, not how many rules ended up unevaluated.
  */
 export interface ReportObstruction {
-  /** Requests made looking for a surface. */
+  /** Distinct URLs the run requested looking for a surface. */
   readonly attempted: number;
-  /** Of those, the ones that never answered — a timeout, a refused connection, a dead navigation. */
+  /** Of those, the ones no attempt ever reached — a timeout, a refused connection, a dead navigation. */
   readonly unanswered: number;
   /** The URLs that did not answer, deduplicated, for a reader who wants to try one by hand. */
   readonly urls: readonly string[];
@@ -345,15 +345,40 @@ function describeObstruction(
   attempts: readonly FetchAttempt[],
   findings: readonly ReportFinding[],
 ): ReportObstruction | null {
-  if (attempts.length === 0) return null;
+  /*
+    Counted in **surfaces**, not in requests, and gathered from every source that recorded one.
 
-  const unanswered = attempts.filter((attempt) => attempt.status === 0);
+    Two things forced both halves. The first version read only the surface-discovery list, and run
+    3c4dea28 showed the cost: the discovery pass went fine, GATE-002's three probes and GATE-003's
+    checkout flow all timed out, two rules came back `not_retrieved` — and the report carried no
+    obstruction statement at all. A block whose whole purpose is to explain unevaluated rules,
+    silent on the run where rules went unevaluated.
+
+    Reading the findings as well fixes that, because they are the complete record by construction:
+    hard constraint 3 requires a `not_evaluable` finding to evidence *why*, with the requests
+    attempted. But it means one request can be recorded twice — once by the pass that made it, once
+    by the finding resting on it — and counting raw requests would then inflate the very number a
+    reader uses to judge the run.
+
+    Counting distinct URLs settles it, and is what the statement actually claims: *how many surfaces
+    were attempted and not reached*. It is also right where a path was retried, which raw counting
+    would have reported as two failures of one surface.
+
+    A URL that answered on any attempt was reached, whatever happened on the others.
+  */
+  const byUrl = new Map<string, FetchAttempt[]>();
+  for (const attempt of [...attempts, ...findings.flatMap((f) => f.evidence.flatMap((e) => e.attempts ?? []))]) {
+    byUrl.set(attempt.url, [...(byUrl.get(attempt.url) ?? []), attempt]);
+  }
+  if (byUrl.size === 0) return null;
+
+  const unanswered = [...byUrl.entries()].filter(([, tries]) => tries.every((t) => t.status === 0));
   if (unanswered.length === 0) return null;
 
   return {
-    attempted: attempts.length,
+    attempted: byUrl.size,
     unanswered: unanswered.length,
-    urls: [...new Set(unanswered.map((attempt) => attempt.url))],
+    urls: unanswered.map(([url]) => url),
     rulesAffected: findings.filter((finding) => finding.notEvaluableKind === 'not_retrieved').length,
   };
 }

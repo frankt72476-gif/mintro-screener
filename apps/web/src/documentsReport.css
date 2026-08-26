@@ -590,5 +590,14 @@ table {width:100%;border-collapse:collapse}
    by typing it is a defect in the artifact rather than in its styling. Applied everywhere rather
    than only in print, because the PDF is rendered from these same components and two typographic
    stacks is the thing ARCHITECTURE.md rules out.
+
+   **On a universal selector, and `body` alone was not enough.** Shipped first as `body{...}` and
+   measured against a production PDF, which still carried the NUL. `font-variant-ligatures` is
+   inherited, but the user-agent stylesheet styles `button` with the `font` *shorthand*, and a
+   shorthand resets every longhand it covers — so the value died at the first button and the
+   category name is a span inside one. Computed on the deployed page: body `none`, `.cat-name`
+   `normal`.
 ------------------------------------------------------------------------------------------------ */
-body{font-variant-ligatures:none}
+*,
+*::before,
+*::after{font-variant-ligatures:none}

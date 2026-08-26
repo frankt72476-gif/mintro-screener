@@ -28,9 +28,23 @@ import { readFileSync } from 'node:fs';
 const SHEETS = ['apps/web/src/styles.css', 'apps/web/src/documentsReport.css'] as const;
 
 describe('ligatures are disabled wherever the report is styled', () => {
-  it.each(SHEETS)('%s turns them off on body', (path) => {
+  /**
+   * On a universal selector, and this is the assertion that would have caught the first attempt.
+   *
+   * `body{font-variant-ligatures:none}` shipped, reached production, and the PDF still carried the
+   * NUL. The property is inherited, but the user-agent stylesheet styles `button` with the `font`
+   * *shorthand*, which resets every longhand it covers — so the value died at the first button, and
+   * the category name is a span inside one. Measured on the deployed page: body `none`,
+   * `.cat-name` `normal`.
+   */
+  it.each(SHEETS)('%s turns them off on every element, not just body', (path) => {
     const css = readFileSync(path, 'utf8').replace(/\s+/g, '');
-    expect(css).toContain('body{font-variant-ligatures:none}');
+    expect(css).toContain('*,*::before,*::after{font-variant-ligatures:none}');
+  });
+
+  it.each(SHEETS)('%s does not rely on inheritance from body alone', (path) => {
+    const css = readFileSync(path, 'utf8').replace(/\s+/g, '');
+    expect(css).not.toContain('body{font-variant-ligatures:none}');
   });
 
   /**

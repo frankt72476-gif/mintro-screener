@@ -130,6 +130,68 @@ const unreached: Finding = {
   notEvaluableKind: 'not_retrieved',
 };
 
+/**
+ * The regression run 3c4dea28 exposed.
+ *
+ * The first version of this read only the surface-discovery list. On that run the discovery pass
+ * went fine and the *gate* probes all timed out: two rules came back `not_retrieved` and the report
+ * carried no obstruction statement at all. A block whose entire purpose is to explain unevaluated
+ * rules, silent on the run where rules went unevaluated.
+ *
+ * The findings are the complete record by construction — hard constraint 3 makes a `not_evaluable`
+ * finding carry the requests it attempted — so they are read too.
+ */
+describe('obstruction is read from every source that recorded a request', () => {
+  const gateTimedOut: Finding = {
+    ruleId: 'GATE-003',
+    state: 'not_evaluable',
+    note: 'page.goto: Timeout 20000ms exceeded.',
+    evidenceKind: 'rendered_page',
+    evidence: [
+      {
+        kind: 'rendered_page',
+        sourceUrl: 'https://shop.example/product/x',
+        sourceSha256: '',
+        evidenceKey: '',
+        capturedAt: '2026-08-26T00:00:00.000Z',
+        attempts: [{ url: 'https://shop.example/checkout', status: 0, error: 'page.goto: Timeout' }],
+      },
+    ],
+    notEvaluableKind: 'not_retrieved',
+  };
+
+  it('reports obstruction when only a finding recorded the failed request', () => {
+    // No `attempts` passed at all — the discovery pass succeeded and told the report nothing.
+    const report = build([gateTimedOut]);
+
+    expect(report.obstruction).toBeDefined();
+    expect(report.obstruction?.unanswered).toBe(1);
+    expect(report.obstruction?.urls).toEqual(['https://shop.example/checkout']);
+    expect(report.obstruction?.rulesAffected).toBe(1);
+  });
+
+  /**
+   * A request recorded by both the pass that made it and the finding resting on it must count
+   * once. Double counting inflates the very number a reader uses to judge the run.
+   */
+  it('counts a request recorded twice only once', () => {
+    const report = build([gateTimedOut], [
+      { url: 'https://shop.example/checkout', status: 0, error: 'page.goto: Timeout' },
+    ]);
+
+    expect(report.obstruction?.attempted).toBe(1);
+    expect(report.obstruction?.unanswered).toBe(1);
+  });
+
+  it('never reports fewer unanswered requests than there are rules blamed on them', () => {
+    const report = build([gateTimedOut]);
+    const obstruction = report.obstruction;
+    expect(obstruction).toBeDefined();
+    expect(obstruction!.unanswered).toBeGreaterThanOrEqual(1);
+    expect(obstruction!.rulesAffected).toBeGreaterThan(0);
+  });
+});
+
 describe('the report states what it could not reach', () => {
   it('counts the requests that did not answer, and the rules that depended on them', () => {
     const report = build([unreached], [
@@ -146,13 +208,30 @@ describe('the report states what it could not reach', () => {
     });
   });
 
-  it('deduplicates a surface tried on several paths', () => {
+  /**
+   * Counted in surfaces, not requests. A path retried twice is one surface that was not reached,
+   * and reporting it as two failures would overstate the obstruction.
+   */
+  it('counts a surface retried twice as one surface', () => {
     const report = build([], [
       { url: 'https://shop.example/faq', status: 0, error: 'timeout' },
       { url: 'https://shop.example/faq', status: 0, error: 'timeout' },
     ]);
     expect(report.obstruction?.urls).toEqual(['https://shop.example/faq']);
-    expect(report.obstruction?.unanswered).toBe(2);
+    expect(report.obstruction?.attempted).toBe(1);
+    expect(report.obstruction?.unanswered).toBe(1);
+  });
+
+  /**
+   * And a surface that answered on any attempt was reached, whatever happened on the others. A
+   * retry that succeeded is not an obstruction.
+   */
+  it('does not count a surface that answered on a retry', () => {
+    const report = build([], [
+      { url: 'https://shop.example/faq', status: 0, error: 'timeout' },
+      { url: 'https://shop.example/faq', status: 200 },
+    ]);
+    expect(report.obstruction).toBeUndefined();
   });
 
   /**
