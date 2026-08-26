@@ -254,6 +254,15 @@ export const REQUIREMENT_HEADINGS = {
   required: 'Program requirement',
   /** For not_evaluable: the requirement stands, and why it could not be assessed is stated. */
   notAssessed: 'Not assessed',
+  /**
+   * For a rule Mintro wrote rather than one the programme states (D-138).
+   *
+   * The other heading reads "Program requirement", and printing a Mintro observation under it
+   * would put words in the programme's mouth — fabricating the authority rather than overstating
+   * the method, which is the worse of the two. Wording beneath a heading cannot fix the heading,
+   * so the renderer branches on `source` and this is the other branch.
+   */
+  mintroObservation: 'Mintro observation, not a program requirement',
 } as const;
 
 /**

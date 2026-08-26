@@ -29,9 +29,9 @@ describe('rules/ruleset.json', () => {
       before 2.9.0 — a merchant reported as linking no certificate under 2.8.0 may link one that
       the earlier vocabulary did not recognise.
     */
-    expect(ruleset.version).toBe('2.14.0');
+    expect(ruleset.version).toBe('2.15.0');
     expect(ruleset.effective).toBe('2026-05-26');
-    expect(ruleset.rules).toHaveLength(54);
+    expect(ruleset.rules).toHaveLength(55);
     expect(ruleset.categories).toHaveLength(10);
   });
 

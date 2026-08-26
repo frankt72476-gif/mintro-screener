@@ -120,6 +120,12 @@ const CASES: readonly Case[] = [
     why: 'two rules sharing an ID means two findings claiming one identity',
   },
   {
+    fixture: 'missing-source',
+    ruleId: null,
+    message: 'required',
+    why: 'a rule whose authority nobody stated would be attributed to the program by default (D-138)',
+  },
+  {
     fixture: 'missing-rule-id',
     ruleId: null,
     message: 'required',

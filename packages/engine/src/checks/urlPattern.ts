@@ -129,6 +129,21 @@ function describeViolation(
     return `${matches.length} of ${examined} content URLs have slugs matching this rule's patterns: ${list}${remainder}. The content of these pages was not examined.`;
   }
 
+  /*
+    "Prohibited" is a claim about the programme, and only a programme rule may make it (D-138).
+
+    Every `expect: absent` url_pattern rule used to be a prohibition — needles, wipes, HCG, tablets
+    — so the shared copy said so. CATG-007 is Mintro's own observation about catalogue composition,
+    and the compounds it names are not prohibited by anything: calling them prohibited would
+    characterise the finding as a problem, which is the one thing Frank ruled it must not do.
+
+    Branching on `source` rather than on a new flag, because the two are the same fact: only the
+    programme can prohibit, so a rule whose clause is not the programme's is not a prohibition.
+  */
+  if (rule.source !== 'programme') {
+    return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched this rule's patterns: ${list}${remainder}.`;
+  }
+
   return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched a prohibited pattern: ${list}${remainder}.`;
 }
 

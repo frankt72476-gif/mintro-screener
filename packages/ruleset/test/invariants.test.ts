@@ -33,6 +33,7 @@ function base(): Ruleset {
         tier: 'review_only',
         title: 'Age affirmation before entry',
         clause: 'Every visitor must be stopped before accessing the website.',
+        source: 'programme',
         params: { surface: 'homepage', expect: 'present' },
       },
       {
@@ -44,6 +45,7 @@ function base(): Ruleset {
         tier: 'review_only',
         title: 'Lab is accredited and independent',
         clause: 'From an accredited independent third-party testing laboratory.',
+        source: 'programme',
         params: { reason: 'Accreditation cannot be verified from a PDF.' },
       },
     ],

@@ -833,7 +833,23 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
         </p>
       </div>
       <div className="req-col">
-        <span className="req-h">{REQUIREMENT_HEADINGS.required}</span>
+        {/*
+          Whose statement this is (D-138).
+
+          Every rule but one quotes the program document, and this heading said so unconditionally.
+          A rule Mintro writes for the reader's benefit has no program requirement behind it, and
+          printing one here would attribute Mintro's words to the program — fabricating the
+          authority rather than overstating the method.
+
+          `source` is absent on runs recorded before the field existed. Those are treated as
+          program rules, which is what every rule was at the time, so an old report renders exactly
+          as it did (D-002).
+        */}
+        <span className="req-h">
+          {finding.source === 'mintro'
+            ? REQUIREMENT_HEADINGS.mintroObservation
+            : REQUIREMENT_HEADINGS.required}
+        </span>
         {/* Verbatim. No trim, no ellipsis, no sentence case. */}
         <blockquote className="req-t req-quote">{finding.clause}</blockquote>
       </div>

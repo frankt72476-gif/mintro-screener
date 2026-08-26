@@ -13,7 +13,7 @@
  *     no instruction attached (D-001, hard constraint 7).
  */
 
-import type { Attestation, Category, NotChecked, Rule, Ruleset, State } from '@mintro/ruleset';
+import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State } from '@mintro/ruleset';
 import type { FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
@@ -24,6 +24,14 @@ export interface ReportFinding extends Finding {
   /** Rule metadata, denormalised so the renderer needs no second lookup. */
   readonly title: string;
   readonly clause: string;
+  /**
+   * Whose statement `clause` is (D-138).
+   *
+   * Snapshotted onto the finding like `title` and `clause`, so a run reopened later renders the
+   * attribution it was produced under. Absent on runs recorded before the field existed; a reader
+   * that finds it absent treats it as `programme`, which is what every rule was then.
+   */
+  readonly source?: RuleSource;
   readonly severity: 'critical' | 'major' | 'minor';
   readonly tier: 'auto_fail' | 'review_only';
   readonly checkType: string;
@@ -267,6 +275,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         ...finding,
         title: rule.title,
         clause: rule.clause,
+        source: rule.source,
         severity: rule.sev,
         tier: rule.tier,
         checkType: rule.type,

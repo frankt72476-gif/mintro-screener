@@ -31,6 +31,24 @@ const layerSchema = z.union([
   z.null(),
 ]);
 
+/**
+ * Whose statement the rule's `clause` is (D-138).
+ *
+ * The report prints `clause` verbatim under a heading, and until now that heading always read
+ * **"Program requirement"** because every rule quoted the programme document. A rule Mintro writes
+ * for the underwriter's benefit — the catalogue's composition, say — has no programme requirement
+ * behind it, and printing one under that heading would put words in the programme's mouth.
+ *
+ * That is worse than any overclaim this codebase has fixed: an overclaim overstates the method, and
+ * this would fabricate the authority. Wording cannot fix a heading, so the distinction is
+ * structural and the renderer branches on it.
+ *
+ * **Required, with no default.** A default would mean a rule whose authority nobody stated is
+ * silently attributed to the programme, which is the exact failure the field exists to prevent.
+ */
+export const RULE_SOURCES = ['programme', 'mintro'] as const;
+export type RuleSource = (typeof RULE_SOURCES)[number];
+
 /** Fields every rule carries, regardless of check type. */
 const ruleCommon = {
   id: z
@@ -42,6 +60,8 @@ const ruleCommon = {
   tier: z.enum(TIERS),
   title: z.string().min(1),
   clause: z.string().min(1),
+  /** Whose statement `clause` is. Required — see `RULE_SOURCES`. */
+  source: z.enum(RULE_SOURCES),
   /**
    * Rules that describe the same observation from another angle (D-050).
    *
@@ -177,6 +197,7 @@ export const notCheckedSchema = z
     why: z.string().min(1),
   })
   .strict();
+
 
 export const rulesetSchema = z
   .object({

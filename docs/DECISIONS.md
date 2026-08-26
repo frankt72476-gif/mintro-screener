@@ -8036,3 +8036,79 @@ Three regressions, all discriminating: reverting the kind, dropping the sentence
 as the limit, and reclassifying the scoped-out pages — the mirror error, which fails too.
 
 ---
+
+---
+
+## D-138 — A rule states whose requirement it is
+**2026-08-26 · Frank's ruling · ruleset 2.14.0 → 2.15.0**
+
+Every rule gains `source`: `programme` or `mintro`. **Required, with no default.** The report
+branches the requirement heading on it. And CATG-007 is added — the first rule Mintro writes rather
+than quotes.
+
+### Why the field exists
+
+The report prints `clause` verbatim under a heading, and that heading read **"Program requirement"**
+unconditionally, because until now every one of the 54 rules quoted the programme document.
+
+CATG-007 does not. The programme document contains no occurrence of *SARM*, *selective androgen*,
+*non-peptide*, or any of the compound names — checked before anything was written. Its
+product-scope section names four prohibited classes, which are already CATG-001 through CATG-004.
+The new rule is Mintro's own observation for the underwriter's benefit.
+
+Frank's ruling: printing it under that heading **would be worse than any overclaim already fixed
+here — it fabricates the authority rather than overstating the method, and wording beneath a
+heading cannot fix the heading.** So the distinction is structural.
+
+**No default, deliberately.** A default would silently attribute a rule whose authority nobody
+stated to the programme, which is the precise failure the field prevents. A fixture with the field
+missing is rejected, and that is tested.
+
+`source` is snapshotted onto the finding like `title` and `clause`. Runs recorded before the field
+existed carry none, and render as programme rules — which every rule was at the time (D-002).
+
+### It changed the finding copy too, which the tests caught
+
+`url_pattern`'s violation copy said *"matched a prohibited pattern"*. True of needles, wipes, HCG
+and tablets; false of CATG-007, whose compounds nothing prohibits. Calling them prohibited would
+characterise the finding as a problem — the one thing Frank ruled this rule must not do.
+
+Branched on `source` rather than on a new flag, because they are the same fact: **only the
+programme can prohibit**, so a rule whose clause is not the programme's is not a prohibition.
+
+### CATG-007 — non-peptide research compounds, not SARMs
+
+`url_pattern`, scope `products`, `expect: absent`, `sev: minor`, **`review_only`**. It reports what
+the catalogue contains and nothing about whether it should.
+
+**Named for what it observes, and the specimen is why.** USADA's published SARM guidance —
+accompanying the WADA Prohibited List, S1.2 Other Anabolic Agents — names eight SARMs (ostarine /
+enobosarm / MK2866 / S22, andarine / S4, LGD-4033 / ligandrol, LGD-3033, TT-701, RAD140 /
+testolone, RAD150, S23) and *separately* names five compounds **"also sometimes marketed as
+SARMs"**: SR9009, SR9011, ibutamoren (MK-677), GW501516 (cardarine) and YK-11.
+
+Of the seven compound families in the one catalogue crawled, **three are SARMs and four are not**. A
+rule titled for SARMs would misname the majority of what it flags, in a document going to an
+underwriter — D-133's failure in a new place. Frank ruled the scope accordingly: non-peptide
+research compounds. Both groups are in the pattern list because that is what the title claims.
+
+I would have placed YK-11 in the SARM column from memory. The specimen says otherwise, which is
+D-118's point exactly: marker lists come from artifacts, not recollection.
+
+**The specimen's limit is carried in the rule's note**, as OFFS-001 and OFFS-006 carry theirs: the
+source is authoritative for naming and for the SARM boundary, and is **not** a definition of the
+programme's scope — because nothing published is.
+
+### What was not done
+
+NAME-003's proper-name coverage for non-peptides stays open and is recorded as open in STATUS.md.
+It needs a ruling that the programme's naming clause reaches non-peptides at all, and authoritative
+proper names from a specimen. Neither exists, and the map was not extended on either.
+
+### Break matrix
+
+Twelve regressions, all discriminating. Three were vacuous first time and each was a real gap: no
+test asserted that a *programme* rule still says "prohibited"; and the two schema breaks passed
+because every rule already carried the field, so a fixture with none was added and is now rejected.
+
+---

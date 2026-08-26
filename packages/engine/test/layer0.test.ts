@@ -56,6 +56,7 @@ describe('rule selection', () => {
       'CATG-002',
       'CATG-003',
       'CATG-004',
+      'CATG-007',
       'OFFS-001',
       'OFFS-006',
     ]);
