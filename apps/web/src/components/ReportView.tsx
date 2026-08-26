@@ -221,6 +221,15 @@ export function ReportView({
         </div>
       )}
 
+      {/*
+        What the crawl could not reach, said before the numbers it distorts (D-136).
+
+        Placed above the verdict deliberately. A reader meeting "37 could not be evaluated" needs
+        to know first whether that count is a fact about the storefront or about this run; below
+        the coverage line it would be an explanation nobody looks for.
+      */}
+      <ObstructionNote report={report} />
+
       <VerdictBanner report={report} />
       <TickStrip report={report} />
       <CoverageBreakdown report={report} />
@@ -316,6 +325,46 @@ export function ReportView({
       {report.notChecked !== undefined && <NotCheckedSection items={report.notChecked} />}
 
       <RunMeta report={report} access={access} />
+    </div>
+  );
+}
+
+/**
+ * Surfaces this run asked for and did not get (D-136).
+ *
+ * Renders nothing on a clean crawl. The block exists to separate two things a coverage count
+ * cannot: a storefront that does not carry what a rule looks for, and a request that never
+ * answered. The first is an observation about the merchant, the second is one about the run, and
+ * a reader was previously given the sum of both under a heading that implied the first.
+ *
+ * Descriptive, and it draws no conclusion (D-001). It does not say the report is unreliable or
+ * that the run should be repeated — it states what was asked for, what came back, and how many
+ * rules were left unevaluated in consequence.
+ */
+function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  const obstruction = report.obstruction;
+  if (obstruction === undefined || obstruction.unanswered === 0) return null;
+
+  const shown = obstruction.urls.slice(0, 6);
+  const more = obstruction.urls.length - shown.length;
+
+  return (
+    <div className="obstruction">
+      <span className="obs-head">Surfaces this run could not reach</span>
+      <p>
+        <strong>
+          {obstruction.unanswered} of {obstruction.attempted} requests for a page did not answer.
+        </strong>{' '}
+        {obstruction.rulesAffected === 0
+          ? 'No rule depended on them.'
+          : `${obstruction.rulesAffected} rule(s) are unevaluated for that reason, rather than for anything observed about the merchant.`}
+      </p>
+      <ul className="obs-urls">
+        {shown.map((url) => (
+          <li key={url}>{url}</li>
+        ))}
+        {more > 0 && <li className="obs-more">and {more} more</li>}
+      </ul>
     </div>
   );
 }

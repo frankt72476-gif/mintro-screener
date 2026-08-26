@@ -320,6 +320,15 @@ export const computedStyleParams = z
 export const docParseParams = z
   .object({
     extract: z.enum(DOC_EXTRACTS).optional(),
+    /**
+     * Assert that the certificate link served a certificate at all (D-136).
+     *
+     * Deliberately not an `extract`. The two below it pull a value out of a document and compare
+     * it; this one asserts about the document itself, and the invariant that an extraction must
+     * carry an assertion would be meaningless applied to it. Bending `extract` to fit would have
+     * cost that invariant its teeth for every rule that really does extract something.
+     */
+    assert_served: z.boolean().optional(),
     min: z.number().optional(),
     max_age_days: z.number().int().positive().optional(),
     cure_days: z.number().int().nonnegative().optional(),
@@ -329,7 +338,7 @@ export const docParseParams = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    requireAtLeastOne(value, ctx, ['extract', 'require_fields'], 'extraction');
+    requireAtLeastOne(value, ctx, ['extract', 'require_fields', 'assert_served'], 'extraction');
     if (value.extract !== undefined && value.min === undefined && value.max_age_days === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

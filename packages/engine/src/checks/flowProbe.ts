@@ -114,11 +114,25 @@ export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeI
     looking at checkout.
   */
   if (observation.reached === 'not_started' || observation.reached === 'unestablished') {
+    /*
+      Two reasons a flow does not begin, and they are facts about different parties (D-136).
+
+      The browser reporting an error — `page.goto: Timeout 20000ms exceeded` — means this run did
+      not reach the page. A flow that started and went somewhere unrecognisable means the
+      storefront did not present what was looked for. Filing the first as `not_exposed` says the
+      merchant published nothing because our request timed out, and GATE-003 did exactly that on
+      run 730764d4.
+
+      Read from the presence of an error rather than from its wording: hard constraint 9 forbids
+      classifying by pattern-matching a reason string, which would silently reclassify every
+      finding whose phrasing changed.
+    */
+    const obstructed = observation.error !== undefined;
     return notEvaluable(
       rule,
       observation.error ?? `${flowName(observation.flow)} could not be started on this storefront`,
       RENDERED,
-      'not_exposed',
+      obstructed ? 'not_retrieved' : 'not_exposed',
       [flowEvidence(observation, session)],
     );
   }

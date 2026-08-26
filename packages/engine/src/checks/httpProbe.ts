@@ -50,15 +50,24 @@ export function checkHttpProbe(
     return notEvaluable(rule, 'no paths were probed', DOCUMENT, 'no_check_built', [sessionEvidence(session, results)]);
   }
 
-  // A probe that never completed observed nothing. Reporting the paths that did complete as the
-  // whole answer would let a network failure read as a clean result.
+  /*
+    A probe that never completed observed nothing. Reporting the paths that did complete as the
+    whole answer would let a network failure read as a clean result.
+
+    **`not_retrieved`, not `not_exposed`** (D-136). Status 0 is a request that did not answer — a
+    timeout, a refused connection, a navigation that never finished. `not_exposed` says *the
+    merchant's site did not carry this*, which is a claim about the merchant that a failed request
+    does not support. It is the conflation D-044 exists to end and D-058 already fixed for
+    certificates; the gate probes were still making it, and GATE-002 landed under "looked for, not
+    found on the site" on a run where nothing was ever looked at.
+  */
   const unreachable = results.filter((result) => result.status === 0);
   if (unreachable.length === results.length) {
     return notEvaluable(
       rule,
-      `none of the ${results.length} probed path(s) could be reached`,
+      `none of the ${results.length} probed path(s) answered, so nothing was observed either way`,
       DOCUMENT,
-      'not_exposed',
+      'not_retrieved',
       [sessionEvidence(session, results)],
     );
   }

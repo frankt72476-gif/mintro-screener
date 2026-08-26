@@ -20,6 +20,7 @@ import {
   checkCoaDate,
   checkCoaFields,
   checkCoaPurity,
+  checkCoaServed,
   type CertificateOutcome,
 } from './checks/docParse.js';
 import { isRendered, type PageContext } from './page.js';
@@ -143,6 +144,7 @@ function certificateFinding(
   if (rule.params.require_fields !== undefined) return checkCoaFields(rule, outcome);
   if (rule.params.extract === 'report_date') return checkCoaDate(rule, outcome, new Date());
   if (rule.params.extract === 'purity_pct') return checkCoaPurity(rule, outcome);
+  if (rule.params.assert_served === true) return checkCoaServed(rule, outcome);
 
   return notEvaluable(
     rule,
@@ -165,7 +167,49 @@ function evaluate(rule: Rule, rendered: readonly SampledPage[], ruleset: Ruleset
 
   const surface = 'surface' in rule.params ? rule.params.surface : undefined;
   if (surface !== 'all_sampled') {
-    // Per-page rule: one finding per page, each citing its own capture.
+    /*
+      Per-page rules collapse when the sample agrees (D-136).
+
+      Nine rules emit one finding per sampled page, and run 730764d4's PDF ran to fifty-five pages
+      largely because of it: PROD-001, PROD-003, PROD-004, PROD-005, CATG-005, CATG-006, NAME-003,
+      OFFS-002 and COA-001 each appeared five times, each with its own evidence slip and a
+      near-identical screenshot. `all_sampled` rules already collapsed and read better for it.
+
+      **Where the pages differ, they stay separate, because the difference is the finding.** A rule
+      that passes on four product pages and fails on the fifth is saying something about that fifth
+      page, and merging it into a majority would delete the observation.
+
+      Sameness is the whole finding bar the page it came from: state, note, and both
+      `not_evaluable` fields. Grouping on state alone would merge two pages that failed for
+      different reasons and pick one arbitrarily.
+
+      Nothing is discarded. The collapsed finding carries every page's evidence, so each capture is
+      still cited and still retained (hard constraint 3); the slip leads on one, which is what it
+      does for a collapsed `all_sampled` finding already.
+    */
+    const sameResult = (finding: Finding): string =>
+      JSON.stringify([
+        finding.state,
+        finding.note,
+        finding.notEvaluableKind ?? null,
+        finding.notEvaluableReason ?? null,
+      ]);
+
+    const distinct = new Set(perPage.map(({ finding }) => sameResult(finding)));
+
+    if (distinct.size === 1 && perPage.length > 1) {
+      const first = perPage[0]!.finding;
+      return [
+        {
+          ...first,
+          note: `${first.note} Observed on all ${perPage.length} sampled product page(s).`,
+          evidence: perPage.flatMap(({ finding }) => finding.evidence),
+        },
+      ];
+    }
+
+    // Per-page rule whose pages disagree: one finding per page, each citing its own capture and
+    // naming the page, because that is the part a reader needs.
     return perPage.map(({ entry, finding }) => ({
       ...finding,
       note: `${new URL(entry.page.finalUrl).pathname} — ${finding.note}`,

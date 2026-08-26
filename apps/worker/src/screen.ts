@@ -339,6 +339,15 @@ export async function screenStorefront(
       findings,
       truncations: [...layer0.truncations, ...(collapse === null ? [] : [collapse])],
       politeness: describeCrawlDelay(delay),
+      /*
+        What the run asked for and did not get (D-136).
+
+        `discoverLayer3` has recorded every navigation and its outcome since it was written; the
+        list simply stopped here and never reached the report. So a run whose gate probes and
+        payment capture all timed out published "37 could not be evaluated" and nothing a reader
+        could use to tell that from a bare storefront.
+      */
+      attempts: discovered.attempts,
     },
     ruleset,
   );

@@ -130,19 +130,27 @@ function unreadable(rule: RuleOfType<'doc_parse'>, outcome: CertificateOutcome):
   }
 
   const { reason, kind } = describeFailure(outcome.why, outcome.attempts);
+  return notEvaluable(rule, reason, 'document', kind, attemptEvidence(outcome.attempts));
+}
 
-  return notEvaluable(rule, reason, 'document', kind, [
+/**
+ * The requests that were made and what each returned.
+ *
+ * Hard constraint 3: a finding that could not read a document evidences *why*, with what was
+ * requested and what came back. These were computed and discarded before D-058. Shared by the
+ * unreadable path and by COA-006, so the two cannot describe the same attempts differently.
+ */
+function attemptEvidence(attempts: readonly FetchAttempt[]): Evidence[] {
+  return [
     {
       kind: 'document',
-      sourceUrl: outcome.attempts[0]?.url ?? '',
+      sourceUrl: attempts[0]?.url ?? '',
       sourceSha256: '',
       evidenceKey: '',
       capturedAt: new Date().toISOString(),
-      // Hard constraint 3: a `not_evaluable` finding evidences *why*, with what was requested and
-      // what came back. These were computed and discarded before D-058.
-      attempts: outcome.attempts,
+      attempts,
     },
-  ]);
+  ];
 }
 
 function describeFailure(
@@ -193,6 +201,66 @@ function describeFailure(
  * `cure_days` is honoured as the rule declares it: a certificate past the limit but within the
  * cure window is reported for review rather than failed, because the program allows that time.
  */
+/**
+ * COA-006 — the certificate link serves a certificate (D-136).
+ *
+ * The observation this exists to carry, from run 730764d4: every certificate link on the site
+ * resolved, and every one served a `.webp` image. COA-002, COA-003 and COA-004 each reported
+ * `not_evaluable` with an accurate reason, and the report showed three not-assessed rows whose
+ * shared cause a reader had to piece together for themselves.
+ *
+ * **That the certificates cannot be read is itself a finding, and a substantive one.** No purity,
+ * batch or test date on this storefront is verifiable by anybody — not by Mintro, not by an
+ * underwriter, not by a customer following the link. Filing it only as the absence of three other
+ * checks understates it.
+ *
+ * The four outcomes stay four things:
+ *
+ *   - a certificate that was fetched and read → `pass`
+ *   - a link that served something else, or a document with no readable text → the finding
+ *   - no link published at all → `not_evaluable`; that is COA-001's subject, not this one
+ *   - a request that did not complete → `not_evaluable`, and about this run (D-058)
+ */
+export function checkCoaServed(rule: RuleOfType<'doc_parse'>, outcome: CertificateOutcome): Finding {
+  if (outcome.found) {
+    const certificate = outcome.certificate;
+    if (certificate.text !== '') {
+      return satisfied(
+        rule,
+        `The certificate link served a document that could be read: ${certificate.url}.`,
+        'document',
+        certificateEvidence(certificate),
+      );
+    }
+
+    // A PDF was served and carries no recoverable text — a scan, or an image wrapped in a
+    // container. Same consequence for a reader as a `.webp`: nothing on it can be checked.
+    return violation(
+      rule,
+      `The certificate at ${certificate.url} was retrieved and no text could be recovered from it` +
+        `${certificate.emptyReason === undefined ? '' : ` (${certificate.emptyReason})`}. ` +
+        `Nothing it states — purity, batch or test date — can be read from it.`,
+      'document',
+      certificateEvidence(certificate),
+    );
+  }
+
+  if (outcome.why === 'link_broken') {
+    return violation(
+      rule,
+      `A certificate link on the sampled product pages returned something that is not a PDF. The ` +
+        `link resolves and looks live to a customer; what it serves is not a certificate, so ` +
+        `nothing it would state can be read. ${outcome.attempts.length} link(s) were requested, ` +
+        `each listed with what it returned.`,
+      'document',
+      attemptEvidence(outcome.attempts),
+    );
+  }
+
+  const { reason, kind } = describeFailure(outcome.why, outcome.attempts);
+  return notEvaluable(rule, reason, 'document', kind, attemptEvidence(outcome.attempts));
+}
+
 export function checkCoaDate(
   rule: RuleOfType<'doc_parse'>,
   outcome: CertificateOutcome,

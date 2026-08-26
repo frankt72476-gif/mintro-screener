@@ -7872,3 +7872,106 @@ fallback path, so the live risk is much reduced, but **the styled path is unboun
 pattern shape is still the hazard. Recorded rather than silently left.
 
 ---
+
+---
+
+## D-136 — Four defects from reading run 730764d4's PDF end to end
+**2026-08-26 · Frank's ruling · ruleset 2.13.0 → 2.14.0**
+
+### 1. An obstructed crawl is reported as one
+
+GATE-002's three probes and GATE-003's checkout flow all died on `page.goto: Timeout 20000ms
+exceeded`, and both were filed under **"looked for, not found on the site"** — a statement about the
+merchant, made about surfaces nobody reached. The summary then said *"37 could not be evaluated from
+the crawled surface"* with nothing to tell a reader whether 37 was ordinary for a storefront like
+this or a symptom of the crawl falling over.
+
+`not_retrieved` already existed and already carried the right reasoning; D-058 introduced it for
+certificates and the gate checks were never moved onto it. They are now:
+
+- **`http_probe`** — every path returning status 0 is `not_retrieved`. Status 0 is a request that
+  did not answer, and `not_exposed` claims something a failed request cannot support.
+- **`flow_probe`** — read from *whether the browser reported an error*, never from its wording, per
+  hard constraint 9. An error means this run did not arrive; a flow that ran and could not identify
+  where it landed is still an observation about the storefront and still says so.
+
+And the run now states its own obstruction above the verdict: how many requests for a page went
+unanswered, which URLs, and how many rules are unevaluated in consequence *rather than for anything
+observed about the merchant*. Above the verdict deliberately — below the coverage line it would be
+an explanation nobody goes looking for. Absent entirely on a clean crawl, because a block reading
+"0 unanswered" on every ordinary report is one a reader learns to skip.
+
+The attempts were already recorded by `discoverLayer3` and simply never reached the report.
+
+### 2. Fifty-five pages, mostly repetition
+
+Nine rules emit one finding per sampled page — PROD-001, PROD-003, PROD-004, PROD-005, CATG-005,
+CATG-006, NAME-003, OFFS-002, COA-001 — each with its own evidence slip and a near-identical
+screenshot. `all_sampled` rules already collapsed and read better for it.
+
+Per-page rules now collapse **when the sample agrees**: one finding, the sample named, every page's
+capture still attached. `EvidenceSlip` already leads on one capture per finding, so collapsing the
+findings is the whole of the fix — no rendering change.
+
+**Where the pages differ they stay separate, because the difference is the finding.** Sameness is
+the whole finding bar the page it came from — state, note, and both `not_evaluable` fields. Grouping
+on state alone would merge two pages that pass while quoting *different* CAS numbers and print one
+page's value as though it were both.
+
+### 3. The COAs are images, and that was filed as nothing
+
+Every certificate link on the site resolved, and every one served a `.webp`. COA-002, COA-003 and
+COA-004 each reported `not_evaluable` with an accurate reason, and a reader met three not-assessed
+rows whose shared cause they had to assemble themselves.
+
+**That the certificates cannot be read is an observation in its own right.** Nothing they state —
+purity, batch, test date — is verifiable by anybody following the link, including the merchant's own
+customers. New rule **COA-006 — "Certificate links serve a readable certificate"**, `major`,
+`review_only`.
+
+`review_only` and not `auto_fail` is a judgement, flagged for Frank: a link serving the wrong asset
+is binary and observable, but it is also the kind of thing worth a human confirming before it counts
+against a merchant. Say the word and it becomes `auto_fail`.
+
+It is driven by a new `assert_served` param rather than by extending `extract`. The two extracts
+pull a value out of a document and compare it, and `params.ts` enforces that an extraction carries
+an assertion; bending `extract` to cover an assertion *about* the document would have cost that
+invariant its teeth for every rule that really does extract something.
+
+A PDF that is served but carries no recoverable text lands in the same finding — different cause,
+identical consequence for a reader.
+
+### 4. The PDF's text was not the text
+
+**"Off-site presence" came out of the exported document as `O\0-site presence`.** Space Grotesk
+draws `ff` as one ligature glyph, and Chromium's `page.pdf()` embeds it with no ToUnicode entry, so
+the pair extracts as a NUL. An underwriter searching the PDF for a category name does not find it,
+and copy-paste carries a control character out with it.
+
+Measured rather than reasoned, rendering the real font through the real `page.pdf()`:
+
+```
+Space Grotesk, default        : "O\u0000-site presence"
+Space Grotesk, ligatures none : "Off-site presence"
+```
+
+`font-variant-ligatures: none` on `body` in both stylesheets. Applied everywhere rather than only in
+print, because the PDF renders from these same components and two typographic stacks is what
+ARCHITECTURE.md rules out.
+
+**The test for it is a proxy and says so.** The real experiment needs Google Fonts over the network,
+which is not a dependency worth giving the suite. What is asserted is that the declaration is
+present and that nothing re-enables ligatures later; the round-trip is verified against a rendered
+production PDF after deploy. Naming the limit rather than dressing a weak guard up as a strong one
+(D-131).
+
+### Break matrix
+
+Eighteen deliberate regressions, all discriminating. Two needed work:
+
+- *the collapse groups on state alone* was vacuous, because every test case differed in state as
+  well. Added two pages that both pass and quote different registry numbers — the case where
+  state-only grouping silently misreports.
+- one break named a line that appears twice; targeted by line number instead.
+
+---

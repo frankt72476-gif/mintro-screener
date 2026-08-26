@@ -1502,3 +1502,34 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   .att-row{break-inside:avoid;page-break-inside:avoid}
   .att{break-before:auto}
 }
+
+/* Surfaces the run could not reach (D-136). Slate rather than rose: this is a fact about the
+   crawl, not an adverse finding about the merchant, and colouring it like a failure would be the
+   conflation the block exists to end. */
+.obstruction{
+  margin:0 0 14px;padding:12px 15px;border:1px solid var(--line);border-left:3px solid var(--slate);
+  border-radius:8px;background:#FBFAFD;
+}
+.obs-head{
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--slate);font-weight:700;display:block;margin-bottom:6px;
+}
+.obstruction p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink-mid)}
+.obs-urls{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:3px}
+.obs-urls li{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--slate);word-break:break-all}
+.obs-more{font-style:italic}
+
+/* ------------------------------------------------------------------------------------------------
+   Ligatures off, so the PDF's text is the text (D-136).
+
+   Space Grotesk draws `ff` as one glyph, and Chromium's `page.pdf()` embeds it with no ToUnicode
+   entry — so "Off-site presence" came out of the exported document as "O -site presence", with a
+   NUL where the pair should be. Measured, not guessed: the same string round-trips correctly with
+   this declaration and does not without it.
+
+   That is the document an underwriter searches and copies from, and a heading that cannot be found
+   by typing it is a defect in the artifact rather than in its styling. Applied everywhere rather
+   than only in print, because the PDF is rendered from these same components and two typographic
+   stacks is the thing ARCHITECTURE.md rules out.
+------------------------------------------------------------------------------------------------ */
+body{font-variant-ligatures:none}

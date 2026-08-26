@@ -324,3 +324,79 @@ describe('runLayer2', () => {
     }
   });
 });
+
+/**
+ * Per-page rules collapse when the sample agrees (D-136).
+ *
+ * Run 730764d4's PDF ran to fifty-five pages, mostly repetition: nine rules emitted one finding per
+ * sampled page, each with its own evidence slip and a near-identical screenshot. The `all_sampled`
+ * rules already collapsed and read better for it.
+ *
+ * The pair of tests is the point. Collapsing is only safe while disagreement survives it — a rule
+ * that passes on four pages and fails on the fifth is saying something about the fifth, and a
+ * collapse that swallowed it would delete the observation the report exists to carry.
+ */
+describe('a per-page rule collapses across a sample that agrees', () => {
+  // PROD-001 is `surface: product`, so it genuinely emits one finding per sampled page. PROD-006
+  // would not do: its surface is `all_sampled`, which has collapsed since it was written.
+  const withCas = 'BPC-157 5mg vial. CAS 137525-51-0.';
+  const withoutCas = 'BPC-157 5mg vial. In stock.';
+
+  it('emits one finding when every sampled page gives the same result', () => {
+    const run = runLayer2(sample([productPage({ text: withCas }), productPage({ text: withCas })]), ruleset);
+    const found = run.findings.filter((f) => f.ruleId === 'PROD-001');
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.note).toContain('Observed on all 2 sampled product page(s)');
+  });
+
+  it('keeps the capture from every page on the collapsed finding', () => {
+    const run = runLayer2(sample([productPage({ text: withCas }), productPage({ text: withCas })]), ruleset);
+    const found = run.findings.find((f) => f.ruleId === 'PROD-001');
+
+    // Nothing is discarded by collapsing: each page is still cited and still retained.
+    expect(found?.evidence.length).toBe(2);
+  });
+
+  it('keeps the pages separate when they disagree', () => {
+    const run = runLayer2(sample([productPage({ text: withCas }), productPage({ text: withoutCas })]), ruleset);
+    const found = run.findings.filter((f) => f.ruleId === 'PROD-001');
+
+    expect(found).toHaveLength(2);
+    expect(new Set(found.map((f) => f.state)).size).toBe(2);
+  });
+
+  it('names the page when they disagree, because that is what a reader needs', () => {
+    const run = runLayer2(sample([productPage({ text: withCas }), productPage({ text: withoutCas })]), ruleset);
+    for (const finding of run.findings.filter((f) => f.ruleId === 'PROD-001')) {
+      expect(finding.note).toContain('/product/');
+    }
+  });
+
+  /**
+   * Same state, different observation. Two pages that both pass PROD-001 while quoting different
+   * registry numbers are not one finding: collapsing them would print one page's CAS number as
+   * though it were both pages'. Grouping on state alone would do exactly that.
+   */
+  it('keeps pages separate when the state agrees but the observation does not', () => {
+    const run = runLayer2(
+      sample([
+        productPage({ text: 'BPC-157 vial. CAS 137525-51-0.' }),
+        productPage({ text: 'Formaldehyde solution. CAS 50-00-0.' }),
+      ]),
+      ruleset,
+    );
+    const found = run.findings.filter((f) => f.ruleId === 'PROD-001');
+
+    expect(found).toHaveLength(2);
+    expect(found.every((f) => f.state === 'pass')).toBe(true);
+    expect(found.map((f) => f.note).join(' ')).toContain('137525-51-0');
+    expect(found.map((f) => f.note).join(' ')).toContain('50-00-0');
+  });
+
+  it('does not collapse a single-page sample into a claim about "all"', () => {
+    const run = runLayer2(sample([productPage({ text: withCas })]), ruleset);
+    const found = run.findings.find((f) => f.ruleId === 'PROD-001');
+    expect(found?.note).not.toContain('Observed on all');
+  });
+});

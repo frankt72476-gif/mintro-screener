@@ -577,3 +577,18 @@ table {width:100%;border-collapse:collapse}
   .rs-checks{display:block;overflow-x:auto}
   .rs-notchecked li{grid-template-columns:1fr;gap:2px}
 }
+
+/* ------------------------------------------------------------------------------------------------
+   Ligatures off, so the PDF's text is the text (D-136).
+
+   Space Grotesk draws `ff` as one glyph, and Chromium's `page.pdf()` embeds it with no ToUnicode
+   entry — so "Off-site presence" came out of the exported document as "O -site presence", with a
+   NUL where the pair should be. Measured, not guessed: the same string round-trips correctly with
+   this declaration and does not without it.
+
+   That is the document an underwriter searches and copies from, and a heading that cannot be found
+   by typing it is a defect in the artifact rather than in its styling. Applied everywhere rather
+   than only in print, because the PDF is rendered from these same components and two typographic
+   stacks is the thing ARCHITECTURE.md rules out.
+------------------------------------------------------------------------------------------------ */
+body{font-variant-ligatures:none}

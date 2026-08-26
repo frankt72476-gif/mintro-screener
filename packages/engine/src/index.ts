@@ -154,6 +154,7 @@ export {
 export {
   checkCoaDate,
   checkCoaPurity,
+  checkCoaServed,
   checkCoaFields,
   findDate,
   findPurity,

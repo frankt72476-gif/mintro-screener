@@ -14,7 +14,7 @@
  */
 
 import type { Attestation, Category, NotChecked, Rule, Ruleset, State } from '@mintro/ruleset';
-import type { Finding, NotEvaluableKind } from './findings.js';
+import type { FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
@@ -172,6 +172,36 @@ export interface ScreeningReport {
    * Absent on runs recorded before this existed; absent renders no section at all.
    */
   readonly attestationQuestions?: readonly Attestation[];
+  /**
+   * Surfaces this run asked for and did not get (D-136).
+   *
+   * Present only when something went unanswered, because a clean crawl has nothing to say here and
+   * a block reading "0 surfaces obstructed" is noise on every report that matters.
+   *
+   * This exists because a reader could not tell a bad crawl from a bare storefront. Run 730764d4
+   * said *"37 could not be evaluated from the crawled surface"* with no way to know whether 37 was
+   * normal for a site like this or a symptom of the crawl falling over — and on that run two gate
+   * probes and a payment capture had timed out.
+   */
+  readonly obstruction?: ReportObstruction;
+}
+
+/**
+ * What the run asked for and did not receive.
+ *
+ * Counted from the requests themselves rather than inferred from findings: a surface can be
+ * attempted several times over several paths, and the honest number is how many requests went
+ * unanswered, not how many rules ended up unevaluated.
+ */
+export interface ReportObstruction {
+  /** Requests made looking for a surface. */
+  readonly attempted: number;
+  /** Of those, the ones that never answered — a timeout, a refused connection, a dead navigation. */
+  readonly unanswered: number;
+  /** The URLs that did not answer, deduplicated, for a reader who wants to try one by hand. */
+  readonly urls: readonly string[];
+  /** Rules left unevaluated because of it, by `not_retrieved`. */
+  readonly rulesAffected: number;
 }
 
 /**
@@ -201,6 +231,13 @@ export interface AssembleInput {
   readonly findings: readonly Finding[];
   readonly truncations?: readonly string[];
   readonly politeness: string;
+  /**
+   * Every navigation the run made looking for a surface, and what it returned.
+   *
+   * Already collected by the discovery pass and by the gate probes; it simply never reached the
+   * report, so the obstruction it records was invisible to a reader (D-136).
+   */
+  readonly attempts?: readonly FetchAttempt[];
   readonly access?: ReportAccess;
 }
 
@@ -261,6 +298,8 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
   const categories = buildCategories(enriched, ruleset.categories, rulesById);
   const counts = tally(enriched);
 
+  const obstruction = describeObstruction(input.attempts ?? [], enriched);
+
   return {
     runId: input.runId,
     merchantDomain: input.merchantDomain,
@@ -283,11 +322,39 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         state: finding.state,
       })),
     ),
+    ...(obstruction === null ? {} : { obstruction }),
     truncations: input.truncations ?? [],
     politeness: input.politeness,
     notChecked: ruleset.not_checked,
     attestationQuestions: ruleset.attestations,
     ...(input.access === undefined ? {} : { access: input.access }),
+  };
+}
+
+/**
+ * The run's own obstruction, or null when there was none (D-136).
+ *
+ * `status === 0` is the marker a request never answered; it is set where the request was made,
+ * never derived from a message, for the reason hard constraint 9 gives.
+ *
+ * Returns null rather than a zero-filled record so the report can omit the block entirely. A
+ * reader seeing "0 unanswered" on every clean run learns to skip it, and then misses it on the run
+ * where it matters.
+ */
+function describeObstruction(
+  attempts: readonly FetchAttempt[],
+  findings: readonly ReportFinding[],
+): ReportObstruction | null {
+  if (attempts.length === 0) return null;
+
+  const unanswered = attempts.filter((attempt) => attempt.status === 0);
+  if (unanswered.length === 0) return null;
+
+  return {
+    attempted: attempts.length,
+    unanswered: unanswered.length,
+    urls: [...new Set(unanswered.map((attempt) => attempt.url))],
+    rulesAffected: findings.filter((finding) => finding.notEvaluableKind === 'not_retrieved').length,
   };
 }
 

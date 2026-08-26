@@ -17,6 +17,7 @@ import {
   checkCoaDate,
   checkCoaFields,
   checkCoaPurity,
+  checkCoaServed,
   findDate,
   findPurity,
   isReadableText,
@@ -334,5 +335,82 @@ describe('unreadable extraction is not an empty document', () => {
 
   it('accepts nothing too short to judge', () => {
     expect(isReadableText('Purity')).toBe(false);
+  });
+});
+
+/**
+ * COA-006 — the certificate link serving a certificate is a finding, not three absences (D-136).
+ *
+ * On run 730764d4 every certificate link resolved and every one served a `.webp`. COA-002, COA-003
+ * and COA-004 each reported `not_evaluable` with an accurate reason, and a reader had to piece the
+ * shared cause together from three not-assessed rows. Nothing on that storefront's certificates is
+ * verifiable by anybody following the link, which is a substantive observation in its own right.
+ */
+describe('COA-006 — the link serves something that can be read', () => {
+  const coa006 = docRule('COA-006');
+
+  it('fails when the link served something that is not a PDF', () => {
+    const finding = checkCoaServed(coa006, {
+      found: false,
+      why: 'link_broken',
+      attempts: [{ url: 'https://shop.example/coa/bpc-157.webp', status: 200 }],
+    });
+
+    // review_only, so a violation lands in the human queue rather than auto-failing a merchant on
+    // an asset-serving quirk.
+    expect(finding.state).toBe('review');
+    expect(finding.note).toContain('is not a certificate');
+    expect(finding.evidence[0]?.attempts?.length).toBe(1);
+  });
+
+  it('passes when a certificate was fetched and read', () => {
+    const finding = checkCoaServed(coa006, {
+      found: true,
+      certificate: {
+        url: 'https://shop.example/coa/bpc-157.pdf',
+        sha256: 'a'.repeat(64),
+        evidenceKey: 'run-1/coa/bpc.pdf',
+        text: 'Purity 99.1% HPLC batch 2026-03',
+        fetchedAt: '2026-08-26T00:00:00.000Z',
+      },
+    });
+    expect(finding.state).toBe('pass');
+  });
+
+  /**
+   * A PDF with no recoverable text is the same fact for a reader as a `.webp`: nothing it states
+   * can be checked. Different cause, same observation, and it must not slip through as a pass.
+   */
+  it('fails when a PDF was served with no readable text', () => {
+    const finding = checkCoaServed(coa006, {
+      found: true,
+      certificate: {
+        url: 'https://shop.example/coa/scan.pdf',
+        sha256: 'b'.repeat(64),
+        evidenceKey: 'run-1/coa/scan.pdf',
+        text: '',
+        emptyReason: 'no text objects were found',
+        fetchedAt: '2026-08-26T00:00:00.000Z',
+      },
+    });
+    expect(finding.state).toBe('review');
+    expect(finding.note).toContain('no text could be recovered');
+  });
+
+  /** No link at all is COA-001's subject. This rule has nothing to say and says nothing. */
+  it('is not evaluable when no certificate link was published', () => {
+    const finding = checkCoaServed(coa006, { found: false, why: 'not_published', attempts: [] });
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_exposed');
+  });
+
+  it('is not evaluable, and about this run, when the request did not complete', () => {
+    const finding = checkCoaServed(coa006, {
+      found: false,
+      why: 'not_retrieved',
+      attempts: [{ url: 'https://shop.example/coa/x.pdf', status: 0, error: 'timeout' }],
+    });
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
   });
 });

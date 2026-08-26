@@ -1,5 +1,5 @@
 {
-  "version": "2.13.0",
+  "version": "2.14.0",
   "source_document": "Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf",
   "effective": "2026-05-26",
   "states": [
@@ -900,6 +900,20 @@
       "clause": "From an accredited independent third-party testing laboratory.",
       "params": {
         "reason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control."
+      }
+    },
+    {
+      "id": "COA-006",
+      "cat": "coa",
+      "layer": 2,
+      "sev": "major",
+      "type": "doc_parse",
+      "tier": "review_only",
+      "title": "Certificate links serve a readable certificate",
+      "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+      "params": {
+        "assert_served": true,
+        "note": "That the certificates cannot be read is an observation in its own right, not merely the reason three other checks are unevaluated: nothing they state is verifiable by anyone following the link. review_only because a link serving the wrong asset is the kind of thing a human should confirm before it counts against a merchant (D-136)."
       }
     },
     {
