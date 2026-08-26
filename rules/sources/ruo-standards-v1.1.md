@@ -1,12 +1,27 @@
 # Research-Use-Only Peptide Programs — v1.1 (August 2026)
 
-Clause corpus. One clause per line, byte-for-byte as it appears in the clause table of
-`docs/wording-change-spec.md`. Quotes, dashes and the degree sign are the document’s own
-characters and must not be normalised: the `packages/ruleset` validator asserts that each
-`clause` on a `source: programme` rule is a byte-exact substring of this file.
+Clause corpus, and the canonical text of the standards. The v1.1 PDF is a rendering
+of this text, not its source.
 
-Some lines repeat, because several rules quote one sentence of the standards — COA-001,
-COA-005 and COA-006; FULF-001 and FULF-002; OFFS-001 and OFFS-007; PROD-008 and OFFS-006.
+Provenance: assembled from the clause table of `docs/wording-change-spec.md`, then
+verified externally on 2026-08-26 against the document source that renders the PDF.
+All 53 clause lines byte-identical. See D-139.
+
+Do not regenerate this file from the PDF. Its embedded fonts map ” to U+02EE and ’
+to U+02BC, and draw hyphen, parenthesis and plus as private-use code points with no
+ToUnicode entry — BPC-157 extracts as BPC157, -20°C as 20°C, 21+ as 21. Only 39 of
+53 clauses survive extraction intact; the other 14 fail on typography alone, and a
+guard failing that way gets weakened rather than fixed.
+
+Quotes, dashes and the degree sign are the document's own characters and must not be
+normalised: the `packages/ruleset` validator asserts that each `clause` on a
+`source: programme` rule is a byte-exact substring of this file. A normalised
+apostrophe is invisible on the page and fatal to that check — and it is exactly what
+a rich-text paste or a well-meaning linter introduces.
+
+Some lines repeat, because several rules quote one sentence of the standards —
+COA-001, COA-005 and COA-006; FULF-001 and FULF-002; OFFS-001 and OFFS-007;
+PROD-008 and OFFS-006.
 
 ## From the standards
 
