@@ -13,7 +13,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { loadRulesetFile, type Ruleset, type RuleOfType } from '@mintro/ruleset';
-import { checkUrlPattern, DIRECTIVE_TERMS, toSlugUrl, type Layer0Result } from '@mintro/engine';
+import {
+  assembleReport,
+  checkUrlPattern,
+  DIRECTIVE_TERMS,
+  toSlugUrl,
+  type Layer0Result,
+} from '@mintro/engine';
 import { RULESET_PATH } from './paths.js';
 
 const ruleset: Ruleset = loadRulesetFile(RULESET_PATH);
@@ -72,6 +78,37 @@ describe('every rule states whose requirement it is', () => {
     const mintro = ruleset.rules.filter((r) => r.source === 'mintro').map((r) => r.id);
     expect(mintro).toEqual(['CATG-007']);
     expect(ruleset.rules.filter((r) => r.source === 'programme')).toHaveLength(ruleset.rules.length - 1);
+  });
+});
+
+/**
+ * Every finding carries the attribution, by every path that makes one.
+ *
+ * Found on a production run, not by a test: `findings_without_source` was 12. The field was added
+ * to the evaluated path and missed on the path that reports rules the run never got to, so twelve
+ * findings went out with no attribution. It was invisible because every unrun rule is a program
+ * rule and the renderer falls back to `programme` — and it would have stopped being invisible the
+ * first time a Mintro rule went unrun.
+ */
+describe('every finding carries its attribution', () => {
+  it('including rules the run never evaluated', () => {
+    // No findings at all, so every rule takes the unrun path.
+    const report = assembleReport(
+      {
+        runId: 'run-1',
+        merchantDomain: 'shop.example',
+        mode: 'public',
+        startedAt: '2026-08-26T00:00:00.000Z',
+        finishedAt: '2026-08-26T00:01:00.000Z',
+        findings: [],
+        politeness: 'none declared',
+      },
+      ruleset,
+    );
+
+    const findings = report.categories.flatMap((c) => c.findings);
+    expect(findings.length).toBe(ruleset.rules.length);
+    expect(findings.filter((f) => f.source === undefined)).toEqual([]);
   });
 });
 

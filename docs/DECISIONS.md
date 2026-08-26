@@ -8111,4 +8111,17 @@ Twelve regressions, all discriminating. Three were vacuous first time and each w
 test asserted that a *programme* rule still says "prohibited"; and the two schema breaks passed
 because every rule already carried the field, so a fixture with none was added and is now rejected.
 
+### One the break matrix did not catch, and the production run did
+
+Verifying against run `266beeb9` showed **twelve findings with no `source` at all**. The field was
+added to the evaluated path and missed on the path that reports rules the run never reached — an
+earlier edit put both replacements on the same line, because the six-space anchor is a substring of
+the eight-space one.
+
+Invisible in the report, because every unrun rule is a program rule and the renderer's absent-field
+fallback is `programme`. It would have stopped being invisible the first time a Mintro rule went
+unrun, which is a rule nobody has written yet. Fixed, and now covered by a test that asserts *no*
+finding lacks the field — which is the assertion that would have caught it, rather than one aimed
+at the path I happened to remember.
+
 ---

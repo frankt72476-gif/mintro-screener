@@ -297,6 +297,12 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
       ...notEvaluable(rule, reasonForUnrun(rule), 'document', kindForUnrun(rule)),
       title: rule.title,
       clause: rule.clause,
+      // The unrun path carries `source` too. It was missed when the field was added and only the
+      // evaluated path got it, which left twelve findings on a live run with no attribution — see
+      // D-138. Invisible today, because every unrun rule happens to be a program rule and the
+      // renderer's absent-field fallback is `programme`. It stops being invisible the first time a
+      // Mintro rule goes unrun.
+      source: rule.source,
       severity: rule.sev,
       tier: rule.tier,
       checkType: rule.type,
