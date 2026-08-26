@@ -9,7 +9,7 @@
 import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import { isRendered } from '../page.js';
-import { notEvaluable, satisfied, violation, type Evidence, type Finding } from '../findings.js';
+import { notEvaluable, satisfied, unsettled, violation, type Evidence, type Finding } from '../findings.js';
 import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
 import { bestResemblance, splitStatements } from '../textSimilarity.js';
 
@@ -397,9 +397,25 @@ function gateFinding(rule: RuleOfType<'dom_assert'>, page: PageContext): Finding
 /**
  * Gathers something for the report rather than asserting on it.
  *
- * OFFS-003 is the case: it collects social handles. Collection never produces a violation —
- * there is nothing here to be wrong about — so the finding is `pass` carrying the observation,
- * and the note says plainly that the off-site content itself was not examined.
+ * OFFS-003 is the case: it reads the social links off the homepage. **This never returns
+ * `pass`,** and that is the whole point of D-133.
+ *
+ * The rule it serves asks whether social links point to the home page only — a fact about where
+ * a bio link on a platform leads. This handler sees which accounts the storefront links to and
+ * nothing else; the rule's own params say so (*"Bio-link inspection requires platform fetch"*).
+ * Returning `pass` meant a merchant with no homepage social links and an Instagram full of
+ * dosing advice earned a green tick on a rule titled for social links. Absence of a link on one
+ * page was being read as compliance of an off-site account — A-04 exactly (D-118).
+ *
+ * So the two cases are told apart rather than collapsed into one cheerful state:
+ *
+ * - **Links found** → `review`. There is something for a human to open, and hard constraint 4
+ *   puts anything a check cannot settle in front of one.
+ * - **No links found** → `not_evaluable`. Nothing was seen and nothing was settled; manufacturing
+ *   a review item out of an empty homepage would waste the queue this rule feeds.
+ *
+ * Neither is a claim about the accounts themselves. What they contain is OFFS-004, which is
+ * `manual` for the same reason.
  */
 function collectFinding(
   rule: RuleOfType<'dom_assert'>,
@@ -411,10 +427,11 @@ function collectFinding(
   const handles = socialLinks(page);
 
   if (handles.length === 0) {
-    return satisfied(
+    return notEvaluable(
       rule,
-      'No social media links were observed on the rendered homepage.',
+      'no social media links were observed on the rendered homepage, and accounts a storefront does not link to are not discoverable from it',
       RENDERED,
+      'not_exposed',
       pageEvidence(page),
     );
   }
@@ -422,9 +439,9 @@ function collectFinding(
   const listed = handles.slice(0, 8).join(', ');
   const more = handles.length > 8 ? ` and ${handles.length - 8} more` : '';
 
-  return satisfied(
+  return unsettled(
     rule,
-    `${handles.length} social media link(s) were observed on the rendered homepage: ${listed}${more}. Where each link leads was not examined.`,
+    `${handles.length} social media link(s) were observed on the rendered homepage: ${listed}${more}. Where each link leads was not examined, and the content of these accounts was not read.`,
     RENDERED,
     [{ ...pageEvidence(page)[0]!, matchedValue: handles.join(', '), matchedUrls: handles }],
   );

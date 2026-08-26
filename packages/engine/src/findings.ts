@@ -170,6 +170,32 @@ export function satisfied(
 }
 
 /**
+ * A rule whose check ran, gathered something real, and settled nothing.
+ *
+ * The gap this fills: `satisfied` and `violation` both claim the rule's question was answered,
+ * and `notEvaluable` says nothing was seen. A collection is none of those — OFFS-003 reads the
+ * social links off the homepage, which is a genuine observation about the storefront, while the
+ * requirement it belongs to is about where those links *lead*, on a platform no crawl visits.
+ *
+ * Returning `pass` there was the D-118 failure in its purest form: a search that never covered
+ * the space reporting the space as clean. The handler's own comment reasoned *"collection never
+ * produces a violation, so the finding is pass"* — but not-wrong is not satisfied, and the tick
+ * strip renders title and state with no note beside them (D-133).
+ *
+ * State is always `review`: the observation goes to the human queue, which is where hard
+ * constraint 4 puts anything a check cannot settle. `invariants.ts` requires any rule reaching
+ * here to be `review_only`, so this can never quietly become a `fail`.
+ */
+export function unsettled(
+  rule: Rule,
+  note: string,
+  evidenceKind: EvidenceKind,
+  evidence: readonly Evidence[],
+): Finding {
+  return { ruleId: rule.id, state: 'review', note, evidenceKind, evidence };
+}
+
+/**
  * Why a rule could not be observed (D-044).
  *
  * Four different facts used to render as one word. They are not interchangeable, and the

@@ -7530,3 +7530,111 @@ around — an unobservable thing must be reported as unobserved, never as a valu
 to a `document_requests` title, to that app's intake form, or to a null-for-anything-missing rule, it
 does not belong here. Prompts and schemas are authored fresh against our rule set, and they carry
 absence as a state rather than as a value.
+
+---
+
+## D-133 — A check reports the surface it read, in its title as well as its note
+**2026-08-26 · Frank's ruling · amends D-018 · ruleset 2.9.0 → 2.10.0**
+
+Six rule titles are rescoped, and two handlers stop claiming more than they saw. `OFFS-003` no
+longer returns `pass` under any input.
+
+| Rule | Was | Now |
+|---|---|---|
+| OFFS-003 | Social links point to the home page only | Social accounts linked from the storefront |
+| FULF-001 | Ships to USA only | Shipping policy states USA only |
+| OFFS-001 | No affiliate program | No affiliate or referral program URLs |
+| PAY-001 | No peer-to-peer payment methods | No peer-to-peer payment methods named on public pages |
+| COA-003 | Purity at or above 98% | Certificate states purity at or above 98% |
+| COA-002 | COA updated within 60 days | Certificate reports a test date within 60 days |
+
+### What the audit found
+
+Table 2 of `peptide-requirements-tables.md` lists nineteen requirements a crawl cannot observe.
+Read against it, the rule set holds up better than expected in one place and worse in another,
+and the split is instructive.
+
+**The states are mostly right.** Thirteen rules are `type: "manual"`; `invariants.ts` forces
+`layer: null`, no handler exists, and `report.ts` classifies them `not_reachable` carrying the
+rule author's own reason. Shipping practice, ban lists, support transcripts, lab accreditation —
+all of them decline to answer, which is correct.
+
+**The notes are right, and D-018 is why.** That ruling audited every `expect: absent` pass note
+and widened five. `doc_parse` writes the model sentence: *"This reports what the certificate
+states; the assay was not repeated."*
+
+**The titles were never audited at all.** D-018 closed by saying *"this is a reporting rule, not
+a state rule"* — a correct scoping of that ruling, and the reason the gap survived. The report
+renders `rule.title`, then the `clause` verbatim, then the note. **The tick strip renders
+`ruleId — title — state` and no note.** So the most scannable surface in the document carries the
+least qualified claim on it, and six titles were asserting facts about merchant conduct that no
+check observed.
+
+`tier` is no protection here. It maps a *violation* to `fail` or `review`; a `pass` is never
+routed to a human. Every one of these reached the underwriter unreviewed by construction.
+
+### OFFS-003 was the one that could never be right
+
+Its `collectFinding` returned `satisfied` on both branches. There was no input to that handler
+that produced anything but `pass`, under a title reading *"Social links point to the home page
+only"* — a fact about where a bio link on a platform leads. The rule's own params admit it:
+*"Bio-link inspection requires platform fetch."*
+
+The case this fails on is the common one. A merchant links no social account from the storefront
+and runs an Instagram full of dosing advice: green tick. Absence of a link on one page was being
+read as compliance of an off-site account, which is A-04 exactly — **a presence check over an
+incomplete haystack cannot return absent** (D-118).
+
+The code's comment records the reasoning that produced it: *"Collection never produces a
+violation — there is nothing here to be wrong about — so the finding is `pass`."* Not-wrong is not
+satisfied. A collection has no verdict in it.
+
+So the two cases are told apart rather than collapsed:
+
+- **Links found** → `review`, via a new `unsettled()` constructor. There is something for a human
+  to open, and hard constraint 4 puts anything a check cannot settle in front of one. Table 1 of
+  the requirements document independently reaches the same state: *partially observable → review*.
+- **No links found** → `not_evaluable` / `not_exposed`. Nothing seen, nothing settled.
+  Manufacturing a review item out of an empty homepage would waste the queue this rule feeds.
+
+`unsettled()` always returns `review`, so an `auto_fail` collecting rule would auto-fail every
+merchant who links a social account — the mirror image of the bug being removed. A new invariant
+requires any rule with `collect` to be `review_only`.
+
+### FULF-001 was making the claim its neighbours decline to make
+
+`text_match`'s `require_any` branch was the one satisfied path D-018's table never covered, so it
+emitted a bare *"Observed: 'united states only'."* under a title reading **Ships to USA only**.
+FULF-002 (PO boxes) and FULF-003 (adult signature) are `manual` precisely because shipping conduct
+is not observable from a website. The branch now names its surface and says the practice was not
+observed.
+
+Note that Table 1 of the requirements document scopes this row the same way on its own —
+*"Shipping policy states US-only, no PO boxes … Stated policy is the seller's position; practice
+is table 2"* — and the practice appears as a Table 2 question. The rule set had collapsed the two
+halves into one green tick.
+
+### What is deliberately not fixed here
+
+`DISC-003` ("Disclaimer on every page") and `COA-001` ("COA linked on each product page") assert
+universals over a sample. Their notes scope this correctly — *"across all N sampled product
+page(s)"* — and the titles do not. That is the same shape but a different axis: crawl completeness
+rather than off-surface conduct, and it is not Table 2's territory. Left standing, named here so
+it is not mistaken for an oversight.
+
+### Why the title guard is a list and not a rule
+
+Whether a title claims more than its check observed is a judgement about what words mean. No
+mechanical property of the rule set decides it, and a keyword heuristic would pass while catching
+nothing — a guard that reports success without doing the work is worse than an explicit list
+somebody has to edit on purpose. `statedNotObserved.test.ts` pins the six, and the limit is
+written into the file.
+
+### Coverage the audit could not claim
+
+Five Table 2 rows have no rule of any kind behind them: shipping to gyms and clinics, the standard
+support response to a dosing question, third-party brand-mention monitoring, other storefronts or
+domains, and prior terminations by an acquirer. Nothing overreaches on them because nothing exists.
+They are attestation questions, not check gaps.
+
+---

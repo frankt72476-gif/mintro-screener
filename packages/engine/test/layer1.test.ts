@@ -367,7 +367,7 @@ describe('GATE-001 — age affirmation (D-016)', () => {
 describe('OFFS-003 — social handles', () => {
   const offs003 = rule<'dom_assert'>('OFFS-003');
 
-  it('collects social links without asserting on them', () => {
+  it('collects social links and sends them to review rather than passing them', () => {
     const p = page({
       links: [
         { href: 'https://instagram.com/shop', text: 'Instagram', rel: '', inFooter: true, inNav: false },
@@ -376,19 +376,49 @@ describe('OFFS-003 — social handles', () => {
     });
 
     const finding = checkDomAssert(offs003, p);
-    expect(finding.state).toBe('pass');
+    expect(finding.state).toBe('review');
     expect(finding.evidence[0]?.matchedUrls).toEqual(['https://instagram.com/shop']);
   });
 
-  it('says plainly that off-site content was not examined', () => {
+  /**
+   * Two different limits, and the note has to carry both. Where a link *leads* is OFFS-003's own
+   * unfinished half; what the account *says* is OFFS-004, which is `manual`. A note admitting
+   * only the first would still leave a reader thinking the posts had been looked at.
+   */
+  it('says plainly that neither the destination nor the account content was examined', () => {
     const p = page({
       links: [{ href: 'https://instagram.com/shop', text: 'IG', rel: '', inFooter: true, inNav: false }],
     });
-    expect(checkDomAssert(offs003, p).note).toContain('not examined');
+    const note = checkDomAssert(offs003, p).note;
+    expect(note).toContain('Where each link leads was not examined');
+    expect(note).toContain('the content of these accounts was not read');
   });
 
-  it('passes when there are no social links at all', () => {
-    expect(checkDomAssert(offs003, page()).state).toBe('pass');
+  /**
+   * D-133. This is the case the old `pass` was worst on, and it is not exotic: a merchant links
+   * no social account from the storefront and runs an Instagram full of dosing advice. The crawl
+   * cannot see the account, so the only honest report is that nothing was settled.
+   *
+   * Asserting `not('pass')` as well as the exact state, because the defect being guarded is
+   * specifically a green tick — a future refactor that reached for `satisfied` again should fail
+   * here on the thing that matters, not only on a string mismatch.
+   */
+  it('does not pass when there are no social links at all', () => {
+    const finding = checkDomAssert(offs003, page());
+    expect(finding.state).not.toBe('pass');
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_exposed');
+  });
+
+  it('never returns pass on any input, because it never settles its rule', () => {
+    const inputs = [
+      page(),
+      page({ links: [{ href: 'https://instagram.com/shop', text: 'IG', rel: '', inFooter: true, inNav: false }] }),
+      page({ links: [{ href: 'https://shop.example/about', text: 'About', rel: '', inFooter: true, inNav: false }] }),
+    ];
+    for (const input of inputs) {
+      expect(checkDomAssert(offs003, input).state).not.toBe('pass');
+    }
   });
 });
 

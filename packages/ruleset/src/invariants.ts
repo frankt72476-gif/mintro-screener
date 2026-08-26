@@ -155,6 +155,20 @@ function checkRule(
     );
   }
 
+  // A collecting rule gathers an observation and settles nothing, so its finding is always
+  // `review` (D-133). `stateForViolation` would turn that into `fail` on an auto_fail rule, which
+  // would auto-fail every merchant who links a social account. The tier is the guard, so it is
+  // required here rather than trusted.
+  if (rule.type === 'dom_assert' && rule.params.collect !== undefined && rule.tier !== 'review_only') {
+    defects.push(
+      defect(
+        rule.id,
+        at('tier'),
+        `a rule that collects '${rule.params.collect}' settles nothing and must be review_only, found ${rule.tier}`,
+      ),
+    );
+  }
+
   // A rule referenced by another must exist. A dangling `target_phrases_from` would leave a
   // critical rule with no subject, which would silently disable it (D-015). Checked for every
   // check type that can declare a subject, not just the first one that needed to.

@@ -58,6 +58,32 @@ describe('checkInvariants', () => {
     expect(checkInvariants(base())).toEqual([]);
   });
 
+  /**
+   * D-133. A collecting rule always returns `review`, and `stateForViolation` turns `review` into
+   * `fail` the moment the tier is `auto_fail`. That would auto-fail every merchant who links a
+   * social account — the mirror image of the false `pass` the ruling was written to remove.
+   * The tier is the only thing standing between those two, so it is required rather than assumed.
+   */
+  describe('a collecting rule must be review_only', () => {
+    const collecting = (tier: 'auto_fail' | 'review_only') => (r: Ruleset) => {
+      r.rules[0] = {
+        ...r.rules[0]!,
+        tier,
+        params: { surface: 'homepage', collect: 'social_handles' },
+      } as Ruleset['rules'][number];
+    };
+
+    it('rejects one that can auto-fail', () => {
+      expect(defectsAfter(collecting('auto_fail'))).toEqual([
+        "a rule that collects 'social_handles' settles nothing and must be review_only, found auto_fail",
+      ]);
+    });
+
+    it('accepts one that goes to review', () => {
+      expect(defectsAfter(collecting('review_only'))).toEqual([]);
+    });
+  });
+
   describe('severity never affects anything (D-009)', () => {
     // sev drives report ordering and nothing else. Every combination must pass, including
     // the one the constraint exists to protect: critical + review_only.

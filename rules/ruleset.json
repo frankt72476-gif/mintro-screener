@@ -1,5 +1,5 @@
 {
-  "version": "2.9.0",
+  "version": "2.10.0",
   "source_document": "Combined_Peptide_Program_Website_Guidelines_Updated_20260526.pdf",
   "effective": "2026-05-26",
   "states": [
@@ -715,7 +715,7 @@
       "sev": "critical",
       "type": "doc_parse",
       "tier": "auto_fail",
-      "title": "COA updated within 60 days",
+      "title": "Certificate reports a test date within 60 days",
       "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
       "params": {
         "extract": "report_date",
@@ -730,7 +730,7 @@
       "sev": "critical",
       "type": "doc_parse",
       "tier": "auto_fail",
-      "title": "Purity at or above 98%",
+      "title": "Certificate states purity at or above 98%",
       "clause": "98% purity for all products.",
       "params": {
         "extract": "purity_pct",
@@ -777,7 +777,7 @@
       "sev": "major",
       "type": "text_match",
       "tier": "review_only",
-      "title": "Ships to USA only",
+      "title": "Shipping policy states USA only",
       "clause": "Ship to USA only. No PO boxes or international addresses.",
       "params": {
         "surface": "shipping_policy",
@@ -848,7 +848,7 @@
       "sev": "critical",
       "type": "url_pattern",
       "tier": "auto_fail",
-      "title": "No affiliate program",
+      "title": "No affiliate or referral program URLs",
       "clause": "No affiliate or influencer marketing program.",
       "params": {
         "patterns": [
@@ -884,7 +884,7 @@
       "sev": "minor",
       "type": "dom_assert",
       "tier": "review_only",
-      "title": "Social links point to the home page only",
+      "title": "Social accounts linked from the storefront",
       "clause": "Social media should link only to your website home page.",
       "params": {
         "surface": "homepage",
@@ -984,7 +984,7 @@
       "sev": "critical",
       "type": "text_match",
       "tier": "auto_fail",
-      "title": "No peer-to-peer payment methods",
+      "title": "No peer-to-peer payment methods named on public pages",
       "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
       "params": {
         "surface": "footer_and_public_pages",

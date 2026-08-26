@@ -343,6 +343,19 @@ function allOfFinding(
       );
 }
 
+/**
+ * One of several accepted phrasings, on a named surface.
+ *
+ * The pass says which surface it read and that reading a page is not watching a practice. D-018
+ * widened the `expect: absent` branches and this one was not in that table, so FULF-001 passed
+ * on a bare *"Observed: 'united states only'."* under a title reading **Ships to USA only** — a
+ * claim about where parcels go, drawn from a sentence on a policy page. Its neighbours FULF-002
+ * and FULF-003 are `manual` precisely because shipping conduct is not observable; this branch
+ * was making the claim they decline to make (D-133).
+ *
+ * The sentence is the one `doc_parse` already writes for a certificate: here is what the
+ * document states, and stating is not doing.
+ */
 function anyOfFinding(
   rule: RuleOfType<'text_match'>,
   page: PageContext,
@@ -350,9 +363,15 @@ function anyOfFinding(
   accepted: readonly string[],
 ): Finding {
   const found = accepted.filter((term) => haystack.includes(normalise(term)));
+  const surface = rule.params.surface === 'all_sampled' ? 'this sampled page' : `the ${rule.params.surface} surface`;
 
   return found.length > 0
-    ? satisfied(rule, `Observed: ${found.map((f) => `'${f}'`).join(', ')}.`, RENDERED, withMatch(page, found.join(', ')))
+    ? satisfied(
+        rule,
+        `Observed in the rendered text of ${surface}: ${found.map((f) => `'${f}'`).join(', ')}. This reports what the page states; the practice itself was not observed.`,
+        RENDERED,
+        withMatch(page, found.join(', ')),
+      )
     : violation(
         rule,
         `None of the accepted phrases was observed: ${accepted.map((a) => `'${a}'`).join(', ')}.`,
