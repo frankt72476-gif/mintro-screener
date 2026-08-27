@@ -8213,6 +8213,24 @@ nothing about the rule set being faithful to the document — and it is the reas
 in the first place. It is answered now, so the validator can be written against this file. The scoping
 stands: `source: programme` clauses only, with Mintro-authored rules exempt by definition (D-140).
 
+**Implemented 2026-08-27** in `packages/ruleset/src/corpus.ts`, run by `npm run validate` and reported
+on its own line. It asserts five things, and **four of them exist because the membership check alone
+would pass vacuously** — every string is a substring of a corpus nobody read: the corpus is readable
+and non-empty; it carries exactly `EXPECTED_CLAUSE_LINES` (53) clause lines under
+`## From the standards`; the number of `source: programme` rules equals that count; every such clause
+is a byte-exact substring of the file *and* stands as a clause line of its own rather than matching
+inside the provenance prose; and every clause line is quoted by some rule, so the corpus cannot
+accumulate text nothing checks. Mintro-authored clauses are validated for presence only. Line endings
+are trimmed for the line-wise half — the corpus is CRLF and the rule set is LF — and the substring half
+is independent of them only while no clause contains a line break, which is asserted rather than
+assumed. Each assertion was made to fail against the real file before being trusted: emptying,
+truncating by one line, altering one byte and deleting the file produce four distinct failures and four
+non-zero exits.
+
+The pinned count is the one thing here a rule addition touches, which brushes against hard constraint 1
+and was accepted deliberately: without it, deleting a programme rule *and* its corpus line together
+leaves the equality satisfied and the corpus quietly shorter than the document it claims to be.
+
 **The committed corpus is canonical going forward, and the PDF is its rendering.** Not the reverse. If
 the two ever disagree, the corpus is the text and the PDF is a typesetting of it — which is the only
 ordering consistent with what the PDF's own text layer does to hyphens, parentheses and quotes.

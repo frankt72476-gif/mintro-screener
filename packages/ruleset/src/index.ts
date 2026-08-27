@@ -45,6 +45,20 @@ export {
 
 export { checkInvariants, checkInvariantsOn, type IndexedRule } from './invariants.js';
 
+/**
+ * The standards corpus check (D-139). Node only — `checkAgainstCorpusFile` reads the corpus, and
+ * the pure half is exported beside it so a caller holding the text does not need the filesystem.
+ * Deliberately absent from `browser.ts`: the frontend has no corpus and no business asserting on one.
+ */
+export {
+  checkAgainstCorpus,
+  corpusClauseLines,
+  CORPUS_CLAUSE_HEADING,
+  CORPUS_MINTRO_HEADING,
+  EXPECTED_CLAUSE_LINES,
+} from './corpus.js';
+export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
+
 export { PARAMS_BY_CHECK_TYPE } from './params.js';
 
 export {
