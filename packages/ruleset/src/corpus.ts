@@ -14,9 +14,27 @@
  * validator prints `Valid.`, and the guarantee it appears to give is worth nothing. Truncate it by one
  * line and 52 still match; only the missing one fails, and only if the clause it held is not a repeat.
  *
- * So the membership check is the smaller half of this module. The count checks are what make it mean
- * anything, and they are ordered so that the cheapest, loudest failure comes first: an empty corpus is
- * reported as an empty corpus rather than as 53 individually missing clauses.
+ * So the membership check is the smaller half of this module. The non-empty check and the count
+ * equality are what make it mean anything, and they are ordered so that the cheapest, loudest failure
+ * comes first: an empty corpus is reported as an empty corpus rather than as 53 individually missing
+ * clauses.
+ *
+ * ## What is deliberately not here: a pinned clause count
+ *
+ * An earlier version asserted the corpus carried exactly 53 lines. It caught one case the equality
+ * below cannot — a programme rule and its corpus line deleted *together*, which leaves the two files
+ * agreeing with each other and both shorter than the document.
+ *
+ * **It also meant adding a rule required editing this file, which hard constraint 1 forbids.** The
+ * rule set is data; adding to it must never touch the engine, and a validator that has to be
+ * renumbered for every new rule is the engine. The number moved to
+ * `packages/ruleset/test/ruleset-json.test.ts`, beside the assertion pinning the rule count, where a
+ * tripwire on a deliberate change belongs: CI is where you want to be stopped and asked whether you
+ * meant it, and a validator is where you want a structural guarantee that holds for any well-formed
+ * pair of files.
+ *
+ * The split is the point. **Divergence is covered here** — the two files moving apart fails the
+ * equality whatever the counts are. **Both-shortened-together is covered there.**
  *
  * ## Pure, and separate from the file
  *
@@ -33,21 +51,6 @@ export const CORPUS_CLAUSE_HEADING = '## From the standards';
 
 /** Where the Mintro-authored clauses start, and the clause region ends. */
 export const CORPUS_MINTRO_HEADING = '## Mintro-authored';
-
-/**
- * How many clause lines the corpus must carry.
- *
- * A tripwire, and deliberately an exact number rather than a floor. The corpus and the rule set are
- * two files that have to move together; pinning the count means a change to one without the other
- * fails here rather than in a report.
- *
- * **It is the one thing in this package that a rule addition touches**, which brushes against hard
- * constraint 1 — adding a rule should never require touching the engine. The trade was made
- * deliberately: without it, deleting a programme rule *and* its corpus line together leaves the
- * equality check satisfied and the corpus quietly shorter than the document it claims to be. Update
- * it in the same commit as the corpus, with a decision number, exactly as `rules/ruleset.json` is.
- */
-export const EXPECTED_CLAUSE_LINES = 53;
 
 const defect = (path: string, message: string): RulesetDefect => ({ path, message });
 const ruleDefect = (ruleId: string, path: string, message: string): RulesetDefect => ({ ruleId, path, message });
@@ -106,21 +109,13 @@ export function checkAgainstCorpus(ruleset: Ruleset, corpusText: string, source:
   }
 
   /*
-    2. The corpus is the length it is supposed to be, and the rule set agrees.
+    2. The two files are the same length as each other.
 
-    Two assertions rather than one. The pinned count catches a corpus and a rule set that were
-    shortened together; the equality catches either moving without the other.
+    Structural, and therefore true of any well-formed pair rather than of one particular pair: it
+    fails whenever the corpus and the rule set move apart, whatever the counts happen to be. What it
+    cannot see is both being shortened in step — that is pinned in `ruleset-json.test.ts`, for the
+    hard-constraint-1 reason given at the top of this file.
   */
-  if (clauseLines.length !== EXPECTED_CLAUSE_LINES) {
-    defects.push(
-      defect(
-        source,
-        `carries ${clauseLines.length} clause line(s) under '${CORPUS_CLAUSE_HEADING}', expected ${EXPECTED_CLAUSE_LINES} — ` +
-          'the corpus has been truncated or extended without updating EXPECTED_CLAUSE_LINES',
-      ),
-    );
-  }
-
   if (programme.length !== clauseLines.length) {
     defects.push(
       defect(

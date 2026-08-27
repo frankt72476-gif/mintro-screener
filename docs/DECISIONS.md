@@ -8214,22 +8214,41 @@ in the first place. It is answered now, so the validator can be written against 
 stands: `source: programme` clauses only, with Mintro-authored rules exempt by definition (D-140).
 
 **Implemented 2026-08-27** in `packages/ruleset/src/corpus.ts`, run by `npm run validate` and reported
-on its own line. It asserts five things, and **four of them exist because the membership check alone
-would pass vacuously** — every string is a substring of a corpus nobody read: the corpus is readable
-and non-empty; it carries exactly `EXPECTED_CLAUSE_LINES` (53) clause lines under
-`## From the standards`; the number of `source: programme` rules equals that count; every such clause
-is a byte-exact substring of the file *and* stands as a clause line of its own rather than matching
-inside the provenance prose; and every clause line is quoted by some rule, so the corpus cannot
-accumulate text nothing checks. Mintro-authored clauses are validated for presence only. Line endings
-are trimmed for the line-wise half — the corpus is CRLF and the rule set is LF — and the substring half
-is independent of them only while no clause contains a line break, which is asserted rather than
-assumed. Each assertion was made to fail against the real file before being trusted: emptying,
-truncating by one line, altering one byte and deleting the file produce four distinct failures and four
-non-zero exits.
+on its own line — `standards  53 programme clause(s) matched against 53 corpus line(s)`, because a check
+whose success is silent is a check nobody notices losing its subject.
 
-The pinned count is the one thing here a rule addition touches, which brushes against hard constraint 1
-and was accepted deliberately: without it, deleting a programme rule *and* its corpus line together
-leaves the equality satisfied and the corpus quietly shorter than the document it claims to be.
+It asserts four things, and **three of them exist because the membership check alone would pass
+vacuously** — every string is a substring of a corpus nobody read. The corpus is readable and non-empty,
+reported once as an empty corpus rather than as 53 individually missing clauses. The number of
+`source: programme` rules equals the number of clause lines under `## From the standards`. Every such
+clause is a byte-exact substring of the file *and* stands as a clause line of its own, so one matching
+only inside the provenance prose fails. And every clause line is quoted by some rule, so the corpus
+cannot accumulate text nothing checks. Mintro-authored clauses are validated for presence only (D-140).
+
+Line endings are trimmed for the line-wise half — the corpus is CRLF and the rule set is LF — and the
+substring half is independent of them only while no clause contains a line break, which is asserted
+rather than assumed.
+
+**The pinned clause count is deliberately not in the validator.** It was, briefly, and it was wrong
+there: hard constraint 1 says the rule set is data and adding a rule must never require touching the
+engine, and a validator carrying `EXPECTED_CLAUSE_LINES = 53` has to be renumbered for every rule
+added. The number now lives in `packages/ruleset/test/ruleset-json.test.ts`, beside the assertion
+pinning the rule count at 55 — the two move for the same reasons and should be read together.
+
+The split is the ruling, not the file it landed in. **Divergence is the validator's** — the count
+equality fails whenever the two files move apart, whatever the counts happen to be, and holds for any
+well-formed pair rather than for one particular pair. **Both-shortened-together is CI's** — a programme
+rule and its corpus line deleted together leaves the pair internally consistent and both shorter than
+the document, which nothing comparing the pair can see. That is a change somebody meant to make, and a
+tripwire on a deliberate change belongs where you want to be stopped and asked whether you meant this
+much of it. `corpus.ts` asserts the gap rather than leaving it implied, with a test named for it.
+
+Each assertion was made to fail against the real file and the shipped binary before being trusted —
+not against the pure function, because a guard correct in a test and unwired in the validator is the
+D-131 failure. Emptying the corpus, altering one clause byte and deleting the file give three distinct
+validator messages and three non-zero exits. Truncating by one clause line fails in both places: the
+validator on the equality, and `npm run check` on the pin. The corpus was restored and the restore
+verified by digest each time.
 
 **The committed corpus is canonical going forward, and the PDF is its rendering.** Not the reverse. If
 the two ever disagree, the corpus is the text and the PDF is a typesetting of it — which is the only

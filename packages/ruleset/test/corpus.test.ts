@@ -15,7 +15,6 @@ import { readFileSync } from 'node:fs';
 import {
   CORPUS_CLAUSE_HEADING,
   CORPUS_MINTRO_HEADING,
-  EXPECTED_CLAUSE_LINES,
   checkAgainstCorpus,
   checkAgainstCorpusFile,
   corpusClauseLines,
@@ -70,9 +69,10 @@ describe('the committed rule set and the committed corpus', () => {
     expect(corpusClauseLines(onDisk)).toEqual(corpusClauseLines(asLf));
   });
 
-  it('carries the pinned number of clause lines', () => {
-    expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(EXPECTED_CLAUSE_LINES);
-    expect(programme).toHaveLength(EXPECTED_CLAUSE_LINES);
+  it('carries one corpus clause line per programme rule', () => {
+    // The number itself is pinned in `ruleset-json.test.ts`, beside the rule count. This is the
+    // relation, which is what the validator enforces.
+    expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(programme.length);
   });
 });
 
@@ -112,25 +112,38 @@ describe('a corpus that is the wrong length', () => {
     const defects = checkAgainstCorpus(ruleset, corpusFor(CLAUSES.slice(0, -1)), SOURCE);
     const text = defects.map((d) => d.message).join(' | ');
 
-    expect(text).toContain(`carries ${EXPECTED_CLAUSE_LINES - 1} clause line(s)`);
+    expect(text).toContain(`the corpus carries ${programme.length - 1} clause line(s)`);
     expect(text).toContain('the two files have moved apart');
     // And the clause that went with it, by rule id.
     expect(defects.some((d) => d.ruleId === programme[programme.length - 1]?.id)).toBe(true);
   });
 
-  /**
-   * The case the pinned count exists for.
-   *
-   * Drop a clause line *and* the rule that quotes it and the equality check is satisfied — the two
-   * files agree with each other and both are shorter than the document. Only the pin catches it.
-   */
-  it('shortened in step with the rule set still fails, on the pin', () => {
-    const shortened = { ...ruleset, rules: ruleset.rules.filter((r) => r.id !== programme[0]?.id) };
-    const defects = checkAgainstCorpus(shortened, corpusFor(CLAUSES.slice(1)), SOURCE);
+  it('one line long fails the same way', () => {
+    const text = messages(corpusFor([...CLAUSES, 'A sentence the standards do not contain.']));
+    expect(text).toContain('the two files have moved apart');
+  });
 
-    expect(defects).toHaveLength(1);
-    expect(defects[0]?.message).toContain(`expected ${EXPECTED_CLAUSE_LINES}`);
-    expect(defects[0]?.message).toContain('EXPECTED_CLAUSE_LINES');
+  /**
+   * The gap this module deliberately leaves, asserted so it is a decision rather than an oversight.
+   *
+   * Drop a clause line **and** the rule that quotes it and the equality is satisfied: the two files
+   * agree with each other, and both are shorter than the document they claim to quote. Nothing here
+   * can see that — the pair is internally consistent, and this module only ever compares the pair.
+   *
+   * It is caught in `ruleset-json.test.ts`, which pins the number. That is where a tripwire on a
+   * deliberate change belongs: pinning it here would mean adding a rule required editing this
+   * package, and hard constraint 1 says the rule set is data and adding to it must never touch the
+   * engine.
+   */
+  it('does not catch a corpus and rule set shortened in step — that is the CI pin\'s job', () => {
+    const shortened = { ...ruleset, rules: ruleset.rules.filter((r) => r.id !== programme[0]?.id) };
+
+    expect(checkAgainstCorpus(shortened, corpusFor(CLAUSES.slice(1)), SOURCE)).toEqual([]);
+
+    // And the pin that does catch it, exercised here so this test names its own counterpart rather
+    // than pointing at one and trusting it exists.
+    expect(corpusClauseLines(corpusFor(CLAUSES.slice(1)))).toHaveLength(52);
+    expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(53);
   });
 
   it('a corpus carrying a line no rule quotes fails on the reverse direction', () => {

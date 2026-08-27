@@ -7,8 +7,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { loadRulesetFile, checkInvariants, CHECK_TYPES } from '../src/index.js';
-import { RULESET_PATH } from './paths.js';
+import { readFileSync } from 'node:fs';
+import { loadRulesetFile, checkInvariants, CHECK_TYPES, corpusClauseLines } from '../src/index.js';
+import { CORPUS_PATH, RULESET_PATH } from './paths.js';
 
 const ruleset = loadRulesetFile(RULESET_PATH);
 
@@ -39,6 +40,31 @@ describe('rules/ruleset.json', () => {
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(55);
     expect(ruleset.categories).toHaveLength(10);
+  });
+
+  /**
+   * The clause corpus is the same length it was when it was verified (D-139).
+   *
+   * **Here rather than in the validator, and the placement is the ruling.** `checkAgainstCorpus`
+   * asserts the corpus and the rule set are the same length *as each other*, which is structural and
+   * holds for any well-formed pair. Pinning the actual number is different in kind: it is a tripwire
+   * on a deliberate change, and putting it in the validator would mean adding a rule required editing
+   * `packages/ruleset` — which hard constraint 1 forbids in as many words. The rule set is data.
+   *
+   * What it catches that the equality cannot: a programme rule and its corpus line deleted
+   * **together**, which leaves the two files agreeing with each other and both shorter than the
+   * document they claim to quote. That is a change somebody meant to make, and CI is the right place
+   * to be stopped and asked whether they meant this much of it.
+   *
+   * Beside `toHaveLength(55)` on purpose — the two numbers move for the same reasons and should be
+   * read, and updated, together.
+   */
+  it('quotes a corpus of the length it was verified at', () => {
+    const clauseLines = corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'));
+    const programme = ruleset.rules.filter((rule) => rule.source === 'programme');
+
+    expect(clauseLines).toHaveLength(53);
+    expect(programme).toHaveLength(53);
   });
 
   it('declares all four states', () => {

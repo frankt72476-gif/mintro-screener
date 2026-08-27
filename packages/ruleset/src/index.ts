@@ -55,7 +55,6 @@ export {
   corpusClauseLines,
   CORPUS_CLAUSE_HEADING,
   CORPUS_MINTRO_HEADING,
-  EXPECTED_CLAUSE_LINES,
 } from './corpus.js';
 export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 
