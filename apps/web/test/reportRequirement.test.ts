@@ -1,13 +1,18 @@
 /**
  * Whose statement the report says a clause is (D-138).
  *
- * The requirement pair prints `clause` verbatim under a heading. Every rule but CATG-007 quotes the
- * program document, so that heading read "Program requirement" unconditionally — and CATG-007 has
- * no program requirement behind it, because the program document does not mention non-peptides.
+ * The requirement pair prints `clause` verbatim under a heading. Every rule but CATG-007 and PAY-004
+ * quotes the published standards, so that heading read unconditionally — and neither of those two has
+ * a published standard behind it: the document does not mention non-peptides, and the risk monitoring
+ * integration is Mintro's own condition of boarding (D-140).
  *
- * Frank's ruling: printing it under that heading would put words in the program's mouth, which is
+ * Frank's ruling: printing either under that heading would put words in the standards' mouth, which is
  * worse than any overclaim already fixed here — it fabricates the authority rather than overstating
  * the method, and wording beneath a heading cannot fix the heading.
+ *
+ * The headings read **"Published standard"** and **"Mintro observation, not a published standard"**
+ * since D-141. They were "Program requirement" and "…not a program requirement", which left a merchant
+ * asking whose programme.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -60,29 +65,38 @@ const text = (markup: string): string =>
   markup.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
 describe('the requirement heading names the author', () => {
-  it('a Mintro rule is not printed as a program requirement', () => {
+  it('a Mintro rule is not printed as a published standard', () => {
     const rendered = text(html({ ...base, source: 'mintro' }));
 
-    expect(rendered).toContain('Mintro observation, not a program requirement');
-    expect(rendered).not.toContain('Program requirement');
+    expect(rendered).toContain('Mintro observation, not a published standard');
+
+    /*
+      The two headings now overlap, which the old pair did not: "Mintro observation, not a published
+      standard" contains the other heading's words in lower case. A bare `not.toContain` on the phrase
+      would be satisfied by the Mintro heading itself and quietly stop testing anything — so the
+      absence check is on the heading as it is actually printed, capitalised and standing alone, and
+      the count below is what makes that non-vacuous.
+    */
+    expect(rendered).not.toContain('Published standard');
+    expect(rendered.match(/published standard/gi) ?? []).toHaveLength(1);
   });
 
-  it('a program rule still prints as a program requirement', () => {
+  it('a standards rule still prints as a published standard', () => {
     const rendered = text(html({ ...base, ruleId: 'CATG-001', source: 'programme' }));
 
-    expect(rendered).toContain('Program requirement');
+    expect(rendered).toContain('Published standard');
     expect(rendered).not.toContain('Mintro observation');
   });
 
   /**
    * Runs recorded before the field existed carry no `source`, and their reports are immutable
-   * (D-002). Every rule was a program rule then, so that is how they must keep rendering — the
+   * (D-002). Every rule quoted the standards then, so that is how they must keep rendering — the
    * absent field must not turn an old report's requirements into Mintro's opinions.
    */
-  it('a run recorded before the field existed still prints as a program requirement', () => {
+  it('a run recorded before the field existed still prints as a published standard', () => {
     const rendered = text(html({ ...base, ruleId: 'CATG-001' }));
 
-    expect(rendered).toContain('Program requirement');
+    expect(rendered).toContain('Published standard');
     expect(rendered).not.toContain('Mintro observation');
   });
 

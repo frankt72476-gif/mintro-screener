@@ -52,6 +52,12 @@ underwriter reading the report or its PDF.
   sequences included. Where a string is a template, the placeholder names are what tell you what the
   reader actually sees.
 
+> **Line numbers are as of the 2026-08-26 snapshot.** The rows this pass changed have been
+> renumbered; other rows in `packages/engine/src/copy.ts`, `apps/web/src/components/Attestations.tsx`,
+> `apps/worker/src/invite.ts` and `apps/web/src/components/CommentPane.tsx` shifted with them and have
+> not been. **Match on the identifier, not the line number** — that is what the Key column is for
+> (D-141).
+
 Counts: **55 rules** (title + clause, plus 12 `manual` reasons), **19 attestation questions**,
 **10 category names**, **1 declared boundary**, and the generated and rendered copy below.
 
@@ -288,10 +294,10 @@ Mintro-authored rule (D-138). Constants rather than component text, so the frami
 
 | Line | Key | String |
 |---|---|---|
-| 253 | `REQUIREMENT_HEADINGS.observed` | Observed |
-| 254 | `REQUIREMENT_HEADINGS.required` | Program requirement |
-| 256 | `REQUIREMENT_HEADINGS.notAssessed` | Not assessed |
-| 265 | `REQUIREMENT_HEADINGS.mintroObservation` | Mintro observation, not a program requirement |
+| 259 | `REQUIREMENT_HEADINGS.observed` | Observed |
+| 260 | `REQUIREMENT_HEADINGS.required` | Published standard |
+| 262 | `REQUIREMENT_HEADINGS.notAssessed` | Not assessed |
+| 271 | `REQUIREMENT_HEADINGS.mintroObservation` | Mintro observation, not a published standard |
 
 ### `packages/engine/src/checks/urlPattern.ts`
 
@@ -684,17 +690,18 @@ is one element.
 
 | Line | Key | String |
 |---|---|---|
-| 108 | `composeInvitation()` — `subject` | `Your response to the screening report for ${merchantDomain}` |
-| 125 | `body[0]` | `Mintro screened the public pages of ${merchantDomain} against the peptide research-use` |
-| 126 | `body[1]` | `programme rule set, on behalf of the underwriting team reviewing the account.` |
-| 128 | `body[3]` | `The report is here, with the screenshot or document behind every observation:` |
-| 130 | `body[5]` | `  ${link}` |
-| 132 | `body[7]` | `${openForComment} observations are open for your response.` |
-| 134–136 | `body[8]` — only when `nothingObserved > 0` | `${input.nothingObserved} of them are ones where your pages did not show one way or the ` + `other — those are where your answer adds the most, because there is nothing on the site ` + `for us to have looked at.` |
-| 139 | `body[10]` | `You can forward this link. Whoever responds gives an email address first, and each response` |
-| 140 | `body[11]` | `is shown against the address given when it was written.` |
-| 142 | `body[13]` | `The link works until ${until}.` |
-| 145 | `body[15]` | `INVITATION_CONTACT_LINE` (above) |
+| 113 | `composeInvitation()` — `subject` | `Your response to the screening report for ${merchantDomain}` |
+| 130 | `body[0]` | `Mintro screened the public pages of ${merchantDomain} against the research-use-only peptide` |
+| 131 | `body[1]` | `standards, on behalf of the underwriting team reviewing the account. Mintro reports what it` |
+| 132 | `body[2]` — states Mintro's role before the count (D-141) | `observed; it does not underwrite the account or decide the outcome.` |
+| 134 | `body[4]` | `The report is here, with the screenshot or document behind every observation:` |
+| 136 | `body[6]` | `  ${link}` |
+| 138 | `body[8]` | `${openForComment} observations are open for your response.` |
+| 140–142 | `body[9]` — only when `nothingObserved > 0` | `${input.nothingObserved} of them are ones where your pages did not show one way or the ` + `other — those are where your answer adds the most, because there is nothing on the site ` + `for us to have looked at.` |
+| 145 | `body[11]` | `You can forward this link. Whoever responds gives an email address first, and each response` |
+| 146 | `body[12]` | `is shown against the address given when it was written.` |
+| 148 | `body[14]` | `The link works until ${until}.` |
+| 151 | `body[16]` | `INVITATION_CONTACT_LINE` (above) |
 
 ### `apps/worker/src/send.ts`
 
@@ -896,11 +903,11 @@ Two sections after the findings, and one rule governing both: nothing here is an
 | 42 | `OUTCOME_LABEL.declined` | Declined to answer |
 | 43 | `OUTCOME_LABEL.unanswered` | Not answered |
 | 53–54 | `UNANSWERED_BODY` | Not observable by Mintro, and not answered. Nothing in this report speaks to this requirement. |
-| 58 | `AUTHORITY_LABEL.law` | Law |
-| 59 | `AUTHORITY_LABEL.network` | Card network |
-| 60 | `AUTHORITY_LABEL.programme` | Programme |
-| 82 | `AttestationSection` heading | Stated by the merchant |
-| 89–91 | `AttestationSection` lede | These are requirements of the programme that a crawl of a website cannot observe. Mintro put them to the merchant and recorded the replies exactly as written. **Nothing in this section was observed or verified by Mintro.** |
+| 64 | `AUTHORITY_LABEL.law` | Law |
+| 65 | `AUTHORITY_LABEL.network` | Card network |
+| 66 | `AUTHORITY_LABEL.programme` | Standards |
+| 88 | `AttestationSection` heading | Stated by the merchant |
+| 94–96 | `AttestationSection` lede | These are published standards that a crawl of a website cannot observe. Mintro put them to the merchant and recorded the replies exactly as written. **Nothing in this section was observed or verified by Mintro.** |
 | 94–95 | `AttestationSection` counts | `{counts.answered} answered · {counts.declined} declined · {counts.unanswered} not answered · {counts.total} asked` |
 | 121 | question text | `question.question` — from `rules/ruleset.json`, snapshotted onto the run |
 | 125 | question meta | `{AUTHORITY_LABEL[question.authority]} · {question.sev}` |
@@ -910,8 +917,8 @@ Two sections after the findings, and one rule governing both: nothing here is an
 | 188 | superseded, declined | Declined to answer. |
 | 215 | `NotCheckedSection` heading | What was not checked |
 | 219–220 | `NotCheckedSection` rows | `item.subject` / `item.why` — from `rules/ruleset.json`, verbatim |
-| 262 | `AttestationForm` heading (merchant-facing) | Questions the screening cannot answer |
-| 263–267 | `AttestationForm` lede | Some programme requirements are about what happens away from your website — where you ship, what your support team says, who tests your batches. Mintro has no way to observe those, so they are put to you directly. Your answers are recorded exactly as you write them and passed on with the report, shown as yours. |
+| 268 | `AttestationForm` heading (merchant-facing) | Questions the screening cannot answer |
+| 269–273 | `AttestationForm` lede | Some of these standards are about what happens away from your website — where you ship, what your support team says, who tests your batches. Mintro has no way to observe those, so they are put to you directly. Your answers are recorded exactly as you write them and passed on with the report, shown as yours. |
 | 269–272 | `AttestationForm` lede, second paragraph (D-067) | You can answer any of these, or none. If you would rather not answer one, saying so is recorded as its own reply. |
 | 331 | `AttestationField` — recorded, declined | Recorded: you chose not to answer this one. |
 | 332 | `AttestationField` — recorded, answered | `Recorded: "${sent.body ?? ''}"` |
@@ -1007,7 +1014,7 @@ the reader's own behaviour back at them (D-067).
 | 348 | comment failure fallback | That could not be saved just now. Please try again. |
 | 378 | eyebrow | `Screening report · {opened.merchantDomain}` |
 | 379 | heading — the ask, not the document (D-067) | Your response |
-| 387–389 | lede | The team reviewing your account asked Mintro to screen your public pages against the peptide research-use programme rule set. This is what was observed, with the capture behind each one. |
+| 393–396 | lede | The team reviewing your account asked Mintro to screen your public pages against the research-use-only peptide standards. This is what was observed, with the capture behind each one. Mintro reports what it observed; it does not underwrite the account or decide the outcome. |
 | 400 | count, leading the second paragraph | `{invited.length} observations are open for your response.` |
 | 400–403 | second paragraph — "or none" before anything is asked | You can respond to any of them, or none. What you write is recorded exactly as you write it, shown as yours, and passed to the team reviewing your account with the report. Mintro does not edit it, shorten it, or reply to it. |
 | 409–411 | link lifetime and forwarding | This link works until {expiresAt}. It can be forwarded — whoever responds says who they are, and each response is shown against the address given when it was written. |

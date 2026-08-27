@@ -53,11 +53,17 @@ const OUTCOME_LABEL: Readonly<Record<AttestationOutcome, string>> = {
 const UNANSWERED_BODY =
   'Not observable by Mintro, and not answered. Nothing in this report speaks to this requirement.';
 
-/** Where the requirement comes from, spelled out rather than left as a code. */
+/**
+ * Where the requirement comes from, spelled out rather than left as a code.
+ *
+ * The key stays `programme` and the label reads "Standards". The key is a rule-set identifier and
+ * D-060's logic applies — an identifier is not something an underwriter reads — while the label is,
+ * and "Programme" left a merchant asking whose.
+ */
 const AUTHORITY_LABEL: Readonly<Record<ResolvedAttestation['authority'], string>> = {
   law: 'Law',
   network: 'Card network',
-  programme: 'Programme',
+  programme: 'Standards',
 };
 
 /**
@@ -86,7 +92,7 @@ export function AttestationSection({
           carrying a statement forward as though Mintro had confirmed it.
         */}
         <p className="att-lede">
-          These are requirements of the programme that a crawl of a website cannot observe. Mintro
+          These are published standards that a crawl of a website cannot observe. Mintro
           put them to the merchant and recorded the replies exactly as written. <strong>Nothing in
           this section was observed or verified by Mintro.</strong>
         </p>
@@ -261,7 +267,7 @@ export function AttestationForm({
       <div className="att-top">
         <h2 id="att-form-head">Questions the screening cannot answer</h2>
         <p className="att-lede">
-          Some programme requirements are about what happens away from your website — where you
+          Some of these standards are about what happens away from your website — where you
           ship, what your support team says, who tests your batches. Mintro has no way to observe
           those, so they are put to you directly. Your answers are recorded exactly as you write
           them and passed on with the report, shown as yours.

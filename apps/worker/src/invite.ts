@@ -20,7 +20,12 @@
  * It also never characterises the findings. No "issues", no "problems", no "concerns" — those are
  * readings, and IQwallet makes them. What Mintro has is observations and a count.
  *
- * ## What it must say: a way to reach a person (D-065)
+ * ## What it must say: what Mintro is, and a way to reach a person (D-065)
+ *
+ * The opening states Mintro's role — *"Mintro reports what it observed; it does not underwrite the
+ * account or decide the outcome"* — before the reader gets to a count. This arrives unexpected from a
+ * company they may never have heard of, and the natural assumption about whoever just screened your
+ * storefront is that they decide something. The comment page carries the same sentence.
  *
  * The invitation carries a contact line and the copy audit fails the build without one. The line
  * is a **pointer, not a mailbox** — see `contactLine.ts` for why an address printed inside a
@@ -122,8 +127,9 @@ export function composeInvitation(input: InvitationInput): Invitation {
     responses are attributed per person changes that decision.
   */
   const body = [
-    `Mintro screened the public pages of ${merchantDomain} against the peptide research-use`,
-    `programme rule set, on behalf of the underwriting team reviewing the account.`,
+    `Mintro screened the public pages of ${merchantDomain} against the research-use-only peptide`,
+    `standards, on behalf of the underwriting team reviewing the account. Mintro reports what it`,
+    `observed; it does not underwrite the account or decide the outcome.`,
     ``,
     `The report is here, with the screenshot or document behind every observation:`,
     ``,

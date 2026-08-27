@@ -134,6 +134,37 @@ describe('merchant attestations are in the bundle', () => {
   });
 });
 
+/**
+ * The merchant page says what Mintro is before it says what was found (D-141).
+ *
+ * Guarded here rather than by rendering, because the sentence lives in the lede of `OpenReport`,
+ * which needs a live Supabase client and a valid token to reach — so the shipped bundle is the only
+ * place its presence can actually be established. That is the same argument the rest of this file
+ * makes: a sentence nothing imports is a sentence nobody reads, however green the unit tests are.
+ *
+ * A merchant arriving from a forwarded link has no idea who Mintro is, and the natural assumption
+ * about whoever just screened their storefront is that they decide something. The page says
+ * otherwise first, rather than leaving them to infer it from the absence of a verdict.
+ */
+describe('the merchant page states Mintro’s role', () => {
+  it('carries the sentence, in the bundle a merchant actually loads', () => {
+    expect(bundle).toContain('does not underwrite the account or decide the outcome');
+  });
+
+  it('no longer asks the merchant whose programme this is', () => {
+    /*
+      The old lede. The published standards are nobody's programme, and a merchant should not have to
+      work out whose it was.
+
+      Matched on the full phrase rather than on "programme rule set", which would also catch
+      `RuleSetPane`'s "No other programme rule set exists" — analyst-facing copy behind the sign-in,
+      outside what D-141 governs and deliberately not changed by it.
+    */
+    expect(bundle).not.toContain('peptide research-use programme rule set');
+    expect(bundle).toContain('research-use-only peptide standards');
+  });
+});
+
 describe('nothing that could purge reaches the bundle', () => {
   const FORBIDDEN = [
     'begin_package_purge',

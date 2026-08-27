@@ -392,6 +392,47 @@ describe('the merchant invitation', () => {
     expect(invitation.body).toContain('The link works until 2026-09-22');
   });
 
+  /**
+   * What Mintro is, said before the count (D-141).
+   *
+   * This arrives unexpected from a company the reader may never have heard of, and the natural
+   * assumption about whoever just screened your storefront is that they decide something. The
+   * sentence is in the opening rather than the sign-off for that reason: by the time a reader reaches
+   * "50 observations are open for your response" they have already been told who acts on them.
+   *
+   * The comment page carries the same sentence, so a reader who opens the link is told once and told
+   * the same thing.
+   */
+  it('says what Mintro does and does not do, before it says what was found', () => {
+    /*
+      Asserted against the message as it reads, not as it wraps.
+
+      `body` is hard-wrapped plain text joined with newlines, so both of this ruling's sentences
+      straddle a line break. Matching the wrapped form would pin the wrap points — a re-wrap that
+      changes nothing a reader sees would turn this red, and the usual response to that is to loosen
+      the assertion until it stops noticing anything.
+    */
+    const flowed = invitation.body.split(String.fromCharCode(10)).join(' ');
+
+    expect(flowed).toContain(
+      'Mintro reports what it observed; it does not underwrite the account or decide the outcome.',
+    );
+
+    // Before the count, not after it: by the time a reader reaches "50 observations are open for your
+    // response" they have already been told who acts on them.
+    const role = flowed.indexOf('does not underwrite');
+    const count = flowed.indexOf('observations are open for your response');
+    expect(role, 'the role sentence is missing').toBeGreaterThan(-1);
+    expect(count, 'the count is missing').toBeGreaterThan(-1);
+    expect(role, 'the count should not precede what Mintro is').toBeLessThan(count);
+  });
+
+  it('screens against standards rather than somebody’s programme', () => {
+    const flowed = invitation.body.split(String.fromCharCode(10)).join(' ');
+    expect(flowed).toContain('research-use-only peptide standards');
+    expect(invitation.body).not.toMatch(/\bprogramme\b/i);
+  });
+
   it('calls out the findings where a response is worth most', () => {
     // The sentence most likely to make someone open the link: it is where their answer is worth
     // most, and the only place on the report with nothing on the site to read instead.

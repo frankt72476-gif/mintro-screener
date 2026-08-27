@@ -96,8 +96,22 @@ describe('the column headings', () => {
     }
   });
 
-  it('says "Program requirement", not "Required action"', () => {
-    expect(REQUIREMENT_HEADINGS.required).toBe('Program requirement');
+  it('says "Published standard", not "Required action"', () => {
+    expect(REQUIREMENT_HEADINGS.required).toBe('Published standard');
+  });
+
+  /**
+   * And it names the standard rather than a programme (D-141).
+   *
+   * "Program requirement" left the merchant-facing half of every finding asking *whose* programme.
+   * These two headings are the highest-frequency instance of the word, so they are also the place it
+   * is most likely to come back — a rename that reached the ledes and missed the constants would
+   * leave it printed beside every clause in every report.
+   */
+  it('names no programme', () => {
+    for (const heading of Object.values(REQUIREMENT_HEADINGS)) {
+      expect(heading.toLowerCase(), heading).not.toMatch(/\bprogramm?e?\b/);
+    }
   });
 });
 

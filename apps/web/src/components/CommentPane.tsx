@@ -383,10 +383,17 @@ function OpenReport({
             "The team reviewing your account", not "the underwriting team" (D-067). A merchant who
             does not know an underwriting team exists should not have to infer one to understand
             the sentence. The email keeps the fuller phrasing, where the register suits it.
+
+            The last sentence says what Mintro is and is not, before any finding is read. A merchant
+            reaching this page from a forwarded link has no idea who Mintro is, and the natural
+            assumption about a company that just screened their storefront is that it decides
+            something. It does not, and the page says so first rather than leaving them to infer it
+            from the absence of a verdict.
           */}
           The team reviewing your account asked Mintro to screen your public pages against the
-          peptide research-use programme rule set. This is what was observed, with the capture
-          behind each one.
+          research-use-only peptide standards. This is what was observed, with the capture
+          behind each one. Mintro reports what it observed; it does not underwrite the account or
+          decide the outcome.
         </p>
 
         <p className="sub">

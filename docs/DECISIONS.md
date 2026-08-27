@@ -8331,3 +8331,92 @@ both rather than counting to two is the point: a rule quietly acquiring Mintro a
 what this assertion is watching for, and a count would pass on the wrong pair.
 
 ---
+
+## D-141 — Merchant-facing copy names the standards, and says what Mintro is
+**2026-08-27 · Frank's ruling**
+
+Two changes to reader-facing wording, both following from the re-basing in D-139 and neither touching
+a rule set file — which is why this lands after that commit rather than in it.
+
+**"Programme" leaves the merchant-facing vocabulary.** Six strings across four files.
+
+| File | Key | From | To |
+|---|---|---|---|
+| `packages/engine/src/copy.ts` | `REQUIREMENT_HEADINGS.required` | Program requirement | Published standard |
+| `packages/engine/src/copy.ts` | `REQUIREMENT_HEADINGS.mintroObservation` | Mintro observation, not a program requirement | Mintro observation, not a published standard |
+| `apps/web/src/components/Attestations.tsx` | `AUTHORITY_LABEL.programme` | Programme | Standards |
+| `apps/web/src/components/Attestations.tsx` | `AttestationSection` lede | These are requirements of the programme that a crawl of a website cannot observe. | These are published standards that a crawl of a website cannot observe. |
+| `apps/web/src/components/Attestations.tsx` | `AttestationForm` lede | Some programme requirements are about what happens away from your website… | Some of these standards are about what happens away from your website… |
+| `apps/worker/src/invite.ts`, `apps/web/src/components/CommentPane.tsx` | the opening line of each | …against the peptide research-use programme rule set | …against the research-use-only peptide standards |
+
+**And the invitation and the comment page state Mintro's role**, in the same sentence on both:
+
+> Mintro reports what it observed; it does not underwrite the account or decide the outcome.
+
+### Whose programme?
+
+The word was doing real damage in a place nobody looks, because it reads as ordinary English to
+everyone inside this project. A merchant who reaches the comment page from a forwarded link has no
+relationship with Mintro, no relationship with the processor, and no way to resolve the possessive.
+*The programme* is somebody's — and the two candidate owners are the two parties whose separation the
+whole report exists to maintain.
+
+Under the re-based corpus the answer is neither: it is a published standard, and saying so removes the
+question rather than answering it. This is the same move D-140 makes on PAY-004's "our plugin" — a
+possessive with no referent in a document read by three parties — arriving at the vocabulary rather
+than at a single clause.
+
+**The `programme` enum value stays.** `AUTHORITY_LABEL` is still keyed on it, and the rule set still
+stores `source: "programme"`. D-060's logic is exactly on point: a rule-set identifier is not something
+an underwriter reads, and renaming it would move a vocabulary that stored findings already use for no
+reader-visible gain. What changed is every place the identifier was being *shown*.
+
+### The two headings were the whole job, and they were two lines
+
+`REQUIREMENT_HEADINGS.required` and `.mintroObservation` sit beside every quoted clause in every
+finding of every report — on screen, in the PDF, and on the merchant's own page. They were the
+highest-frequency instance of the word by a wide margin.
+
+They were also a two-line change, and that is not luck. They are constants in the engine rather than
+strings typed into a component **because the framing is the headings** — the reasoning that put them
+there was that "Required action" would turn the identical two pieces of text into an instruction. The
+same property that protects the framing is what let a vocabulary change reach every surface at once,
+and it is why `requirement.test.ts` now carries a standing assertion that no heading names a programme:
+a rename that reached the ledes and missed the constants would leave the old word printed beside every
+clause in every report, which is the one place it would be least noticed.
+
+### The role sentence goes in the opening, not the sign-off
+
+A merchant reading either surface has just learned that a company they may never have heard of screened
+their storefront. The natural inference about whoever did that is that they decide something.
+
+They do not, and both surfaces now say so **before the reader reaches a count**. Placement is the
+ruling, not the wording: by the time someone reads *"50 observations are open for your response"* they
+have already been told who acts on them, and a disclaimer at the bottom of a message read in a glance
+is a disclaimer nobody reads. `copy.test.ts` asserts the ordering rather than merely the presence.
+
+It is the same posture the IQwallet covering email has carried since D-001 — *"Findings state what was
+observed. They are not compliance determinations."* That audience knows who Mintro is and needed only
+the second half. The merchant audience needed both, in their own register.
+
+### What deliberately did not change
+
+- **The load-bearing sentence of the attestation section.** *"Nothing in this section was observed or
+  verified by Mintro."* Untouched. The ledes around it moved; the sentence that stops a reader carrying
+  a statement forward did not.
+- **`RuleSetPane`'s "No other programme rule set exists".** Analyst-facing, behind the sign-in, and
+  outside what this ruling governs. It is about Mintro's own rule sets, where the possessive has a
+  referent the reader knows.
+- **Everything the engine generates.** Findings, not-evaluable reasons, coverage lines, the
+  participation record, the commentary states. All of it describes observation and limitation in
+  Mintro's own vocabulary and never borrowed the source document's, which is why the re-basing reached
+  none of it.
+
+### Carried
+
+Three comments still describe the old heading by name — `ReportView.tsx`, `EvidenceSlip.tsx` and
+`packages/ruleset/src/schema.ts` each quote "Program requirement" while explaining why the constant
+exists. They are internal prose, not copy, and were left rather than swept in with a copy pass; they
+are wrong the moment someone reads them as current. Fix them in whatever pass next touches those files.
+
+---

@@ -198,7 +198,7 @@ export interface RequirementAudit {
 }
 
 /**
- * Audits one finding's Observed / Program requirement pair.
+ * Audits one finding's Observed / Published standard pair.
  *
  * Two different standards, deliberately:
  *
@@ -244,25 +244,31 @@ export function auditRequirement(observation: string, requirement: string, claus
 /**
  * The column headers, defined once.
  *
- * The framing is the headers: "Observed" and "Program requirement" are both nouns, and neither
+ * The framing is the headers: "Observed" and "Published standard" are both nouns, and neither
  * addresses the reader. A header like "Required action" or "How to fix" would turn the same two
  * pieces of text into instructions without a word of the content changing, which is why these are
  * a constant rather than a string typed into a component.
+ *
+ * **"Published standard", not "Program requirement".** These two headings sit beside every quoted
+ * clause in every report, which made them the highest-frequency instance of a word a merchant cannot
+ * resolve: *whose* programme? Under a published standard the answer is in the heading. Being
+ * constants rather than component text — the reason they were made constants — is what let a
+ * two-line change reach every surface at once.
  */
 export const REQUIREMENT_HEADINGS = {
   observed: 'Observed',
-  required: 'Program requirement',
+  required: 'Published standard',
   /** For not_evaluable: the requirement stands, and why it could not be assessed is stated. */
   notAssessed: 'Not assessed',
   /**
-   * For a rule Mintro wrote rather than one the programme states (D-138).
+   * For a rule Mintro wrote rather than one the standards state (D-138).
    *
-   * The other heading reads "Program requirement", and printing a Mintro observation under it
-   * would put words in the programme's mouth — fabricating the authority rather than overstating
-   * the method, which is the worse of the two. Wording beneath a heading cannot fix the heading,
-   * so the renderer branches on `source` and this is the other branch.
+   * The other heading reads "Published standard", and printing a Mintro observation under it would
+   * put words in the standards' mouth — fabricating the authority rather than overstating the
+   * method, which is the worse of the two. Wording beneath a heading cannot fix the heading, so the
+   * renderer branches on `source` and this is the other branch.
    */
-  mintroObservation: 'Mintro observation, not a program requirement',
+  mintroObservation: 'Mintro observation, not a published standard',
 } as const;
 
 /**

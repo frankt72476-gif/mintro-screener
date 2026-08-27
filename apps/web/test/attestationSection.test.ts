@@ -105,7 +105,9 @@ describe('every question appears', () => {
   it('states the authority and severity of each requirement', () => {
     const rendered = text(render());
     expect(rendered).toContain('Card network');
-    expect(rendered).toContain('Programme');
+    // "Standards", not "Programme" (D-141). The `programme` key stays — it is a rule-set identifier,
+    // and D-060's logic is that an identifier is not something an underwriter reads. The label is.
+    expect(rendered).toContain('Standards');
     expect(rendered).toContain('Law');
   });
 });
