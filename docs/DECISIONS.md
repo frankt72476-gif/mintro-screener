@@ -8307,6 +8307,13 @@ thing the boundary exists to convey.
 ## D-140 — PAY-004 is Mintro-authored, not programme-derived
 **2026-08-26 · Frank's ruling · ruleset 2.15.0 → 3.0.0**
 
+> **Superseded by D-142 (2026-08-27), and kept.** This record decided *whose requirement* the risk
+> monitoring integration was, on the understanding that it was an ongoing obligation a merchant
+> carried. D-142 records that it is installed after boarding and accepted as a condition of
+> approval, so the rule was removed rather than re-attributed. The reasoning below was right for
+> what was known; what changed is the fact, not the argument. Read both — a rule can be correctly
+> attributed and still not belong, and attribution is the second question.
+
 PAY-004 changes hands. `source: programme` → `source: mintro`, with a new title, clause and
 `params.reason`. **The rule survives; only its attribution changes.**
 
@@ -8455,5 +8462,123 @@ Three comments still describe the old heading by name — `ReportView.tsx`, `Evi
 `packages/ruleset/src/schema.ts` each quote "Program requirement" while explaining why the constant
 exists. They are internal prose, not copy, and were left rather than swept in with a copy pass; they
 are wrong the moment someone reads them as current. Fix them in whatever pass next touches those files.
+
+---
+
+## D-142 — PAY-004 is removed; the risk monitoring integration is not a screening question
+**2026-08-27 · Frank's ruling · ruleset 3.0.0 → 3.1.0**
+
+PAY-004 leaves the rule set. **Nothing replaces it** — no attestation, no field, no note in the report.
+
+| | Before | After |
+|---|---|---|
+| `version` | `3.0.0` | `3.1.0` |
+| `effective` | `2026-08-26` | unchanged |
+| rules | 55 | **54** |
+| `payment` category | 4 | **3** |
+| `manual` reasons | 12 | **11** |
+| `source: mintro` | CATG-007, PAY-004 | **CATG-007** |
+| `source: programme` | 53 | **53**, unchanged |
+
+Minor rather than major: no rule that remains asks anything different, and `effective` does not move —
+the standards did not change, only what Mintro screens against them.
+
+### Why it does not belong in a pre-underwriting report
+
+Two facts about the integration, and each on its own is enough.
+
+**Installation is post-boarding.** It happens after the account exists, which is after the decision
+this report feeds. A screening report describes a storefront as it stands before approval; a
+requirement that cannot have been met yet has no observable state to describe.
+
+**Acceptance is already a condition of account approval.** The merchant agrees to it as part of
+boarding, through the agreement, not through anything on their website. It is enforced where it is
+agreed.
+
+So it is neither observable at screening time nor an input to the underwriting decision, and a rule
+that is neither is noise in a document whose whole value is that every line in it is an observation
+bearing on that decision. It rendered as `not_evaluable` on every run — twelve of them across the five
+real merchants — under a heading saying no crawl of a website could answer it. True, and true of a
+great many things that are correctly absent from the rule set.
+
+### It supersedes D-140 rather than replacing it
+
+**Both records stand, and the pair is the point.** D-140 decided that the requirement was real and
+only its attribution was wrong, and moved PAY-004 from `programme` to `mintro` so it would render
+under the Mintro heading rather than appear to quote a standard. That reasoning was correct **for what
+was believed at the time** — that this was an ongoing obligation a merchant carried and could be
+measured against.
+
+What changed is the fact, not the reasoning. Once the integration is understood as installed after
+boarding and accepted at boarding, the question D-140 answered — *whose requirement is this, and how
+should the report attribute it?* — stops arising, because the report should not be carrying it at all.
+
+Deleting D-140 would leave the repository claiming the attribution question was never asked, and the
+next person to meet a Mintro-authored requirement would rediscover it from nothing. Keeping it, marked
+superseded, records the more useful thing: **a rule can be correctly attributed and still not belong**,
+and attribution is the second question, not the first.
+
+### The corpus lost its Mintro-authored section, and its header lost a half-truth
+
+`rules/sources/ruo-standards-v1.1.md` carried a `## Mintro-authored — not drawn from the standards`
+section holding exactly one clause: PAY-004's. It went with the rule, and the section went with it —
+an empty section labelled for a category with no members is worse than no section, because it reads as
+a category that happens to be empty rather than one that no longer exists.
+
+The line it carried said the clauses were *"listed here so the corpus is complete"*, and **that was
+only ever partly true**: CATG-007 is also `source: mintro` and was never in it. The header now says
+what is actually so — every line under the heading is a clause of the standards and nothing else is,
+rules Mintro writes quote no standard and are deliberately not reproduced, and the section that once
+claimed otherwise is named as removed.
+
+The 53 clause lines were not touched. Verified by hashing the region either side of both edits.
+
+**One latent trap closed with it.** `corpusClauseLines` bounded the clause region by the Mintro
+heading, so removing that section left a bound matching nothing and a region running to end of file.
+Harmless while the corpus ends at its last clause, and silently wrong the first time anything is
+appended — a new section's prose would be counted as clauses, and the count equality would fail
+somewhere far from the cause. The bound is now the next `##` heading, whatever it is, which is true of
+the file as it is and as it may become.
+
+### Explicitly out of scope: checking for the plugin on boarded merchants
+
+Worth stating because it is the obvious next thought and it is a different piece of work.
+
+Whether a boarded merchant still has the integration installed is a real question and somebody may
+want it answered periodically. **It is monitoring, not screening**, and the three things that define a
+check are all different:
+
+| | Screening | Monitoring the integration |
+|---|---|---|
+| **Trigger** | an analyst submits a storefront for a decision | a schedule, or a portfolio review |
+| **Population** | applicants, before approval | merchants already boarded |
+| **Question** | what does this storefront show a customer? | is a thing we required still in place? |
+
+Running it through the screener would put it in a document that goes to an underwriter deciding an
+application, about a merchant whose application was decided months ago. That is the wrong report, the
+wrong reader and the wrong moment. It needs its own trigger, its own output and its own decision
+record; nothing in this one anticipates it, and D-002's no-scheduler ruling is still in force for the
+screener.
+
+### What was left alone
+
+**The five real runs.** Their reports carry PAY-004 findings and keep them — a completed run is
+immutable and renders the rule set it was produced under (D-002). The fixtures in `reports/` and
+`apps/web/public/reports/` are not rewritten, and `apps/web/test/reachability.test.ts` and the
+requirement tests read them as the historical records they are.
+
+**`docs/wording-inventory.md`.** Dated by construction: it is a snapshot of the copy as it stood on
+2026-08-26 and says so. Its PAY-004 rows record what the rule said then, which is what a snapshot is
+for.
+
+**`docs/wording-change-spec.md`** keeps Ruling 2 in full, with a dated note at its head pointing here,
+so it is not read as current guidance.
+
+**Carried, and wrong until somebody fixes it:** `docs/STATUS.md` has a *Not covered* table listing the
+manual rules and why each is out of reach, and it still carries a `Risk-monitoring plugin | PAY-004`
+row with the pre-D-140 wording. That row is now false twice over — the rule id does not exist, and the
+integration is not something the screener declines to cover but something outside screening
+altogether. It was left rather than swept in with a rule-set change, and it is a deletion rather than
+an edit: the row should go, not be reworded.
 
 ---

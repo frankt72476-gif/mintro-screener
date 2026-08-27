@@ -1,10 +1,10 @@
 /**
  * Whose statement the report says a clause is (D-138).
  *
- * The requirement pair prints `clause` verbatim under a heading. Every rule but CATG-007 and PAY-004
- * quotes the published standards, so that heading read unconditionally — and neither of those two has
- * a published standard behind it: the document does not mention non-peptides, and the risk monitoring
- * integration is Mintro's own condition of boarding (D-140).
+ * The requirement pair prints `clause` verbatim under a heading. Every rule but CATG-007 quotes the
+ * published standards, so that heading read unconditionally — and CATG-007 has no published standard
+ * behind it, because the document does not mention non-peptides at all. PAY-004 was briefly the
+ * second such rule (D-140) and has since left the set entirely (D-142).
  *
  * Frank's ruling: printing either under that heading would put words in the standards' mouth, which is
  * worse than any overclaim already fixed here — it fabricates the authority rather than overstating

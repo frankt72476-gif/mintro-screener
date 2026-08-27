@@ -144,11 +144,11 @@ describe('every finding is accounted for', () => {
 
     // Every unrun non-manual rule is a check Mintro has not written.
     expect(coverage.noCheckBuilt).toBe(ruleset.rules.filter((r) => r.type !== 'manual').length);
-    // The manual rules, and only those. Twelve since FULF-002 (D-055) and PAY-002 (D-052) joined
-    // them: neither is observable from a public surface without transacting or being let past a
-    // gate the program requires.
+    // The manual rules, and only those. Twelve once FULF-002 (D-055) and PAY-002 (D-052) joined
+    // them — neither is observable from a public surface without transacting or being let past a
+    // gate the program requires — and eleven since PAY-004 left the rule set entirely (D-142).
     expect(coverage.notReachable).toBe(ruleset.rules.filter((r) => r.type === 'manual').length);
-    expect(coverage.notReachable).toBe(12);
+    expect(coverage.notReachable).toBe(11);
     // Nothing is left in the pre-D-044 bucket for a report assembled now.
     expect(coverage.kindNotRecorded).toBe(0);
   });

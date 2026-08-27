@@ -14,7 +14,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   CORPUS_CLAUSE_HEADING,
-  CORPUS_MINTRO_HEADING,
   checkAgainstCorpus,
   checkAgainstCorpusFile,
   corpusClauseLines,
@@ -26,8 +25,14 @@ const ruleset = loadRulesetFile(RULESET_PATH);
 const programme = ruleset.rules.filter((rule) => rule.source === 'programme');
 const SOURCE = 'corpus';
 
-/** A corpus carrying exactly the clauses a rule set quotes, in rule-set order. */
-function corpusFor(clauses: readonly string[], eol = '\n'): string {
+/**
+ * A corpus carrying exactly the clauses a rule set quotes, in rule-set order.
+ *
+ * Ends at the last clause, which is the shape of the real file since the Mintro-authored section went
+ * with PAY-004 (D-142). `trailing` appends a section after it, for the cases that check the clause
+ * region is bounded by the next heading rather than running to end of file.
+ */
+function corpusFor(clauses: readonly string[], eol = '\n', trailing = false): string {
   return [
     '# Research-Use-Only Peptide Programs',
     '',
@@ -36,10 +41,9 @@ function corpusFor(clauses: readonly string[], eol = '\n'): string {
     CORPUS_CLAUSE_HEADING,
     '',
     ...clauses,
-    '',
-    `${CORPUS_MINTRO_HEADING} — not drawn from the standards`,
-    '',
-    'Mintro requires something the standards do not.',
+    ...(trailing
+      ? ['', '## Something appended later', '', 'Prose that is not a clause and must not be counted as one.']
+      : []),
     '',
   ].join(eol);
 }
@@ -73,6 +77,52 @@ describe('the committed rule set and the committed corpus', () => {
     // The number itself is pinned in `ruleset-json.test.ts`, beside the rule count. This is the
     // relation, which is what the validator enforces.
     expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(programme.length);
+  });
+
+  /**
+   * The corpus holds standards and nothing else (D-142).
+   *
+   * The Mintro-authored section was removed with the only rule listed in it, and CATG-007 — also
+   * `source: mintro` — had never been listed there. Nothing replaces it: a rule that quotes no
+   * standard has no place in the text of the standards.
+   */
+  it('holds no Mintro-authored section', () => {
+    const text = readFileSync(CORPUS_PATH, 'utf8');
+    expect(text).not.toContain('## Mintro-authored');
+
+    const mintro = ruleset.rules.filter((rule) => rule.source === 'mintro');
+    expect(mintro.map((rule) => rule.id)).toEqual(['CATG-007']);
+    for (const rule of mintro) expect(text).not.toContain(rule.clause);
+  });
+});
+
+/**
+ * The clause region ends at the next heading, not at end of file.
+ *
+ * It used to be bounded by the Mintro-authored heading specifically. Removing that section left a
+ * bound matching nothing — harmless while the corpus ends at its last clause, and wrong the first
+ * time anything is appended.
+ */
+describe('the clause region is bounded structurally', () => {
+  it('stops at a section appended after it', () => {
+    const withTrailing = corpusFor(CLAUSES, '\n', true);
+    expect(corpusClauseLines(withTrailing)).toHaveLength(CLAUSES.length);
+    expect(checkAgainstCorpus(ruleset, withTrailing, SOURCE)).toEqual([]);
+  });
+
+  it('counts every clause when nothing follows, which is the real shape', () => {
+    expect(corpusClauseLines(corpusFor(CLAUSES))).toHaveLength(CLAUSES.length);
+  });
+
+  it('would have counted the appended prose under the old bound', () => {
+    // The defect the structural bound prevents, stated so the guard has a subject: everything after
+    // the clause heading, with no heading-aware stop, is four lines longer than the clause set.
+    const naive = corpusFor(CLAUSES, '\n', true)
+      .split('\n')
+      .slice(corpusFor(CLAUSES, '\n', true).split('\n').indexOf(CORPUS_CLAUSE_HEADING) + 1)
+      .filter((line) => line.trim() !== '');
+
+    expect(naive.length).toBeGreaterThan(CLAUSES.length);
   });
 });
 

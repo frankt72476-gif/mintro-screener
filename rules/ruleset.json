@@ -1,5 +1,5 @@
 {
-  "version": "3.0.0",
+  "version": "3.1.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -1283,20 +1283,6 @@
           "chargeback"
         ],
         "expect": "present"
-      }
-    },
-    {
-      "id": "PAY-004",
-      "cat": "payment",
-      "layer": null,
-      "sev": "major",
-      "type": "manual",
-      "tier": "review_only",
-      "title": "Risk monitoring integration",
-      "clause": "Mintro requires the merchants it boards to install and keep active the risk monitoring integration it specifies. This is a condition of the account rather than a requirement drawn from the published standards.",
-      "source": "mintro",
-      "params": {
-        "reason": "Not observable from a storefront crawl — installation is confirmed at boarding. Requires merchant attestation."
       }
     },
     {

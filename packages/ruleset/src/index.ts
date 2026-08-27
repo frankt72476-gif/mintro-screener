@@ -50,12 +50,7 @@ export { checkInvariants, checkInvariantsOn, type IndexedRule } from './invarian
  * the pure half is exported beside it so a caller holding the text does not need the filesystem.
  * Deliberately absent from `browser.ts`: the frontend has no corpus and no business asserting on one.
  */
-export {
-  checkAgainstCorpus,
-  corpusClauseLines,
-  CORPUS_CLAUSE_HEADING,
-  CORPUS_MINTRO_HEADING,
-} from './corpus.js';
+export { checkAgainstCorpus, corpusClauseLines, CORPUS_CLAUSE_HEADING } from './corpus.js';
 export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 
 export { PARAMS_BY_CHECK_TYPE } from './params.js';

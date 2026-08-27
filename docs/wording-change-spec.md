@@ -89,6 +89,15 @@ mis-scoped rather than the clause.
 
 ## Ruling 2 — PAY-004 is reassigned to Mintro authorship, not deleted
 
+> **Superseded 2026-08-27 by D-142 — this section is not current guidance.** PAY-004 was reassigned as
+> described below and applied at rule set 3.0.0. It was then **removed from the rule set entirely** at
+> 3.1.0: the risk monitoring integration is installed after boarding and accepted as a condition of
+> account approval, so it is neither observable at screening time nor an input to the underwriting
+> decision. Nothing replaces it. The section is kept intact because the attribution reasoning is worth
+> reading on its own — a rule can be correctly attributed and still not belong — and because the
+> counts it quotes (55 rules, `payment` 4, 12 `manual` reasons) describe 3.0.0, not the rule set as it
+> now stands (54 / 3 / 11). See D-140 and D-142.
+
 ```
 PAY-004  Risk monitoring plugin installed
 source   programme

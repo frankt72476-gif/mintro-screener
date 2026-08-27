@@ -24,6 +24,7 @@ describe('rules/ruleset.json', () => {
         2.8.0  COA-002 extracts `report_date`, not `test_date` (D-058)
         2.9.0  COA-001's link vocabulary widened and shared with the fetch (D-059)
         3.0.0  the clause corpus re-based on the published standards
+        3.1.0  PAY-004 removed (D-142)
 
       Two of those matter most to a reader comparing runs: COA-002 now asks when the certificate
       was issued rather than when the sample was drawn, and COA-001 asked a **narrower** question
@@ -35,11 +36,29 @@ describe('rules/ruleset.json', () => {
       standards, so 53 clauses were replaced at once and PAY-004 changed hands to Mintro authorship.
       Runs produced before it keep rendering the wording they were made under (D-002), which is why
       the fixtures in `reports/` are still at 2.9.0 and are not rewritten to match this.
+
+      3.1.0 is minor: PAY-004 left the set, and no rule that remains asks anything different. The
+      risk monitoring integration is installed after boarding and accepted as a condition of
+      approval, so it is neither observable at screening time nor an input to the decision the
+      report feeds. `effective` does not move — the standards did not change, only what Mintro
+      screens against them.
     */
-    expect(ruleset.version).toBe('3.0.0');
+    expect(ruleset.version).toBe('3.1.0');
     expect(ruleset.effective).toBe('2026-08-26');
-    expect(ruleset.rules).toHaveLength(55);
+    expect(ruleset.rules).toHaveLength(54);
     expect(ruleset.categories).toHaveLength(10);
+  });
+
+  /**
+   * The counts D-142 moved, pinned where the rule count is.
+   *
+   * `payment` and the manual-reason total are the two that changed with PAY-004, and both are the
+   * kind of number that drifts unremarked — a rule quietly added back would restore them.
+   */
+  it('holds the category and manual-rule counts D-142 left', () => {
+    expect(ruleset.rules.filter((rule) => rule.cat === 'payment')).toHaveLength(3);
+    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(11);
+    expect(ruleset.rules.map((rule) => rule.id)).not.toContain('PAY-004');
   });
 
   /**
@@ -56,8 +75,10 @@ describe('rules/ruleset.json', () => {
    * document they claim to quote. That is a change somebody meant to make, and CI is the right place
    * to be stopped and asked whether they meant this much of it.
    *
-   * Beside `toHaveLength(55)` on purpose — the two numbers move for the same reasons and should be
-   * read, and updated, together.
+   * Beside `toHaveLength(54)` on purpose — though the two do not always move together, and D-142 is
+   * the case that showed it. Removing PAY-004 took the rule count from 55 to 54 and left the corpus
+   * at 53, because PAY-004 was `source: mintro` and never quoted a standard. Adjacent because they
+   * are read together; asserted separately because they are separate facts.
    */
   it('quotes a corpus of the length it was verified at', () => {
     const clauseLines = corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'));

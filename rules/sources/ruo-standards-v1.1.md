@@ -19,6 +19,11 @@ normalised: the `packages/ruleset` validator asserts that each `clause` on a
 apostrophe is invisible on the page and fatal to that check — and it is exactly what
 a rich-text paste or a well-meaning linter introduces.
 
+Every line below the heading is a clause of the standards, and nothing else is. Rules Mintro
+writes for the reader's benefit quote no standard — CATG-007 is the only one — so they are exempt
+from the substring check and are deliberately not reproduced here. A Mintro-authored section did
+sit at the foot of this file, holding one clause; it went with the rule it held (D-142). It had
+never listed CATG-007, so its claim to make the corpus complete was only ever partly true.
 Some lines repeat, because several rules quote one sentence of the standards —
 COA-001, COA-005 and COA-006; FULF-001 and FULF-002; OFFS-001 and OFFS-007;
 PROD-008 and OFFS-006.
@@ -78,9 +83,3 @@ Publish a refund and chargeback policy, clearly written and easy to find.
 No dosing advice, no administration guidance, and nothing a reader could take as instruction for using a drug — in any channel, by any staff member.
 This standard covers every channel — your FAQ and site copy, email, live chat, phone, and social media direct messages.
 Staff must never offer to help a customer “figure out” a protocol.
-
-## Mintro-authored — not drawn from the standards
-
-Exempt from the substring check by `source: mintro`, and listed here so the corpus is complete.
-
-Mintro requires the merchants it boards to install and keep active the risk monitoring integration it specifies. This is a condition of the account rather than a requirement drawn from the published standards.

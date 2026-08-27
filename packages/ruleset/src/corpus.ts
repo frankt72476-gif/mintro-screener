@@ -46,11 +46,15 @@
 import type { RulesetDefect } from './errors.js';
 import type { Rule, Ruleset } from './schema.js';
 
-/** The heading the clause corpus sits under. Everything before it is provenance prose. */
+/**
+ * The heading the clause corpus sits under.
+ *
+ * Everything before it is provenance prose; everything after it, up to the next `##` heading or the
+ * end of the file, is clauses. There is no second heading in the corpus today — the Mintro-authored
+ * section went with PAY-004 (D-142) — and the bound is structural rather than named so that adding
+ * one back does not silently turn its prose into clauses.
+ */
 export const CORPUS_CLAUSE_HEADING = '## From the standards';
-
-/** Where the Mintro-authored clauses start, and the clause region ends. */
-export const CORPUS_MINTRO_HEADING = '## Mintro-authored';
 
 const defect = (path: string, message: string): RulesetDefect => ({ path, message });
 const ruleDefect = (ruleId: string, path: string, message: string): RulesetDefect => ({ ruleId, path, message });
@@ -61,6 +65,13 @@ const ruleDefect = (ruleId: string, path: string, message: string): RulesetDefec
  * Line endings are trimmed rather than split on: the corpus is CRLF on disk and the rule set is LF,
  * so a line-wise comparison that kept the terminator would fail on every line for a reason that has
  * nothing to do with wording — the exact class of failure D-139 records the PDF route dying of.
+ *
+ * **Bounded by the next `##` heading, whatever it is.** It used to be bounded by the Mintro-authored
+ * section specifically, and that section was removed with PAY-004 (D-142) — leaving a bound that
+ * matched nothing and a region that ran to end of file. Harmless while the corpus ends at the last
+ * clause, and silently wrong the first time anything is appended: a new section's prose would be
+ * counted as clauses, and the count equality would fail somewhere far from the cause. Bounding on the
+ * structure rather than on one section's title is true of the file as it is now and as it may become.
  */
 export function corpusClauseLines(text: string): readonly string[] {
   const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
@@ -68,7 +79,7 @@ export function corpusClauseLines(text: string): readonly string[] {
   const from = lines.indexOf(CORPUS_CLAUSE_HEADING);
   if (from === -1) return [];
 
-  const end = lines.findIndex((line, i) => i > from && line.startsWith(CORPUS_MINTRO_HEADING));
+  const end = lines.findIndex((line, i) => i > from && line.startsWith('## '));
   const region = lines.slice(from + 1, end === -1 ? lines.length : end);
 
   return region.filter((line) => line.trim() !== '');
@@ -192,10 +203,10 @@ export function checkAgainstCorpus(ruleset: Ruleset, corpusText: string, source:
   /*
     5. Mintro-authored rules are exempt, and checked for presence only (D-140).
 
-    They quote nothing — CATG-007 because the standards do not mention non-peptides, PAY-004 because
-    the risk monitoring integration is Mintro's own condition of boarding. Requiring them to appear in
-    the corpus would be requiring Mintro's words to be in the standards, which is the attribution
-    D-138 exists to prevent.
+    They quote nothing — CATG-007 because the standards do not mention non-peptides at all. Requiring
+    them to appear in the corpus would be requiring Mintro's words to be in the standards, which is
+    the attribution D-138 exists to prevent. It is a set of one today, and stays plural here because
+    the exemption is a property of `source`, not of a rule id.
   */
   for (const rule of mintro) {
     if (rule.clause.trim() === '') {
