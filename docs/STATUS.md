@@ -881,7 +881,6 @@ report as `not_evaluable` with the reason the rule set itself gives.
 | Order-record storage | GATE-006 | Server-side. Requires merchant attestation. |
 | Staff conduct and training | COMM-003 | Internal training. Requires merchant attestation. |
 | Monthly social audits | OFFS-005 | Internal process. Requires merchant attestation. |
-| Risk-monitoring plugin | PAY-004 | Program requirement, not regulatory. Confirm at onboarding; keep separate from FDA-derived findings. |
 
 Two further limits are properties of what the crawl can see, and each finding states them:
 

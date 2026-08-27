@@ -8574,11 +8574,18 @@ for.
 **`docs/wording-change-spec.md`** keeps Ruling 2 in full, with a dated note at its head pointing here,
 so it is not read as current guidance.
 
-**Carried, and wrong until somebody fixes it:** `docs/STATUS.md` has a *Not covered* table listing the
-manual rules and why each is out of reach, and it still carries a `Risk-monitoring plugin | PAY-004`
-row with the pre-D-140 wording. That row is now false twice over — the rule id does not exist, and the
-integration is not something the screener declines to cover but something outside screening
-altogether. It was left rather than swept in with a rule-set change, and it is a deletion rather than
-an edit: the row should go, not be reworded.
+**`docs/STATUS.md`'s *Not covered* table — closed.** It listed the manual rules and why each is out of
+reach, and carried a `Risk-monitoring plugin | PAY-004` row with the pre-D-140 wording. That row was
+false twice over: the rule id no longer exists, and the integration is not something the screener
+declines to cover but something outside screening altogether.
+
+**Deleted rather than reworded, and the distinction is the ruling in miniature.** A *Not covered* row
+is a position — *this is a requirement, and here is why a crawl cannot reach it*. The screener has no
+position on the integration to state. Rewording the row would have kept the claim that this is
+something Mintro would screen if only it could, which is the reading D-142 exists to remove; the table
+now names eight subjects and every rule id in it still exists.
+
+That table was never a complete index of the manual rules — it groups by subject and three manual
+rules have never appeared in it — so removing a row breaks no invariant. Checked rather than assumed.
 
 ---
