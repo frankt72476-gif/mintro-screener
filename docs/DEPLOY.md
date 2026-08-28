@@ -72,6 +72,64 @@ meaning the plaintext token existed in a browser. Invitations are issued worker-
 handled each attempt. `mailer` is not-null with no default — existing rows read `unrecorded`, which
 is the truth about them. **Send to IQwallet does nothing without it.**
 
+### 1.1b Outstanding against production — as of 2026-08-28
+
+**Production is at 0044. `0045` and `0046` have not been applied.** Checked read-only against
+production's REST API on 2026-08-28, not assumed:
+
+| Migration | Production | Verification (`wakpxbojiqgbjuxikqab`) |
+|---|---|---|
+| `0044_merchant_attestations.sql` | **applied** | applied 2026-08-28 |
+| `0045_response_rounds.sql` | **not applied** | applied 2026-08-28 |
+| `0046_merchant_domain_is_folded.sql` | **not applied** *(see below)* | applied 2026-08-28 |
+
+`0046` is the one entry that could not be confirmed by probing. It adds a check constraint and
+replaces a function, and PostgREST exposes neither — so its state is inferred from `0045` being
+absent and from the two being written and applied as one batch. Confirm it directly before or after
+applying, with `select pg_get_constraintdef(oid) from pg_constraint where conname =
+'merchants_domain_is_folded'`.
+
+**Do not stop at the first error.** §1.1 above says that a migration erroring on an object it
+creates means you are up to date. That rule does not hold here: `0044` is already applied, so
+running the batch from `0044` errors immediately on `create table public.merchant_attestations` —
+and stopping there would leave `0045` and `0046` unapplied while looking like success. Start at
+`0045`.
+
+#### What is missing without them
+
+`0045` is the response round (D-143 - D-151): `comment_submissions`, `response_nonresponses`,
+`response_notices`, `invited_addresses()`, `submit_response_round()`, and the amended
+`submit_merchant_comment()` and `open_report_for_comment()`.
+
+Two things break, and neither degrades quietly:
+
+- **The merchant page stops loading.** `0045` replaces `open_report_for_comment`; the `0016` version
+  returns no `invited`, `submissions` or `attestations`, and `OpenReport` seeds state from
+  `opened.submissions` and filters it during render. That is a `TypeError` on undefined, so the
+  route is down rather than diminished.
+- **The worker exits on its first poll cycle.** `claimNextNotice` throws when `response_notices` is
+  missing, and the poll loop is wrapped in `try/finally` with no `catch` — so the throw leaves
+  `main()`, the browser closes, and the process ends. The error names `0045`. Scans, PDFs, sends and
+  invitations all stop with it.
+
+**So deploy order matters.** The migration goes before the frontend and before the worker image, or
+the merchant-facing route breaks for as long as the gap lasts.
+
+`0046` folds `merchants.domain` and constrains it. Without it a Documents Check package created with
+a capitalised domain silently creates a **second merchant row** for a storefront that already exists,
+splitting its Site Check runs from its documents (D-150). Production's seven merchant rows are all
+already lowercase, so nothing needs folding — the migration is preventive.
+
+#### Applying them here needs the `pg` route
+
+`psql.exe` and `supabase.exe` are both blocked on Frank's machine by an Application Control policy,
+so neither `scripts/live/apply-migrations.mjs` nor `npx supabase db query --linked` can run. The
+dashboard SQL Editor still works and needs nothing installed. See
+`scripts/live/apply-migrations-pg.mjs`, which is guarded to the **test** project — applying to
+production needs `assertProduction()` from `guard-production.mjs`, deliberately a different file.
+
+---
+
 ### 1.2 Confirm it took
 
     npm run inspect-supabase

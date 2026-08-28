@@ -3,6 +3,16 @@
  *
  *     node --env-file=.env.test <this file>
  *
+ * ## Superseded on this machine — see `apply-migrations-pg.mjs`
+ *
+ * This shells out to `psql`, and `psql.exe` is blocked by an Application Control policy here. So is
+ * `supabase.exe`. Both fail with *"An Application Control policy has blocked this file"*, which
+ * reads like a missing binary and is not one — reinstalling PostgreSQL does not help. Use
+ * `apply-migrations-pg.mjs`, which does the same work over the `pg` driver under `node`.
+ *
+ * Kept rather than deleted: it is the shorter path wherever `psql` is available, and it is what
+ * production was migrated with.
+ *
  * The repo has no migration runner — production was migrated through the Supabase CLI against a
  * linked project, and that link currently points at production. This applies them over a direct
  * connection instead, so nothing re-links and production's CLI state is left exactly as it was.

@@ -1,0 +1,20 @@
+# Line endings, settled once so they cannot drift again.
+#
+# `text=auto` means: git decides what is text, stores every text file with LF in the object
+# database, and checks it out in whatever the platform wants — CRLF here, because `core.autocrlf`
+# is true. Nothing about editing changes; what changes is that storage stops depending on who
+# staged the file and with which client.
+#
+# ## Why this file exists
+#
+# Two stylesheets were committed with CRLF *in the blob* while the other 458 text files in the repo
+# held LF. Nobody noticed until a two-line comment fix rewrote one of them through a byte-level
+# path, git normalised it on staging, and a 128-line change arrived as a 1670-line diff — which
+# destroyed `git blame` on the file it touched (D-152).
+#
+# The churn was invisible in review precisely because it was *correct*: the commit brought those
+# files into line with the repo. What was missing was anything that said what the line was.
+#
+# Files git detects as binary are unaffected — `apps/worker/test/rasterize.test.ts` embeds a real
+# `Exif\0\0` header, and a NUL byte is how git decides a file is not text.
+* text=auto
