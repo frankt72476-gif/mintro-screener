@@ -86,14 +86,49 @@ export function runLayer2(
 
     // No page rendered — nothing was observed, so nothing can be concluded.
     if (rendered.length === 0) {
+      const noneToSample = sampled.length === 0;
       findings.push(
         notEvaluable(
           rule,
-          sampled.length === 0
+          noneToSample
             ? 'no product pages could be identified to sample'
-            : 'none of the sampled product pages rendered',
+            : `none of the ${sampled.length} sampled product pages rendered`,
           RENDERED,
-          'not_exposed',
+          /*
+            Which party fell short (D-156).
+
+            Both branches used to file as `not_exposed`, which says *the merchant did not present
+            this*. That is true of the first — no product URLs were found — and false of the
+            second, where product pages were found and **our** renders of them failed. Filing a
+            page of timeouts as merchant absence is D-136's conflation, and it was still here.
+          */
+          noneToSample ? 'not_exposed' : 'not_retrieved',
+        ),
+      );
+      continue;
+    }
+
+    /*
+      A sample read in part supports no verdict (D-156).
+
+      `rendered` silently drops the pages that failed, and the aggregate below is then computed
+      over the survivors — so three product pages loading and two timing out produced a clean
+      result on a five-page sample, with nothing in the state to say two were missing. Every
+      product-surface rule in the blocker set is `expect: absent`, so the pages that failed to load
+      are exactly the ones that could have carried the violation.
+
+      **Never `pass`, never `fail`.** The verdict rests on the sample, and this is not the sample.
+    */
+    if (rendered.length < sampled.length) {
+      const missing = sampled.length - rendered.length;
+      findings.push(
+        notEvaluable(
+          rule,
+          `${missing} of ${sampled.length} sampled product pages did not render, so the ` +
+            `${rendered.length} that did do not support a conclusion either way: ` +
+            unrenderedReasons(sampled),
+          RENDERED,
+          'not_retrieved',
         ),
       );
       continue;
@@ -247,6 +282,18 @@ function dispatch(rule: Rule, page: PageContext, ruleset: Ruleset): Finding {
     default:
       return notEvaluable(rule, unbuiltCheckReason(rule), RENDERED, 'no_check_built');
   }
+}
+
+/** What went wrong on the sampled pages that did not render, for the finding that says so. */
+function unrenderedReasons(sampled: readonly SampledPage[]): string {
+  const reasons = sampled
+    .filter((entry) => !isRendered(entry.page))
+    .map((entry) => {
+      const where = entry.page.requestedUrl;
+      const why = entry.page.renderError ?? `HTTP ${entry.page.httpStatus}`;
+      return `${where} — ${why}`;
+    });
+  return reasons.slice(0, 3).join('; ') + (reasons.length > 3 ? ` and ${reasons.length - 3} more` : '');
 }
 
 /** Ordering for "worst state wins". `not_evaluable` outranks `pass`: it is less of a claim. */

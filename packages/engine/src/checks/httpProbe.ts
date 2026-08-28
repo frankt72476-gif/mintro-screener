@@ -62,10 +62,33 @@ export function checkHttpProbe(
     found on the site" on a run where nothing was ever looked at.
   */
   const unreachable = results.filter((result) => result.status === 0);
-  if (unreachable.length === results.length) {
+
+  /*
+    **Any** path that did not answer makes the whole result unusable (D-156).
+
+    This used to require *all* of them to fail. One surviving 404 was enough to proceed, the path
+    carrying the violation was simply missing from `served`, and the rule reported `pass` — with an
+    honest sentence about a path not reached appended to a verdict that had already been decided
+    the wrong way. Demonstrated on sportstechnologylabs, whose `/shop` serves 200: with `/shop`
+    timed out and the other two answering 404, GATE-002 came back clean.
+
+    That is the failure hard constraint 2 names, arrived at through the back door. A `pass` here
+    asserts that no probed path served content publicly; a path that did not answer supports no
+    such assertion, and neither does the arithmetic of the ones that did.
+
+    **Never `pass`, never `fail`, symmetrically.** A violation seen among partial results is a real
+    observation, and it is still discarded: the finding has to be reproducible from the same run
+    twice, and one that flips with which request happened to time out is not. A rule that can gate
+    an automatic decline cannot rest on that.
+  */
+  if (unreachable.length > 0) {
+    const which = unreachable.map((result) => result.url).join(', ');
     return notEvaluable(
       rule,
-      `none of the ${results.length} probed path(s) answered, so nothing was observed either way`,
+      unreachable.length === results.length
+        ? `none of the ${results.length} probed path(s) answered, so nothing was observed either way`
+        : `${unreachable.length} of ${results.length} probed path(s) did not answer (${which}), so the ` +
+          `paths that did answer do not support a conclusion either way`,
       DOCUMENT,
       'not_retrieved',
       [sessionEvidence(session, results)],

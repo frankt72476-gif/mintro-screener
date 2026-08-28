@@ -149,15 +149,50 @@ describe('a probe that observed nothing', () => {
     expect(checkHttpProbe(gate002, { results: [], session: NO_SESSION }).state).toBe('not_evaluable');
   });
 
-  it('reports what it could reach when only some paths failed', () => {
+  /*
+    This test used to assert `pass` here, on D-018's reasoning that a clean result naming what it
+    could not reach is honest enough. It is not (D-156). The sentence was honest and the verdict was
+    already wrong: a `pass` asserts that no probed path served content publicly, and a path that did
+    not answer supports no such assertion.
+  */
+  it('is not_evaluable when only some paths failed, not a pass that names the gap', () => {
     const finding = checkHttpProbe(gate002, {
       results: [probe('/collections/all', 404), { ...probe('/shop', 0), error: 'timed out' }],
       session: NO_SESSION,
     });
 
-    // D-018: a clean result names what it could not reach rather than implying full coverage.
-    expect(finding.state).toBe('pass');
-    expect(finding.note).toContain('could not be reached');
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
+    // Still names what it could not reach — the D-018 requirement survives the state change.
+    expect(finding.note).toContain('did not answer');
+    expect(finding.note).toContain('/shop');
+  });
+
+  it('discards an observed violation rather than report one from a partial probe', () => {
+    // The sportstechnologylabs shape: /shop genuinely serves 200, and one sibling path timed out.
+    // Reporting `fail` would be a verdict that flips with which request happened to answer, which
+    // is not something an automatic decline can rest on.
+    const finding = checkHttpProbe(gate002, {
+      results: [probe('/shop', 200), { ...probe('/products', 0), error: 'timed out' }],
+      session: NO_SESSION,
+    });
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
+  });
+
+  it('still reaches a verdict when every path answered', () => {
+    const clean = checkHttpProbe(gate002, {
+      results: [probe('/collections/all', 404), probe('/shop', 404)],
+      session: NO_SESSION,
+    });
+    expect(clean.state).toBe('pass');
+
+    const dirty = checkHttpProbe(gate002, {
+      results: [probe('/collections/all', 404), probe('/shop', 200)],
+      session: NO_SESSION,
+    });
+    expect(dirty.state).toBe('fail');
   });
 
   it('records every attempt, including the failures', () => {

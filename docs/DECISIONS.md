@@ -9346,3 +9346,102 @@ after the crawl returns, a terminated run produces no findings at all, so there 
 available to misattribute.
 
 ---
+
+---
+
+## D-156 — A verdict requires complete acquisition, and a shortfall names whose it was
+
+**2026-08-28 · business owner's ruling, applied · prompted by the 868bcce A/B**
+
+Run 5506488a produced GATE-002 and GATE-003 results differing from both the Aug-23 baseline and the
+post-change re-run, on rules that were not modified. Same storefront, same rule set, three runs, two
+answers, decided by how the merchant's CDN behaved that afternoon.
+
+### The ruling
+
+> A check may not return a verdict on data it did not fully obtain. Partial acquisition resolves to
+> `not_evaluable` — never `pass`, never `fail`. Absence of evidence caused by our own failure is not
+> evidence of absence.
+
+This is hard constraint 2 extended one step. That constraint says a rule that *cannot be observed*
+returns `not_evaluable`; this says the same of a rule observed *in part*. The gap between them is
+where five defects were living, all of the same shape: a check that got most of what it asked for
+and reported as though it had got all of it.
+
+**Never `fail` either, and that half is deliberate.** A violation seen among partial results is a
+real observation and it is still not a verdict, because the finding has to be the same on a second
+run. GATE-002 returned `fail` when `/shop`'s 200 was reached and `pass` when that was the request
+that timed out — the same storefront, opposite answers, nothing in either saying which run you were
+holding. A rule that gates an automatic decline cannot rest on that. The observation is not
+discarded: it stays in `attempts` and the note names it. It simply does not become a verdict.
+
+This reverses an expectation asserted in `obstruction.test.ts` — *"a partial obstruction must not
+suppress what was actually observed"* — which was a test comment rather than a numbered ruling. It
+reads well, and it never asked whether the finding was reproducible.
+
+### The five instances
+
+| where | was | now |
+|---|---|---|
+| `checkHttpProbe` (GATE-002) | required **all** probes to fail; one surviving 404 was enough to report `pass` while the path carrying the violation was missing | **any** unanswered path → `not_evaluable` / `not_retrieved` |
+| `runCheckoutFlow` payment markers (GATE-003) | a lookup that timed out fell back to `0`, identical to "no card field", so the flow reported `checkout` and the rule reported `pass` | failures counted; a sweep that failed to look resolves to `unestablished`, obstructed |
+| `runCheckoutFlow` `clickFirst` | a timed-out lookup returned `false`, identical to "no such control", reported as *"no add-to-cart control was found on the product page"* — a statement about the merchant | returns `{ clicked, unanswered }`; the caller reports which it saw |
+| `checkUrlPattern` (5 of the 11 blockers) | a partially fetched sitemap set left a shorter URL list that passed every guard; `expect: absent` then reported a clean catalogue it had not finished reading | `!layer0.surface.complete` → `not_evaluable` / `not_retrieved` |
+| `runLayer2` sample | pages that failed to render were silently dropped and the aggregate computed over the survivors — three loading and two timing out produced a clean five-page result | any unrendered page → `not_evaluable` / `not_retrieved`, naming which and why |
+
+`report.truncations` was recorded and joined to nothing: the report carried both the pass and the
+reason to doubt it, in two places, with no link. It is now joined through
+`Layer0Result.surface`.
+
+### Completeness is recorded structurally, never inferred from prose
+
+`surface: { complete, gaps }` is appended where each gap happens — a sitemap that did not answer, a
+200 that did not parse, an index left unfollowed at the depth limit, a URL cap reached. Not derived
+from the `truncations` strings, for two reasons. Hard constraint 9 forbids classifying by
+pattern-matching a reason string. And `truncations` mixes URL-discovery gaps with evidence-retention
+ones, which are not the same thing: the evidence cap means some fetched documents were not *kept*,
+while the URL surface was read in full. That one is deliberately not a gap.
+
+A sitemap returning non-200 produced no truncation at all before this, so `truncations: []` did not
+mean complete acquisition. It does now.
+
+### `notEvaluableKind` carried two different things
+
+D-136 introduced `not_retrieved` (our request failed) against `not_exposed` (the merchant did not
+present it), and got the principle right and the signal wrong. `checkFlowProbe` classified on
+whether `observation.error` was set — and `runCheckoutFlow` sets that field for merchant outcomes
+too. So *"the add-to-cart control was clicked but the cart remained empty"*, which is a fact about
+the storefront, was filed as a retrieval failure of ours. Run 5b29036d recorded exactly that for
+comopeptides, in a document that goes to IQwallet.
+
+**Split, rather than stopped.** `FlowObservation` gains `obstructed`, set by the producer at the
+point the failure happens; `error` keeps its prose for the reader. Every `observe()` call in
+`runCheckoutFlow` now states which it is, and only the `catch` — the branch where the browser threw
+— and the two lookup-failure branches set the flag. The classifier reads the flag and never the
+wording, which is the half of D-136's reasoning that was right.
+
+`runLayer2` had the same conflation in the other direction: *"none of the sampled product pages
+rendered"* filed as `not_exposed`, which says the merchant published nothing when what happened is
+that our renders failed. Product pages were found; we did not get them.
+
+### What it cost
+
+Both validation storefronts re-run: **findings identical on all 54 rules and on the note text of
+every finding**, 62 and 66. That is the expected result and the point of checking — the ruling
+changes behaviour only on the degraded paths, and neither run was degraded.
+
+The exposure it adds is real and worth stating: runs on a throttled site will now return
+`not_evaluable` where they previously returned a verdict. That is the ruling working. It also means
+a merchant scanned on a bad afternoon produces a thinner report, and the retry path — release and
+re-queue (D-154) — is what makes that acceptable rather than terminal.
+
+### Not closed
+
+**PAY-001.** `checkPaymentTerms` requires at least one surface to have been read but does not
+distinguish four from one, so a run that reached only the footer still returns a verdict. The fix is
+not mechanical: Layer 3 surfaces are *discovered*, not enumerated, so a merchant with no FAQ and a
+merchant whose FAQ we failed to reach are indistinguishable from the candidate list. What
+completeness means for a discovered surface set is a business ruling. Recorded in
+`docs/blocker-audit.md` §1 as the one open item on the acquisition axis.
+
+---

@@ -53,8 +53,19 @@ describe('a probe that never answered is a fact about the run', () => {
     expect(finding.notEvaluableKind).toBe('not_retrieved');
   });
 
-  it('still reads a probe that did answer', () => {
-    const finding = checkHttpProbe(gate002, {
+  /*
+    **Reversed by D-156.** This asserted `fail`, on the reasoning that a partial obstruction must
+    not suppress what was actually observed — which reads well and does not survive the question
+    it was never asked: is the finding the same on a second run?
+
+    It is not. The same storefront returns `fail` when the 200 is reached and `pass` when it is the
+    path that times out, and nothing in either verdict says which run you are holding. A rule that
+    can gate an automatic decline has to be reproducible from the acquisition, not from the luck of
+    it. The observation is not discarded — it is in `attempts`, and the note names it — but it does
+    not become a verdict.
+  */
+  it('does not turn a partial probe into a verdict, in either direction (D-156)', () => {
+    const withViolation = checkHttpProbe(gate002, {
       results: [
         { url: 'https://shop.example/collections/all', status: 200 },
         { url: 'https://shop.example/products', status: 0, error: 'timeout' },
@@ -63,9 +74,10 @@ describe('a probe that never answered is a fact about the run', () => {
       session: SESSION,
     } as never);
 
-    // One path served the catalogue anonymously, which is the violation the rule exists for. A
-    // partial obstruction must not suppress what was actually observed.
-    expect(finding.state).toBe('fail');
+    expect(withViolation.state).toBe('not_evaluable');
+    expect(withViolation.notEvaluableKind).toBe('not_retrieved');
+    // What was seen is still on the record, in the place a reader can check it.
+    expect(withViolation.evidence[0]?.attempts).toHaveLength(3);
   });
 });
 
@@ -78,12 +90,32 @@ describe('a flow that never started is told apart from one that found nothing', 
         flow: 'checkout',
         reached: 'not_started',
         error: 'page.goto: Timeout 20000ms exceeded',
+        // D-156: the signal is this flag, not the presence of `error`. The producer sets it where
+        // the failure happens; the classifier never infers it from wording.
+        obstructed: true,
         capturedAt: '2026-08-26T00:00:00.000Z',
       },
       session: SESSION,
     } as never);
 
     expect(finding.notEvaluableKind).toBe('not_retrieved');
+  });
+
+  it('is not_exposed when the flow ran and the storefront came up short (D-156)', () => {
+    // The comopeptides case: the cart genuinely stayed empty. That is a fact about the merchant,
+    // and run 5b29036d filed it as a retrieval failure of ours because `error` was set.
+    const finding = checkFlowProbe(gate003, {
+      observation: {
+        flow: 'checkout',
+        reached: 'not_started',
+        error: 'the add-to-cart control was clicked but the cart remained empty, so the flow never began',
+        capturedAt: '2026-08-26T00:00:00.000Z',
+      },
+      session: SESSION,
+    } as never);
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_exposed');
   });
 
   /**

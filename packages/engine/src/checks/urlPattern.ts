@@ -42,6 +42,34 @@ export function checkUrlPattern(rule: RuleOfType<'url_pattern'>, layer0: Layer0R
     );
   }
 
+  /*
+    The catalogue was read in part (D-156).
+
+    `usable` above asks whether anything was seen; this asks whether everything was. A sitemap that
+    404s, an index left unfollowed at the depth limit, a document cap reached — each leaves a
+    shorter URL list that still passes every other guard here, and an `expect: absent` rule then
+    reports a clean catalogue it did not finish reading. Five of the eleven blocker candidates are
+    `url_pattern` rules, so this is the difference between a gate that declines on the catalogue and
+    one that declines on how much of the catalogue happened to load.
+
+    **Never `pass`, never `fail`.** A verdict either way rests on the whole list. That a violation
+    was already seen does not make the read complete, and a rule that failed on partial data would
+    be as unrepeatable as one that passed on it.
+
+    `not_retrieved`, because the shortfall is ours: the merchant published a sitemap we did not
+    finish fetching, which is not a fact about their catalogue.
+  */
+  if (!layer0.surface.complete) {
+    return notEvaluable(
+      rule,
+      `the URL surface was read in part, so no conclusion about it holds either way: ` +
+        `${layer0.surface.gaps.join('; ')}`,
+      LAYER0_EVIDENCE_KIND,
+      'not_retrieved',
+      unobservableEvidence(layer0),
+    );
+  }
+
   const { patterns, scope, expect } = rule.params;
   const inScopeUrls = layer0.urls.filter((url) => inScope(url, scope));
 

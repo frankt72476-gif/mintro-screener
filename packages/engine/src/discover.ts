@@ -66,6 +66,16 @@ export interface FetchedDocument {
   readonly error?: string;
 }
 
+/**
+ * Whether Layer 0 obtained the whole URL surface, and what it missed if not (D-156).
+ *
+ * `gaps` are for the reader; `complete` is what a check reads. Nothing branches on the strings.
+ */
+export interface SurfaceAcquisition {
+  readonly complete: boolean;
+  readonly gaps: readonly string[];
+}
+
 export interface Layer0Result {
   readonly origin: string;
   /**
@@ -75,6 +85,21 @@ export interface Layer0Result {
   readonly usable: boolean;
   /** Why the surface could not be observed. Present only when `usable` is false. */
   readonly unusableReason?: string;
+  /**
+   * Whether the URL surface was obtained **in full** (D-156).
+   *
+   * `usable` and `complete` are different questions and conflating them is what let a
+   * partially fetched catalogue read as a clean scan. `usable` asks whether anything was seen at
+   * all; this asks whether everything was. A sitemap that 404s, an index left unfollowed at the
+   * depth limit, a document cap reached — each leaves a shorter URL list that still looks usable,
+   * and an `expect: absent` rule then passes on a catalogue it did not finish reading.
+   *
+   * Recorded **structurally**, at the point each gap occurs, never by matching the wording of a
+   * truncation string. Hard constraint 9 forbids classifying by pattern — and `truncations` mixes
+   * URL-discovery gaps with evidence-retention ones, which are not the same thing and must not be
+   * read as if they were.
+   */
+  readonly surface: SurfaceAcquisition;
   readonly robots: RobotsTxt;
   readonly urls: readonly SlugUrl[];
   readonly documents: readonly FetchedDocument[];
@@ -203,6 +228,9 @@ export async function discoverLayer0(
   let sitemapsFetched = 0;
   let anySitemapParsed = false;
   let urlCapReached = false;
+  // Structural record of everything the URL discovery did not obtain (D-156). Appended where the
+  // gap happens, so nothing has to infer it later from prose.
+  const gaps: string[] = [];
 
   while (queue.length > 0) {
     const next = queue.shift();
@@ -211,9 +239,9 @@ export async function discoverLayer0(
     visited.add(next.url);
 
     if (sitemapsFetched >= limits.maxSitemaps) {
-      truncations.push(
-        `stopped after ${limits.maxSitemaps} sitemap documents; ${queue.length + 1} more were listed and not fetched`,
-      );
+      const line = `stopped after ${limits.maxSitemaps} sitemap documents; ${queue.length + 1} more were listed and not fetched`;
+      truncations.push(line);
+      gaps.push(line);
       break;
     }
 
@@ -223,6 +251,11 @@ export async function discoverLayer0(
 
     if (response.status !== 200) {
       documents.push(describe(response, 'sitemap'));
+      // A sitemap that did not answer is a piece of the catalogue we did not read. It produced no
+      // truncation before this, so the shortened URL list looked complete (D-156).
+      gaps.push(
+        `${next.url} returned ${response.status === 0 ? 'no response' : `HTTP ${response.status}`}, so the URLs it lists were not read`,
+      );
       continue;
     }
 
@@ -235,6 +268,7 @@ export async function discoverLayer0(
       // A 200 that is not a sitemap. Recorded as an error so it cannot be mistaken for an
       // empty catalogue.
       documents.push({ ...describe(response, 'sitemap'), error: parsed.reason });
+      gaps.push(`${next.url} returned 200 but did not parse as a sitemap: ${parsed.reason}`);
       continue;
     }
 
@@ -244,9 +278,9 @@ export async function discoverLayer0(
       documents.push({ ...describe(response, 'sitemapindex'), urlCount: parsed.locations.length });
 
       if (next.depth >= limits.maxDepth) {
-        truncations.push(
-          `sitemap index at ${next.url} was not followed: depth limit ${limits.maxDepth} reached`,
-        );
+        const line = `sitemap index at ${next.url} was not followed: depth limit ${limits.maxDepth} reached`;
+        truncations.push(line);
+        gaps.push(line);
         continue;
       }
       for (const location of parsed.locations) {
@@ -271,8 +305,12 @@ export async function discoverLayer0(
   }
 
   if (urlCapReached) {
-    truncations.push(`stopped after ${limits.maxUrls} URLs; the catalogue is larger than that`);
+    const line = `stopped after ${limits.maxUrls} URLs; the catalogue is larger than that`;
+    truncations.push(line);
+    gaps.push(line);
   }
+  // Deliberately not a `gap`: this is a limit on what was *retained*, not on what was *read*. The
+  // URL surface is complete; some of the documents backing it were not kept (D-156).
   if (evidenceCapReached) {
     truncations.push(
       `evidence retention stopped at ${limits.maxEvidenceBytes} bytes; some fetched documents were not captured`,
@@ -312,6 +350,7 @@ export async function discoverLayer0(
   return {
     origin: base.origin,
     usable: true,
+    surface: { complete: gaps.length === 0, gaps },
     robots,
     urls,
     documents,
@@ -348,6 +387,8 @@ function unusable(
     origin,
     usable: false,
     unusableReason: reason,
+    // Nothing was obtained, so nothing was obtained in full.
+    surface: { complete: false, gaps: [reason] },
     robots,
     urls: [],
     documents,

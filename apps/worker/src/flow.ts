@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
 import { cartHoldsProduct } from './cart.js';
 import { establishCheckout } from './locate.js';
-import { withDeadlineOr } from './deadline.js';
+import { withDeadline, withDeadlineOr } from './deadline.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
 
 /** Markers that identify a payment step without submitting anything. */
@@ -76,7 +76,18 @@ export async function runCheckoutFlow(
   page.setDefaultTimeout(timeout);
   page.setDefaultNavigationTimeout(timeout);
 
-  const observe = (reached: FlowStage, error?: string): Promise<FlowObservation> =>
+  /*
+    `obstructed` says **our request failed**; `error` is prose for the reader (D-156).
+
+    They were one field, and `checkFlowProbe` classified on the presence of `error` — so an empty
+    cart, which is a fact about the storefront, was filed as a retrieval failure of ours. Every
+    call below now states which it is, at the point where it knows.
+  */
+  const observe = (
+    reached: FlowStage,
+    error?: string,
+    obstructed = false,
+  ): Promise<FlowObservation> =>
     withDeadlineOr(page.content(), timeout, 'page.content() while recording the flow outcome', '')
       .then((html) => ({
         flow: 'add_to_cart_then_checkout',
@@ -84,6 +95,7 @@ export async function runCheckoutFlow(
         steps,
         finalUrl: page.url(),
         ...(error === undefined ? {} : { error }),
+        ...(obstructed ? { obstructed: true } : {}),
         capturedAt,
         sha256: createHash('sha256').update(html, 'utf8').digest('hex'),
       }));
@@ -92,8 +104,19 @@ export async function runCheckoutFlow(
     await page.goto(options.productUrl, { waitUntil: 'domcontentloaded', timeout });
     steps.push(`opened ${new URL(options.productUrl).pathname}`);
 
-    const added = await clickFirst(page, ADD_TO_CART, timeout);
-    if (!added) return await observe('not_started', 'no add-to-cart control was found on the product page');
+    const add = await clickFirst(page, ADD_TO_CART, timeout);
+    if (!add.clicked) {
+      // A lookup that did not answer is not a control that is not there (D-156). Only the first
+      // of these is a fact about the storefront.
+      return add.unanswered === 0
+        ? await observe('not_started', 'no add-to-cart control was found on the product page')
+        : await observe(
+            'not_started',
+            `${add.unanswered} of ${ADD_TO_CART.length} add-to-cart lookups did not answer, so it ` +
+              `was not established whether the page carries one`,
+            true,
+          );
+    }
     steps.push('clicked add to cart');
 
     /*
@@ -126,8 +149,8 @@ export async function runCheckoutFlow(
 
     steps.push('cart confirmed to hold the product');
 
-    const proceeded = await clickFirst(page, CHECKOUT_CONTROLS, timeout);
-    if (!proceeded) {
+    const proceed = await clickFirst(page, CHECKOUT_CONTROLS, timeout);
+    if (!proceed.clicked) {
       // Some storefronts have no cart page; try the conventional path directly before concluding.
       await page.goto(new URL('/checkout', options.origin).toString(), {
         waitUntil: 'domcontentloaded',
@@ -148,20 +171,47 @@ export async function runCheckoutFlow(
       return await observe('redirected_to_login');
     }
 
+    /*
+      A lookup that did not answer is not a field that is not there (D-156).
+
+      The fallback used to be `0`, which made "the page never replied" identical to "no card field
+      on this page" — and since GATE-003 is `fail_if: payment_step_reached`, the flow then reported
+      `checkout` and the rule reported **pass**, on a merchant whose guest checkout reaches a card
+      field. That is the false pass D-056 was written to end, re-entering through the timeout.
+
+      So failures are counted, and a sweep that found nothing while failing to look properly
+      resolves to `unestablished` — nothing observed — rather than to a clean checkout.
+    */
+    const unanswered: string[] = [];
     for (const marker of PAYMENT_MARKERS) {
-      // `count()` resolves immediately against a healthy page and not at all against a wedged one,
-      // so it is bounded like everything else here (D-153).
-      const count = await withDeadlineOr(
-        page.locator(marker).first().count(),
-        timeout,
-        `locator.count() for ${marker}`,
-        0,
-      );
+      let count: number;
+      try {
+        // Bounded like everything else here (D-153), but a timeout is now a distinct outcome
+        // rather than a zero.
+        count = await withDeadline(
+          page.locator(marker).first().count(),
+          timeout,
+          `locator.count() for ${marker}`,
+        );
+      } catch {
+        unanswered.push(marker);
+        continue;
+      }
       if (count > 0) {
         steps.push(`payment field observed (${marker})`);
         // Observed only. Nothing is filled and nothing is submitted.
         return await observe('payment_step_reached');
       }
+    }
+
+    if (unanswered.length > 0) {
+      steps.push(`${unanswered.length} payment-field lookup(s) did not answer`);
+      return await observe(
+        'unestablished',
+        `${unanswered.length} of ${PAYMENT_MARKERS.length} payment-field lookups did not answer ` +
+          `(${unanswered.slice(0, 3).join(', ')}), so the absence of a payment field was not established`,
+        true,
+      );
     }
 
     /*
@@ -180,33 +230,49 @@ export async function runCheckoutFlow(
     steps.push(`no payment field observed on ${where.how}`);
     return await observe('checkout');
   } catch (error) {
+    // The only branch in this function that is genuinely our failure: the browser threw.
+    // Everything else here is an observation about the storefront (D-156).
     const raw = error instanceof Error ? error.message : String(error);
-    return await observe('not_started', raw.split('\n')[0] ?? 'flow failed');
+    return await observe('not_started', raw.split('\n')[0] ?? 'flow failed', true);
   } finally {
     await page.close().catch(() => undefined);
   }
 }
 
-/** Clicks the first control that exists, reporting whether any did. */
+/**
+ * Clicks the first control that exists, reporting whether any did **and how many lookups failed**.
+ *
+ * `unanswered` exists because "no control matched" and "we could not tell whether one matched" are
+ * different observations, and the caller has to be able to tell them apart (D-156). Collapsing
+ * them into `false` is how a timeout became a statement about the merchant's page.
+ */
 async function clickFirst(
   page: { locator: (selector: string) => { first: () => { count: () => Promise<number>; click: (options: { timeout: number }) => Promise<void> } } },
   selectors: readonly string[],
   timeout: number,
-): Promise<boolean> {
+): Promise<{ readonly clicked: boolean; readonly unanswered: number }> {
+  let unanswered = 0;
+
   for (const selector of selectors) {
     const target = page.locator(selector).first();
-    // Bounded for the same reason as the payment markers: `count()` is instant on a live page and
-    // open-ended on a wedged one, and `.catch` covers only the first case (D-153).
-    const count = await withDeadlineOr(target.count(), timeout, `locator.count() for ${selector}`, 0);
+    let count: number;
+    try {
+      // Bounded for the same reason as the payment markers: `count()` is instant on a live page
+      // and open-ended on a wedged one, and `.catch` covers only the first case (D-153).
+      count = await withDeadline(target.count(), timeout, `locator.count() for ${selector}`);
+    } catch {
+      unanswered += 1;
+      continue;
+    }
     if (count === 0) continue;
     try {
       await target.click({ timeout });
-      return true;
+      return { clicked: true, unanswered };
     } catch {
       // A control that exists but will not click is not a match; try the next candidate.
     }
   }
-  return false;
+  return { clicked: false, unanswered };
 }
 
 /** The first line of an error message, which is the part that names what went wrong. */

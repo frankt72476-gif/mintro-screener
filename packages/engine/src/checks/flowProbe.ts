@@ -52,8 +52,24 @@ export interface FlowObservation {
   readonly steps: readonly string[];
   /** Where the flow ended. */
   readonly finalUrl: string;
-  /** Why the flow could not run, when it could not. */
+  /** Why the flow could not run, when it could not. Prose, for the reader. */
   readonly error?: string;
+  /**
+   * True when **our request failed** — a timeout, a navigation that never completed, a lookup that
+   * did not answer (D-156).
+   *
+   * Separate from `error`, and that separation is the whole point. `error` was carrying two
+   * different kinds of thing: *"page.goto: Timeout 20000ms exceeded"*, which is our failure, and
+   * *"the cart remained empty after adding"*, which is a fact about the storefront. Classifying on
+   * `error !== undefined` filed both as `not_retrieved`, so run 5b29036d recorded comopeptides'
+   * genuinely empty cart as a retrieval failure of ours — a merchant property reported as our
+   * fault, in a document that reaches IQwallet.
+   *
+   * Set by the producer at the point the failure happens. Never inferred from the wording of
+   * `error`, which hard constraint 9 forbids and which would silently reclassify every finding
+   * whose phrasing changed.
+   */
+  readonly obstructed?: boolean;
   readonly capturedAt: string;
   /** Evidence store key for the screenshot taken where the flow stopped. */
   readonly screenshotKey?: string;
@@ -123,11 +139,17 @@ export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeI
       merchant published nothing because our request timed out, and GATE-003 did exactly that on
       run 730764d4.
 
-      Read from the presence of an error rather than from its wording: hard constraint 9 forbids
-      classifying by pattern-matching a reason string, which would silently reclassify every
-      finding whose phrasing changed.
+      **Read from `obstructed`, not from `error` (D-156).** D-136 got the principle right and the
+      signal wrong: it tested whether an error string was present, and the producer sets that field
+      for merchant outcomes too. So every non-verdict outcome landed on `not_retrieved` — including
+      an empty cart, which is a fact about the storefront. The flag is set where the failure
+      happens and carries one meaning.
+
+      Still never read from the *wording* of the reason: hard constraint 9 forbids classifying by
+      pattern-matching a string, which would silently reclassify every finding whose phrasing
+      changed.
     */
-    const obstructed = observation.error !== undefined;
+    const obstructed = observation.obstructed === true;
     return notEvaluable(
       rule,
       observation.error ?? `${flowName(observation.flow)} could not be started on this storefront`,

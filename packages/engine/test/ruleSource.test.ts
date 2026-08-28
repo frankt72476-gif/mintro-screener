@@ -56,6 +56,8 @@ function layer0(paths: readonly string[]): Layer0Result {
   return {
     origin: 'https://shop.example',
     usable: true,
+    // The whole catalogue was read. A url_pattern verdict requires that (D-156).
+    surface: { complete: true, gaps: [] },
     urls,
     artifacts: [
       {
