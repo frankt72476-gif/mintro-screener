@@ -41,6 +41,8 @@ export {
   toSlugUrl,
   tokenizePath,
   containsTokenSequence,
+  inflectionKey,
+  splitAlphaNumeric,
   inScope,
   type ScopeOverrides,
   type SlugUrl,
@@ -91,6 +93,8 @@ export {
 } from './politeness.js';
 
 export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
+
+export { scopeTerms, termsAt, type ClaimScope, type ScopedHit } from './claimScope.js';
 
 export {
   similarity,

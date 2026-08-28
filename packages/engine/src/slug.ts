@@ -87,12 +87,53 @@ export interface ScopeOverrides {
   readonly knownUrls?: Partial<Record<Exclude<UrlScope, 'all'>, readonly string[]>>;
 }
 
-/** Splits a path into lowercase alphanumeric tokens. */
+/**
+ * Splits a path into lowercase alphanumeric tokens.
+ *
+ * **Letter/digit boundaries are token boundaries** (D-159). `hcg5000` is two tokens, not one, and
+ * so are `mk677` and `10mg`. A merchant who writes the unit against the number is not writing a
+ * different word, and a matcher that treated `hcg5000` as an atom was blind to CATG-003's own
+ * subject spelled the way half of them spell it.
+ */
 export function tokenizePath(path: string): string[] {
   return path
     .toLowerCase()
     .split(/[^a-z0-9]+/)
+    .flatMap(splitAlphaNumeric)
     .filter((token) => token !== '');
+}
+
+/** `hcg5000` to `['hcg', '5000']`. Pure digits and pure letters pass through untouched. */
+export function splitAlphaNumeric(token: string): string[] {
+  return token.match(/[a-z]+|[0-9]+/g) ?? [];
+}
+
+/**
+ * The comparison form of a token, so a pattern matches the natural spelling of its own subject
+ * (D-159).
+ *
+ * `tablet` did not match `tablets`, `wipe` did not match `wipes`, `nootropic` did not match
+ * `nootropics` — and the plural is how these are actually sold. That is the constraint-9 trap in
+ * an `expect: absent` rule: the check located its subject by one particular form and was blind to
+ * every other, so the merchants it exists to catch passed.
+ *
+ * **Fixed here rather than in the rule set.** Adding plurals to every rule's `patterns` would
+ * work today and defer the same defect to whoever writes the next rule — and they would have to
+ * know to do it. A matcher that only recognises what it was handed is not a matcher.
+ *
+ * Deliberately conservative. English inflection has a long tail and this handles the regular
+ * cases; the guards below exist so it does not mangle the short, uninflected identifiers these
+ * paths are full of. `hcg`, `hgh`, `iu` and `sars` must survive intact, and `-ss`, `-us` and `-is`
+ * endings are not plurals.
+ */
+export function inflectionKey(token: string): string {
+  if (token.length <= 3) return token;
+  if (/(ss|us|is|as|os)$/.test(token)) return token;
+
+  if (token.endsWith('ies') && token.length > 4) return `${token.slice(0, -3)}y`;
+  if (/(ch|sh|x|z|s)es$/.test(token)) return token.slice(0, -2);
+  if (token.endsWith('s')) return token.slice(0, -1);
+  return token;
 }
 
 /** Parses a discovered URL into the form the matcher works on. Returns null if unparseable. */
@@ -181,7 +222,10 @@ export function containsTokenSequence(
   for (let start = 0; start <= limit; start += 1) {
     let matched = true;
     for (let offset = 0; offset < patternTokens.length; offset += 1) {
-      if (tokens[start + offset] !== patternTokens[offset]) {
+      // Compared on inflection key, so `tablet` matches `tablets` and vice versa (D-159).
+      const a = tokens[start + offset];
+      const b = patternTokens[offset];
+      if (a === undefined || b === undefined || inflectionKey(a) !== inflectionKey(b)) {
         matched = false;
         break;
       }

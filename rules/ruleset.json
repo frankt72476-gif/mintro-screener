@@ -583,11 +583,11 @@
           "therapeutic",
           "symptom",
           "injury",
-          "disease",
-          "condition"
+          "disease"
         ],
         "expect": "absent",
-        "note": "High false-positive rate. Review only."
+        "note": "High false-positive rate. Review only. 'condition' was removed in D-159: it is a disease word and a legal-boilerplate word, and every storefront's footer carries 'Terms & Conditions'. A real claim about a condition is caught by 'treat' or 'cure' in the same sentence.",
+        "word_boundary": true
       }
     },
     {
@@ -1119,8 +1119,9 @@
       "source": "programme",
       "params": {
         "surface": "product",
-        "selector": "[class*=review], [class*=testimonial], [data-product-reviews]",
-        "expect": "absent"
+        "selector": "[itemtype*=\"schema.org/Review\"], [itemtype*=\"schema.org/AggregateRating\"], [itemprop=\"review\"], [itemprop=\"aggregateRating\"], [data-product-reviews]",
+        "expect": "absent",
+        "note": "Located by review markup a plugin emits for search engines, not by a class name the theme chose (D-159). The old selector [class*=review] matched 'preview' and missed any theme naming its section differently. A testimonial written as plain prose with no markup is not detected, and the finding says so."
       }
     },
     {

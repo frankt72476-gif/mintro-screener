@@ -24,15 +24,24 @@ const textRule = (id: string): RuleOfType<'text_match'> => {
 const PAY_001 = textRule('PAY-001');
 
 describe('PAY-001 - the surfaces where these rails are advertised (D-049)', () => {
+  // `required` is what the floor is counted on (D-158); the label is prose and must not be.
   const footerSurface = (text: string) => ({
     label: 'the homepage footer',
     text,
     url: 'https://shop.example/',
+    required: 'footer' as const,
   });
   const policySurface = (text: string) => ({
     label: 'the terms document (https://shop.example/terms)',
     text,
     url: 'https://shop.example/terms',
+    required: 'terms' as const,
+  });
+  /** A surface that widens coverage and does not count toward the floor. */
+  const faqSurface = (text: string) => ({
+    label: 'the FAQ (https://shop.example/faq)',
+    text,
+    url: 'https://shop.example/faq',
   });
 
   /**
@@ -86,16 +95,54 @@ describe('PAY-001 - the surfaces where these rails are advertised (D-049)', () =
     const finding = checkPaymentTerms(PAY_001, []);
 
     expect(finding.state).toBe('not_evaluable');
-    expect(finding.notEvaluableKind).toBe('not_exposed');
-    expect(finding.note).toContain('none of the surfaces this rule names was read');
+    // Both required surfaces exist on any real storefront, so missing them is a fact about the
+    // run rather than about the merchant (D-158).
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
+    expect(finding.note).toContain('the homepage footer and the terms document');
   });
 
-  it('names only the surfaces it actually read', () => {
-    const finding = checkPaymentTerms(PAY_001, [footerSurface('(c) Shop.')]);
+  /*
+    The floor, and the reason it is a named pair rather than a count (D-158).
 
-    expect(finding.state).toBe('pass');
-    expect(finding.note).toContain('1 public surface(s): the homepage footer');
-    // The terms document was not read on this run, so it must not appear.
-    expect(finding.note).not.toContain('terms document');
+    A `pass` on the footer alone states that peer-to-peer rails are not offered, on evidence
+    covering half the surface the rule declares — which is what this file's header has said all
+    along and what the check did anyway.
+  */
+  it('is not_evaluable on the footer alone, however clean the footer is', () => {
+    const finding = checkPaymentTerms(PAY_001, [footerSurface('(c) Shop. Visa, Mastercard.')]);
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
+    expect(finding.note).toContain('the terms document');
+  });
+
+  it('is not_evaluable on the terms document alone', () => {
+    const finding = checkPaymentTerms(PAY_001, [policySurface('All orders are processed by card.')]);
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.note).toContain('the homepage footer');
+  });
+
+  it('does not let a discovered surface stand in for a required one', () => {
+    // A merchant with no FAQ and a merchant whose FAQ we failed to fetch are indistinguishable, so
+    // counting the FAQ toward the floor would reintroduce exactly what the floor fixes.
+    const finding = checkPaymentTerms(PAY_001, [
+      footerSurface('(c) Shop.'),
+      faqSurface('We ship worldwide.'),
+      faqSurface('Orders arrive in 3 days.'),
+    ]);
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.note).toContain('the terms document');
+  });
+
+  it('does not fail on a term seen before the floor is met either (D-156)', () => {
+    // Symmetric with checkHttpProbe. A violation found on half the declared surface is still a
+    // verdict on data not fully obtained, and a finding that depends on which surface happened to
+    // load is not one an automatic decline can rest on. The term is still in the note.
+    const finding = checkPaymentTerms(PAY_001, [footerSurface('Pay by Zelle for 10% off.')]);
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
   });
 });

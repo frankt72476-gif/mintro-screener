@@ -15,6 +15,7 @@ import type { PageContext } from '../page.js';
 import { isRendered } from '../page.js';
 import { notEvaluable, satisfied, violation, type Finding } from '../findings.js';
 import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
+import { splitAlphaNumeric } from '../slug.js';
 
 /** One place where a term from each class fell within the window. */
 export interface Cooccurrence {
@@ -98,9 +99,22 @@ export function findCooccurrences(
   classB: readonly string[],
   windowTokens: number,
 ): Cooccurrence[] {
+  /*
+    Letter/digit boundaries are token boundaries (D-159).
+
+    `5mg` used to be a single token, which is not equal to `mg`, so class A never matched it — and
+    `5mg` is how peptide storefronts write a mass. Measured on the validation storefronts: two of
+    three had **zero** space-separated masses, so on those pages class A could not have matched
+    anything whatever the page said. `"BPC-157 5mg twice daily subcutaneous"` scored zero hits and
+    the rule reported a clean pass.
+
+    The same constraint-9 trap as the plurals in `findMatches`: the check recognised one spelling
+    of its own subject and was blind to the common one.
+  */
   const tokens = text
     .toLowerCase()
     .split(/[^a-z0-9]+/)
+    .flatMap(splitAlphaNumeric)
     .filter((token) => token !== '');
 
   const positionsA = locate(tokens, classA);

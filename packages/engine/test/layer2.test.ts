@@ -46,7 +46,9 @@ function productPage(overrides: Partial<PageContext> = {}): PageContext {
     shop: { productUrls: [], collectionUrls: [], catalogueEntryUrls: [], signals: [] },
     footerPaymentTerms: [],
     gate: NO_GATE,
-    selectorMatches: { '[class*=review], [class*=testimonial], [data-product-reviews]': 0 },
+    // Keyed off the rule's own selector rather than a copy of it, so changing the selector in the
+    // rule set cannot leave this fixture silently answering a question nobody asked (D-159).
+    selectorMatches: { [offs002Selector]: 0 },
     productTitle: 'BPC-157',
     capturedAt: '2026-08-20T00:00:00.000Z',
     screenshotKey: 'run-1/layer2/shot.png',
@@ -152,6 +154,14 @@ describe('findCooccurrences', () => {
     expect(findCooccurrences('5 mg per day', ['mg'], ['per day'], 6)).toHaveLength(1);
   });
 });
+
+/** OFFS-002's selector, read from the rule set. */
+const offs002Selector = (() => {
+  const rule = ruleset.rules.find((r) => r.id === 'OFFS-002');
+  const selector = rule !== undefined && rule.type === 'dom_assert' ? rule.params.selector : undefined;
+  if (selector === undefined) throw new Error('OFFS-002 has no selector');
+  return selector;
+})();
 
 describe('runLayer2', () => {
   it('produces a finding for every layer 2 rule', () => {

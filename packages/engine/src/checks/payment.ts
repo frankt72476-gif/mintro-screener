@@ -26,7 +26,28 @@ export interface PublicSurface {
   readonly label: string;
   readonly text: string;
   readonly url: string;
+  /**
+   * Whether this surface is one of the two the rule requires (D-158).
+   *
+   * The footer and the terms document. Discovered surfaces — FAQ, shipping, refund policy — widen
+   * what was read and never count toward the floor.
+   */
+  readonly required?: 'footer' | 'terms';
 }
+
+/**
+ * The surfaces PAY-001 must have read before it may return a verdict (D-158).
+ *
+ * **A named minimum, not a count of what happened to be found.** `checkPaymentTerms` required at
+ * least one surface, which let a run that reached the footer and failed at everything else return
+ * `pass` — a verdict on data it did not fully obtain, which D-156 forbids.
+ *
+ * Counting *discovered* surfaces toward the floor would reintroduce the problem it fixes: a
+ * merchant with no FAQ and a merchant whose FAQ we failed to fetch are indistinguishable from the
+ * candidate list, so "we read four of five" is not a statement anyone can check. These two exist on
+ * any real storefront, so failing to read either is a fact about the run.
+ */
+const REQUIRED_SURFACES = ['footer', 'terms'] as const;
 
 /**
  * PAY-001 — peer-to-peer payment rails, on the surfaces where they are advertised (D-049).
@@ -49,6 +70,32 @@ export function checkPaymentTerms(
   surfaces: readonly PublicSurface[],
 ): Finding {
   const terms = rule.params.terms ?? [];
+
+  /*
+    The floor is checked **before** anything is matched (D-156, D-158).
+
+    Not after. A violation found on half the declared surface is still a verdict on data not fully
+    obtained, and D-156 forbids it in both directions for the same reason: the finding has to be
+    the same on a second run, and one that depends on which surface happened to load is not. This
+    is the same discipline `checkHttpProbe` applies when one probed path did not answer.
+  */
+  const missing = REQUIRED_SURFACES.filter(
+    (needed) => !surfaces.some((surface) => surface.required === needed),
+  );
+
+  if (missing.length > 0) {
+    const names = { footer: 'the homepage footer', terms: 'the terms document' };
+    return notEvaluable(
+      rule,
+      `this rule reports on ${names.footer} and ${names.terms} together, and ` +
+        `${missing.map((m) => names[m]).join(' and ')} ${missing.length === 1 ? 'was' : 'were'} not read` +
+        `${surfaces.length === 0 ? '' : `; ${surfaces.length} other surface(s) were: ${surfaces.map((surface) => surface.label).join(', ')}`}. ` +
+        `A term absent from part of the public surface is not a term absent from it`,
+      'rendered_page',
+      // Both surfaces exist on any real storefront, so not reaching one is a fact about this run.
+      'not_retrieved',
+    );
+  }
 
   const hits: string[] = [];
   const where: string[] = [];
@@ -84,16 +131,6 @@ export function checkPaymentTerms(
         `${read.length} public surface(s) were read: ${read.join(', ')}.`,
       'rendered_page',
       evidence,
-    );
-  }
-
-  if (surfaces.length === 0) {
-    return notEvaluable(
-      rule,
-      'none of the surfaces this rule names was read: no footer was identified on the homepage and ' +
-        'no public payment or policy page was reached',
-      'rendered_page',
-      'not_exposed',
     );
   }
 

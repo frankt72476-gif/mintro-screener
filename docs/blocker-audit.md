@@ -1,5 +1,18 @@
 # Blocker-tier audit — the eleven candidates
 
+> **Status, 2026-08-28.** This is the audit **as found**, kept as the record of what was wrong.
+> Three rulings and a repair followed it and parts of it are now historical:
+>
+> - **D-157** — PROD-005, PROD-008 and OFFS-002 **left the list**; they are `review_only` and a
+>   blocker tier may not override hard constraint 4 by side effect. **The candidates are eight.**
+> - **D-158** — PAY-001's open item in §1 is **closed**: the floor is the homepage footer and the
+>   terms document, checked before any term is matched.
+> - **D-159** — the plural blindness in §2 and the three false-decline matchers in §3 are
+>   **repaired**, with two-sided fixtures. §2's table now reads *match* on every row.
+>
+> §4 (evidence sufficiency) and §5 (the two rulings the audit could not make) stand as written,
+> except that §5's first item is what D-157 settled. The 54-rule matrix is in the appendix.
+
 Run after the D-156 acquisition ruling was applied, so every statement below describes current
 behaviour. Supersedes the brief in `docs/blocker-audit-brief.md`, which stays for the framing.
 
@@ -212,3 +225,89 @@ defining before the D-156 rule can be applied to it.
 The narrowest set that could gate a decline today, on this audit's evidence, is **PROD-006** —
 distinctive terms, word boundaries, `auto_fail`, acquisition-guarded, evidence-backed — with its
 third-party-content exposure stated. Every other candidate has at least one open item above.
+
+---
+
+# Appendix — the 54-rule matrix (D-159 sweep)
+
+How every rule locates its subject, and whether that locator was form-dependent. Generated from
+`rules/ruleset.json`; `wb` is `word_boundary`.
+
+Counts: **26** repaired by D-159 · **11** `manual`, not evaluated by the crawl · **3** structural
+(request outcome or resolved style, no term matching) · **14** `dom_assert` / `doc_parse` reviewed
+individually below.
+
+| rule | cat | type | tier | expect | wb | how it locates its subject | form-blindness |
+|---|---|---|---|---|---|---|---|
+| CATG-001 | catalog | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| CATG-002 | catalog | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| CATG-003 | catalog | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| CATG-004 | catalog | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| CATG-005 | catalog | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| CATG-006 | catalog | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| CATG-007 | catalog | `url_pattern` | review_only | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| COA-001 | coa | `dom_assert` | review_only | present | — | CSS selector / link text / region | SEE NOTES |
+| COA-002 | coa | `doc_parse` | auto_fail | — | — | patterns over a fetched document | SEE NOTES |
+| COA-003 | coa | `doc_parse` | auto_fail | — | — | patterns over a fetched document | SEE NOTES |
+| COA-004 | coa | `doc_parse` | review_only | — | — | patterns over a fetched document | SEE NOTES |
+| COA-005 | coa | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| COA-006 | coa | `doc_parse` | review_only | — | — | patterns over a fetched document | SEE NOTES |
+| COMM-001 | comms | `text_cooccurrence` | review_only | — | — | alphanumeric-split token windows | fixed D-159 |
+| COMM-002 | comms | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| COMM-003 | comms | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| DISC-001 | disclose | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| DISC-002 | disclose | `computed_style` | auto_fail | — | — | resolved style of located text | structural |
+| DISC-003 | disclose | `dom_assert` | auto_fail | present | — | CSS selector / link text / region | SEE NOTES |
+| FULF-001 | fulfil | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| FULF-002 | fulfil | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| FULF-003 | fulfil | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| FULF-004 | fulfil | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| FULF-005 | fulfil | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| GATE-001 | gate | `dom_assert` | review_only | present | — | CSS selector / link text / region | SEE NOTES |
+| GATE-002 | gate | `http_probe` | auto_fail | status seen | — | request outcome per path | structural |
+| GATE-003 | gate | `flow_probe` | auto_fail | stage reached | — | flow stage reached | structural |
+| GATE-004 | gate | `dom_assert` | review_only | present | — | CSS selector / link text / region | SEE NOTES |
+| GATE-005 | gate | `dom_assert` | review_only | present | — | CSS selector / link text / region | SEE NOTES |
+| GATE-006 | gate | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| GATE-007 | gate | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| NAME-001 | naming | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| NAME-002 | naming | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| NAME-003 | naming | `text_match` | review_only | — | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| OFFS-001 | offsite | `url_pattern` | auto_fail | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| OFFS-002 | offsite | `dom_assert` | review_only | absent | — | CSS selector / link text / region | SEE NOTES |
+| OFFS-003 | offsite | `dom_assert` | review_only | — | — | CSS selector / link text / region | SEE NOTES |
+| OFFS-004 | offsite | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| OFFS-005 | offsite | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| OFFS-006 | offsite | `url_pattern` | review_only | absent | — | inflection-aware token sequence over the URL path | fixed D-159 |
+| OFFS-007 | offsite | `dom_assert` | review_only | absent | — | CSS selector / link text / region | SEE NOTES |
+| PAY-001 | payment | `text_match` | auto_fail | absent | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PAY-002 | payment | `manual` | review_only | — | — | not evaluated by the crawl | n/a |
+| PAY-003 | payment | `dom_assert` | review_only | present | — | CSS selector / link text / region | SEE NOTES |
+| PROD-001 | product | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-002 | product | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-003 | product | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-004 | product | `text_match` | review_only | present | no | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-005 | product | `text_cooccurrence` | review_only | — | — | alphanumeric-split token windows | fixed D-159 |
+| PROD-006 | product | `text_match` | auto_fail | absent | yes | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-007 | product | `text_match` | auto_fail | absent | yes | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-008 | product | `text_match` | review_only | absent | yes | term list over rendered sentences, scoped to claims | fixed D-159 |
+| PROD-009 | product | `dom_assert` | review_only | absent | — | CSS selector / link text / region | SEE NOTES |
+| PROD-010 | product | `text_match` | review_only | absent | yes | term list over rendered sentences, scoped to claims | fixed D-159 |
+
+## The fourteen selector and document rules
+
+None is in the blocker eight — OFFS-002 left the list under D-157 — and the sweep found no second
+instance of the plural/unspaced defect in them, because none matches free text against a term list.
+Two are worth naming:
+
+**DISC-003** is `auto_fail`, `critical` and `expect: present`. It is the only rule in the set whose
+degraded direction is a **false decline**: an under-rendered page makes a displayed disclaimer look
+absent and the merchant fails for it. D-156 closed the acquisition half — a partial sample is now
+`not_evaluable` — but a page that renders successfully and incompletely is not covered by anything.
+It is the first candidate for the next sweep.
+
+**COA-002 and COA-003** are `auto_fail` and depend on a certificate being fetched and parsed. They
+carry no `expect`, so their degraded direction has to be read from the handler rather than the rule;
+they were not examined in depth here and are the second candidate.
+
+Everything else in the fourteen is `review_only` and cannot gate a decline.

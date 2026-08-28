@@ -184,17 +184,30 @@ function registerFinding(rule: RuleOfType<'dom_assert'>, signup: SignupForm): Fi
 function publicSurfaces(input: Layer3Input): readonly PublicSurface[] {
   const surfaces: PublicSurface[] = [];
 
+  /*
+    The two required surfaces are tagged; the rest widen coverage and never count toward the floor
+    (D-158). `required` is what `checkPaymentTerms` reads — the label is prose and must not be.
+  */
   const footer = input.homepage?.footer;
   if (footer !== undefined && footer.found) {
     surfaces.push({
       label: 'the homepage footer',
       text: footer.text,
       url: input.homepage?.finalUrl ?? '',
+      required: 'footer',
+    });
+  }
+
+  if (input.terms !== undefined) {
+    surfaces.push({
+      label: `the terms document (${input.terms.finalUrl})`,
+      text: input.terms.text,
+      url: input.terms.finalUrl,
+      required: 'terms',
     });
   }
 
   for (const [label, page] of [
-    ['the terms document', input.terms],
     ['the shipping policy', input.shipping],
     ['the FAQ', input.faq],
     ['the payment or refund policy', input.payment],

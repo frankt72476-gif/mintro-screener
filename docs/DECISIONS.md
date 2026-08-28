@@ -9445,3 +9445,169 @@ completeness means for a discovered surface set is a business ruling. Recorded i
 `docs/blocker-audit.md` §1 as the one open item on the acquisition axis.
 
 ---
+
+## D-157 — The blocker list is eight, and `review_only` is not overridden by a side effect
+
+**2026-08-28 · business owner**
+
+PROD-005, PROD-008 and OFFS-002 leave the blocker candidate list. It is now: **CATG-001, CATG-002,
+CATG-003, CATG-004, PROD-006, PROD-007, NAME-001, PAY-001.**
+
+All three removed rules are `tier: review_only`, and hard constraint 4 says what that means:
+*"Rules marked `review_only` go to a human queue regardless of confidence… Severity never overrides
+this — see D-009."* A blocker tier that declined on them would override that constraint **as a side
+effect of a feature**, which is the wrong way for a constraint of that weight to fall.
+
+If one of them should auto-decline, the route is to reclassify it `auto_fail`, and that
+reclassification needs its own justification recorded as its own decision — argued on the rule's
+merits, not inherited from a tier it was put in. Not now, and not as a consequence of the matcher
+work.
+
+They stay in the report as review findings and their matchers are repaired under D-159 anyway. A
+rule that does not gate still renders to IQwallet, and a false `review` is still noise a human pays
+for.
+
+Worth recording that the three removed are the three the audit found the worst matchers on. The
+constraint and the evidence pointed the same way, which is some comfort about the constraint.
+
+---
+
+## D-158 — PAY-001 reads a named minimum, not a count
+
+**2026-08-28 · business owner**
+
+D-156 left PAY-001 as the one blocker candidate still able to return a verdict on partial
+acquisition: `checkPaymentTerms` required *at least one* surface, so a run that reached the footer
+and failed at everything else returned `pass` on the footer alone.
+
+**The floor is the homepage footer and the terms document.** Read both, return a verdict. Reach
+fewer, `not_evaluable`.
+
+**Discovered surfaces do not count toward it.** The FAQ, the shipping policy and the refund policy
+still widen what was read and are still named in the finding, and none of them can substitute for a
+required one. Counting them would reintroduce exactly what the floor fixes: a merchant with no FAQ
+and a merchant whose FAQ we failed to fetch are indistinguishable from the candidate list, so "four
+of five surfaces" is not a statement anyone can check. The two required surfaces exist on any real
+storefront, so failing to read either is a fact about the run — `not_retrieved`, not `not_exposed`.
+
+The floor is checked **before** any term is matched, not after. That is D-156 applied symmetrically:
+a rail found on half the declared surface is still a verdict on data not fully obtained, and a
+finding that depends on which surface happened to load is not one an automatic decline can rest on.
+It is the same discipline `checkHttpProbe` applies when one probed path did not answer.
+
+`required` is a field on the surface, not a substring of its label. A floor counted by reading prose
+would be a floor that moves when someone rewords a label.
+
+---
+
+## D-159 — A matcher that cannot recognise the natural form of its subject is not a matcher
+
+**2026-08-28 · business owner's ruling, applied**
+
+Five of the eight blocker candidates were blind to plurals and PROD-005 was blind to unspaced units.
+One defect in two matchers, and it is the constraint-9 trap in the `expect: absent` direction: a
+check that locates its subject by matching one particular form is blind to every other form, and
+those are the merchants it exists to catch.
+
+**Fixed in the matchers, not in the rule sets.** Adding plurals to every rule's `patterns` would
+work today and hand the same defect to whoever writes the next rule — who would have to know to do
+it, and would not.
+
+### `findMatches` — inflection and letter/digit boundaries
+
+Token comparison is on an inflection key, so `tablet` matches `tablets` and back. Deliberately
+conservative: nothing under four characters is stemmed, `-ss`, `-us`, `-is`, `-as` and `-os`
+endings are left alone, so `hcg`, `hgh` and `iu` survive intact.
+
+`tokenizePath` also splits letter/digit boundaries, so `hcg5000` is two tokens. A merchant writing
+the strength against the name is not writing a different word.
+
+Re-driven against the eight cases the audit found failing, plus the live one:
+
+| rule | URL | before | after |
+|---|---|---|---|
+| CATG-001 | `/product/syringes-10pack/` | miss | **match** |
+| CATG-001 | `/product/needles/` | miss | **match** |
+| CATG-002 | `/product/alcohol-wipes/` | miss | **match** |
+| CATG-002 | `/product/alcohol-prep-pads/` | miss | **match** |
+| CATG-003 | `/product/hcg5000/` | miss | **match** |
+| CATG-004 | `/product/mk-677-tablets/` | miss | **match** |
+| CATG-004 | `/product/rad-140-pills/` | miss | **match** |
+| CATG-004 | `/product/60-softgels/` | miss | **match** |
+| NAME-001 | `swisschems.is/product-category/nootropics/` | miss | **match** |
+
+And the distractors still miss: `sterile-wipes` is not an alcohol wipe, `needlepoint-kit` is not a
+needle, `mk-677-60-capsules` is CATG-006's subject and not CATG-004's.
+
+### `findCooccurrences` — the same split, for units
+
+`5mg` was one token and not equal to `mg`, so PROD-005's class A never matched it. Measured
+earlier: two of three validation storefronts had **zero** space-separated masses, so on those pages
+class A could not have matched anything whatever the page said, and *"BPC-157 5mg twice daily
+subcutaneous"* scored zero and passed.
+
+Now: `5mg`, `250mcg`, `10IU`, `2.5mg/week` and every spaced form are recognised. A mass alone still
+does not fire — *"Vial contains 10mg of lyophilised powder"* is zero hits, which is the rule's own
+note: *"Mass alone is a legitimate quantity spec."*
+
+### The three false-decline matchers
+
+**PROD-008.** Three changes. `condition` is removed from the term list: it is a disease word and a
+legal-boilerplate word, every storefront's footer carries *Terms & Conditions*, and a real claim
+about a condition is caught by `treat` or `cure` in the same sentence. `word_boundary` is set, which
+keeps `cure` out of *se**cure** checkout* and `heal` out of *health*. And claim scoping, below.
+
+**PROD-007.** No rule change; claim scoping alone. Route words inside a cited abstract are the
+literature's words.
+
+**OFFS-002.** The selector was `[class*=review]`, which matched `preview` and depended on the theme
+naming its section "review" — constraint 9 in both directions at once. It is now the review markup a
+plugin emits for search engines: `schema.org/Review`, `schema.org/AggregateRating`, `itemprop`
+equivalents, and the existing data attribute. Theme-independent, and present only where there is
+actual review data rather than an empty tab container.
+
+**Stated rather than approximated:** a testimonial written as plain prose with no markup at all is
+not detected. The handler's wording already scopes itself to the markup searched — *"no review-widget
+markup was observed"*, never *"no testimonials"* — and that remains the honest limit of the check.
+
+### Claim scoping
+
+An `expect: absent` text rule asks whether the merchant **says** a thing. It was asking whether the
+characters appear, and the difference is where every false decline lived. Occurrences are now
+classified by the sentence they sit in:
+
+- **claim** — counts.
+- **negated** — the sentence denies it. Not a claim, and usually the opposite: the FDA disclaimer
+  contains four of PROD-008's terms and its presence is evidence of compliance.
+- **attributed** — quoted or cited. **`not_evaluable`, not `pass`** — attributing someone else's
+  sentence to a merchant is a claim this project does not make, and calling the page clean because
+  the only mentions were in a citation would be the false-clean half of the same error.
+
+Attribution is judged over a sentence **and its neighbours**, because a citation is never one
+sentence: *"Sikiric P, et al. | Therapeutic potential of BPC-157 in injury models. | J. Biol. Chem.
+(2019)."* splits into three and the middle one — the one carrying the terms — holds no marker.
+
+The excluded sentences are named in the finding, so a reader sees what was set aside and why.
+
+**The stated failure mode:** *"this product is not just a supplement, it cures X"* carries a
+negation cue and a real claim, and is classified `negated`. That miss is accepted because the
+alternative — firing on every storefront that publishes the required disclaimer — is a rule nobody
+can act on.
+
+### One regression, caught by the re-run
+
+Claim scoping was first written with a leading word boundary only. `Cagri` then matched
+`Cagrilintide` — the correct chemical name PROD-010 exists to encourage — and comopeptides went
+`pass` → `review` on a page selling it. The scoping was imposing its own matching terms instead of
+honouring the rule's `word_boundary`, which PROD-010's note had already specified: *"Substring of
+legitimate chemical names. Word-boundary tokenization mandatory."*
+
+Fixed by reading the flag from the rule. And then the anchoring had to learn inflection too, because
+`\bcure\b` does not match *"this peptide **cures** inflammation"* — the same defect this decision is
+about, appearing inside its own fix. The suffix list is closed (`s`, `es`, `d`, `ed`, `ing`) so
+`heal` still does not reach `health` and `Cagri` still does not reach `Cagrilintide`.
+
+That sequence is the argument for the two-sided fixtures. It was not caught by reasoning about the
+matcher; it was caught by re-running a real storefront and asking why one rule moved.
+
+---

@@ -14,6 +14,7 @@ import { isRendered } from '../page.js';
 import { notEvaluable, satisfied, violation, type Finding } from '../findings.js';
 import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
 import { bestResemblance, splitStatements } from '../textSimilarity.js';
+import { scopeTerms, termsAt } from '../claimScope.js';
 
 /** Surfaces this handler can locate on a rendered page. */
 // `terms` joined this list when Layer 3 learned to fetch the document (D-048). A surface is in
@@ -495,30 +496,76 @@ function termsFinding(
   terms: readonly string[],
 ): Finding {
   const wordBoundary = rule.params.word_boundary === true;
-  const found = terms.filter((term) => containsTerm(haystack, normalise(term), wordBoundary));
   const expect = rule.params.expect ?? 'absent';
-  const violates = expect === 'absent' ? found.length > 0 : found.length === 0;
 
-  if (!violates) {
-    // D-018: a clean `expect: absent` result names the surface it searched. "4 terms were
-    // checked; none was observed" named neither what was searched nor how far the search
-    // reached, which invites reading it as a claim about the merchant rather than the page.
+  /*
+    An `expect: absent` rule asks whether the merchant *says* a thing (D-159).
+
+    It was asking whether the characters appear, which is a narrower question, and the difference
+    is every false decline the audit found: PROD-008 fired on the FDA compliance disclaimer — the
+    sentence whose presence is evidence of compliance — on all four storefronts tested, and
+    PROD-007 fired on route words inside cited abstracts.
+
+    So occurrences are scoped by the sentence they sit in, and the three outcomes are kept apart:
+    a claim counts, a negation does not, and quoted material resolves to `not_evaluable` rather
+    than to either. Attributing someone else's sentence to a merchant is a claim this project does
+    not make; reporting a clean result because the only mentions were in a citation would be the
+    false-clean half of the same error.
+
+    `expect: present` is untouched by this. It asks whether required wording is *there*, and a
+    disclaimer that says "we do not X" is still the page carrying that wording.
+  */
+  if (expect === 'absent') {
+    const scoped = scopeTerms(page.text, terms, wordBoundary);
+    const claims = termsAt(scoped, 'claim');
+    const negated = termsAt(scoped, 'negated');
+    const attributed = termsAt(scoped, 'attributed');
+
+    if (claims.length > 0) {
+      const setAside =
+        negated.length + attributed.length === 0
+          ? ''
+          : ` Not counted: ${[...negated, ...attributed].map((t) => `'${t}'`).join(', ')} appeared only in negated or quoted sentences.`;
+      return violation(rule, `Observed: ${quote(claims)}.${setAside}`, RENDERED, withMatch(page, claims.join(', ')));
+    }
+
+    if (attributed.length > 0) {
+      const example = scoped.find((hit) => hit.scope === 'attributed')?.sentence ?? '';
+      return notEvaluable(
+        rule,
+        `${quote(attributed)} appeared only in sentences carrying a citation, so the words could ` +
+          `not be attributed to the merchant rather than to a cited source. Nearest: "${truncate(example, 160)}"`,
+        RENDERED,
+        'not_applicable',
+        pageEvidence(page),
+      );
+    }
+
     const scope = rule.params.surface === 'all_sampled' ? 'this sampled page' : `the ${rule.params.surface}`;
+    const excluded =
+      negated.length === 0
+        ? ''
+        : ` ${quote(negated)} appeared only in sentences that deny them, which is not a claim.`;
     return satisfied(
       rule,
-      expect === 'absent'
-        ? `None of ${terms.length} prohibited term(s) was observed in the rendered text of ${scope}: ${quote(terms)}. Text not rendered on the page was not examined.`
-        : `Observed: ${quote(found)}.`,
+      `None of ${terms.length} prohibited term(s) was claimed in the rendered text of ${scope}: ` +
+        `${quote(terms)}.${excluded} Text not rendered on the page was not examined.`,
       RENDERED,
       pageEvidence(page),
     );
   }
 
+  const found = terms.filter((term) => containsTerm(haystack, normalise(term), wordBoundary));
+  const violates = found.length === 0;
+
+  // Only `expect: present` reaches here; the absent branch returned above.
+  if (!violates) {
+    return satisfied(rule, `Observed: ${quote(found)}.`, RENDERED, pageEvidence(page));
+  }
+
   return violation(
     rule,
-    expect === 'absent'
-      ? `Observed: ${found.map((f) => `'${f}'`).join(', ')}.`
-      : `None of the expected terms was observed: ${terms.map((t) => `'${t}'`).join(', ')}.`,
+    `None of the expected terms was observed: ${terms.map((t) => `'${t}'`).join(', ')}.`,
     RENDERED,
     found.length > 0 ? withMatch(page, found.join(', ')) : pageEvidence(page),
   );
