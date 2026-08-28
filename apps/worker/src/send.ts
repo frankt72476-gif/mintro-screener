@@ -11,6 +11,7 @@
  * when.** That makes it the load-bearing part of this module, not the email.
  */
 
+import { createHash } from 'node:crypto';
 import { auditAnalystNote, type ScreeningReport } from '@mintro/engine';
 import { REPORT_CONTACT_LINE } from './contactLine.js';
 
@@ -127,11 +128,35 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
  * It returns an outcome rather than throwing, because a refused send is a fact the log has to
  * carry, not an exception the caller may or may not catch.
  */
-export async function postToResend(apiKey: string, payload: Record<string, unknown>): Promise<SendOutcome> {
+export async function postToResend(
+  apiKey: string,
+  payload: Record<string, unknown>,
+  /**
+   * Resend's `Idempotency-Key`, when the caller can name this message (D-149).
+   *
+   * A retry carrying the same key returns the original response **without sending again**, for 24
+   * hours. That is what closes the crash window between the provider accepting a message and our
+   * recording that it did: the queue row stays `running`, the stale-claim reclaim runs the job a
+   * second time, and the second send is absorbed by the provider rather than landing in an inbox.
+   *
+   * **The key must cover the content, not just the job.** Resend hashes the normalised body and
+   * returns `409 invalid_idempotent_request` if the same key arrives with a different one — so a key
+   * naming only the job would turn a legitimately-changed message into a job that can never send.
+   * `idempotencyKeyFor` folds a content digest in, which makes changed content a different key and
+   * therefore a different message, which is what it is.
+   *
+   * Omitted means at-least-once, and callers that omit it say why.
+   */
+  idempotencyKey?: string,
+): Promise<SendOutcome> {
   try {
     const response = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
+      },
       body: JSON.stringify(payload),
     });
 
@@ -305,11 +330,25 @@ export function attachmentName(report: ScreeningReport): string {
 
 export interface Message {
   readonly from: string;
-  readonly to: string;
+  /**
+   * One recipient, or several on one message.
+   *
+   * A list is one email with several addresses in `To:`, not several emails. That matters for the
+   * response-round notification (D-143): the operator side is three people, they are told the same
+   * thing at the same moment, and three separate sends would be three things that can independently
+   * fail — leaving the record saying two of three were told and no obvious way to say which.
+   */
+  readonly to: string | readonly string[];
   readonly replyTo?: string;
   readonly subject: string;
   readonly text: string;
+  /** See `postToResend`. Absent means this message may be sent twice after a crash (D-149). */
+  readonly idempotencyKey?: string;
 }
+
+/** Recipients as a list, whichever way the caller expressed them. */
+export const recipientsOf = (to: Message['to']): readonly string[] =>
+  typeof to === 'string' ? [to] : to;
 
 export interface Messenger {
   send(message: Message): Promise<SendOutcome>;
@@ -321,15 +360,62 @@ export function createResendMessenger(apiKey: string): Messenger {
   return {
     description: 'Resend',
     async send(message) {
-      return postToResend(apiKey, {
-        from: message.from,
-        to: [message.to],
-        subject: message.subject,
-        text: message.text,
-        ...(message.replyTo === undefined ? {} : { reply_to: [message.replyTo] }),
-      });
+      return postToResend(
+        apiKey,
+        {
+          from: message.from,
+          to: [...recipientsOf(message.to)],
+          subject: message.subject,
+          text: message.text,
+          ...(message.replyTo === undefined ? {} : { reply_to: [message.replyTo] }),
+        },
+        message.idempotencyKey,
+      );
     },
   };
+}
+
+/**
+ * A key naming one message: this job, and this content (D-149).
+ *
+ * Two halves, and both are load-bearing.
+ *
+ * **The job id** scopes the key so two different jobs never collide, however similar their text.
+ *
+ * **The content digest** is what makes a retry safe. Resend normalises and hashes the request body
+ * against the stored key, and answers `409 invalid_idempotent_request` when the same key arrives
+ * with different content. A key naming only the job would therefore turn a message whose content
+ * legitimately changed between the crash and the reclaim — another responder submitted, so the
+ * count line moved — into a job that returns 409 on every attempt and can never send.
+ *
+ * With the digest folded in, the semantics land where they should:
+ *
+ *   same job, same words   →  the provider returns the first response and sends nothing
+ *   same job, new words    →  a different key, and a different message goes, which it is
+ *
+ * Resend's own suggested shape is `<event-type>/<entity-id>`; this adds the digest and stays well
+ * inside the 256-character limit.
+ */
+export function idempotencyKeyFor(
+  scope: string,
+  jobId: string,
+  parts: readonly (string | undefined)[],
+): string {
+  /*
+    Hashed as JSON, not as a joined string.
+
+    Any separator character can appear inside a subject or a body, so joining would let two
+    different part lists produce one digest — and a digest collision here means a message that
+    changed is treated as one that did not, and never sent. `JSON.stringify` of the array is
+    unambiguous by construction and needs no escape, which is the other reason: the separator
+    written here started as a backslash-u null escape and reached the file as a literal NUL
+    byte. A control character nobody can see is not a separator anybody can review.
+  */
+  const digest = createHash('sha256')
+    .update(JSON.stringify(parts.map((part) => part ?? null)), 'utf8')
+    .digest('hex');
+
+  return `${scope}/${jobId}/${digest.slice(0, 32)}`;
 }
 
 /** Composes and posts nothing. A distinct implementation, for the reason `createDryRunMailer` is. */

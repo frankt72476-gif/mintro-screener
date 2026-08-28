@@ -26,7 +26,7 @@
  * built to be forwarded.
  */
 
-/** The four addresses, resolved. */
+/** The four senders and the notice recipients, resolved. */
 export interface MailAddresses {
   /** The IQwallet report send. */
   readonly reportFrom: string;
@@ -34,6 +34,18 @@ export interface MailAddresses {
   /** The merchant invitation (D-063). */
   readonly inviteFrom: string;
   readonly inviteReplyTo: string;
+  /**
+   * Who is told about a response round (D-143). Empty means nobody is configured.
+   *
+   * The only *recipient* list this file resolves, and it is here for the reason the senders are:
+   * **the worker refuses to start on a malformed one.** A bad `RESPONSE_NOTICE_TO` would otherwise
+   * be discovered one notice at a time, as a provider rejection recorded on a queue row that
+   * nobody reads — an operator not being told, in a form that looks like nothing happening.
+   *
+   * Empty is not an error. It means the notification goes to the analyst who issued the invitation,
+   * which is the sensible default and the behaviour when the variable is unset.
+   */
+  readonly noticeTo: readonly string[];
 }
 
 /**
@@ -62,9 +74,9 @@ export function addressesFor(env: NodeJS.ProcessEnv = process.env): MailAddresse
   const inviteFrom = pick(env, 'INVITE_MAIL_FROM', reportFrom);
   const inviteReplyTo = pick(env, 'INVITE_REPLY_TO', reportReplyTo);
 
-  const addresses = { reportFrom, reportReplyTo, inviteFrom, inviteReplyTo };
+  const senders = { reportFrom, reportReplyTo, inviteFrom, inviteReplyTo };
 
-  for (const [name, value] of Object.entries(addresses)) {
+  for (const [name, value] of Object.entries(senders)) {
     if (!ADDRESS.test(value)) {
       throw new Error(
         `${name} is not a usable email address: ${JSON.stringify(value)}. ` +
@@ -73,7 +85,28 @@ export function addressesFor(env: NodeJS.ProcessEnv = process.env): MailAddresse
     }
   }
 
-  return addresses;
+  /*
+    Comma or whitespace separated, because both are what a person types into a secret.
+
+    Every entry is checked and a bad one refuses the boot. Silently dropping the malformed entry
+    would be worse than refusing: two of three operators would be told, the third would not, and
+    nothing anyone reads would say which.
+  */
+  const noticeTo = (env['RESPONSE_NOTICE_TO'] ?? '')
+    .split(/[,\s]+/)
+    .map((address) => address.trim())
+    .filter((address) => address !== '');
+
+  for (const address of noticeTo) {
+    if (!ADDRESS.test(address)) {
+      throw new Error(
+        `RESPONSE_NOTICE_TO contains an entry that is not a usable email address: ` +
+          `${JSON.stringify(address)}. Separate addresses with commas.`,
+      );
+    }
+  }
+
+  return { ...senders, noticeTo };
 }
 
 function pick(env: NodeJS.ProcessEnv, name: string, fallback: string): string {

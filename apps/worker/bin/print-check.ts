@@ -247,6 +247,10 @@ async function main(): Promise<number> {
           invitation: { issued: true, firstOpenedAt: '2026-08-23T23:29:54.000Z', sentTo: ['a@b.co'] },
           comments: [],
           undelivered: null,
+          // Nothing has gone to IQwallet in this fixture, so no version of any response is one an
+          // underwriter could hold (D-147).
+          sentAt: [],
+          invitedAddresses: [{ address: 'a@b.co', invitedAt: '2026-08-23T20:00:00.000Z' }],
         },
       },
     });

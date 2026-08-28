@@ -1520,11 +1520,137 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .obs-more{font-style:italic}
 
 /* ------------------------------------------------------------------------------------------------
+   The merchant page's footer: saving, and saying you are finished (D-143, D-144)
+   ------------------------------------------------------------------------------------------------
+   Sits at the end of the document rather than fixed to the viewport. A bar pinned over a report
+   somebody is reading is a bar arguing with them while they read it, and this page's one rule is
+   that responding is never pressed on anyone. */
+
+.rfoot {
+  margin: 22px 0 0;
+  padding: 15px 18px;
+  border-left: 3px solid var(--line);
+}
+
+/* Always visible, never conditional on a save having happened — it answers "is this going
+   anywhere?", which is asked before the first keystroke. */
+.rfoot-auto { margin: 0 0 12px; font-size: 11.5px; line-height: 1.55; color: var(--slate); }
+
+.rfoot-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rfoot-note { font-size: 11.5px; color: var(--slate); }
+
+.rfoot-done {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.rfoot-who { margin: 12px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--slate); }
+
+/* Per-field confirmation. Quiet: the fact worth reading is the words in the box, not the receipt. */
+.cbox-saved { margin: 8px 0 0; font-size: 11px; color: var(--slate); }
+
+/* ------------------------------------------------------------------------------------------------
+   The operator's response round (D-143 … D-145)
+   ------------------------------------------------------------------------------------------------
+   Mintro's own workspace. `.printing` hides it below, because the PDF carries participation and not
+   workflow (D-146) — a rule enforced structurally by the component tree and repeated here so a
+   stray render cannot reach a printed page either. */
+
+.rround {
+  margin: 16px 0 0;
+  padding: 14px 17px;
+  border-left: 3px solid var(--line);
+}
+
+.rround-head {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 9px;
+}
+
+.rround-none { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--slate); }
+.rround-count { margin: 0; font-size: 12.5px; color: var(--ink); }
+
+/* A statement, styled as one. No badge, no colour that reads as a green light: all-in is a prompt
+   toward the operator's decision, not the system having decided (D-143). */
+.rround-allin {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--slate);
+}
+
+.rround-list { list-style: none; margin: 14px 0 0; padding: 0; }
+
+.rround-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.rround-who { font-size: 12.5px; }
+.rround-who strong { font-weight: 600; }
+
+.rround-facts {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 5px 18px;
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.rround-facts dt { color: var(--slate); }
+.rround-facts dd { margin: 0; color: var(--ink); }
+
+.rround-qual { display: block; margin-top: 3px; font-size: 10.5px; color: var(--slate); }
+
+/* A flag, not an alarm. "Edited after submitting" and "invited after all-in" are both ordinary
+   things that happened, and colouring them as warnings would make an operator read them as faults
+   of the merchant's. */
+.rround-flag {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.rround-mark { display: block; }
+
+/* The operator's own words, set apart the way a quotation is — because that is what it is, and a
+   judgement run together with the facts around it reads as one of them (D-145). */
+.rround-reason {
+  display: block;
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-style: italic;
+}
+
+.rround-act { margin-top: 10px; }
+.rround-form { margin-top: 11px; }
+
+/* Never printed. The PDF carries participation, not workflow (D-146). */
+.printing .rround,
+.printing .rfoot { display: none !important; }
+
+/* ------------------------------------------------------------------------------------------------
    Ligatures off, so the PDF's text is the text (D-136).
 
    Space Grotesk draws `ff` as one glyph, and Chromium's `page.pdf()` embeds it with no ToUnicode
-   entry — so "Off-site presence" came out of the exported document as "O -site presence", with a
-   NUL where the pair should be. Measured, not guessed: the same string round-trips correctly with
+   entry — so "Off-site presence" came out of the exported document as "O<NUL>-site presence", with a
+   NUL where the pair should be. Written `<NUL>` rather than pasted as the byte it was
+   measured as: a real NUL here renders as nothing, so the one illustration this comment has
+   was invisible in the file that carries it. Measured, not guessed: the same string round-trips correctly with
    this declaration and does not without it.
 
    That is the document an underwriter searches and copies from, and a heading that cannot be found

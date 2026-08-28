@@ -43,6 +43,34 @@ export interface RunCommentary {
    * nothing to explain — either no link was ever made, or one was genuinely sent.
    */
   readonly undelivered: string | null;
+  /**
+   * When an accepted send of this run went out, earliest first (D-147, D-148).
+   *
+   * Read here rather than by each caller, because it decides which stored versions of a response
+   * are printed: a version that was current when a document went to IQwallet stays visible, and one
+   * superseded before anyone outside Mintro saw it is a draft. Two callers assembling this list
+   * separately is how the screen and the PDF come to show different words.
+   *
+   * The same rows close the response round (D-148), so the boundary is one fact rather than two
+   * that could disagree.
+   */
+  readonly sentAt: readonly string[];
+  /**
+   * The invited set, with when each address was invited (D-144).
+   *
+   * The same `delivered` list `sentTo` is built from — one derivation, two shapes — because the
+   * response round needs a time per address and the participation record needs only the addresses.
+   * Deriving them separately is how the set the Submit button is scoped to comes to differ from the
+   * set the PDF names.
+   */
+  readonly invitedAddresses: readonly InvitedAddress[];
+}
+
+/** One address Mintro transmitted an invitation to, and when. */
+export interface InvitedAddress {
+  readonly address: string;
+  /** When the earliest delivered link to this address was issued. */
+  readonly invitedAt: string;
 }
 
 /** Nothing was asked, and nothing pretends otherwise. */
@@ -50,6 +78,8 @@ const NOTHING: RunCommentary = {
   invitation: { issued: false },
   comments: [],
   undelivered: null,
+  sentAt: [],
+  invitedAddresses: [],
 };
 
 /**
@@ -63,15 +93,28 @@ export async function readRunCommentary(
   db: CommentaryReader,
   runId: string,
 ): Promise<RunCommentary | null> {
+  /*
+    When this run went to IQwallet, which is what separates a response from a draft (D-147).
+
+    Read first and unconditionally, including for a run with no links at all: a caller that reaches
+    the `NOTHING` branch still gets a truthful `sentAt`, so the field never means "not read" in one
+    branch and "none" in another. `outcome` is filtered here rather than in the query because the
+    reader interface takes one `eq` — and a rejected send reached nobody, so it is not a version
+    anyone holds.
+  */
+  const sends = await rows<SendRow>(db, 'sends', 'sent_at, outcome', runId, 'sent_at');
+  if (sends === null) return null;
+  const sentAt = sends.filter((send) => send.outcome === 'accepted').map((send) => send.sent_at);
+
   const links = await rows<LinkRow>(
     db,
     'comment_links',
-    'id, first_opened_at, expires_at, sent_to',
+    'id, first_opened_at, expires_at, sent_to, issued_at',
     runId,
     'issued_at',
   );
   if (links === null) return null;
-  if (links.length === 0) return NOTHING;
+  if (links.length === 0) return { ...NOTHING, sentAt };
 
   const jobs = await rows<JobRow>(db, 'comment_invites', 'link_id, status, delivery', runId, 'created_at');
   if (jobs === null) return null;
@@ -87,6 +130,7 @@ export async function readRunCommentary(
   if (delivered.length === 0) {
     return {
       ...NOTHING,
+      sentAt,
       undelivered:
         `${links.length} invitation link(s) were created for this run and none were transmitted. ` +
         'Nothing reached the merchant, so the blank responses below are not their silence.',
@@ -133,15 +177,44 @@ export async function readRunCommentary(
 
   const expiries = delivered.map((link) => link.expires_at).sort();
 
+  /*
+    The invited set, earliest first, one entry per address however many links went to it.
+
+    Re-issuing an expired link adds a row rather than replacing one (D-063), so an address can
+    appear several times. The *earliest* issue is kept, because the question this answers is when
+    Mintro first asked them — which is what decides whether they were invited before or after the
+    round had already reached all-in.
+  */
+  const invitedAddresses = foldedUnique(delivered.map((link) => link.sent_to))
+    .map((address) => {
+      const issues = delivered
+        .filter((link) => link.sent_to.trim().toLowerCase() === address.trim().toLowerCase())
+        .map((link) => link.issued_at)
+        .sort();
+      return { address, invitedAt: issues[0] as string };
+    })
+    // Sorted here rather than relying on the query's ordering. The order is load-bearing — the
+    // merchant page names the *most recent* invited address to everyone who cannot submit — and a
+    // caller that read rows in a different order would name the wrong person.
+    .sort((a, b) => Date.parse(a.invitedAt) - Date.parse(b.invitedAt));
+
   return {
     invitation: {
       issued: true,
       ...(openings[0] === undefined ? {} : { firstOpenedAt: openings[0] }),
       // The latest expiry: while any delivered link still works, the merchant can still respond.
       ...(expiries.length === 0 ? {} : { expiresAt: expiries[expiries.length - 1] as string }),
-      // Only the links that were actually transmitted. Where an untransmitted link was addressed
-      // is not somewhere the merchant was invited (D-064).
-      sentTo: [...new Set(delivered.map((link) => link.sent_to))],
+      /*
+        Only the links that were actually transmitted. Where an untransmitted link was addressed is
+        not somewhere the merchant was invited (D-064).
+
+        Folded when deduplicating and displayed as recorded, matching `public.invited_addresses`
+        (D-144). This deduplicated on the raw string until the invited set became load-bearing:
+        `Ops@shop.example` and `ops@shop.example` are one agent, and counting them as two would
+        leave a round permanently one address short of all-in — and print two invitation addresses
+        in the participation record for one invitation.
+      */
+      sentTo: invitedAddresses.map((invited) => invited.address),
       visits: arrived.map(
         (visit): CommentVisit => ({
           identifiedAs: visit.identified_as,
@@ -159,6 +232,8 @@ export async function readRunCommentary(
       }),
     ),
     undelivered: null,
+    sentAt,
+    invitedAddresses,
   };
 }
 
@@ -167,6 +242,7 @@ interface LinkRow {
   first_opened_at: string | null;
   expires_at: string;
   sent_to: string;
+  issued_at: string;
 }
 interface JobRow {
   link_id: string | null;
@@ -177,6 +253,10 @@ interface VisitRow {
   link_id: string;
   identified_as: string;
   identified_at: string;
+}
+interface SendRow {
+  sent_at: string;
+  outcome: string;
 }
 interface CommentRow {
   rule_id: string;
@@ -198,4 +278,25 @@ async function rows<T>(
   });
   if (error !== null) return null;
   return (data ?? []) as T[];
+}
+
+/**
+ * Distinct addresses, compared folded and returned as recorded.
+ *
+ * The fold is the comparison only. What is displayed is what Mintro actually sent to, because the
+ * participation record is a record of Mintro's own action and normalising it would be reporting a
+ * tidied version of what happened.
+ */
+export function foldedUnique(addresses: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+
+  for (const address of addresses) {
+    const key = address.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(address);
+  }
+
+  return kept;
 }

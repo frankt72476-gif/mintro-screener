@@ -8589,3 +8589,405 @@ That table was never a complete index of the manual rules — it groups by subje
 rules have never appeared in it — so removing a row breaks no invariant. Checked rather than assumed.
 
 ---
+
+## D-143 — Completion is operator-declared
+
+**2026-08-27 · business owner**
+
+Responders report their own state. **The operator determines the round's.**
+
+A merchant or an agent presses Submit, which records *I have said what I have to say*. When every
+invited address has done that — or carries an operator's judgement that it will not — the round is
+**all-in**. All-in is a **prompt**, never a state transition. Nothing auto-closes, nothing is locked,
+nothing is enabled or disabled by it, and no row records that a run has entered it.
+
+Implemented as an absence rather than a feature: there is no `all_in_at`, no round status on `runs`,
+and no closed state anywhere. `responseRoundFor` computes all-in at read time from three sets — who
+was invited, who submitted, who was marked as not responding — and the same function serves the
+operator's screen and the worker that mails the notification. Two implementations of "is the round
+complete" is how a screen comes to say the round is in while the email says four are outstanding.
+
+**Reasoning.** A tool that decided a merchant's response window had closed would be making a
+determination about the merchant's participation, and participation is part of what IQwallet weighs.
+It is also the kind of determination that is wrong quietly: a round the system closes at the moment
+the last submit event lands is a round that closes while somebody is still typing.
+
+The only thing stored is the *notification* — see D-144's fingerprint — because a message that has
+been sent is a fact, and a round that is complete is a reading of the present rows.
+
+---
+
+## D-144 — Submit is scoped to the set of invited addresses
+
+**2026-08-27 · business owner**
+
+The Submit button renders for an identity in the set of addresses Mintro transmitted the report to,
+and for nobody else. **The set, not the most recent invitation**: re-issuing an expired link adds an
+address, it does not replace one, so an agent invited in March and a merchant invited in April are
+both invited.
+
+**This is a display convention, not authentication.** The identity is typed into a box on a page
+anyone holding a forwarded link can open, and nothing verifies it — so a submit event carries no more
+assurance than a comment does, and no reader-facing copy describes the button as restricted, secured
+or authorised. Someone who is not invited sees Save, and a line naming who will submit:
+*"{address} will submit this when it's complete."* An absent control with no explanation reads as
+something being broken.
+
+The scope is enforced server-side as well, and that is **not** a security measure. A submit event
+from an address Mintro never wrote to has no place in the outstanding count: admitting one would let
+a round reach all-in through somebody nobody asked.
+
+**Where the set comes from.** `public.invited_addresses(run_id)` — the addresses on `comment_links`
+whose `comment_invites` job says `status = 'done'` and `delivery = 'resend'`, folded and
+deduplicated. The `delivery` gate is D-064 applied one level down: a composed-but-untransmitted
+invitation invited nobody, so an address that never received a link is not one the round waits on. No
+new table; the records that answer this already exist.
+
+Addresses are compared folded and trimmed, and displayed as recorded. An invited set that treated
+`Ops@Shop.example` and `ops@shop.example` as two people would leave a round permanently one address
+short of all-in, waiting on somebody who had already answered.
+
+**One submit event per identity, guaranteed by an index rather than by the caller.** A unique index
+on `(run_id, lower(btrim(identified_as)))` makes a second press a no-op in the database, which is
+where the race is — two tabs, or a slow network and a second press. Keyed on the identity and not the
+visit, because someone who refreshes and re-identifies under the same address is the same person
+finishing the same round.
+
+> **Amended by D-151.** The index is now `(run_id, folded identity, content watermark)`: one event
+> per identity *per state of their response*. A repeated press is still not an event, which is the
+> property this clause wanted; a press carrying text added since the last one now is, which this
+> clause ruled out by accident.
+
+**Submitting locks nothing.** Post-submit edits save normally. Whether anything was written
+afterwards is derived at read time — runs are immutable (D-002), so it is not a flag on the run — and
+the confirmation says so in as many words: *"Submitted as {email}. You can keep adding — anything you
+add is saved."*
+
+**The disclosure is accepted.** Naming the invited address to a non-invited reader tells whoever
+holds a forwarded link which address Mintro wrote to. They received the link from that person.
+
+---
+
+## D-145 — "Not responding" is an operator judgement, recorded as such, and supersedable
+
+**2026-08-27 · business owner**
+
+An operator may mark an invited address as not responding. It removes that address from the
+outstanding count and can therefore complete the round.
+
+**A reason is required, and it is free text.** A dropdown would turn a judgement into a category, and
+categories are read as findings. The reason exists so a later reader can see that the judgement *was*
+a judgement, and the row carries the analyst who made it — stamped server-side from the analysts
+table, because a browser that supplied the author could attribute a conclusion to somebody who did
+not reach it.
+
+**It is never rendered as a fact about the merchant**, and it is on the OUT list for the IQwallet PDF
+(D-146). Mintro concluding that a merchant will not reply is a workflow decision about how long to
+wait; presenting it to an underwriter as the merchant's conduct would put a characterisation in the
+document under Mintro's name — the thing D-001 exists to prevent.
+
+**Supersedable.** A mistaken mark can complete a round early and there was no way back. A later row
+for the same address replaces the earlier one at read time — latest wins — and a `withdrawn` row
+takes the mark back, returning the address to the outstanding count so all-in can fire again when it
+resolves. Nothing is mutated and nothing is deleted: the operator view shows the current judgement
+with the earlier one still in the record, its reason and its author intact.
+
+There is no `supersedes` column. The address is the key and the clock is the order; a chain column
+would be a second way of saying the same thing, and the two could disagree.
+
+---
+
+## D-146 — The IQwallet PDF carries participation, not workflow
+
+**2026-08-27 · business owner**
+
+**In.** Who identified themselves, when they opened it, when each comment was entered, what they
+wrote, and — **as a count** — that some invited findings were left unanswered.
+
+**Out.** Submit events, all-in, not-responding marks and their reasons, edited-after-submit flags,
+save timestamps.
+
+The line is what the merchant did versus what Mintro did about it. An underwriter weighing an
+application is entitled to the first; the second is Mintro's internal handling of its own process,
+and printing it would tell IQwallet how long an analyst waited before concluding somebody was not
+going to reply. That is not evidence about the merchant.
+
+**Unanswered findings appear as a count, per D-074, which this does not reopen.** The IN list was
+first stated as "which invited findings were left unanswered", which reads as an enumeration. D-074
+already ruled that out: a bare list of rule codes is a lookup table, sending an underwriter hunting
+through ninety-seven findings to learn what it means. The count is the fact and the *answered* list
+is the readable half. Nothing in the PDF changes on this point.
+
+**Enforced structurally, and asserted anyway.** `ResponseRoundPanel` is a sibling of `ReportView`
+rather than a prop on it, and the print path renders `ReportView` — so workflow has no route to the
+PDF. That is one refactor away from being wrong, so `apps/web/test/pdfParticipation.test.ts` renders
+the print path and checks every term on the OUT list against the text a reader would see.
+
+**The audit found nothing to remove.** The full rendered print document is: the report header; the
+participation card (invitation addresses, first opened, who identified themselves with the
+self-declared qualifier, the answered/unanswered counts, the answered list); the obstruction note;
+verdict, tick strip and coverage; every category and finding with Observed / Published standard /
+Evidence and the merchant's response verbatim with its per-comment attribution and time; the
+attestation section; the not-checked section; and the run meta. Everything on the IN list is present,
+and no item on the OUT list appeared — because none of it existed before this slice.
+
+---
+
+## D-147 — Draft rows are collapsed at render, not at write
+
+**2026-08-27 · business owner**
+
+The merchant page autosaves on blur, so one response can arrive as five rows: a sentence, the
+sentence finished, a typo fixed. Every row is stored — append-only is not negotiable — and printing
+all five would present four abandoned half-sentences to an underwriter as things the merchant said.
+
+**The rule.** Render the latest body per finding per author, and print an earlier body only where it
+was current at the time of an **accepted `sends` row** for that run.
+
+That reads D-002 correctly. Its guarantee is that *a version IQwallet may have read stays readable*,
+not that every keystroke reaches the document. A version that was current when a document went out is
+one an underwriter may be holding; a version superseded thirty seconds later, before anything was
+sent, was never read by anyone outside Mintro.
+
+The boundary is not a heuristic and not a time window — it is the `sends` table, which is also what
+closes the round (D-148). "What IQwallet may have read" and "what ended the response round" are one
+fact, read from one place.
+
+**And a second rule, at the other end.** Autosave writes only when the body differs from the last
+stored body for that identity and finding. Tabbing through an untouched field writes nothing — not a
+request the server declines, no request — so most of the noise never reaches storage and the row
+count means something. The database enforces it too: an identical body returns the existing row and
+its stored time rather than appending.
+
+**Save on unchanged text confirms against the stored row.** A real round trip, with the timestamp
+read back from what is held — which is why the confirmation can show a time earlier than the press.
+That is the honest answer to *when was this saved*. "Not a no-op with a toast" means do not fake it
+in the client; a real read of real storage satisfies it.
+
+**A mutable draft table was rejected.** It would have left words the page told a merchant were saved
+sitting somewhere the report never reads.
+
+This amended one existing test. `packages/engine/test/commentary.test.ts` asserted that two versions
+by one author both render, under D-002's heading. That was right when a merchant pressed a button per
+response and every row was a deliberate act. Both rows are still stored, and the test now covers both
+halves: the current words alone when nothing has been sent, and both when a send carried the earlier
+one.
+
+---
+
+## D-148 — The response round closes when the operator sends to IQwallet
+
+**2026-08-27 · business owner**
+
+There is no close button and no closed state. Sending the combined document ends the response round,
+and `sends` already records it.
+
+All-in is a prompt toward that act, not a precondition for it — D-001 is unchanged, and **send is
+never blocked**, including for a round with four addresses outstanding. An operator may send at any
+point, and the participation record says what the merchant's side looked like when they did.
+
+**This interlocks with D-147.** Accepted `sends` rows are already the boundary the renderer keys on,
+so *what IQwallet may have read* and *what closed the round* are the same fact rather than two that
+could drift apart.
+
+---
+
+## D-149 — A send that may be repeated carries an idempotency key
+
+**2026-08-27 · business owner**
+
+Every queue in this system claims a row, does the work, and records the outcome. Between the work
+and the record there is a window: if the worker dies in it, the row stays `running`, the stale-claim
+reclaim picks it up after fifteen minutes, and the job runs again. That is the right behaviour for a
+scan and the wrong behaviour for an email, which cannot be un-sent.
+
+**The claim did not close it, and the code said it did.** The all-in one-shot is a partial unique
+index on `(run_id, all_in_fingerprint)`, claimed before the message is composed — which resolves a
+race between *two* notices for one invited set. It does nothing about *one* notice retried: the row
+updating itself to values it already holds violates no index. Reproduced against the real migrations
+before this was written; the update succeeded and a second email would have gone.
+
+**The fix is at the provider.** Resend's `Idempotency-Key` on `POST /emails` returns the original
+response without sending again, and keys are kept for **24 hours** — comfortably past our fifteen
+minute reclaim. Verified against their documentation rather than assumed.
+
+**The key covers the content, not just the job.** Resend normalises and hashes the request body
+against the stored key and answers `409 invalid_idempotent_request` when the same key arrives with a
+different one. A key naming only the job would therefore turn a message whose content legitimately
+changed between the crash and the reclaim — another responder submitted, so the count line moved —
+into a job that 409s on every attempt and can never send. `idempotencyKeyFor` folds a content digest
+in, and the semantics land where they should:
+
+    same job, same words   the provider returns the first response and sends nothing
+    same job, new words    a different key, and a different message goes, which it is
+
+That property depends on the composed message being **deterministic over unchanged rows**. The
+response notice is: every time in it is a stored time read from its own row, never a clock read.
+`apps/worker/test/responseNoticeJob.test.ts` asserts a re-run produces the same key, so a clock
+reaching the body fails the suite.
+
+**One policy, both surfaces, and it deduplicates less on one of them.** A reclaimed invitation mints
+a **fresh token**, because the first was never stored and cannot be recovered — so the body differs,
+the key differs, and a second invitation is sent. That is correct rather than a gap: links are
+additive by design (D-063), both work, both open the same report, and suppressing the second would
+leave a merchant holding an invitation whose delivery nobody can demonstrate.
+
+**B1 was rejected and the reasoning is recorded.** Resolving an ambiguous reclaim to `not_sent`
+would mean a genuinely failed send is never retried and an operator is silently never told — the
+failure the notification exists to prevent. A duplicate is noise against a run view that already
+shows the truth.
+
+### The two comments that asserted this could not happen
+
+Both `handleInvite` and `handleNotice` had a branch, for the case where the recording write returns
+an error, saying the job was *"reported rather than retried silently"* because *"a reclaim would send
+a second copy"*. Returning does not prevent the reclaim: it leaves the row at `status = 'running'`,
+which is exactly what the claim query looks for. The comments described an intention as though it
+were a mechanism, and reading them would have cost somebody an afternoon before they looked at the
+claim query. Both now say what actually happens and what makes it survivable.
+
+### Not fixed, and named rather than left
+
+The IQwallet report send has the same window. `SentButUnrecordedError` covers the case where the
+recording write *throws* — the row is marked `failed` with `transmitted` true, which takes it out of
+the reclaim set — but a hard crash bypasses that and IQwallet would receive the report twice. It is
+not fixed here because the payload contains a freshly rendered PDF whose bytes are not stable across
+renders, so a content-digest key would never match and a job-only key would 409. Closing it needs a
+deterministic render or a stored artifact, which is a separate piece of work.
+
+---
+
+## D-150 — `merchants.domain` is folded, and the table says so
+
+**2026-08-27 · business owner**
+
+`merchants.domain` had two writers that disagreed about its shape. The crawl writes
+`new URL(url).host`, which the WHATWG parser always lowercases. The Documents Check package form
+wrote `domain.trim()` — whatever an analyst typed. `ensure_merchant` looked the domain up with
+`where domain = trim(p_domain)`, and the column carries a plain case-sensitive `unique`.
+
+So typing `Shop.Example` for a storefront already stored as `shop.example` matched nothing, inserted,
+and was not refused. **One storefront, two merchant rows**: Site Check runs hanging off one and the
+Documents Check package off the other, with nothing joining them. Reproduced against the real
+migrations before anything was changed.
+
+**Three changes, and the middle one is the one that lasts.**
+
+- `ensure_merchant` folds to `lower(trim())` once, and uses that value for both the lookup and the
+  insert. Computing it twice is how the two came to differ in the first place.
+- `merchants.domain` gains `check (domain ~ '^[a-z0-9.-]+\.[a-z]{2,}$')` — character for character
+  the constraint `credential_deposits.merchant_domain` has carried since 0013. Normalising in one
+  function fixes the writer that was wrong; the constraint fixes every writer, including the ones
+  nobody has written yet.
+- `NewPackage.tsx` folds before it submits, so an analyst meets the stored value rather than a
+  constraint violation.
+
+**It refuses rather than folds.** Anything reaching the constraint unfolded is a writer that has not
+been taught, and silently accepting it would leave that writer undiscovered — which is the position
+this decision exists to get out of.
+
+**No rows changed.** Surveyed first: seven rows, every one already lowercase, no pair colliding under
+a fold. Every one came from the crawl, which had it right; nobody has yet typed a capitalised domain
+into the package form. The defect was real and reachable and had not been triggered.
+
+**D-002 does not bite, and the reason is worth stating.** `merchants` carries no append-only trigger
+and is already upserted on every run by `persistRun`, and D-002 and hard constraints 5 and 8 name
+runs, findings and evidence. Folding a domain in place changes no id, so no `runs.merchant_id` is
+repointed and no run row is touched. Had two rows collided, **merging them would have been a
+different matter** — that repoints runs at a different merchant, which is a write to a run, and would
+have needed a ruling before it happened rather than after.
+
+**The constraint immediately found a second thing.** A fixture in
+`apps/worker/test/schema/packages.test.ts` generated `northwind.example-k3j2` — the unique suffix
+appended after the TLD, which is not a domain. Every other fixture in that suite already had it the
+right way round. The fixture was fixed; the constraint was not weakened.
+
+---
+
+## D-151 — A re-submit over new text is a real event
+
+**2026-08-27 · business owner**
+
+**Amends D-144, and extends D-143.** It does not stand alone, and which part of each it touches
+matters:
+
+- **D-144 said** *"Submit is idempotent per identity. Pressing twice does not produce two events."*
+  That is now **one event per identity per state of their response**. The property D-144 wanted —
+  a repeated press is not an event — is untouched. What it accidentally also ruled out was a press
+  that carried something new.
+- **D-143 is extended, not amended.** Completion is still operator-declared, all-in is still a
+  prompt, and a re-submit **cannot** be the all-in transition: it is by an address that resolved when
+  it first submitted, so the outstanding set does not move and the fingerprint index stays scoped to
+  `kind = 'all_in'`.
+
+### The defect
+
+`comment_submissions` was unique on `(run_id, folded identity)`. A second press recorded nothing and
+sent nothing — while the button said "Submit again" and the page confirmed. **A merchant who added a
+paragraph and pressed it was told something had happened when the database had done nothing.** The
+addition surfaced only as `editedAfterSubmit` in the operator panel, which nobody is necessarily
+watching.
+
+### The watermark
+
+Every submission records `covers_content_at` — the newest thing that identity had written when they
+pressed. A later press is an event only when there is content newer than that. The unique index moves
+with it:
+
+    pressed twice, nothing written between   same watermark, refused, no event
+    pressed again after adding a paragraph   different watermark, a new row, a notice
+
+Still an index rather than a check in the caller, for the reason D-144 gave: two tabs, or a slow
+network and a second press, is a race, and the race is in the database. `-infinity` in the index
+expression because nulls are distinct in a unique index by default, and submitting having written
+nothing is a legitimate thing to say — *I have looked and I have nothing to add.*
+
+### Both channels count as writing
+
+The watermark covers comments **and** attestation answers. An answer to one of the nineteen questions
+is text the merchant added exactly as a comment is; scoping the question to one channel would leave
+someone who answered five questions after submitting with a dark button and an operator told nothing
+— the same silence this decision exists to remove, in the other half of the page. `editedAfterSubmit`
+widened to match, so the merchant page's button and the operator's flag cannot disagree about what
+writing is.
+
+### A third notice kind
+
+`resubmit`, distinct from `submit` and `all_in`. It leads *"A responder added to their response after
+submitting."*, names who, when they pressed, when the text was added, says their earlier response
+stands, and links to the run. It falls under the copy audit like the others.
+
+It never claims the all-in fingerprint. Checked **before** all-in rather than after, because a
+re-submit arriving while the round happens to be in would otherwise compose the all-in message for a
+set the operator was told about days ago — and then be refused by the index, sending nothing at all.
+
+The idempotency key folds a content digest as the others do (D-149), and every time in the body is a
+stored time: the press and the content watermark, both read from the row. A test asserts a re-run
+produces the same key, so a clock reaching the body fails the suite.
+
+### The button never offers a press that records nothing
+
+After a submit the control **goes away**, and comes back only when there is content newer than that
+event — labelled "Submit your addition", because it is one. The page computes the watermark from the
+same two channels the database does and from values the database handed back, rather than recomputing
+them: a second expression of the watermark is a button that offers a press the server declines, which
+is the original defect in a new spelling.
+
+`submit_response_round` returns `recorded`, so a caller that presses anyway is told nothing happened
+rather than handed the old row to confirm. The page and the function each hold the guarantee
+independently.
+
+### Also in this slice
+
+**Button hierarchy.** Save takes the primary style when it is the only control on the page. The
+merchant who was forwarded the link — the common case, and the one with no Submit button — was seeing
+a single quiet control and no visual answer to *what do I press when I have finished*. Where Submit is
+also rendered the original ordering is right.
+
+**The disabled asymmetry, resolved toward Save.** `!identified` **is** reachable: nothing gates the
+page render on identity, `Identify` is a card at the top rather than a door, and the whole page
+including the footer renders before anyone types an address. Submit was unreachable in that state
+only because `maySubmit` happens to require an identity — a coupling nothing stated, and one that
+would have left a pressable button whose handler returns immediately. Both carry the guard now.
+
+---

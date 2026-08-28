@@ -62,3 +62,28 @@ export function shortHash(sha256: string): string {
   if (sha256.length <= 20) return sha256;
   return `${sha256.slice(0, 12)}…${sha256.slice(-8)}`;
 }
+
+/**
+ * `3:14pm` — a clock time, for a save confirmation.
+ *
+ * The one place in this project that prints a time without a date or a zone, and it is deliberate:
+ * "Saved · 3:14pm" is read seconds after the press by the person who pressed it, and a full stamp
+ * would be an evidence timestamp where a clock is meant.
+ *
+ * The zone is New York for the same reason `formatStamp` uses it — every other time this app shows
+ * a person is in it, and one line in a different zone is a line that gets misread. Everything
+ * *recorded* stays UTC.
+ */
+export function formatClock(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/New_York',
+  })
+    .format(date)
+    .replace(/\s?([AP])M$/i, (_match, meridiem: string) => meridiem.toLowerCase() + 'm');
+}

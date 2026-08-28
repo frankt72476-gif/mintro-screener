@@ -45,6 +45,7 @@ import { establishSession } from '../src/auth/login.js';
 import { createHttpFetcher } from '@mintro/engine';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
+import { runResponseNotice } from '../src/responseNoticeJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
@@ -343,6 +344,14 @@ async function main(argv: readonly string[]): Promise<number> {
       const invite = await claimNextInvite(supabase);
       if (invite !== null) {
         await handleInvite(supabase, invite, addresses);
+        continue;
+      }
+
+      // Response-round notifications, for the same reason and one step further down: a merchant
+      // pressing Submit must never be what delays a scan.
+      const notice = await claimNextNotice(supabase);
+      if (notice !== null) {
+        await handleNotice(supabase, notice, addresses);
         continue;
       }
 
@@ -782,6 +791,7 @@ async function handleInvite(
     }
 
     const result = await issueInvitation(supabase, {
+      requestId: request.id,
       runId: request.run_id,
       sendTo: request.send_to,
       issuedBy: request.requested_by,
@@ -801,8 +811,21 @@ async function handleInvite(
       .eq('id', request.id);
 
     if (error !== null) {
-      // The link exists and the mail went. Only the bookkeeping failed — and a reclaim would issue
-      // a second link, so this is reported rather than retried silently.
+      /*
+        The link exists and the mail went. Only the bookkeeping failed.
+
+        **This does not prevent a reclaim, and the comment that used to sit here said it did.**
+        Returning leaves the row at `status = 'running'` with an old `claimed_at`, which is exactly
+        what `claimNextInvite` looks for — so the job is picked up again after `STALE_CLAIM_MS` and
+        a second invitation is issued. The same is true of a hard crash anywhere after the mailer
+        accepted.
+
+        That is now survivable rather than silent (D-149). The send carries an idempotency key, so a
+        recomposed identical message is absorbed by the provider; a reclaim that mints a fresh token
+        composes a different message and does send, which is the additive-links behaviour D-063
+        already describes. What is logged here is the bookkeeping failure itself, which is the part
+        an operator can act on.
+      */
       console.error(`  could not record the invitation outcome: ${error.message}`);
       return;
     }
@@ -817,6 +840,157 @@ async function handleInvite(
 
     await supabase.client
       .from('comment_invites')
+      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
+  }
+}
+
+interface NoticeRequest {
+  readonly id: string;
+  readonly run_id: string;
+  readonly trigger: 'submit' | 'not_responding';
+  readonly submission_id: string | null;
+  readonly nonresponse_id: string | null;
+  readonly status: string;
+}
+
+/** Same compare-and-swap as the other queues, for the same reasons. */
+async function claimNextNotice(supabase: WorkerSupabase): Promise<NoticeRequest | null> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const columns = 'id, run_id, trigger, submission_id, nonresponse_id, status';
+
+  const { data, error } = await supabase.client
+    .from('response_notices')
+    .select(columns)
+    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error !== null) {
+    const hint = /response_notices/i.test(error.message)
+      ? `
+  The notification queue is created by supabase/migrations/0045_response_rounds.sql. Apply it.`
+      : '';
+    throw new Error(`could not read the notification queue: ${error.message}${hint}`);
+  }
+
+  const candidate = (data ?? [])[0] as NoticeRequest | undefined;
+  if (candidate === undefined) return null;
+
+  const { data: claimed, error: claimError } = await supabase.client
+    .from('response_notices')
+    .update({ status: 'running', claimed_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', candidate.status)
+    .select(columns);
+
+  if (claimError !== null) {
+    throw new Error(`could not claim notification ${candidate.id}: ${claimError.message}`);
+  }
+
+  return ((claimed ?? [])[0] as NoticeRequest | undefined) ?? null;
+}
+
+/**
+ * Sends one operator notification and records what happened. Never throws.
+ *
+ * A reclaimed stale notice recomputes the round from scratch rather than resuming, which is right:
+ * the answer may have changed while the machine was gone, and an all-in claim it already holds is
+ * its own and re-claims cleanly.
+ */
+async function handleNotice(
+  supabase: WorkerSupabase,
+  request: NoticeRequest,
+  addresses: MailAddresses,
+): Promise<void> {
+  console.log(
+    `
+notice  ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}  ${request.trigger}`,
+  );
+
+  try {
+    if (WEB_ORIGIN === undefined) {
+      throw new Error(
+        'WEB_ORIGIN is not set, so the run link in the notification would not resolve. ' +
+          'Set it to the origin the analyst app is served from.',
+      );
+    }
+
+    const result = await runResponseNotice(supabase, {
+      noticeId: request.id,
+      runId: request.run_id,
+      trigger: request.trigger,
+      submissionId: request.submission_id,
+      nonresponseId: request.nonresponse_id,
+      webOrigin: WEB_ORIGIN,
+      from: addresses.inviteFrom,
+      replyTo: addresses.inviteReplyTo,
+      to: addresses.noticeTo,
+    });
+
+    /*
+      `not_sent` is a finished job, not a failure.
+
+      "This mark did not complete the round" and "the operator was already told" are outcomes with
+      reasons, and recording them as failures would put a red row in front of an analyst every time
+      the system correctly declined to send a second email.
+    */
+    const { error } = await supabase.client
+      .from('response_notices')
+      .update(
+        result.notSent === null
+          ? {
+              status: 'done',
+              kind: result.kind,
+              invited_addresses: result.invitedAddresses,
+              invited_count: result.invitedCount,
+              submitted_count: result.submittedCount,
+              to_addresses: result.toAddresses,
+              delivery: result.delivery,
+              finished_at: new Date().toISOString(),
+            }
+          : {
+              status: 'not_sent',
+              invited_addresses: result.invitedAddresses,
+              invited_count: result.invitedCount,
+              submitted_count: result.submittedCount,
+              error: result.notSent,
+              finished_at: new Date().toISOString(),
+            },
+      )
+      .eq('id', request.id);
+
+    if (error !== null) {
+      /*
+        The mail went and only the bookkeeping failed.
+
+        **Returning does not stop the reclaim, and the comment that used to sit here claimed it
+        did.** The row is left at `status = 'running'`, which is what `claimNextNotice` reclaims
+        after `STALE_CLAIM_MS` — so this job runs again, and so does any job whose worker died
+        between the provider's 2xx and this update.
+
+        What makes that harmless is the idempotency key on the send (D-149), not this branch.
+        Re-running recomposes the same message from the same stored rows, the provider recognises
+        the key and sends nothing, and the operator is told once. If the round genuinely moved in
+        between, the message is different and a different message goes.
+      */
+      console.error(`  could not record the notification outcome: ${error.message}`);
+      return;
+    }
+
+    console.log(
+      result.notSent === null
+        ? `  ${result.kind} → ${result.toAddresses.join(', ')} · ${result.submittedCount}/${result.invitedCount} submitted · ` +
+            (result.delivery === 'resend' ? 'transmitted' : 'composed only, NOT transmitted')
+        : `  nothing sent: ${result.notSent}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`  FAILED: ${message}`);
+
+    await supabase.client
+      .from('response_notices')
       .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
       .eq('id', request.id)
       .then(() => undefined, () => undefined);

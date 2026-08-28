@@ -17,8 +17,23 @@
  * ## What it does not do
  *
  * No account, no dashboard, no other run, no history. One link, one report, a box under each
- * invited finding, submit. Nothing here can change a finding, and there is no code path from this
- * component to anything but `submit_merchant_comment`.
+ * invited finding, save, submit. **Nothing here can change a finding**, and the only writes it can
+ * reach are `identify_for_comment`, `submit_merchant_comment`, `submit_merchant_attestation` and
+ * `submit_response_round` — four security-definer functions that take the token as their whole
+ * credential and none of which can touch `runs` or `findings`.
+ *
+ * ## Saving, and saying you are finished (D-143, D-144, D-147)
+ *
+ * Boxes autosave on blur; one Save button writes them all; a Submit button records that the person
+ * considers their response complete. The three are different acts and the page keeps them apart:
+ * Save is about the words, Submit is about the person, and **neither closes anything**. Post-submit
+ * edits save exactly as before — a responder reporting their own state is not a state this page
+ * enters.
+ *
+ * Submit renders only for an address Mintro sent the report to. That is a display convention, not
+ * authentication — the identity is typed into a box and nothing verifies it — so no copy here calls
+ * the button restricted, secured or authorised, and everyone else is told who *will* submit rather
+ * than left with a control that silently is not there.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -26,7 +41,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commentaryFor,
   commentTokenFrom,
-  invitesComment,
   type CommentVisit,
   type FindingCommentary,
   type MerchantComment,
@@ -37,12 +51,13 @@ import { createEvidenceAccess } from '../lib/evidence.js';
 import { clearVisit, readVisit, writeVisit } from '../lib/visitStore.js';
 import {
   NOTHING_OBSERVED_ID,
+  invitedFindings,
   nothingObservedCount,
   nothingObservedSection,
 } from '../lib/grouping.js';
 import { AttestationForm } from './Attestations.js';
 import { ReportView, type Filter } from './ReportView.js';
-import { formatStamp } from '../lib/format.js';
+import { formatClock, formatStamp } from '../lib/format.js';
 
 /** `?comment=<token>` — the merchant's whole credential. */
 export function commentToken(): string | null {
@@ -59,6 +74,32 @@ interface OpenedReport {
   readonly report: ScreeningReport;
   readonly comments: readonly MerchantComment[];
   readonly visits: readonly CommentVisit[];
+  /**
+   * The addresses Mintro sent this report to, earliest first (D-144).
+   *
+   * Submit is offered to these and to nobody else. **That is a display convention, not a
+   * check on who anyone is** — the identity is typed into a box and nothing verifies it, so a
+   * submit event carries no more assurance than a comment does. Nothing on this page describes the
+   * button as restricted, secured, or authorised, because it is none of those things.
+   *
+   * It also tells whoever holds a forwarded link which address will submit on their behalf, which
+   * is the point: an absent button with no explanation reads as something being broken.
+   */
+  readonly invited: readonly string[];
+  readonly submissions: readonly {
+    readonly identifiedAs: string;
+    readonly submittedAt: string;
+    /** The newest text they had written when they pressed it (D-151). Null means none. */
+    readonly coversContentAt: string | null;
+  }[];
+  /**
+   * Attestation answers with their times, bodies excluded (D-151).
+   *
+   * The page counts these alongside comments when deciding whether pressing Submit again would
+   * record anything, because an answer to one of the nineteen questions is text the merchant added
+   * exactly as a comment is. The database asks the same question over the same two channels.
+   */
+  readonly attestations: readonly { readonly identifiedAs: string; readonly submittedAt: string }[];
 }
 
 type Opened =
@@ -223,13 +264,17 @@ function OpenReport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened.runId]);
 
-  const invited = useMemo(
-    () =>
-      opened.report.categories
-        .flatMap((category) => category.findings)
-        .filter((finding) => invitesComment(finding.state, finding.notEvaluableKind)),
-    [opened.report],
-  );
+  /*
+    The findings that carry a box, from the same grouping that renders them.
+
+    This walked `report.categories` directly until Save became a page-level button. That produced a
+    list with no ordinals, and an ordinal is what tells one sampled page's box from another's — so a
+    Save that walked it would have written every repeat of a rule into the first one's slot.
+
+    `invitedFindings` walks `groupReport`, which is what `ReportView` renders from and what the
+    participation record counts against (D-034). One traversal, three consumers.
+  */
+  const invited = useMemo(() => invitedFindings(opened.report), [opened.report]);
 
   /*
     The merchant has opened the report, by definition — they are looking at it. So every invited
@@ -308,12 +353,24 @@ function OpenReport({
       p_visit_id: identity.visitId,
     });
 
-    const payload = data as { ok?: boolean; reason?: string } | null;
+    const payload = data as { ok?: boolean; reason?: string; submittedAt?: string } | null;
     if (error !== null || payload?.ok !== true) {
       // Same recovery as a comment: a stored visit from a different link is refused server-side,
       // and asking again is the honest fix. Nothing typed is cleared on failure.
       if (payload?.reason?.includes('email address is needed') === true) forgetIdentity();
       return payload?.reason ?? 'That could not be saved just now. Please try again.';
+    }
+
+    /*
+      Answering moves the watermark (D-151).
+
+      The stored time, read back, rather than the browser's clock: the database compares against the
+      row's own `submitted_at`, and a boundary the two disagree about is a Submit button that offers
+      a press recording nothing.
+    */
+    if (payload.submittedAt !== undefined) {
+      const at = payload.submittedAt;
+      setAttestedAt((existing) => [...existing, { identifiedAs: identity.email, submittedAt: at }]);
     }
 
     setAnswers((existing) => {
@@ -324,18 +381,73 @@ function OpenReport({
     return null;
   };
 
-  const submit = async (finding: ReportFinding, ordinal: number | undefined, body: string) => {
+  /*
+    What is in each box right now, held here rather than in each box.
+
+    Autosave and the page's one Save button both need to reach every field, and a page-level button
+    that could only save the box somebody last touched would be a Save button that does not save.
+    Keyed the way a comment is keyed, so a draft and the comment it becomes cannot disagree about
+    which finding they belong to.
+  */
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(new Map());
+
+  /** When each field was last confirmed stored, from the database's own clock, never the browser's. */
+  const [savedAt, setSavedAt] = useState<ReadonlyMap<string, string>>(new Map());
+
+  const [submissions, setSubmissions] = useState(opened.submissions);
+  const [attestedAt, setAttestedAt] = useState<readonly { identifiedAs: string; submittedAt: string }[]>(
+    opened.attestations,
+  );
+  const [saving, setSaving] = useState(false);
+  const [saveNote, setSaveNote] = useState<string | null>(null);
+  const [saveProblem, setSaveProblem] = useState<string | null>(null);
+
+  const keyOf = (ruleId: string, ordinal: number | undefined): string => `${ruleId}::${ordinal ?? 'x'}`;
+
+  /**
+   * The last thing this identity stored about a finding.
+   *
+   * The comparison autosave skips on, and the text a returning tab starts from. Matched on the
+   * folded address because someone who refreshes and re-identifies is the same person continuing
+   * the same response, which is the rule the database applies too.
+   */
+  const storedBody = (ruleId: string, ordinal: number | undefined): string => {
+    if (identity === null) return '';
+    const mine = comments.filter(
+      (comment) =>
+        comment.ruleId === ruleId &&
+        (comment.ordinal ?? undefined) === ordinal &&
+        comment.identifiedAs.trim().toLowerCase() === identity.email.trim().toLowerCase(),
+    );
+    return mine[mine.length - 1]?.body ?? '';
+  };
+
+  const bodyOf = (ruleId: string, ordinal: number | undefined): string =>
+    drafts.get(keyOf(ruleId, ordinal)) ?? storedBody(ruleId, ordinal);
+
+  /**
+   * Writes one field, and records what the database says about it.
+   *
+   * `wrote: false` is not a failure and not a no-op — the row was read and its stored time came
+   * back. That is why an unchanged Save can confirm a timestamp earlier than the press: it is the
+   * honest answer to *when was this saved* (D-147).
+   */
+  const saveField = async (
+    ruleId: string,
+    ordinal: number | undefined,
+    body: string,
+  ): Promise<string | null> => {
     if (identity === null) return 'Please give an email address above before writing a response.';
 
     const { data, error } = await client.rpc('submit_merchant_comment', {
       p_token: token,
-      p_rule_id: finding.ruleId,
+      p_rule_id: ruleId,
       p_ordinal: ordinal ?? null,
       p_body: body,
       p_visit_id: identity.visitId,
     });
 
-    const payload = data as { ok?: boolean; reason?: string } | null;
+    const payload = data as { ok?: boolean; reason?: string; savedAt?: string; wrote?: boolean } | null;
     if (error !== null || payload?.ok !== true) {
       /*
         The server validates the visit against *this link*, not merely this run (0016). A stored
@@ -348,17 +460,232 @@ function OpenReport({
       return payload?.reason ?? 'That could not be saved just now. Please try again.';
     }
 
-    setComments((existing) => [
-      ...existing,
-      {
-        ruleId: finding.ruleId,
-        ...(ordinal === undefined ? {} : { ordinal }),
-        identifiedAs: identity.email,
-        body,
-        submittedAt: new Date().toISOString(),
-      },
-    ]);
+    const at = payload.savedAt ?? new Date().toISOString();
+    setSavedAt((existing) => new Map(existing).set(keyOf(ruleId, ordinal), at));
+
+    if (payload.wrote === true) {
+      setComments((existing) => [
+        ...existing,
+        {
+          ruleId,
+          ...(ordinal === undefined ? {} : { ordinal }),
+          identifiedAs: identity.email,
+          body,
+          submittedAt: at,
+        },
+      ]);
+    }
     return null;
+  };
+
+  /**
+   * Autosave, on blur.
+   *
+   * **A field whose text has not changed writes nothing at all** — not a request the server
+   * declines, no request. Tabbing through a report is the ordinary way to read one, and every
+   * untouched field it passes would otherwise be a round trip and a row (D-147).
+   */
+  const autosave = (ruleId: string, ordinal: number | undefined): void => {
+    if (identity === null) return;
+    const body = bodyOf(ruleId, ordinal);
+    if (body.trim() === '' || body === storedBody(ruleId, ordinal)) return;
+
+    void saveField(ruleId, ordinal, body).then((failure) => {
+      if (failure !== null) setSaveProblem(failure);
+    });
+  };
+
+  /**
+   * The Save button: every field with text in it, written now.
+   *
+   * A real round trip per field, even where nothing changed, because the confirmation has to mean
+   * *the database holds this* rather than *the browser thinks so*. Where nothing changed the write
+   * is refused server-side and the stored time comes back instead, which is what the button then
+   * shows.
+   */
+  const saveEvery = async (): Promise<{ readonly written: number; readonly failure: string | null }> => {
+    const fields = invited
+      .map((finding) => ({
+        ruleId: finding.ruleId,
+        ordinal: finding.ordinal,
+        body: bodyOf(finding.ruleId, finding.ordinal),
+      }))
+      .filter((field) => field.body.trim() !== '');
+
+    for (const field of fields) {
+      const failure = await saveField(field.ruleId, field.ordinal, field.body);
+      // Stops at the first failure rather than pressing on. Continuing would leave some fields
+      // stored and some not behind a single message, and the reader could not tell which.
+      if (failure !== null) return { written: fields.length, failure };
+    }
+
+    return { written: fields.length, failure: null };
+  };
+
+  const saveAll = async (): Promise<void> => {
+    setSaving(true);
+    setSaveProblem(null);
+
+    const { written, failure } = await saveEvery();
+    setSaving(false);
+
+    if (failure !== null) {
+      setSaveNote(null);
+      setSaveProblem(failure);
+      return;
+    }
+
+    setSaveNote(
+      written === 0
+        ? // Honest rather than reassuring: nothing was stored, so "Saved" would be a claim about a
+          // write that did not happen.
+          'Nothing written yet.'
+        : `Saved · ${formatClock(new Date().toISOString())}`,
+    );
+  };
+
+  /*
+    Whether this identity is one of the addresses Mintro wrote to (D-144).
+
+    A display convention and nothing more. The address was typed into a box on this page and nothing
+    verifies it — so this decides which control is shown, never who anybody is, and no copy on this
+    page calls the button restricted or secured.
+  */
+  const maySubmit =
+    identity !== null &&
+    opened.invited.some(
+      (address) => address.trim().toLowerCase() === identity.email.trim().toLowerCase(),
+    );
+
+  const fold = (address: string): string => address.trim().toLowerCase();
+
+  /** This identity's submit events, oldest first. */
+  const mySubmissions = useMemo(
+    () =>
+      identity === null
+        ? []
+        : submissions
+            .filter((event) => fold(event.identifiedAs) === fold(identity.email))
+            .slice()
+            .sort((a, b) => Date.parse(a.submittedAt) - Date.parse(b.submittedAt)),
+    [submissions, identity],
+  );
+
+  /** Their first press — what the confirmation reads back. */
+  const mySubmission = mySubmissions[0];
+  const myLatestSubmission = mySubmissions[mySubmissions.length - 1];
+
+  /**
+   * The newest thing this identity has written, across both channels (D-151).
+   *
+   * The same watermark `submit_response_round` computes, over the same two tables, so the button and
+   * the database agree about whether a press would record anything. Two expressions of that would be
+   * a button that offers a press the server declines — which is the defect this replaced, in a new
+   * spelling.
+   */
+  const myContentAt = useMemo(() => {
+    if (identity === null) return null;
+    const mine = [...comments, ...attestedAt]
+      .filter((entry) => fold(entry.identifiedAs) === fold(identity.email))
+      .map((entry) => Date.parse(entry.submittedAt))
+      .filter((at) => !Number.isNaN(at));
+    return mine.length === 0 ? null : Math.max(...mine);
+  }, [comments, attestedAt, identity]);
+
+  /**
+   * What the Submit control should say, or null for no control at all.
+   *
+   * Three states, and the middle one is the fix: after submitting, the button **goes away** until
+   * there is something new to submit. It used to read "Submit again" permanently, so a merchant who
+   * added a paragraph and pressed it was told something had happened when the database had recorded
+   * nothing — and a merchant who pressed it having changed nothing was told the same.
+   *
+   * Never a press that confirms an event which did not fire.
+   */
+  const submitControl: string | null = (() => {
+    if (!maySubmit) return null;
+    if (myLatestSubmission === undefined) return 'Submit';
+
+    const covered = myLatestSubmission.coversContentAt;
+    const coveredAt = covered === null ? null : Date.parse(covered);
+    const hasNewer =
+      myContentAt !== null && (coveredAt === null || myContentAt > coveredAt);
+
+    return hasNewer ? 'Submit your addition' : null;
+  })();
+
+  /**
+   * Submitting.
+   *
+   * Saves everything first, so a field still open when they press it is part of what they submitted
+   * rather than a draft they assume went. Then records the event — idempotently, per identity, in
+   * the database: pressing twice finds the first event and returns it, so a second press produces no
+   * second event whatever the network did with the first.
+   *
+   * **It locks nothing.** The boxes stay open, autosave keeps working, and anything written
+   * afterwards is saved exactly as before.
+   */
+  const submitRound = async (): Promise<void> => {
+    if (identity === null) return;
+
+    setSaving(true);
+    setSaveProblem(null);
+
+    const { failure } = await saveEvery();
+    if (failure !== null) {
+      // Nothing is submitted over an unsaved field. The event would say their response is complete
+      // while the words it refers to are only in a browser.
+      setSaving(false);
+      setSaveNote(null);
+      setSaveProblem(failure);
+      return;
+    }
+
+    const { data, error } = await client.rpc('submit_response_round', {
+      p_token: token,
+      p_visit_id: identity.visitId,
+    });
+
+    const payload = data as
+      | {
+          ok?: boolean;
+          reason?: string;
+          recorded?: boolean;
+          identifiedAs?: string;
+          submittedAt?: string;
+          coversContentAt?: string | null;
+        }
+      | null;
+
+    setSaving(false);
+
+    if (error !== null || payload?.ok !== true) {
+      if (payload?.reason?.includes('email address is needed') === true) forgetIdentity();
+      setSaveProblem(payload?.reason ?? 'That could not be recorded just now. Please try again.');
+      return;
+    }
+
+    setSaveNote(null);
+
+    /*
+      The row the database actually holds, appended rather than replacing (D-151).
+
+      Appended because a re-submit is a second event and both are real. `coversContentAt` comes back
+      from the server rather than being recomputed here, so the page's view of what a press covered
+      is the row's own value — recomputing it would be a second expression of the watermark, and the
+      two would eventually disagree about whether to offer the button.
+
+      `recorded: false` is the case where nothing was written: the button should not have been on
+      screen, and appending an event here would make the page claim one anyway.
+    */
+    if (payload.recorded === true) {
+      const event = {
+        identifiedAs: payload.identifiedAs ?? identity.email,
+        submittedAt: payload.submittedAt ?? new Date().toISOString(),
+        coversContentAt: payload.coversContentAt ?? null,
+      };
+      setSubmissions((existing) => [...existing, event]);
+    }
   };
 
   return (
@@ -458,7 +785,12 @@ function OpenReport({
           commentBox={(finding, ordinal) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
-              onSubmit={(body) => submit(finding, ordinal, body)}
+              body={bodyOf(finding.ruleId, ordinal)}
+              onChange={(next) =>
+                setDrafts((existing) => new Map(existing).set(keyOf(finding.ruleId, ordinal), next))
+              }
+              onBlur={() => autosave(finding.ruleId, ordinal)}
+              savedAt={savedAt.get(keyOf(finding.ruleId, ordinal))}
               existing={commentaryOf(finding, ordinal).comments}
               identified={identity !== null}
             />
@@ -481,7 +813,179 @@ function OpenReport({
             onAnswer={answer}
           />
         )}
+
+        <ResponseFooter
+          identified={identity !== null}
+          submitControl={submitControl}
+          maySubmit={maySubmit}
+          submittedAs={mySubmission}
+          resubmitted={mySubmissions.length > 1}
+          mostRecentInvited={opened.invited[opened.invited.length - 1]}
+          busy={saving}
+          note={saveNote}
+          problem={saveProblem}
+          onSave={() => void saveAll()}
+          onSubmit={() => void submitRound()}
+        />
       </main>
+    </div>
+  );
+}
+
+/**
+ * Saving, and saying you are finished (D-143, D-144).
+ *
+ * Two controls with two different meanings, and the difference is the whole of what this component
+ * has to communicate. **Save is about the words**: they are in the database. **Submit is about the
+ * person**: they have said what they have to say. Neither closes anything, neither locks anything,
+ * and the round is over when the operator decides it is (D-148).
+ *
+ * ## Nothing here is described as restricted
+ *
+ * Submit appears for the addresses Mintro sent the report to and not for anyone else. That is a
+ * display convention (D-144) — the address was typed into a box on this page and nothing verifies
+ * it — so the copy explains *who will submit* rather than implying anyone was refused. "Only the
+ * authorised recipient may submit" would be a claim about an assurance this page does not provide.
+ *
+ * ## And nothing here counts silence
+ *
+ * No "you have 4 unanswered", no progress bar, no warning about leaving. A merchant may reasonably
+ * have nothing to add to an observation they accept (D-067), and a footer that totted up their
+ * blanks would be the one place on this page that argued with that.
+ */
+function ResponseFooter({
+  identified,
+  submitControl,
+  maySubmit,
+  submittedAs,
+  resubmitted,
+  mostRecentInvited,
+  busy,
+  note,
+  problem,
+  onSave,
+  onSubmit,
+}: {
+  readonly identified: boolean;
+  /**
+   * The Submit button's label, or null for no button (D-151).
+   *
+   * Null covers two different situations that both mean *there is nothing to submit*: this identity
+   * was not one Mintro wrote to, or they have already submitted and written nothing since. The copy
+   * below tells them apart; the control does not exist in either.
+   */
+  readonly submitControl: string | null;
+  /**
+   * Whether this identity is one Mintro wrote to (D-144).
+   *
+   * Distinct from `submitControl`, and both are needed: after somebody submits with nothing new to
+   * add, the control goes away while they remain invited. Collapsing the two would tell a merchant
+   * who had just submitted that somebody else would be submitting on their behalf.
+   */
+  readonly maySubmit: boolean;
+  readonly submittedAs: { readonly identifiedAs: string; readonly submittedAt: string } | undefined;
+  /** Whether they have submitted more than once, so the confirmation can say so. */
+  readonly resubmitted: boolean;
+  readonly mostRecentInvited: string | undefined;
+  readonly busy: boolean;
+  readonly note: string | null;
+  readonly problem: string | null;
+  readonly onSave: () => void;
+  readonly onSubmit: () => void;
+}): JSX.Element {
+  return (
+    <div className="card rfoot">
+      {/*
+        The persistent line, always visible and never conditional on anything having been saved yet.
+
+        It is the answer to the question a text box on someone else's website always raises — *is
+        this going anywhere?* — and it has to be readable before the first keystroke, which is
+        exactly when a status line that only appears after a save is not there.
+      */}
+      <p className="rfoot-auto">Your answers save as you type.</p>
+
+      <div className="rfoot-row">
+        {/*
+          Save is the primary act when it is the only one.
+
+          The hierarchy was fixed, so a merchant who was forwarded the link — the common case, and
+          the one with no Submit button — saw a single quiet control and no visual answer to "what
+          do I press when I have finished". Where Submit is also rendered the ordering is right:
+          Submit is the act, Save is secondary to it.
+        */}
+        <button
+          className={`btn ${submitControl === null ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={onSave}
+          disabled={busy || !identified}
+        >
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+
+        {submitControl !== null && (
+          /*
+            The same `!identified` guard as Save, and it is not redundant.
+
+            It is unreachable today only because `maySubmit` happens to require an identity, so the
+            two conditions were coupled without saying so — and a change to how the invited set is
+            matched would have left a pressable Submit whose handler returns immediately, which
+            reads as a button that does nothing.
+          */
+          <button className="btn btn-primary" onClick={onSubmit} disabled={busy || !identified}>
+            {submitControl}
+          </button>
+        )}
+
+        {note !== null && <span className="rfoot-note">{note}</span>}
+        {problem !== null && <span className="cbox-problem">{problem}</span>}
+      </div>
+
+      {submittedAs !== undefined && (
+        /*
+          The confirmation reads the identity back.
+
+          One forwardable link may be used by several people, and "Submitted" alone would leave a
+          merchant who has just handed the laptop back unsure whose response was recorded. And it
+          says the page is still open, because it is — the alternative is somebody with more to add
+          believing they have missed their chance.
+        */
+        <p className="rfoot-done">
+          Submitted as <strong>{submittedAs.identifiedAs}</strong>
+          {resubmitted && ', and again since'}. You can keep adding — anything you add is saved.
+        </p>
+      )}
+
+      {submittedAs !== undefined && submitControl !== null && (
+        /*
+          They have written something since submitting, and it has not been submitted (D-151).
+
+          Stated as what is true of the two acts rather than as an instruction: the words are already
+          stored, and submitting again is what puts the addition in front of the team. "You should
+          submit again" would be directive, and the copy audit would catch it.
+        */
+        <p className="rfoot-who">
+          What you have added since is saved. Submitting again lets the team reviewing your account
+          know it is there.
+        </p>
+      )}
+
+      {identified && !maySubmit && mostRecentInvited !== undefined && (
+        <p className="rfoot-who">
+          {mostRecentInvited} will submit this when it&rsquo;s complete.
+        </p>
+      )}
+
+      {identified && !maySubmit && mostRecentInvited === undefined && (
+        /*
+          No transmitted invitation exists for this run, so there is no address to name.
+
+          Said as Mintro's own gap rather than left as a missing button — the same discipline
+          `comment_invites.delivery` exists for (D-064). Everything written here is still stored.
+        */
+        <p className="rfoot-who">
+          Mintro has no record of who this report was sent to, so there is nobody to name here.
+          Anything you write is still saved.
+        </p>
+      )}
     </div>
   );
 }
@@ -648,19 +1152,30 @@ function Identify({
  * time, because it is already part of the document IQwallet may have read (D-002).
  */
 function CommentBox({
-  onSubmit,
+  body,
+  onChange,
+  onBlur,
+  savedAt,
   existing,
   identified,
 }: {
-  readonly onSubmit: (body: string) => Promise<string | null>;
+  /**
+   * What is in the box, held by the page (D-147).
+   *
+   * Controlled rather than local, because Save is one button for the whole page and a box that kept
+   * its own text would be one the button could not reach. It starts from what this identity last
+   * stored, so a refresh returns them to their own words rather than to an empty box beside them.
+   */
+  readonly body: string;
+  readonly onChange: (next: string) => void;
+  /** Autosave. Writes nothing when the text is unchanged — see `autosave`. */
+  readonly onBlur: () => void;
+  /** When this field was last confirmed stored, from the database's clock. */
+  readonly savedAt: string | undefined;
   readonly existing: readonly MerchantComment[];
   /** Until someone says who they are, the box is readable but not writable. */
   readonly identified: boolean;
 }): JSX.Element {
-  const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-
   return (
     <div className="cbox">
       {existing.length > 0 && (
@@ -713,7 +1228,8 @@ function CommentBox({
         value={body}
         disabled={!identified}
         placeholder={identified ? 'How does your site handle this, now or in future?' : ''}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
       {!identified && (
         <p className="cbox-hint" style={{ marginTop: 6 }}>
@@ -721,24 +1237,17 @@ function CommentBox({
         </p>
       )}
 
-      <div className="cbox-foot">
-        <button
-          className="btn btn-primary"
-          disabled={busy || !identified || body.trim() === ''}
-          onClick={() => {
-            setBusy(true);
-            setProblem(null);
-            void onSubmit(body).then((failure) => {
-              setBusy(false);
-              if (failure === null) setBody('');
-              else setProblem(failure);
-            });
-          }}
-        >
-          {busy ? 'Saving…' : 'Save response'}
-        </button>
-        {problem !== null && <span className="cbox-problem">{problem}</span>}
-      </div>
+      {/*
+        No button here any more, and that is the change rather than an omission.
+
+        The box used to carry "Save response", which made saving a per-field act somebody could
+        forget on the field they cared about most. It now saves when the field loses focus, and the
+        page carries one Save for the whole document — so there is nothing left in this box that a
+        person has to remember to press.
+
+        The confirmation stays local, because *this field is stored* is a fact about this field.
+      */}
+      {savedAt !== undefined && <p className="cbox-saved">Saved · {formatClock(savedAt)}</p>}
     </div>
   );
 }

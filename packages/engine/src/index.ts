@@ -120,6 +120,8 @@ export {
 export {
   DIRECTIVE_TERMS,
   INTERNAL_TERMS,
+  CHARACTERISATION_TERMS,
+  PARTICIPATION_TERMS,
   auditCopy,
   auditInternalVocabulary,
   quotedFromEvidence,
@@ -166,6 +168,7 @@ export { extractPdfText, looksLikePdf, isReadableText, type PdfText } from './pd
 export {
   invitesComment,
   commentaryFor,
+  collapseDrafts,
   describeCommentary,
   type MerchantComment,
   type CommentInvitation,
@@ -176,9 +179,25 @@ export {
 
 export {
   readRunCommentary,
+  foldedUnique,
   type CommentaryReader,
+  type InvitedAddress,
   type RunCommentary,
 } from './commentaryStore.js';
+
+export {
+  responseRoundFor,
+  invitedFingerprintSource,
+  foldAddress,
+  type AddressStanding,
+  type NonResponseMark,
+  type NoticeRecord,
+  type ResponseRound,
+  type SubmissionRecord,
+  type WrittenRecord,
+} from './responseRound.js';
+
+export { readResponseRound } from './responseRoundStore.js';
 
 export {
   readRunAttestations,
@@ -193,7 +212,9 @@ export {
 
 export {
   COMMENT_PATH,
+  RUN_PARAM,
   commentLinkFor,
+  runLinkFor,
   commentTokenFrom,
 } from './commentLink.js';
 

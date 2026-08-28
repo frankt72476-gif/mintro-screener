@@ -13,6 +13,8 @@
 export {
   DIRECTIVE_TERMS,
   INTERNAL_TERMS,
+  CHARACTERISATION_TERMS,
+  PARTICIPATION_TERMS,
   auditCopy,
   auditInternalVocabulary,
   quotedFromEvidence,
@@ -48,6 +50,7 @@ export type {
 export {
   invitesComment,
   commentaryFor,
+  collapseDrafts,
   describeCommentary,
   type MerchantComment,
   type CommentInvitation,
@@ -58,9 +61,38 @@ export {
 
 export {
   readRunCommentary,
+  foldedUnique,
   type CommentaryReader,
+  type InvitedAddress,
   type RunCommentary,
 } from './commentaryStore.js';
+
+/*
+  The response round (D-143 - D-148).
+
+  Here as well as in the Node entry, and both sides genuinely need it: the operator's screen renders
+  what `readResponseRound` returns, and the worker decides which notification to send from the same
+  function. That is the point of it being one module -- two implementations of all-in is how the
+  screen comes to say the round is in while the email says four are outstanding.
+
+  Safe in this entry because none of it touches a Node built-in. **`invitedFingerprintSource`
+  returns the text to hash rather than the digest**, deliberately: hashing it needs `node:crypto`,
+  only the worker needs the digest, and a `node:crypto` import anywhere in this module graph breaks
+  the browser build even when nothing calls it.
+*/
+export {
+  responseRoundFor,
+  invitedFingerprintSource,
+  foldAddress,
+  type AddressStanding,
+  type NonResponseMark,
+  type NoticeRecord,
+  type ResponseRound,
+  type SubmissionRecord,
+  type WrittenRecord,
+} from './responseRound.js';
+
+export { readResponseRound } from './responseRoundStore.js';
 
 /*
   Merchant attestations (D-134).
@@ -84,7 +116,9 @@ export {
 
 export {
   COMMENT_PATH,
+  RUN_PARAM,
   commentLinkFor,
+  runLinkFor,
   commentTokenFrom,
 } from './commentLink.js';
 

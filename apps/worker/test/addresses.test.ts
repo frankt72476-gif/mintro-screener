@@ -9,6 +9,9 @@
 import { describe, expect, it } from 'vitest';
 import { addressesFor, DEFAULT_FROM } from '../src/addresses.js';
 
+/** No senders configured, so each test names only the variable it is about. */
+const BASE: NodeJS.ProcessEnv = {};
+
 describe('defaults', () => {
   it('sends from the verified domain when nothing is configured', () => {
     const addresses = addressesFor({});
@@ -95,5 +98,47 @@ describe('what it refuses to accept as an address', () => {
   it('treats an empty variable as unset rather than as an address', () => {
     // Fly and .env both produce empty strings for a variable someone meant to leave alone.
     expect(addressesFor({ MAIL_FROM: '   ' }).reportFrom).toBe(DEFAULT_FROM);
+  });
+});
+
+/**
+ * Who is told about a response round (D-143).
+ *
+ * The only recipient list this module resolves, and it is here for the reason the senders are:
+ * **the worker refuses to start on a malformed one.** A bad entry would otherwise be discovered one
+ * notice at a time, as a provider rejection on a queue row nobody reads — an operator not being
+ * told, in the form that looks most like nothing having happened.
+ */
+describe('response-round notice recipients', () => {
+  it('is empty when unset, which means the analyst who issued the invitation', () => {
+    // Not an error. Empty is a fallback, not an absence of anyone to tell.
+    expect(addressesFor({ ...BASE }).noticeTo).toEqual([]);
+  });
+
+  it('takes all three, comma separated', () => {
+    expect(
+      addressesFor({
+        ...BASE,
+        RESPONSE_NOTICE_TO: 'drews@gomintro.com, frankt@gomintro.com, michaels@gomintro.com',
+      }).noticeTo,
+    ).toEqual(['drews@gomintro.com', 'frankt@gomintro.com', 'michaels@gomintro.com']);
+  });
+
+  it('tolerates newlines and stray whitespace, which is what a pasted secret contains', () => {
+    expect(
+      addressesFor({ ...BASE, RESPONSE_NOTICE_TO: '  a@x.example \n b@x.example,\tc@x.example ' })
+        .noticeTo,
+    ).toEqual(['a@x.example', 'b@x.example', 'c@x.example']);
+  });
+
+  it('refuses to start on a malformed entry rather than dropping it', () => {
+    /*
+      The failure being prevented: silently skipping `not-an-address` would tell two of the three
+      operators and leave nothing anyone reads saying which one was missed. A boot that refuses is
+      loud, immediate, and fixable.
+    */
+    expect(() =>
+      addressesFor({ ...BASE, RESPONSE_NOTICE_TO: 'drews@gomintro.com, not-an-address' }),
+    ).toThrow(/RESPONSE_NOTICE_TO/);
   });
 });

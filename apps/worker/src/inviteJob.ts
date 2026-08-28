@@ -24,10 +24,17 @@
 
 import { commentLinkFor, invitesComment, type ScreeningReport } from '@mintro/engine';
 import { composeInvitation, expiresAt, issueToken } from './invite.js';
-import { mailersFor, type Messenger } from './send.js';
+import { idempotencyKeyFor, mailersFor, type Messenger } from './send.js';
 import type { WorkerSupabase } from './store/supabase.js';
 
 export interface InviteJobInput {
+  /**
+   * The `comment_invites` row this attempt belongs to.
+   *
+   * Here so the send can carry an idempotency key naming it (D-149). It is the job that recurs on a
+   * stale-claim reclaim, so it is the job the key has to be scoped to.
+   */
+  readonly requestId: string;
   readonly runId: string;
   readonly sendTo: string;
   readonly issuedBy: string;
@@ -108,6 +115,25 @@ export async function issueInvitation(
     replyTo: input.replyTo,
     subject: invitation.subject,
     text: invitation.body,
+    /*
+      The same policy as the notification, and it deduplicates less here — deliberately (D-149).
+
+      A reclaimed invitation mints a **fresh token**, because the first one was never stored and
+      cannot be recovered. So the body differs, the digest differs, and Resend sends. That is the
+      right answer rather than a gap: links are additive by design (D-063), both work, both open the
+      same report, and the alternative — suppressing the second — would leave a merchant holding an
+      invitation whose token nobody can prove was ever delivered.
+
+      What the key does close is the narrower window where nothing about the attempt changed:
+      a transport error retried inside the job, or a reclaim that recomposes an identical message.
+    */
+    idempotencyKey: idempotencyKeyFor('comment-invite', input.requestId, [
+      input.sendTo,
+      input.from,
+      input.replyTo,
+      invitation.subject,
+      invitation.body,
+    ]),
   });
 
   if (!outcome.accepted) {

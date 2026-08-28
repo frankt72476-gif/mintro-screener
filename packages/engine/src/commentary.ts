@@ -130,6 +130,70 @@ export function invitesComment(state: State, kind?: NotEvaluableKind): boolean {
 }
 
 /**
+ * Superseded drafts, removed at render (D-147).
+ *
+ * The merchant page autosaves, so one response can arrive as five rows: a sentence, the sentence
+ * finished, a typo fixed. Every one of them is stored — append-only is not negotiable — but printing
+ * all five in the document an underwriter reads would present four abandoned half-sentences as
+ * things the merchant said.
+ *
+ * **The line is what IQwallet may already have read.** D-002's guarantee is that a version an
+ * underwriter has seen stays readable, not that every keystroke reaches the document. So a row is
+ * kept when it is the latest one for its author, or when it was the latest one *at the moment of an
+ * accepted send* — which is exactly the set of versions that could have been in a document someone
+ * outside Mintro holds. Everything else was superseded before anyone saw it, and is a draft.
+ *
+ * That boundary is not a heuristic and not a time window: it is the `sends` table, which is also
+ * what closes the round (D-148). "What IQwallet may have read" and "what ended the response round"
+ * are one fact, read from one place.
+ *
+ * Nothing is deleted, here or anywhere. The rows remain, and the run record holds every version.
+ *
+ * @param comments Rows for **one finding**, in any order.
+ * @param sentAt   Accepted send times for the run, ISO 8601. Empty means nothing has gone out yet,
+ *                 in which case only each author's latest text survives.
+ */
+export function collapseDrafts(
+  comments: readonly MerchantComment[],
+  sentAt: readonly string[],
+): readonly MerchantComment[] {
+  const ordered = comments
+    .slice()
+    .sort((a, b) => Date.parse(a.submittedAt) - Date.parse(b.submittedAt));
+
+  // Timestamps cross a format boundary — PostgREST renders `+00:00`, `toISOString` renders `Z` —
+  // so they are compared as instants. String comparison would silently order these wrongly.
+  const sends = sentAt.map((at) => Date.parse(at)).filter((at) => !Number.isNaN(at));
+
+  const byAuthor = new Map<string, MerchantComment[]>();
+  for (const comment of ordered) {
+    const key = comment.identifiedAs.trim().toLowerCase();
+    const group = byAuthor.get(key);
+    if (group === undefined) byAuthor.set(key, [comment]);
+    else group.push(comment);
+  }
+
+  const kept = new Set<MerchantComment>();
+  for (const group of byAuthor.values()) {
+    // Their current words, always.
+    kept.add(group[group.length - 1] as MerchantComment);
+
+    for (const send of sends) {
+      // The version that was current when that document went out. `undefined` when they had written
+      // nothing yet, which is not a version and needs no row.
+      let current: MerchantComment | undefined;
+      for (const comment of group) {
+        if (Date.parse(comment.submittedAt) <= send) current = comment;
+        else break;
+      }
+      if (current !== undefined) kept.add(current);
+    }
+  }
+
+  return ordered.filter((comment) => kept.has(comment));
+}
+
+/**
  * The commentary state for one finding.
  *
  * Pure. Given what the rule set offered, what was invited, and what came back, it says which of
@@ -140,15 +204,24 @@ export function commentaryFor(
   ordinal: number | undefined,
   invitation: CommentInvitation,
   all: readonly MerchantComment[],
+  /**
+   * Accepted send times for this run (D-147). Omitted means none, not unknown.
+   *
+   * A caller that does not pass these shows each author's latest words and no drafts, which is the
+   * right answer for a run nothing has been sent from. A caller that has sends and forgets them
+   * would drop a version IQwallet holds, so both surfaces read them from `readRunCommentary` rather
+   * than assembling the list themselves.
+   */
+  sentAt: readonly string[] = [],
 ): FindingCommentary {
   if (!invitesComment(finding.state, finding.notEvaluableKind) || !invitation.issued) {
     return { state: 'not_invited', comments: [] };
   }
 
-  const comments = all
-    .filter((c) => c.ruleId === finding.ruleId && (c.ordinal ?? undefined) === ordinal)
-    .slice()
-    .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  const comments = collapseDrafts(
+    all.filter((c) => c.ruleId === finding.ruleId && (c.ordinal ?? undefined) === ordinal),
+    sentAt,
+  );
 
   if (comments.length > 0) return { state: 'commented', comments };
 

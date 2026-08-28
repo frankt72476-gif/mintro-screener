@@ -106,12 +106,36 @@ describe('what the merchant wrote', () => {
     { ruleId: 'GATE-001', identifiedAs: 'ops@shop.example', body: 'A different rule.', submittedAt: '2026-08-23T10:30:00.000Z' },
   ];
 
-  it('returns their words in the order they were written', () => {
+  it('returns their current words when nothing has been sent', () => {
     const result = commentaryFor(finding('fail'), undefined, ISSUED_OPENED, comments);
 
+    /*
+      D-147 amends what this test asserted.
+
+      It read *"a revision is another entry and the first stays readable"* and expected both. That
+      was right when a merchant pressed a button per response and every row was a deliberate act;
+      the page now autosaves, so most rows are drafts, and printing all of them puts half-written
+      sentences in the document an underwriter reads.
+
+      Append-only is untouched — both rows are stored and the next test shows the first one
+      surviving where it matters. What changed is that D-002's guarantee is stated precisely: a
+      version IQwallet *may have read* stays readable, not every version that was ever stored.
+    */
     expect(result.state).toBe('commented');
-    // Append-only: a revision is another entry and the first stays readable (D-002).
-    expect(result.comments.map((c) => c.body)).toEqual(['First answer.', 'Correction: second answer.']);
+    expect(result.comments.map((c) => c.body)).toEqual(['Correction: second answer.']);
+  });
+
+  it('keeps a version that was current when the report went to IQwallet', () => {
+    const result = commentaryFor(finding('fail'), undefined, ISSUED_OPENED, comments, [
+      '2026-08-23T10:30:00.000Z',
+    ]);
+
+    // The send at 10:30 carried "First answer.", so an underwriter holds a document containing it.
+    // Dropping it now would leave them reading a statement the report no longer shows (D-002).
+    expect(result.comments.map((c) => c.body)).toEqual([
+      'First answer.',
+      'Correction: second answer.',
+    ]);
   });
 
   it('keeps comments on the same rule for different pages apart', () => {

@@ -61,3 +61,21 @@ export function commentTokenFrom(url: string): string | null {
     return null;
   }
 }
+
+/**
+ * The link to a run in the analyst app, by merchant domain.
+ *
+ * Same reason the comment link lives here: it is **built in the worker and read in the browser**,
+ * and the last time a URL shape was stated in two places an invitation delivered a merchant to a
+ * sign-in screen. The operator notification carries this link, and `App.tsx` reads the same
+ * parameter — neither side spells it out itself.
+ *
+ * A domain rather than a run id because a run id is not something an operator can check against
+ * anything, and the app resolves a domain to its most recent run — which is the run a notification
+ * about the current response round is about.
+ */
+export const RUN_PARAM = 'report';
+
+export function runLinkFor(origin: string, merchantDomain: string): string {
+  return `${origin.replace(/\/+$/, '')}/?${RUN_PARAM}=${encodeURIComponent(merchantDomain)}`;
+}

@@ -582,8 +582,10 @@ table {width:100%;border-collapse:collapse}
    Ligatures off, so the PDF's text is the text (D-136).
 
    Space Grotesk draws `ff` as one glyph, and Chromium's `page.pdf()` embeds it with no ToUnicode
-   entry — so "Off-site presence" came out of the exported document as "O -site presence", with a
-   NUL where the pair should be. Measured, not guessed: the same string round-trips correctly with
+   entry — so "Off-site presence" came out of the exported document as "O<NUL>-site presence", with a
+   NUL where the pair should be. Written `<NUL>` rather than pasted as the byte it was
+   measured as: a real NUL here renders as nothing, so the one illustration this comment has
+   was invisible in the file that carries it. Measured, not guessed: the same string round-trips correctly with
    this declaration and does not without it.
 
    That is the document an underwriter searches and copies from, and a heading that cannot be found

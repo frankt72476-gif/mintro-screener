@@ -22,10 +22,18 @@ afterAll(async () => {
 
 const HASH = (n: number): string => String(n).padStart(64, '0');
 
-async function seedPackage(domain = 'northwind.example'): Promise<{ merchantId: string; packageId: string }> {
+async function seedPackage(label = 'northwind'): Promise<{ merchantId: string; packageId: string }> {
   const [merchant] = await db.query<{ id: string }>(
     `insert into public.merchants (domain) values ($1) returning id`,
-    [`${domain}-${Math.random().toString(36).slice(2)}`],
+    /*
+      The unique part goes in the label, not after the TLD (D-150).
+
+      This appended the random suffix to a whole domain — `northwind.example-k3j2` — which is not a
+      domain, and `merchants_domain_is_folded` correctly refuses it. Every other fixture in this
+      suite already had it the right way round; this one was the outlier, and the constraint is what
+      found it.
+    */
+    [`${label}-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
     `insert into public.packages (merchant_id, processor_key, template_version)

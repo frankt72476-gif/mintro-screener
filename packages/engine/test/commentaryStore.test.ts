@@ -31,7 +31,21 @@ function reader(tables: Tables, failing?: string): CommentaryReader {
   };
 }
 
-const LINK = { id: 'link-1', first_opened_at: null, expires_at: '2026-09-22T00:00:00.000Z' };
+/*
+  A link row as the table actually holds one.
+
+  `sent_to` and `issued_at` are `not null` in `0016`, and this fixture omitted both — which the
+  reader tolerated by putting `undefined` into `sentTo` and printing it in the participation record
+  as an invitation address. A fixture that is missing a not-null column is testing a row the
+  database cannot contain.
+*/
+const LINK = {
+  id: 'link-1',
+  first_opened_at: null,
+  expires_at: '2026-09-22T00:00:00.000Z',
+  sent_to: 'ops@shop.example',
+  issued_at: '2026-08-23T09:00:00.000Z',
+};
 const SENT = { link_id: 'link-1', status: 'done', delivery: 'resend' };
 
 describe('an invitation that was never transmitted', () => {
@@ -96,7 +110,13 @@ describe('an invitation that was transmitted', () => {
       reader({
         ...tables,
         comment_links: [
-          { id: 'link-2', first_opened_at: '2026-08-30T09:00:00.000Z', expires_at: '2026-10-01T00:00:00.000Z' },
+          {
+            id: 'link-2',
+            first_opened_at: '2026-08-30T09:00:00.000Z',
+            expires_at: '2026-10-01T00:00:00.000Z',
+            sent_to: 'owner@shop.example',
+            issued_at: '2026-08-29T09:00:00.000Z',
+          },
           { ...LINK, first_opened_at: '2026-08-24T09:00:00.000Z' },
         ],
         comment_invites: [SENT, { link_id: 'link-2', status: 'done', delivery: 'resend' }],
@@ -108,6 +128,59 @@ describe('an invitation that was transmitted', () => {
     expect(result?.invitation.firstOpenedAt).toBe('2026-08-24T09:00:00.000Z');
     // While any delivered link still works, they can still respond.
     expect(result?.invitation.expiresAt).toBe('2026-10-01T00:00:00.000Z');
+
+    // Re-issuing **adds** an address (D-144). The set is what the merchant page scopes Submit to
+    // and what the participation record names, and a second invitation must not unseat the first.
+    expect(result?.invitation.sentTo).toEqual(['ops@shop.example', 'owner@shop.example']);
+    expect(result?.invitedAddresses.map((invited) => invited.invitedAt)).toEqual([
+      '2026-08-23T09:00:00.000Z',
+      '2026-08-29T09:00:00.000Z',
+    ]);
+  });
+
+  it('counts one address written two ways as one invitation', async () => {
+    const result = await readRunCommentary(
+      reader({
+        ...tables,
+        comment_links: [
+          { ...LINK },
+          {
+            ...LINK,
+            id: 'link-2',
+            sent_to: 'OPS@Shop.example',
+            issued_at: '2026-08-29T09:00:00.000Z',
+          },
+        ],
+        comment_invites: [SENT, { link_id: 'link-2', status: 'done', delivery: 'resend' }],
+      }),
+      'run-1',
+    );
+
+    /*
+      One agent, two spellings. Counted as two, the round would wait forever on somebody who has
+      already answered — and the participation record would print two invitation addresses for one
+      invitation. Displayed as recorded: the fold is the comparison, not the presentation.
+    */
+    expect(result?.invitation.sentTo).toEqual(['ops@shop.example']);
+    // The earliest issue, because the question the round asks is when Mintro first wrote to them.
+    expect(result?.invitedAddresses[0]?.invitedAt).toBe('2026-08-23T09:00:00.000Z');
+  });
+
+  it('carries the accepted sends that separate a response from a draft', async () => {
+    const result = await readRunCommentary(
+      reader({
+        ...tables,
+        sends: [
+          { sent_at: '2026-08-25T10:00:00.000Z', outcome: 'accepted' },
+          // Rejected: the provider refused it, so no underwriter holds a document from it, and no
+          // version of a response was frozen by it (D-147).
+          { sent_at: '2026-08-26T10:00:00.000Z', outcome: 'rejected' },
+        ],
+      }),
+      'run-1',
+    );
+
+    expect(result?.sentAt).toEqual(['2026-08-25T10:00:00.000Z']);
   });
 
   it('ignores an arrival through a link that was never sent', async () => {

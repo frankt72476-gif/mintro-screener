@@ -142,6 +142,59 @@ export const DETERMINATION_TERMS: readonly string[] = [
   'proven',
 ];
 
+/**
+ * Words that turn observations into a characterisation of the merchant.
+ *
+ * "Four issues are open for response" and "four observations are open for response" describe the
+ * same four rows. The first has decided they are problems, which is IQwallet's decision to make
+ * (D-001) — and it decides it in an internal message nobody thinks of as reader-facing, which is
+ * exactly where this drifts back in.
+ *
+ * **Deliberately not merged into `DIRECTIVE_TERMS`.** `assembleReport` writes *"3 rule(s) were
+ * observed to fail, and 2 other failure(s)"*, which is a count of rules whose stated condition was
+ * not met — the word naming a rule's own outcome, not a judgement about the merchant. Adding
+ * "failures" globally would fail the verdict line for using the vocabulary the four states are
+ * literally named in.
+ *
+ * So this is a second, narrower list applied where the distinction holds: text about *the
+ * merchant's participation*, where there are no rule outcomes to name and every one of these words
+ * would be a characterisation.
+ */
+export const CHARACTERISATION_TERMS: readonly string[] = [
+  'issue',
+  'issues',
+  'problem',
+  'problems',
+  'concern',
+  'concerns',
+  'violation',
+  'violations',
+  'failure',
+  'failures',
+  'deficiency',
+  'deficiencies',
+  'unresponsive',
+  'uncooperative',
+  'evasive',
+  'stonewalling',
+  'ignoring',
+  'refused to respond',
+  'failed to respond',
+];
+
+/**
+ * Everything a message about the response round is audited against (D-143 … D-146).
+ *
+ * The operator notification is internal mail, which is the argument for not auditing it and the
+ * reason it must be. Nothing else Mintro writes describes a merchant's *conduct*, and an operator
+ * who reads "the merchant failed to respond" in their own inbox every week will eventually write it
+ * into a covering note.
+ */
+export const PARTICIPATION_TERMS: readonly string[] = [
+  ...DIRECTIVE_TERMS,
+  ...CHARACTERISATION_TERMS,
+];
+
 /** Everything a generated finding is audited against. */
 export const FINDING_TERMS: readonly string[] = [...DIRECTIVE_TERMS, ...DETERMINATION_TERMS];
 

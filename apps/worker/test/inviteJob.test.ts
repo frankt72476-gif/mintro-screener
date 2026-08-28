@@ -68,6 +68,7 @@ function store(options: { readonly report?: unknown; readonly insertFails?: bool
 }
 
 const INPUT = {
+  requestId: 'invite-1',
   runId: 'run-1',
   sendTo: 'agent@example.com',
   issuedBy: 'analyst-1',

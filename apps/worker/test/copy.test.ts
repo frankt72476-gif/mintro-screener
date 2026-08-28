@@ -16,10 +16,13 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
 import { composeInvitation } from '../src/invite.js';
+import { composeResponseNotice } from '../src/responseNotice.js';
 import { INVITATION_CONTACT_LINE, REPORT_CONTACT_LINE, isPointerContactLine } from '../src/contactLine.js';
 import {
+  CHARACTERISATION_TERMS,
   DIRECTIVE_TERMS,
   INTERNAL_TERMS,
+  PARTICIPATION_TERMS,
   assembleReport,
   auditCopy,
   auditInternalVocabulary,
@@ -355,8 +358,19 @@ describe('the merchant invitation', () => {
   });
 
   it('does not characterise the observations', () => {
-    // A count is a fact; "issues", "problems" and "concerns" are readings, and IQwallet makes them.
-    expect(invitation.body).not.toMatch(/(issues?|problems?|concerns?|violations?|failures?)/i);
+    /*
+      A count is a fact; "issues", "problems" and "concerns" are readings, and IQwallet makes them.
+
+      This was a regex typed into this file, and it could not fail: the word boundaries in it were
+      literal backspace bytes rather than backslash-b escapes, so the pattern only matched a characterisation
+      with a control character beside it. The assertion had been green over text nobody was checking.
+
+      It is now `CHARACTERISATION_TERMS` in `@mintro/engine`, audited by the same `auditCopy` every
+      other surface uses — the operator notification needs the same rule, and a second copy of a rule
+      in a test file is what produced a check that never checked anything (D-029).
+    */
+    expect(auditCopy(invitation.body, CHARACTERISATION_TERMS).flagged).toEqual([]);
+    expect(auditCopy(invitation.subject, CHARACTERISATION_TERMS).flagged).toEqual([]);
   });
 
   /**
@@ -591,5 +605,128 @@ describe('assembled verdicts across outcomes', () => {
       }));
 
     expect(offending(build(findings).verdict)).toEqual([]);
+  });
+});
+
+/**
+ * The operator notification (D-143 … D-146).
+ *
+ * Internal mail, and that is the argument for auditing it rather than against. Nothing else Mintro
+ * writes describes a merchant's *conduct*, and an operator who reads "the merchant failed to
+ * respond" in their own inbox every week will eventually write it into a covering note — where
+ * D-029 catches it after it has been typed rather than before it was ever modelled.
+ */
+describe('the response-round notification', () => {
+  const submitted = composeResponseNotice({
+    merchantDomain: 'shop.example',
+    runLink: 'https://screener.gomintro.com/?report=shop.example',
+    allIn: false,
+    submittedCount: 1,
+    invitedCount: 2,
+    event: {
+      kind: 'submitted',
+      address: 'ops@shop.example',
+      at: new Date('2026-08-27T14:05:00.000Z'),
+    },
+  });
+
+  const allIn = composeResponseNotice({
+    merchantDomain: 'shop.example',
+    runLink: 'https://screener.gomintro.com/?report=shop.example',
+    allIn: true,
+    submittedCount: 1,
+    invitedCount: 2,
+    event: {
+      kind: 'not_responding',
+      address: 'owner@shop.example',
+      by: 'analyst@example.com',
+      at: new Date('2026-08-27T14:20:00.000Z'),
+    },
+  });
+
+  const resubmitted = composeResponseNotice({
+    merchantDomain: 'shop.example',
+    runLink: 'https://screener.gomintro.com/?report=shop.example',
+    // Never true for a re-submit: a re-submit is by an address that resolved when it first
+    // submitted, so it cannot move the invited set (D-151).
+    allIn: false,
+    submittedCount: 2,
+    invitedCount: 2,
+    event: {
+      kind: 'resubmitted',
+      address: 'ops@shop.example',
+      at: new Date('2026-08-28T11:00:00.000Z'),
+      addedAt: new Date('2026-08-28T10:55:00.000Z'),
+    },
+  });
+
+  it.each([
+    ['submit', submitted],
+    ['all-in', allIn],
+    ['re-submit', resubmitted],
+  ])('%s instructs nobody and characterises nobody', (_name, notice) => {
+    // `PARTICIPATION_TERMS` is the directive list plus the words that only make sense about a
+    // *party*: "issues", "concerns", "failures", "unresponsive".
+    expect(auditCopy(notice.subject, PARTICIPATION_TERMS).flagged).toEqual([]);
+    expect(auditCopy(notice.body, PARTICIPATION_TERMS).flagged).toEqual([]);
+  });
+
+  it.each([
+    ['submit', submitted],
+    ['all-in', allIn],
+    ['re-submit', resubmitted],
+  ])("%s carries none of Mintro's internal vocabulary", (_name, notice) => {
+    expect(auditInternalVocabulary(notice.subject).clean).toBe(true);
+    expect(auditInternalVocabulary(notice.body).clean).toBe(true);
+  });
+
+  it('leads with the all-in line only when the round is in', () => {
+    expect(allIn.body.startsWith('All invited responses are in.')).toBe(true);
+    expect(submitted.body).not.toContain('All invited responses are in');
+  });
+
+  it('says all-in has closed nothing', () => {
+    /*
+      The single most likely misreading, and it is worth a sentence in every one of these.
+
+      An operator who sees "All invited responses are in" once a week will start reading it as the
+      system having done something. It has not: nothing was closed, nothing was sent, and the round
+      ends when they send the combined document (D-143, D-148).
+    */
+    expect(allIn.body).toContain('Nothing has been closed or sent');
+  });
+
+  it('reports the count as a count', () => {
+    expect(submitted.body).toContain('1 of 2 invited have submitted.');
+  });
+
+  it('keeps a self-declared identity self-declared', () => {
+    // The address was typed into a box on a page anyone holding a forwarded link can open. "From
+    // ops@shop.example" would present it as established, which is the claim D-144 refuses to make.
+    expect(submitted.body).toContain('Someone identified as ops@shop.example');
+  });
+
+  it('attributes a not-responding mark to the operator who made it', () => {
+    // Mintro's judgement, named as Mintro's. Rendering it as a fact about the merchant is the one
+    // thing D-145 forbids, and an unattributed line is how that happens.
+    expect(allIn.body).toContain('was marked as not responding by analyst@example.com');
+    expect(allIn.body).toContain('operator judgement, recorded as one');
+  });
+
+  it('says plainly what a re-submit is, without telling anyone to act on it', () => {
+    expect(resubmitted.body.startsWith('A responder added to their response after submitting.')).toBe(
+      true,
+    );
+    // The earlier response is not replaced, and an operator should not have to infer that.
+    expect(resubmitted.body).toContain('Their earlier response stands');
+    // And never the all-in line: a re-submit cannot resolve an invited set that already resolved.
+    expect(resubmitted.body).not.toContain('All invited responses are in');
+  });
+
+  it('links to the run rather than describing what to do with it', () => {
+    expect(allIn.body).toContain('https://screener.gomintro.com/?report=shop.example');
+    // No "please review", no "action required" — those are in `DIRECTIVE_TERMS` and the audit above
+    // would catch them, but the shape matters too: the message ends at a link.
+    expect(allIn.body.trimEnd().split('\n').slice(-3).join(' ')).not.toMatch(/\bplease\b/i);
   });
 });

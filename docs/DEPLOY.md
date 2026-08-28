@@ -389,6 +389,56 @@ mailer. Sending is never blocked by a report outcome (D-001) — the `send_reque
 carries no condition on findings or counts, and a schema test asserts it stays that way — which
 makes the send log the only record of what went out and when.
 
+### 5b. Response-round notifications (D-143)
+
+A third message goes through the same `mailersFor()`, in three kinds: one per merchant submit event,
+an "All invited responses are in" version when the last outstanding invited address resolves, and a
+`resubmit` when a responder adds to a response they had already submitted (D-151). A re-submit never
+composes the all-in version and never claims its fingerprint — it is by an address that resolved when
+it first submitted, so the invited set has not moved. It goes to
+**operators**, not to a merchant.
+
+    RESPONSE_NOTICE_TO="drews@gomintro.com,frankt@gomintro.com,michaels@gomintro.com"
+
+All three receive every notice, submit and all-in alike, **on one message rather than one each**.
+Three separate sends are three things that can fail independently, and the record would then say two
+of three were told with no way to say which. `response_notices.to_addresses` stores the set that was
+actually on the message, so "who was told" is answerable later without reading a config value that
+may since have changed.
+
+Comma or whitespace separated. `addressesFor` validates every entry and the worker **refuses to
+start** on a malformed one — the same discipline as the four sender addresses, and for the same
+reason: a bad entry would otherwise surface one notice at a time, as a provider rejection on a queue
+row nobody reads.
+
+Unset is a working fallback rather than an outage: the notice goes to the analyst who issued the most
+recent transmitted invitation for that run.
+
+It is a queue like the other four. `response_notices` rows are written by a database trigger on every
+submit event and every not-responding mark, so no writer can forget to enqueue one; the worker claims
+them with the same compare-and-swap and records the outcome on the row.
+
+**"Never twice for the same set" is a unique index, not a check in code.** The worker claims the
+invited set's fingerprint *before* composing anything, so two responders submitting at the same moment
+resolve the race before either message exists. A send that fails releases the claim and the stale-claim
+reclaim retries it. A job that correctly sends nothing — a mark that did not complete the round, a set
+already reported — finishes as `not_sent` with the reason on the row, never as a failure.
+
+A dry run is recorded as `dry_run`: the operator was not told, and the run view reads that column
+rather than assuming a finished row was delivered.
+
+**Sends carry an `Idempotency-Key` (D-149).** Every queue here claims a row, does the work, then
+records the outcome — and a worker that dies between the send and the record leaves the row `running`
+for the stale-claim reclaim to run again. Resend returns the original response for a repeated key
+without sending again, and keys are kept **24 hours**, comfortably past the 15-minute reclaim. The
+key covers the job *and* a digest of the message, because Resend answers `409
+invalid_idempotent_request` when one key arrives with two different bodies — so a message whose
+content legitimately changed is a different key and does send.
+
+This applies to the response notice and the merchant invitation. It does **not** yet apply to the
+IQwallet report send, whose payload carries a freshly rendered PDF with unstable bytes; that window
+is open and named in D-149.
+
 ### Secrets and settings this needs on Fly
 
     fly secrets set       WEB_ORIGIN="https://screener.gomintro.com"       MAIL_REPLY_TO="no-reply@gomintro.com"       INVITE_REPLY_TO="no-reply@gomintro.com"       --app mintro-screener-worker
@@ -448,6 +498,7 @@ repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as writ
 | `MAIL_REPLY_TO` | — | optional | — | optional |
 | `INVITE_MAIL_FROM` | — | optional | — | optional |
 | `INVITE_REPLY_TO` | — | optional | — | optional |
+| `RESPONSE_NOTICE_TO` | — | optional | — | optional |
 
 Two `.env` files, and they are not interchangeable. **`apps/web/.env` is Vite's** and may hold
 only `VITE_`-prefixed values, all of which are public. **The root `.env`** is the worker's and

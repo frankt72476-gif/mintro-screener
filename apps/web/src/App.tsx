@@ -26,6 +26,9 @@ import {
   participationFor,
   readRunAttestations,
   readRunCommentary,
+  readResponseRound,
+  RUN_PARAM,
+  type ResponseRound,
   resolveAttestations,
   type Participation,
   type FindingCommentary,
@@ -38,6 +41,8 @@ import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
 import { InviteModal } from './components/InviteModal.js';
+import { ResponseRoundPanel } from './components/ResponseRoundPanel.js';
+import { createResponseRoundActions } from './lib/responseRound.js';
 import { DocumentsPane } from './components/DocumentsPane.js';
 import { Rail } from './components/Rail.js';
 import { CommentPane, commentToken } from './components/CommentPane.js';
@@ -66,6 +71,23 @@ type Stage = 'input' | 'watching' | 'running' | 'report';
 function printRequest(): string | null {
   const params = new URLSearchParams(window.location.search);
   return params.get('print') === '1' ? params.get('report') : null;
+}
+
+/**
+ * `?report=<domain>` with no `print` — open that merchant's most recent run.
+ *
+ * What the operator notification links to. The parameter name comes from `@mintro/engine` rather
+ * than being spelled out here, for the reason `commentLinkFor` exists: a URL built in the worker and
+ * read in the browser is a rule expressed in two places, and the last time that happened an
+ * invitation delivered a merchant to a sign-in screen (D-034).
+ *
+ * It resolves a domain rather than a run id, so a link mailed today still opens the right thing —
+ * the run the response round is about is the most recent one, which is what `list()` returns first.
+ */
+function openRequest(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('print') === '1') return null;
+  return params.get(RUN_PARAM);
 }
 
 /**
@@ -235,6 +257,8 @@ function Screener({
 }): JSX.Element {
   const analystEmail = analyst.email;
   const printDomain = useMemo(() => printRequest(), []);
+  /** `?report=<domain>` without `print` — the run link an operator notification carries. */
+  const openDomain = useMemo(() => openRequest(), []);
   /** `?package=<uuid>`, read once. M1 has no package picker; see the Documents pane. */
   const openPackageId = useMemo(() => new URLSearchParams(window.location.search).get('package'), []);
   const [pane, setPane] = useState<Pane>('scan');
@@ -284,6 +308,19 @@ function Screener({
     of the document silently, which is exactly the substitution D-036 is about.
   */
   const [commentary, setCommentary] = useState<RunCommentary | null | undefined>(undefined);
+
+  /*
+    Where the response round stands (D-143).
+
+    Same three-way distinction as `commentary`, for the same reason: `undefined` is unread,
+    `null` is a read that failed, and the panel says which. A failed read rendered as an empty
+    round would show an operator nobody outstanding, which is the prompt to send.
+  */
+  const [round, setRound] = useState<ResponseRound | null | undefined>(undefined);
+  const roundActions = useMemo(
+    () => createResponseRoundActions(client, analyst.id),
+    [client, analyst.id],
+  );
   /** Undefined while unread or unreadable; a resolved set once read. See the read site below. */
   const [attestations, setAttestations] = useState<RunAttestations | undefined>(undefined);
 
@@ -320,6 +357,29 @@ function Screener({
       .then(setAvailable)
       .catch(() => setAvailable([]));
   }, [runs]);
+
+  /*
+    The run link from an operator notification (D-143).
+
+    Resolved the same way the print route resolves its domain, and once: an operator who arrives
+    from a link expects the run, and re-resolving on every render would fight with any navigation
+    they then do.
+  */
+  useEffect(() => {
+    if (openDomain === null) return;
+
+    void runs.list().then((summaries) => {
+      const match = summaries.find((summary) => summary.domain === openDomain);
+      if (match === undefined) {
+        // Named rather than silently ignored. A link that opens the empty scan pane looks like the
+        // notification was wrong; this says the run could not be read, which is the actual fact.
+        setError(`no run readable for ${openDomain}`);
+        return;
+      }
+      void load(match.runId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDomain, runs]);
 
   // Print route: load the requested report immediately and mark the document so the print
   // stylesheet applies. The worker waits for `data-print-ready` before calling `page.pdf()`.
@@ -413,6 +473,7 @@ function Screener({
     setStage('running');
     setError(null);
     setCommentary(undefined);
+    setRound(undefined);
     setAttestations(undefined);
     try {
       const loaded = await runs.load(runId);
@@ -423,7 +484,12 @@ function Screener({
 
       // Read after the report is on screen rather than gating it. A commentary read that is slow
       // or fails should not withhold the findings; the commentary section says which it was.
-      setCommentary(await readRunCommentary(client, runId));
+      const read = await readRunCommentary(client, runId);
+      setCommentary(read);
+
+      // The round is measured against the addresses the commentary read resolved, so it cannot be
+      // read without one. A failed commentary read leaves the round unread rather than empty.
+      setRound(read === null ? null : await readResponseRound(client, runId, read));
 
       /*
         Read after the report is on screen, for the reason commentary is: a slow or failing read
@@ -705,6 +771,25 @@ function Screener({
                 {...commentaryProps(commentary, report)}
                 {...(attestations === undefined ? {} : { attestations })}
               />
+
+              {/*
+                Mintro's workspace, below the report and outside it (D-146).
+
+                Deliberately not a prop on `ReportView`: `ReportView` is the component the PDF
+                prints, and workflow that lives inside it is workflow one refactor away from
+                reaching an underwriter. The split is structural rather than a flag.
+
+                Unread — the report has not finished loading its commentary — renders nothing.
+                Unreadable renders the panel's own failure line.
+              */}
+              {round !== undefined && (
+                <ResponseRoundPanel
+                  runId={report.runId}
+                  round={round}
+                  actions={roundActions}
+                  onChanged={() => void load(report.runId)}
+                />
+              )}
             </>
           )}
         </section>
@@ -1230,7 +1315,14 @@ function commentaryProps(
 
   const props = {
     commentaryOf: (finding: ReportFinding, ordinal?: number): FindingCommentary =>
-      commentaryFor(finding, ordinal, commentary.invitation, commentary.comments),
+      /*
+        `sentAt` is what separates a response from a superseded draft (D-147).
+
+        Passed on both surfaces from the same read, so the screen and the PDF collapse identically.
+        Omitting it on one of them is the shape this helper exists to prevent — two renderings of
+        one merchant's words that differ in which versions they show.
+      */
+      commentaryFor(finding, ordinal, commentary.invitation, commentary.comments, commentary.sentAt),
     /*
       The participation record, from the same grouping the boxes came from (D-063).
 

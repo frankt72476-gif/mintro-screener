@@ -120,7 +120,15 @@ export function NewPackage({ creation, onCreated, onCancel }: NewPackageProps): 
         const merchantId = await creation.ensureMerchant({
           legalName: legalName.trim(),
           dba: dba.trim() === '' ? null : dba.trim(),
-          domain: domain.trim() === '' ? null : domain.trim(),
+          /*
+            Folded here as well as in `ensure_merchant` (D-150).
+
+            Not redundancy for its own sake: the database is the backstop and refuses an uppercase
+            domain outright, so a form that submitted one would show an analyst a constraint
+            violation instead of creating their package. Folding before it leaves means the typed
+            value and the stored value are the same thing, and the analyst never meets the rule.
+          */
+          domain: domain.trim() === '' ? null : domain.trim().toLowerCase(),
         });
 
         const { slots, removals } = toRows(
