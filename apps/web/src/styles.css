@@ -632,6 +632,36 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .queue-state.done     { color: var(--jade); }
 .queue-state.failed   { color: var(--rose); }
 
+/*
+  A request no worker is attached to (D-152).
+
+  Amber, not rose: nothing has failed. The claim goes back on the queue and the scan is retried,
+  so colouring it as a failure would say more than is known — the same distinction the four
+  finding states keep.
+*/
+.queue-state.stalled  { color: var(--amber); }
+
+.queue-item.stalled {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 6%, var(--card));
+}
+
+.stalled-note { color: var(--amber); }
+
+/* The progress card, when the run behind it has no worker. */
+.card.prog.stalled { border-color: var(--amber); }
+
+.layer.stalled { color: var(--amber); }
+
+/*
+  The pulse is the page's claim that something is happening. On a stalled run nothing is, so it
+  holds still — an animation that keeps running over dead work is the display lying quietly.
+*/
+.layer.stalled .dot {
+  background: var(--amber);
+  animation: none;
+}
+
 .queue-url {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import type { Browser, BrowserContext } from 'playwright';
 import type { ProbeResult } from '@mintro/engine';
+import { withDeadline } from './deadline.js';
 
 export interface ProbeOptions {
   /** A context carrying a session, or null to probe as an anonymous visitor. */
@@ -35,15 +36,30 @@ export async function probePaths(
   const owned = options.authenticated === null;
   const results: ProbeResult[] = [];
 
+  /*
+    Defaults go on the pages this function creates, never on the context (D-153).
+
+    A context supplied through `options.authenticated` belongs to the caller and outlives this
+    call. Setting a default on it would silently retune every later request the caller makes with
+    it — a timeout applied by a function the caller did not know was involved is the kind of
+    action-at-a-distance that is very hard to find later. Pages created here are ours, so the
+    setting stays inside the call.
+  */
+
   try {
     for (const path of paths) {
       const url = new URL(path, origin).toString();
       const fetchedAt = new Date().toISOString();
       const page = await context.newPage();
+      page.setDefaultTimeout(timeout);
+      page.setDefaultNavigationTimeout(timeout);
 
       try {
         const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
-        const bodyText = await page.content();
+        // `page.content()` takes no timeout and ignores the page default — measured, not assumed
+        // (D-153). Against a page whose main thread is wedged it never settles, so the bound has
+        // to come from outside it. The `finally` below closes the page, which reaps the call.
+        const bodyText = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
 
         results.push({
           url,

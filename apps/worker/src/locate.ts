@@ -14,6 +14,7 @@ import type { Page } from 'playwright';
 import type { Located, SurfaceSpec } from '@mintro/engine';
 import { located, unreachable, endedAtWhatWasAsked, pathNamesSurface } from '@mintro/engine';
 import type { FetchAttempt, PageContext } from '@mintro/engine';
+import { withDeadlineOr } from './deadline.js';
 
 /**
  * Positive signals that a page is checkout.
@@ -42,7 +43,7 @@ const CHECKOUT_CONTAINERS = ['#payment-form', '[data-payment-method]', 'form.che
  * reason it failed — the reason is what the finding reports, and an earlier version of this logic
  * discarded it.
  */
-export async function establishCheckout(page: Page): Promise<Located<true>> {
+export async function establishCheckout(page: Page, timeoutMs = 20_000): Promise<Located<true>> {
   const url = page.url();
 
   let path: string;
@@ -56,8 +57,17 @@ export async function establishCheckout(page: Page): Promise<Located<true>> {
     return located(true, url, `${url}, whose path names checkout`);
   }
 
-  const collects = await page
-    .evaluate(
+  /*
+    Bounded explicitly (D-153).
+
+    `page.evaluate` takes no timeout and does not honour `setDefaultTimeout` — measured against
+    Playwright 1.49, where it sat pending for 39 seconds against a wedged page and rejected only
+    when the browser was torn down. The `.catch` below turns a rejection into "no signal"; it does
+    nothing for a call that never settles, and this one runs on a checkout page reached by a flow
+    that has already clicked things, which is where a page is most likely to be busy.
+  */
+  const collects = await withDeadlineOr(
+    page.evaluate(
       ({ tokens, containers }) => {
         const byAutocomplete = tokens.find(
           (token) => document.querySelector(`[autocomplete*="${token}"]`) !== null,
@@ -68,8 +78,11 @@ export async function establishCheckout(page: Page): Promise<Located<true>> {
         return byContainer === undefined ? null : `a checkout container matching '${byContainer}'`;
       },
       { tokens: CHECKOUT_INPUT_TOKENS, containers: CHECKOUT_CONTAINERS },
-    )
-    .catch(() => null);
+    ),
+    timeoutMs,
+    'page.evaluate() while establishing the checkout page',
+    null,
+  );
 
   if (collects !== null) {
     return located(true, url, `${url}, which collects checkout details — ${collects}`);

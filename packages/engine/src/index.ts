@@ -90,6 +90,8 @@ export {
   type PacerClock,
 } from './politeness.js';
 
+export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
+
 export {
   similarity,
   resembles,

@@ -15,6 +15,15 @@
  */
 
 import type { Page } from 'playwright';
+import { withDeadlineOr } from './deadline.js';
+
+/**
+ * Bound on the one call in this file that carries no timeout of its own (D-153).
+ *
+ * Matched to the `networkidle` wait above it: a cart page that has gone quiet has either filled
+ * itself or is not going to, and reading its links takes milliseconds either way.
+ */
+const EVALUATE_DEADLINE_MS = 10_000;
 
 /**
  * What the store says about the cart.
@@ -128,15 +137,21 @@ async function renderedCartShowsProduct(
     // The block fills itself after load; give it the chance before reading.
     await page.waitForLoadState('networkidle', { timeout: 6_000 }).catch(() => undefined);
 
-    const shows = await page
-      .evaluate(
+    // Bounded explicitly: `page.evaluate` honours no default timeout and accepts none (D-153).
+    // A cart page that is still spinning on its Store API call is exactly the busy page this
+    // would otherwise wait on forever.
+    const shows = await withDeadlineOr<boolean | null>(
+      page.evaluate(
         (needle) =>
           Array.from(document.querySelectorAll('a')).some((a) =>
             a.getAttribute('href')?.toLowerCase().includes(needle),
           ),
         slug,
-      )
-      .catch(() => null);
+      ),
+      EVALUATE_DEADLINE_MS,
+      `page.evaluate() reading the cart page at ${origin}${path}`,
+      null,
+    );
 
     if (shows !== null) return shows;
   }

@@ -37,6 +37,7 @@ import type {
 import { NO_SIGNUP_FORM } from '@mintro/engine';
 import { establishDocument } from './locate.js';
 import { renderPage } from './render.js';
+import { withDeadline } from './deadline.js';
 import { extractSignupForm, type RawSignupForm } from './extract.js';
 
 /**
@@ -242,9 +243,16 @@ async function readForm(
   await options.pacer.before();
   const context = await browser.newContext();
   try {
+    const timeout = options.timeoutMs ?? 30_000;
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs ?? 30_000 });
-    return (await page.evaluate(extractSignupForm)) as RawSignupForm;
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
+    // Bounded: `page.evaluate` honours no default and takes no timeout (D-153). The `catch` below
+    // already turns a failure into "could not read the form", which is the honest answer.
+    return (await withDeadline(
+      page.evaluate(extractSignupForm),
+      timeout,
+      `page.evaluate() reading the sign-up form at ${url}`,
+    )) as RawSignupForm;
   } catch {
     return null;
   } finally {

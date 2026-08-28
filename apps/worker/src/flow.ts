@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
 import { cartHoldsProduct } from './cart.js';
 import { establishCheckout } from './locate.js';
+import { withDeadlineOr } from './deadline.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
 
 /** Markers that identify a payment step without submitting anything. */
@@ -65,10 +66,18 @@ export async function runCheckoutFlow(
   const capturedAt = new Date().toISOString();
   const page = await context.newPage();
 
+  /*
+    The page default bounds navigations and actions (D-153).
+
+    It does **not** bound `page.content()` or `page.evaluate` — measured, not assumed. Those two
+    are wrapped in `withDeadline*` at each call site below, and the `finally` that closes this page
+    is what actually ends an abandoned one.
+  */
+  page.setDefaultTimeout(timeout);
+  page.setDefaultNavigationTimeout(timeout);
+
   const observe = (reached: FlowStage, error?: string): Promise<FlowObservation> =>
-    page
-      .content()
-      .catch(() => '')
+    withDeadlineOr(page.content(), timeout, 'page.content() while recording the flow outcome', '')
       .then((html) => ({
         flow: 'add_to_cart_then_checkout',
         reached,
@@ -140,7 +149,14 @@ export async function runCheckoutFlow(
     }
 
     for (const marker of PAYMENT_MARKERS) {
-      const count = await page.locator(marker).first().count().catch(() => 0);
+      // `count()` resolves immediately against a healthy page and not at all against a wedged one,
+      // so it is bounded like everything else here (D-153).
+      const count = await withDeadlineOr(
+        page.locator(marker).first().count(),
+        timeout,
+        `locator.count() for ${marker}`,
+        0,
+      );
       if (count > 0) {
         steps.push(`payment field observed (${marker})`);
         // Observed only. Nothing is filled and nothing is submitted.
@@ -155,7 +171,7 @@ export async function runCheckoutFlow(
       from wherever it happened to be standing, so a product listing reached by redirect was
       reported as "stopped at checkout, no payment field observed" (D-054, D-056).
     */
-    const where = await establishCheckout(page);
+    const where = await establishCheckout(page, timeout);
     if (!where.located) {
       steps.push(where.reason);
       return await observe('unestablished', where.reason);
@@ -179,7 +195,9 @@ async function clickFirst(
 ): Promise<boolean> {
   for (const selector of selectors) {
     const target = page.locator(selector).first();
-    const count = await target.count().catch(() => 0);
+    // Bounded for the same reason as the payment markers: `count()` is instant on a live page and
+    // open-ended on a wedged one, and `.catch` covers only the first case (D-153).
+    const count = await withDeadlineOr(target.count(), timeout, `locator.count() for ${selector}`, 0);
     if (count === 0) continue;
     try {
       await target.click({ timeout });

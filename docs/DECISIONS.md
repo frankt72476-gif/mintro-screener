@@ -8991,3 +8991,199 @@ only because `maySubmit` happens to require an identity — a coupling nothing s
 would have left a pressable button whose handler returns immediately. Both carry the guard now.
 
 ---
+
+## D-152 — A run has a wall-clock deadline, and the queue says when nothing is working
+
+**2026-08-28 · engineering · prompted by the comopeptides hang**
+
+Full trace in `docs/stuck-run-investigation.md`. In short: request `5ccd3051` claimed at 13:37:55
+ET, produced its last output at 13:39:47, and then sat silent. The worker was alive and healthy —
+no OOM, no restart, `oom_killed=false` — and blocked inside `runCheckoutFlow`. It stayed blocked
+for **twenty-nine minutes**, and ended only because an operator restarted the machine at 14:08:51,
+which tore down Chromium and rejected the pending call.
+
+Nothing recovered it, and nothing was going to. Three separate mechanisms that look like they
+cover this each declined to:
+
+- **The `try/catch` in `handle`** writes `status: 'failed'` on any throw. Nothing threw. A hang is
+  not an exception, and code that only handles exceptions does not handle it.
+- **The stale-claim reclaim** takes back a `running` row after fifteen minutes — from inside the
+  job loop, which was the thing that was stuck. See D-154.
+- **The UI** showed `running` with a progress line, which was true and useless: the line was the
+  last thing the worker managed to say, half an hour earlier.
+
+### The ruling
+
+**A run gets 25 minutes of wall clock. After that it is terminated, not waited on.**
+
+The number is derived, not picked. Summing every per-step timeout in a full crawl gives a bounded
+worst case of about sixteen minutes. Twenty-five leaves headroom for a slow-but-progressing site
+while ensuring that anything past it is not going to finish — the observed hang was already at
+twenty-four minutes when the investigation opened.
+
+**The timeout resolves; it does not throw.** `Promise.race` between the crawl and a timer, with
+the timer resolving to a sentinel. Routing it through the `catch` would have been less code and
+would have recorded a fabricated exception against a run where nothing failed. The queue row gets
+a distinct, machine-readable token — `watchdog_timeout:` — so the difference survives into the
+database and into the UI, which says "no worker" rather than "failed".
+
+**The browser is recycled after a termination.** This is what makes the watchdog real rather than
+cosmetic. `screenStorefront` creates its own contexts and hands none back, so there is no way to
+reach the abandoned crawl's pages from the caller. Racing a timer returns control to the loop and
+leaves the crawl running inside Chromium, holding contexts and pages on a machine with 1GB. The
+close both frees them and rejects whatever call was hung, which is the only way to end it from
+outside. The loop owns the browser's lifetime, so the loop does the recycling; `handle` reports
+that it is needed rather than closing something it did not open.
+
+### Mid-run checkpointing was considered and rejected
+
+The tempting alternative: write findings as each layer completes, so a hang at minute twenty-nine
+leaves twenty-eight minutes of work on disk instead of nothing. The comopeptides run had rendered
+about ten pages and produced 64 captures, all of which were lost.
+
+**Rejected, and not on cost grounds.** It breaks D-002 and hard constraint 8.
+
+A run is immutable. `0004_runs.sql` freezes the row on `finished_at`, evidence is append-only with
+a trigger that `service_role` cannot bypass, and `persistRun` verifies completeness *before*
+closing precisely because an earlier version closed first and froze five runs carrying findings
+that cite captures with no evidence row — unfixable, because runs are never deleted.
+
+Checkpointing means a run row that exists while incomplete and grows over time. That is a run in a
+*pending* state, and the whole design says there is no such thing: a request records that someone
+asked, a run records what was observed, and the second does not exist until there is something to
+record. A half-written run is indistinguishable from a complete one to every reader — the report
+route, the PDF renderer, the export builder — and none of them has a way to ask "is this all of
+it?" That is the exact shape of D-033's defect, reintroduced deliberately.
+
+The behaviour under an abrupt kill confirms the current design is right. When the operator's
+restart landed one second after the totals line, `persistRun` had not started: **no merchant row,
+no run row, no findings, no evidence, no storage objects.** Verified. The interrupted run left
+nothing behind to reconcile, because writing once after the crawl returns means there is no
+partial state to be wrong about. Checkpointing would have left a run row, some findings and some
+evidence from a crawl that never finished — and D-002 would have frozen it there.
+
+Losing the work is the price of that guarantee, and the price is correct. A re-scan is cheap: the
+second attempt of this same request completed in 163 seconds.
+
+### The queue surfaces staleness
+
+A request whose claim is older than the watchdog deadline renders as **"no worker"**, in amber,
+with the time of the last claim and the last progress line — not as `running`, and not as failed.
+The count beside the queue separates the two: a stalled request is pending but is not progressing,
+and "1 in progress" over a row nothing is touching is what made the hang look like ordinary work.
+
+It says what is known and stops there. It does not say the run failed, because it has not: a stale
+claim is released and retried (D-154). The progress dot stops animating, because an animation over
+dead work is the display asserting something it was not told.
+
+Measured from `claimed_at`, never `created_at`. Time spent waiting for a free worker is not the
+worker failing to answer, and counting it would mark a request stale before anyone had picked it
+up.
+
+---
+
+## D-153 — `setDefaultTimeout` is not a bound, and the two calls it misses are the ones that hang
+
+**2026-08-28 · engineering**
+
+The first draft of the fix for D-152 set `page.setDefaultTimeout` on every context in `probe.ts`,
+`flow.ts` and `cart.ts`, on the reasoning that the crawl's one bounded file — `render.ts:111` — did
+that and the unbounded ones did not.
+
+**That fix would have been cosmetic, and the measurement is why it is not the fix.** Playwright
+1.49, `setDefaultTimeout(3000)`, against a page whose main thread is wedged in a `while (true)`:
+
+| call | outcome |
+|---|---|
+| `page.evaluate(...)` | still pending at **39s**; rejected only when the browser was torn down |
+| `page.content()` | still pending at **12s**; rejected only when the browser was torn down |
+
+Neither honours the default and neither accepts a timeout argument. So the default bounds the
+calls that were already bounded — navigations and actions — and misses exactly the two that hang.
+
+A `.catch` does not help either, and this is the same error one level down. `flow.ts` wrapped both
+in `.catch(() => ...)` and read as defensive. A catch converts a **rejection** into a fallback; a
+call that never settles never rejects, so the handler never runs. The code looked guarded and was
+not, which is D-026's shape again — a precondition asserted rather than established.
+
+### The ruling
+
+**Every Playwright call is bounded explicitly. Where the API accepts a timeout, it is passed; where
+it does not, the call is wrapped in `withDeadline`.** No call relies on an ambient default.
+
+`withDeadline` bounds *our* wait, not the browser's work: racing a timer does not cancel the
+underlying call, which stays pending inside Playwright. What ends it is the page or context being
+closed, which every caller here already does in a `finally`. Both halves are required and the
+pairing is documented at the top of `deadline.ts`, because a caller that raced a deadline and then
+kept using the page would be talking to a page with an abandoned operation still on it.
+
+Call sites, with the bound each was given:
+
+| file | call | bound |
+|---|---|---|
+| `probe.ts` | `page.content()` | `withDeadline`, 20s (the probe timeout) |
+| `flow.ts` | `page.content()` in `observe` | `withDeadlineOr`, 20s, empty string |
+| `flow.ts` | `locator.count()` per payment marker | `withDeadlineOr`, 20s, `0` |
+| `flow.ts` | `locator.count()` in `clickFirst` | `withDeadlineOr`, 20s, `0` |
+| `locate.ts` | `page.evaluate` in `establishCheckout` | `withDeadlineOr`, 20s, `null` |
+| `cart.ts` | `page.evaluate` reading the cart page | `withDeadlineOr`, 10s, `null` |
+| `render.ts` | `page.evaluate(extractPage)` | `withDeadline`, render timeout (30s) |
+| `render.ts` | `page.content()` | `withDeadline`, render timeout (30s) |
+| `signup.ts` | `page.evaluate(extractSignupForm)` | `withDeadline`, 30s |
+
+Page-level defaults are set in `probe.ts` and `flow.ts` as well, for the navigations and actions
+they *do* cover. On the **page**, never on the context: a context supplied by a caller outlives
+the call, and retuning it would apply a timeout to every later request the caller makes with a
+context it did not know had been touched.
+
+`render.ts`, `locate.ts` and `signup.ts` are outside the three files the work was scoped to. They
+are included because they carry the identical defect on the *main* render path — every page of
+every run goes through `render.ts` — and bounding the checkout flow while leaving an unbounded
+`evaluate` on every page render would have fixed the instance and left the class.
+
+---
+
+## D-154 — The stale-claim sweep runs on its own clock, and a working worker says so
+
+**2026-08-28 · engineering**
+
+The reclaim in `claimNext` is correct and did nothing for twenty-nine minutes, because it lives
+inside the job loop. Everything in that loop is behind one `await handle(...)`, so a sweep placed
+there can only run when the worker is idle — and an idle worker is the one case where nothing needs
+sweeping. The mechanism was structurally unable to fire in the situation it exists for.
+
+**The sweep moves onto its own `setInterval`, once a minute, outside the loop.**
+
+**It releases; it does not execute.** A stale row is set back to `queued` for whoever polls next,
+here or on another machine. Concurrency is unchanged: the loop stays strictly sequential and one
+machine still runs one job at a time. Making the sweep a second executor would be a concurrency
+change nobody asked for, on a 1GB machine already running Chromium.
+
+### The heartbeat is not optional, and moving the sweep is what makes it necessary
+
+`claimed_at` was written once, at claim time, and never touched. That was safe **only** because
+reclaim ran between jobs — a job in flight could not be reclaimed, because the loop that would
+reclaim it was the loop running it.
+
+Move the sweep onto a timer and that accidental protection is gone, and the numbers then collide.
+`STALE_CLAIM_MS` is fifteen minutes; D-152 lets a run go to twenty-five. A perfectly healthy
+sixteen-minute crawl would have a sixteen-minute-old claim, the sweep would read it as abandoned,
+and the request would be released and run **a second time, concurrently with the first**, against
+the merchant's site — two runs where an analyst asked for one.
+
+So the worker now refreshes `claimed_at` every sixty seconds while it works, and the sweep is
+tuned to that: fifteen minutes is fifteen consecutive missed beats, not one slow write.
+
+This is what makes "stale" mean what `0012_scan_requests.sql` always claimed it meant. Not *old* —
+**no worker is touching this**. A stale claim becomes positive evidence that a worker is gone
+rather than an inference from elapsed time, which is D-026's rule applied to the queue instead of
+to a session. The heartbeat is stopped in `handle`'s `finally` before anything else, because a
+heartbeat outliving its job would keep refreshing a claim on a row nobody is working, which is
+precisely the lie the sweep depends on not being told.
+
+Deliberately **not** done: starting the second Fly machine. It exists, it is stopped, and the CAS
+claim is safe for any number of workers — but a second machine doubles the Chromium memory bill and
+is a concurrency change, and the fix for "one job blocked everything" is to stop jobs blocking, not
+to add a lane.
+
+---

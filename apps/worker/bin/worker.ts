@@ -42,7 +42,7 @@ import { assessRun } from '../src/store/completeness.js';
 import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { establishSession } from '../src/auth/login.js';
-import { createHttpFetcher } from '@mintro/engine';
+import { createHttpFetcher, RUN_DEADLINE_MS, runTimeoutMessage } from '@mintro/engine';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -63,6 +63,13 @@ import { createIngestStore } from '../src/store/ingestStore.js';
 import { openRasterizer, type RasterizerHandle } from '../src/rasterize.js';
 import { createAnthropicVisionClient } from '@mintro/extraction';
 import { addressesFor, type MailAddresses } from '../src/addresses.js';
+import {
+  RECLAIM_SWEEP_MS,
+  STALE_CLAIM_MS,
+  startHeartbeat,
+  sweepStaleClaims,
+} from '../src/reclaim.js';
+
 
 /** How long to wait when the queue is empty. Short enough that a demo does not feel stalled. */
 const POLL_INTERVAL_MS = 3_000;
@@ -75,9 +82,6 @@ const POLL_INTERVAL_MS = 3_000;
  */
 const SWEEP_EVERY_MS = 60 * 60 * 1000;
 let lastSweptAt = 0;
-
-/** A claim older than this is assumed to belong to a machine that died. */
-const STALE_CLAIM_MS = 15 * 60 * 1000;
 
 /**
  * The built frontend, which the PDF renderer prints.
@@ -144,7 +148,7 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log('        Public crawls are unaffected; screening_account requests will fail.');
   }
 
-  const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  let browser = await launchBrowser();
 
   // A stop signal must not kill a scan halfway. Fly sends SIGTERM before replacing a machine; the
   // loop finishes the request it is on and then exits, so a redeploy costs a delay rather than a
@@ -190,13 +194,50 @@ async function main(argv: readonly string[]): Promise<number> {
   // browser launch per upload would be most of the cost of a short one (D-108).
   let rasterizer: RasterizerHandle | undefined;
 
+  /*
+    The stale-claim sweep, on its own clock (D-154).
+
+    Deliberately outside the loop below. Everything in that loop is behind one `await`, so a sweep
+    placed inside it can only run when the worker is idle — and an idle worker is the one case
+    where nothing needs sweeping. On its own interval it runs *while* a job is in flight, which is
+    when a stranded row actually exists.
+
+    Guarded against overlapping with itself: a slow database round trip must not stack up sweeps.
+  */
+  let sweeping = false;
+  const sweepTimer = setInterval(() => {
+    if (sweeping) return;
+    sweeping = true;
+    void sweepStaleClaims(supabase).finally(() => {
+      sweeping = false;
+    });
+  }, RECLAIM_SWEEP_MS);
+  sweepTimer.unref?.();
+
   try {
     while (!stopping) {
       if (keys !== undefined) await drainDeposits(supabase, keys);
 
       const request = await claimNext(supabase);
       if (request !== null) {
-        await handle(supabase, browser, ruleset, request, keys);
+        const outcome = await handle(supabase, browser, ruleset, request, keys);
+
+        /*
+          A timed-out crawl is still holding pages in this browser (D-152).
+
+          Closing it is what makes the watchdog real rather than cosmetic: without this the loop
+          moves on while the abandoned crawl keeps its contexts, its pages and their memory, on a
+          machine with 1GB and a Chromium already in it. The close also rejects whatever call was
+          hung, which is the only way to end it from outside.
+
+          The rasterizer holds a page in the old browser, so it goes too and reopens on next use.
+        */
+        if (outcome.recycleBrowser) {
+          await browser.close().catch(() => undefined);
+          rasterizer = undefined;
+          browser = await launchBrowser();
+          console.log('  browser recycled after the watchdog termination');
+        }
         continue;
       }
 
@@ -360,6 +401,7 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     return 0;
   } finally {
+    clearInterval(sweepTimer);
     if (rasterizer !== undefined) await rasterizer.close();
     await browser.close();
   }
@@ -416,6 +458,20 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
   return row;
 }
 
+/**
+ * What `handle` tells the loop about the browser it was lent.
+ *
+ * `recycleBrowser` is set only by a watchdog termination. The crawl that timed out is still
+ * holding pages inside that browser and there is no way to reach them from here — `screenStorefront`
+ * creates its own contexts and does not hand them back — so the only lever that actually frees
+ * them is closing the browser they belong to. The loop owns the browser's lifetime, so the loop
+ * does the recycling; `handle` reports that it is needed rather than closing something it did not
+ * open (D-152).
+ */
+interface HandleOutcome {
+  readonly recycleBrowser: boolean;
+}
+
 /** Screens one request and records what happened. Never throws: the queue row carries the outcome. */
 async function handle(
   supabase: WorkerSupabase,
@@ -423,7 +479,7 @@ async function handle(
   ruleset: Ruleset,
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
-): Promise<void> {
+): Promise<HandleOutcome> {
   const runId = randomUUID();
   const started = Date.now();
   // A holder rather than a `let`: the assignment happens inside the `escalate` callback, and
@@ -435,8 +491,13 @@ async function handle(
   const held: { context: BrowserContext | null } = { context: null };
   console.log(`\n${request.url}  request ${request.id.slice(0, 8)}  run ${runId.slice(0, 8)}`);
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  // Held for as long as this job is, so the sweep can tell a working worker from a dead one.
+  const stopHeartbeat = startHeartbeat(supabase, request.id);
+
   try {
-    const { report, artifacts } = await screenStorefront(browser, request.url, ruleset, {
+    const screening = screenStorefront(browser, request.url, ruleset, {
       runId,
 
       // Called only if the anonymous crawl is refused. The analyst chose nothing; this is the
@@ -457,6 +518,45 @@ async function handle(
       },
     });
 
+    /*
+      The watchdog (D-152).
+
+      It **resolves** rather than rejects, and that is the whole point of its shape. A deadline is
+      not an exception: nothing threw, no call site failed, and routing it through the `catch`
+      below would record a fabricated exception message against a run that simply never came back.
+      Racing two resolutions makes "the crawl finished" and "the clock ran out" two outcomes of
+      equal standing, and the caller has to handle both.
+    */
+    const deadline = new Promise<{ readonly kind: 'timeout' }>((resolve) => {
+      timer = setTimeout(() => resolve({ kind: 'timeout' }), RUN_DEADLINE_MS);
+    });
+
+    const outcome = await Promise.race([
+      screening.then((value) => ({ kind: 'screened' as const, value })),
+      deadline,
+    ]);
+
+    if (outcome.kind === 'timeout') {
+      /*
+        The crawl is still live inside the browser the loop is about to close. Attaching a handler
+        first is not tidiness: closing the browser rejects every pending Playwright call, and an
+        orphaned promise with no handler takes the process down with an unhandled rejection.
+      */
+      void screening.catch(() => undefined);
+
+      const minutes = Math.round(RUN_DEADLINE_MS / 60_000);
+      const message = runTimeoutMessage(RUN_DEADLINE_MS);
+
+      console.error(
+        `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
+          `${minutes} minutes expired; the browser will be recycled before the next job`,
+      );
+      await finish(supabase, request.id, { status: 'failed', error: message });
+      return { recycleBrowser: true };
+    }
+
+    const { report, artifacts } = outcome.value;
+
     await persistRun(supabase, { report, artifacts, runId });
 
     // What the run actually did, recorded against the request. `mode` stopped being a choice at
@@ -476,6 +576,7 @@ async function handle(
 
     await finish(supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
+    return { recycleBrowser: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`  FAILED: ${message}`);
@@ -483,7 +584,16 @@ async function handle(
     // The request records the failure. The run, if one was opened, is already marked `failed` with
     // `finished_at` null by persistRun, so it stays resumable rather than freezing broken.
     await finish(supabase, request.id, { status: 'failed', error: message });
+    return { recycleBrowser: false };
   } finally {
+    // Before anything else: a heartbeat outliving its job would keep refreshing the claim on a row
+    // this worker is no longer touching, which is the exact lie the sweep depends on not being told.
+    stopHeartbeat();
+
+    // Left pending, this keeps the event loop alive for the full deadline after every successful
+    // job — a worker that will not exit for 25 minutes after its last scan.
+    if (timer !== undefined) clearTimeout(timer);
+
     // Ours to close: `renderPage` borrows a supplied context and never closes it, precisely so the
     // session survives from one page to the next.
     await held.context?.close().catch(() => undefined);
@@ -617,6 +727,16 @@ async function note(supabase: WorkerSupabase, requestId: string, line: string): 
       () => undefined,
     );
 }
+
+/**
+ * Launches Chromium.
+ *
+ * One function rather than a literal at the launch site, because the watchdog relaunches it after
+ * a termination (D-152) and a second copy of these flags is a second thing to get wrong — a
+ * recycled browser running without `--no-sandbox` would fail every job after the first timeout.
+ */
+const launchBrowser = (): Promise<Browser> =>
+  chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 

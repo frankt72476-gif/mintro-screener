@@ -26,6 +26,7 @@ import {
   USER_AGENT,
 } from '@mintro/engine';
 import { extractPage, type RawExtraction, type RawStyledText } from './extract.js';
+import { withDeadline } from './deadline.js';
 
 /** Payment method names looked for in the footer, carried forward for Layer 3 (PAY-001). */
 const PAYMENT_TERMS = [
@@ -118,11 +119,24 @@ export async function renderPage(
     const status = response?.status() ?? 0;
     const finalUrl = page.url();
 
-    const extraction = (await page.evaluate(extractPage, {
-      paymentTerms: [...PAYMENT_TERMS],
-      selectors: [...(options.selectors ?? [])],
-    })) as RawExtraction;
-    const html = await page.content();
+    /*
+      Both of these are unbounded without the wrapper (D-153).
+
+      `page.evaluate` and `page.content()` take no timeout and ignore `setDefaultTimeout`. This is
+      the highest-traffic pair in the crawl — every page of every run goes through here — so an
+      unbounded wait on either is a hang available on any storefront, not only one with a checkout
+      flow. A failure here already has a home: it throws, the catch below returns a `PageContext`
+      carrying `renderError`, and the layer above turns that into `not_evaluable` with a reason.
+    */
+    const extraction = (await withDeadline(
+      page.evaluate(extractPage, {
+        paymentTerms: [...PAYMENT_TERMS],
+        selectors: [...(options.selectors ?? [])],
+      }),
+      timeout,
+      `page.evaluate() extracting ${url}`,
+    )) as RawExtraction;
+    const html = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
     const htmlSha256 = sha256(html);
 
     // Captures happen before the keys are set. A key is only written onto the context once the

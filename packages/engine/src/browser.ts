@@ -36,6 +36,16 @@ export type {
   NotEvaluableKind,
 } from './findings.js';
 
+/*
+  The watchdog deadline, shared with the queue UI (D-152).
+
+  Plain constants with no imports, so exporting them here costs the browser bundle nothing and
+  keeps the frontend measuring staleness against the *same* number the worker enforces. Two copies
+  would drift, and the drift would show as a queue calling a healthy run stalled — the display
+  disagreeing with the machine about what is happening.
+*/
+export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
+
 export type {
   AssembleInput,
   ReportAccess,

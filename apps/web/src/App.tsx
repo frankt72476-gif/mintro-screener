@@ -14,7 +14,13 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
-import { createScanQueue, isPending, type ScanRequestSummary } from './lib/scanQueue.js';
+import {
+  createScanQueue,
+  isPending,
+  isStalled,
+  RUN_DEADLINE_MS,
+  type ScanRequestSummary,
+} from './lib/scanQueue.js';
 import { formatReportDate } from './lib/format.js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
@@ -903,7 +909,14 @@ function ScanInput({
     else setRequestError(result.error);
   };
 
+  /*
+    A stalled request is pending but is not *progressing* (D-152), and the two are counted apart.
+    "1 in progress" over a row no worker has touched for half an hour is the line that made the
+    comopeptides hang look like ordinary work.
+  */
   const pending = queued.filter((request) => isPending(request.status));
+  const stalled = pending.filter((request) => isStalled(request));
+  const working = pending.filter((request) => !isStalled(request));
   /*
     Five quick links, not the whole queue (D-047).
 
@@ -961,14 +974,38 @@ function ScanInput({
           <div className="field">
             <span className="flabel">Recent requests</span>
             <p className="fhint">
-              {pending.length > 0
-                ? `${pending.length} in progress. A full scan renders the homepage and samples five product pages.`
+              {working.length > 0
+                ? `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
                 : 'Nothing running.'}
+              {stalled.length > 0 && (
+                <>
+                  {' '}
+                  <strong className="stalled-note">
+                    {stalled.length === 1 ? '1 request has' : `${stalled.length} requests have`} no
+                    worker attached and will be retried.
+                  </strong>
+                </>
+              )}
             </p>
             <ul className="queue-list">
               {recent.map((request) => (
-                <li key={request.id} className={`queue-item ${request.status}`}>
-                  <span className={`queue-state ${request.status}`}>{request.status}</span>
+                <li
+                  key={request.id}
+                  className={`queue-item ${request.status}${isStalled(request) ? ' stalled' : ''}`}
+                >
+                  {/*
+                    A request claimed longer ago than the worker's own watchdog deadline is not
+                    "running" in any sense an analyst can use (D-152). Saying so is the whole fix:
+                    the comopeptides row sat labelled `running` for twenty-nine minutes with a
+                    progress line that had stopped changing, and nothing on screen distinguished
+                    that from work in progress.
+
+                    The label says what is known — no worker is touching it — and not what is not:
+                    it does not say failed, because a released claim is retried, not abandoned.
+                  */}
+                  <span className={`queue-state ${isStalled(request) ? 'stalled' : request.status}`}>
+                    {isStalled(request) ? 'no worker' : request.status}
+                  </span>
                   <span className="queue-url">
                     {request.url}
                     {request.mode === 'screening_account' && (
@@ -994,6 +1031,8 @@ function ScanInput({
                       <button className="queue-open" onClick={() => onRun(request.runId as string)}>
                         Open report
                       </button>
+                    ) : isStalled(request) ? (
+                      `No worker has touched this since ${formatReportDate(request.claimedAt as string)}. It is past the ${Math.round(RUN_DEADLINE_MS / 60000)}-minute limit a run is given, so the claim will be released and the scan retried. Last progress: ${request.progress ?? 'none recorded'}`
                     ) : (
                       (request.progress ?? 'waiting for the worker')
                     )}
@@ -1079,22 +1118,28 @@ function ScanProgress({
   readonly state: ScanRequestSummary | null;
 }): JSX.Element {
   const status = state?.status ?? 'queued';
+  // Null state is "not read yet", which is not stalled. `isStalled` needs a claim to measure from.
+  const stale = state !== null && isStalled(state);
 
   return (
     <div>
-      <div className="eyebrow">{status === 'queued' ? 'Queued' : 'Running'}</div>
+      <div className="eyebrow">
+        {status === 'queued' ? 'Queued' : stale ? 'No worker attached' : 'Running'}
+      </div>
       <h1>{displayHost(url)}</h1>
       <p className="sub">
         The crawl runs on the worker. This report opens when <strong>this scan</strong> finishes —
         an earlier run of the same merchant is a different report and is not substituted for it.
       </p>
 
-      <div className="card prog">
-        <div className="layer run">
+      <div className={`card prog${stale ? ' stalled' : ''}`}>
+        <div className={`layer ${stale ? 'stalled' : 'run'}`}>
           <span className="dot" />
           {status === 'queued'
             ? 'Waiting for the worker to claim this request'
-            : (state?.progress ?? 'Screening the storefront')}
+            : stale
+              ? `No worker has touched this scan since ${formatReportDate(state?.claimedAt as string)}. It is past the ${Math.round(RUN_DEADLINE_MS / 60000)}-minute limit a run is given, so the claim will be released and the scan retried.`
+              : (state?.progress ?? 'Screening the storefront')}
         </div>
       </div>
     </div>

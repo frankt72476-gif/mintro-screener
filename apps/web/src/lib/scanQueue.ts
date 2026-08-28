@@ -17,6 +17,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { RUN_DEADLINE_MS as DEADLINE } from '@mintro/engine';
 
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed';
 
@@ -40,6 +41,14 @@ export interface ScanRequestSummary {
   readonly error: string | null;
   readonly runId: string | null;
   readonly createdAt: string;
+  /**
+   * When the worker took this request, or null while it is still queued.
+   *
+   * Carried so the UI can tell a run that is *working* from one that is merely *labelled*
+   * `running` (D-152). A live worker refreshes this every minute, so an old value means no worker
+   * is touching the row — which is a different thing to show an analyst than "in progress".
+   */
+  readonly claimedAt: string | null;
   readonly mode: ScanMode;
 }
 
@@ -133,7 +142,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
   };
 }
 
-const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, mode';
+const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, claimed_at, mode';
 
 function toSummary(row: RequestRow): ScanRequestSummary {
   return {
@@ -144,6 +153,7 @@ function toSummary(row: RequestRow): ScanRequestSummary {
     error: row.error,
     runId: row.run_id,
     createdAt: row.created_at,
+    claimedAt: row.claimed_at,
     mode: row.mode as ScanMode,
   };
 }
@@ -156,6 +166,7 @@ interface RequestRow {
   error: string | null;
   run_id: string | null;
   created_at: string;
+  claimed_at: string | null;
   mode: string;
 }
 
@@ -185,3 +196,34 @@ export function normaliseUrl(input: string): string | null {
 
 /** True while the worker still owes an answer, which is when the UI should keep watching. */
 export const isPending = (status: ScanStatus): boolean => status === 'queued' || status === 'running';
+
+/**
+ * The worker's own watchdog deadline, re-exported from `@mintro/engine` (D-152).
+ *
+ * **The same constant the worker enforces, not a copy of its value.** A second literal here would
+ * be a rule expressed in two places, and the drift would surface as a queue that calls a healthy
+ * run stalled or a stalled one healthy — the display disagreeing with the machine about what is
+ * happening. A request still `running` past this has outlived the ceiling the worker holds itself
+ * to, so either the worker is gone or its watchdog is not running.
+ */
+export { RUN_DEADLINE_MS } from '@mintro/engine';
+
+/**
+ * Whether a request is `running` in name only (D-152).
+ *
+ * Measured from `claimed_at`, not `created_at`: time spent waiting in the queue is not the worker
+ * failing to answer, and counting it would call a request stale before anyone had picked it up.
+ * A live worker refreshes `claimed_at` every minute, so a value older than the deadline means no
+ * process is working on this row.
+ *
+ * The UI states that and nothing more. It does not say the run failed — it has not been told that,
+ * and a stale claim is released and retried rather than abandoned.
+ */
+export function isStalled(
+  request: Pick<ScanRequestSummary, 'status' | 'claimedAt'>,
+  now: number = Date.now(),
+): boolean {
+  if (request.status !== 'running' || request.claimedAt === null) return false;
+  const claimed = Date.parse(request.claimedAt);
+  return Number.isFinite(claimed) && now - claimed > DEADLINE;
+}
