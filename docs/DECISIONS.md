@@ -2201,6 +2201,11 @@ contain no verb of instruction.
 ---
 
 ## D-042 — The report reads as a report
+
+> **Revised by D-166.** The print view no longer keeps a separate category structure. The
+> grouping it was written against collapsed findings behind a disclosure paper cannot open; the
+> group is now a container that print expands entirely, so the export holds exactly what the screen
+> holds. The concern recorded below is answered by the container rather than by a second structure.
 **2026-08-21 · Frank's ruling**
 
 97 findings rendered as a flat wall. This is where D-022 — raised at M3, never implemented —
@@ -9775,5 +9780,197 @@ Runs recorded before today do not carry the summary and never will: a completed 
 says the report predates the flag rather than showing "0 of 0 stopping conditions" — that would be
 a statement about the merchant drawn from the age of the file. Same rule as `notEvaluableKind`
 under D-044, and the anchors test caught it.
+
+---
+
+## D-162 — The sample basis is stored, and the coverage line keeps four buckets apart
+
+**2026-08-28 · business owner · report restructure step 1 and 6**
+
+The report reported *"26 passed"* and gave a reader no structured way to learn that 26 rested on
+five product pages out of sixty-four. Layer 0 computed the denominator, interpolated it into
+`url_pattern` note prose — *"64 URLs in scope 'products' were examined"* — and discarded the value.
+
+`SampleBasis` on the report now carries `productsInScope`, `productsSampled` and `surfacesRead`,
+fed from `screen.ts`, which held all three and kept none. **An engine change, ruled in
+deliberately**: additive, touching no rule and no finding, and old runs render without it.
+
+**Passes and sample basis appear together or not at all.** A summary reporting what held without
+reporting how little it held over is misleading in aggregate even where every individual finding is
+candid — and every individual finding here is candid.
+
+`surfacesRead` names only what was reached. A surface that was not reached is absent from the list
+and is **not** reported as missing: a merchant with no FAQ and a run whose FAQ fetch failed are
+indistinguishable from that list, which is the distinction D-158 turns on.
+
+Optional and permanently so. Runs before this are immutable (D-002), so a reader that finds it
+absent omits the sentence rather than rendering a denominator it does not have, and never reports
+"0 product pages" from an absent record (D-044).
+
+### The four buckets stay apart
+
+The obvious coverage sentence — *"4 of 27 requests did not answer, leaving 22 rules unevaluated"* —
+is wrong, and wrong in the direction this project guards hardest. `obstruction.rulesAffected` is
+**2**. The 22 is every `not_evaluable`, and it is four facts belonging to four parties:
+
+| bucket | c268f8d7 | whose fact |
+|---|---|---|
+| `not_retrieved` | **2** | **ours** — this run could not fetch them |
+| `not_exposed` | 6 | the merchant's — looked for, not on the site |
+| `not_reachable` | 11 | nobody's — no crawl of a website could answer these |
+| `no_check_built` | 1 | Mintro's — not built yet |
+
+Merging them would tell an agent our network trouble cost them twenty-two rules when it cost two —
+the conflation D-136 introduced `notEvaluableKind` to end and D-156 extended. The line states each
+number against whose fact it is, and the reasoning sits at the call site so whoever tightens the
+wording next knows which part was the ruling.
+
+---
+
+## D-163 — The intake-criteria notice
+
+**2026-08-28 · business owner · report restructure step 2**
+
+Produced when a `blocking: true` rule is in a failing state. Goes to the **agent**, carries no
+comment link, is not the document sent to IQwallet, and **prints** — the blocking panel it grew
+from was print-excluded, which was right for an internal aid on a screen and wrong for a document
+that gets forwarded.
+
+Three lines the wording holds, and each is easy to cross:
+
+- **It never characterises the merchant.** It reports what was observed on named pages, with the
+  captures (hard constraint 7, D-001).
+- **It never predicts IQwallet.** Mintro does not know what IQwallet will do with this, and a
+  sentence implying otherwise would be Mintro making the determination it exists not to make.
+- **"Rejected" appears nowhere.** "Decline" appears only as a property of IQwallet's stated
+  criteria — *conditions IQwallet has stated it declines applications on* — never as a verb applied
+  to this merchant and never as something Mintro concluded.
+
+The authority and date come from `blocking_source`, so the notice says whose conditions these are
+rather than leaving a reader to assume they are Mintro's.
+
+`hasFailedStoppingConditions` returns **false** for a run that predates the flag. That is not the
+same as no condition failing: routing such a run to a notice would assert a stopping condition
+nobody observed. It renders the full report, which says the run predates the flag (D-044).
+
+Nothing auto-sends. The operator reads and decides (D-161).
+
+---
+
+## D-164 — Cascades collapse on a shared failed retrieval, and on nothing else
+
+**2026-08-28 · business owner · report restructure step 4**
+
+One fact — the certificate link does not serve a PDF — produced four findings: COA-006 `review`
+plus COA-002, COA-003 and COA-004 each `not_evaluable`, each repeating the same sentence and the
+same five-URL evidence block.
+
+**The signal is evidence identity: `sourceUrl` plus the exact set of attempts** — each URL, status
+and error. Two rules sharing it are reporting on the same request that did not answer.
+
+Measured across both reference reports in full before it was built: exactly one group each, root
+unambiguous, and **zero false groupings among 62 and 66 findings**. COA-005 is excluded because
+nothing was ever tried for it; COA-001 because its evidence is per-page screenshots.
+
+**Never note text.** String matching would catch the cascades whose wording happens to agree and
+miss the rest — hard constraint 9 in a new place. It would also have merged comopeptides' PROD-003
+and NAME-003, which repeat three times each with identical reasons and are not cascades at all but
+one rule per page.
+
+### `target_phrases_from` was considered and rejected
+
+It is declared in data and it groups the disclosure findings exactly — DISC-002 and DISC-003 both
+point at DISC-001. It is still the wrong signal: it declares where a rule's *subject wording* comes
+from, not that a rule is a **consequence**, and it aligns with the cascade here by coincidence. A
+future rule borrowing phrases without being downstream would group wrongly. The disclosure findings
+stay flat.
+
+`corroborates` was rejected too: D-050 defines it as a peer relation — the same observation from
+another angle — already rendered as `sameObservation`. Using it as parent/child would misrepresent
+a relation the rule set defines precisely.
+
+Where no signal fires, findings stay flat. Silence is the fallback.
+
+---
+
+## D-165 — The root of a cascade is its worst state, never the direction of an edge
+
+**2026-08-28 · business owner**
+
+Recorded separately because it outlives the signal that prompted it.
+
+The disclosure findings make the case. `target_phrases_from` points DISC-002 and DISC-003 at
+DISC-001 — but DISC-001 is only a `review` and **DISC-003 is the `fail`**. Heading that group by
+the edge would nest the most consequential finding underneath a lesser one, which is the opposite
+of what a reader scanning for failures needs.
+
+So the root is selected by state. In the certificate cascade the worst state is also the only
+member that was actually evaluated, and choosing by state rather than by position is what keeps
+that true where it is not.
+
+A group whose members are **all** `not_evaluable` has no root — nothing was observed to cause
+anything — and is left flat.
+
+---
+
+## D-166 — One row per rule, spanning states, and the distribution is never flattened
+
+**2026-08-28 · business owner · report restructure steps 3 and 5**
+
+Findings were partitioned by state first and grouped by rule inside each section, so a rule whose
+pages disagreed appeared **twice** — comopeptides' PROD-001 once under review and again under pass,
+with nothing on either row saying the other existed. That is half of what makes the current
+document unscannable.
+
+Grouping by rule first, across states, with the group placed in the section of its worst state.
+
+### The badge sorts; the sentence tells the truth
+
+The worst state heads the row so it sorts and scans. **It never replaces the distribution:**
+
+    uniform  "Observed on all 5 sampled product pages."
+    mixed    "Review on 3 of 5 sampled product pages; passed on 2."
+
+A per-page difference in state **is** an observation, and a row reporting only the worst deletes
+one. That is spec constraint 3 — *a finding's own honesty must survive the compression* — applied
+to state rather than to note text. It is also the rule `runLayer2` already follows one layer down,
+where pages that disagree stay separate because the difference is the finding.
+
+### It fixed a comment-keying collision rather than causing one
+
+A comment is keyed `(ruleId, ordinal)` where the ordinal is the finding's index **within its
+group**. Under the old grouping PROD-001's first review finding and its first pass finding both
+keyed `(PROD-001, 0)`, so a comment on one matched the other. Rule-level groups number a rule's
+findings once, so ordinals are unique.
+
+**Verified before changing it**: the four merchant comments in the database all carry
+`ordinal: null`, so none is on a multi-finding rule and none could move. `ordinalOf` is untouched
+and remains the single place a comment is keyed.
+
+### The collapsed row is a summary, not a replacement
+
+Each finding still renders as itself inside the disclosure, with its own note, its own evidence,
+its own ordinal and its own comment box. That is what keeps the qualifications — *"Text not
+rendered on the page was not examined"* — where a reader can reach them, and what keeps the
+participation record agreeing with the screen (D-063).
+
+### Section counts changed shape, and the guarantee is stronger
+
+A section holds whole rules now, so its count no longer equals a state's total and `report.counts`
+is where per-state totals were always authoritative. What holds instead is that **every finding is
+rendered exactly once**, which is the invariant that actually matters. Sections carry `rules` as
+well as `count`, because "11 rules" is what a reader is scanning and "14 findings" is what those
+rules produced, and neither number can stand for the other.
+
+### D-042 is revised: the export renders the same structure as the screen
+
+D-042 kept the print view on the category structure, reasoning that *"a grouped export would
+quietly hold less"*. That was correct about the grouping it had — one that collapsed findings
+behind a disclosure paper cannot open.
+
+The group is now a **container**. Print opens every one, so the export holds exactly what the
+screen holds, in the order the screen holds it, with every instance expanded inline. The concern
+D-042 recorded is answered by the container rather than by a second structure — and two structures
+for one report was the thing that made them able to disagree.
 
 ---

@@ -183,11 +183,30 @@ describe('nothing is lost', () => {
 });
 
 describe('the collapsed row says what it is hiding', () => {
-  it('names the number of pages when a rule spans several', () => {
+  /*
+    Reworded by D-166. It read "4 observations across 4 pages", which stated a count and told a
+    reader nothing about what the rule did. The row now carries the outcome, because the outcome is
+    what someone scanning the section is looking for.
+  */
+  it('says the rule held across every sampled page when they agreed', () => {
     const built = report(perPage('CATG-005', 'review', 4));
     const group = groupFor(built, 'CATG-005', 'review')!;
 
-    expect(describeGroup(group)).toBe('4 observations across 4 pages');
+    expect(describeGroup(group)).toBe('Observed on all 4 sampled product pages.');
+  });
+
+  it('states the distribution when the pages disagreed, never just the worst state', () => {
+    /*
+      The badge carries `review` so the row sorts and scans; the sentence carries both outcomes. A
+      per-page difference in state is itself an observation, and a row reporting only the worst
+      would delete one — spec constraint 3 applied to state rather than to note text (D-166).
+    */
+    const built = report([...perPage('CATG-005', 'review', 2), ...perPage('CATG-005', 'pass', 3)]);
+    const group = groupFor(built, 'CATG-005', 'review')!;
+
+    expect(group.state).toBe('review');
+    expect(group.uniform).toBe(false);
+    expect(describeGroup(group)).toBe('Review on 2 of 5 sampled product pages; passed on 3.');
   });
 
   it('shows the finding itself when there is only one', () => {
@@ -198,11 +217,13 @@ describe('the collapsed row says what it is hiding', () => {
   });
 
   it('does not summarise the findings', () => {
-    // A summary of five observations is a sixth statement nobody observed. The row states a count
-    // and a page span, and stops.
+    // A summary of three observations is a fourth statement nobody observed. The row states where
+    // the rule stood and stops; it never synthesises the notes.
     const built = report(perPage('CATG-005', 'review', 3));
-    const described = describeGroup(groupFor(built, 'CATG-005', 'review')!);
+    const group = groupFor(built, 'CATG-005', 'review')!;
+    const described = describeGroup(group);
 
-    expect(described).toMatch(/^\d+ observations/);
+    expect(described).toBe('Observed on all 3 sampled product pages.');
+    for (const finding of group.findings) expect(described).not.toContain(finding.note);
   });
 });

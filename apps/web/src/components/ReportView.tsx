@@ -287,16 +287,25 @@ export function ReportView({
         difference between the two views, and it is why the props are separate rather than one.
       */}
       {print ? (
+        /*
+          The export renders the **same structure** as the screen, with every instance expanded
+          inline (D-042 as revised by D-166).
+
+          D-042 kept the print view on the category structure because "a grouped export would
+          quietly hold less" — and that was right about the grouping it had, which collapsed
+          findings behind a disclosure the paper could not open. The group is now a *container*:
+          print opens every one, so the export holds exactly what the screen holds, in the order
+          the screen holds it. Two structures for one report was the thing that made them able to
+          disagree.
+        */
         <div>
-          {report.categories.map((category, index) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              index={index}
-              filter="all"
+          {groupReport(report).map((section) => (
+            <StateSection
+              key={section.key}
+              section={section}
               access={access}
-              print
               ordinals={ordinals}
+              print
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             />
           ))}
@@ -1079,8 +1088,11 @@ function StateSection({
   ordinals,
   commentaryOf,
   commentBox,
+  print,
 }: {
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  /** Every instance expanded inline, for the export (D-042 as revised by D-166). */
+  readonly print?: boolean;
   /** Carries the `#nothing-observed` anchor the merchant page jumps to (D-067). */
   readonly anchored?: boolean;
   readonly section: import('../lib/grouping.js').ReportSection;
@@ -1133,8 +1145,14 @@ function StateSection({
     >
       <div className="sect-head">
         <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
+        {/*
+          Rows and findings, both (D-166). A section holds whole rules now, so "11 rules" is what a
+          reader is scanning and "14 findings" is what those rules produced. One number would have
+          to stand for the other and neither can.
+        */}
         <span className="sect-count">
-          {section.count} finding{section.count === 1 ? '' : 's'}
+          {section.rules} rule{section.rules === 1 ? '' : 's'}
+          {section.count !== section.rules && ` · ${section.count} findings`}
         </span>
       </div>
       <p className="sect-lede">{section.lede}</p>
@@ -1145,6 +1163,7 @@ function StateSection({
           group={group}
           access={access}
           ordinals={ordinals}
+          {...(print === true ? { print: true } : {})}
           {...(commentaryOf === undefined ? {} : { commentaryOf })}
           {...(commentBox === undefined ? {} : { commentBox })}
         />
@@ -1166,6 +1185,7 @@ function GroupCard({
   ordinals,
   commentaryOf,
   commentBox,
+  print,
 }: {
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
   readonly group: FindingGroup;
@@ -1201,22 +1221,34 @@ function GroupCard({
   readonly filter?: Filter;
   readonly onFilterChange?: (filter: Filter) => void;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  /** The export expands every instance inline (D-042 as revised by D-166). */
+  readonly print?: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
 
-  if (!group.collapsible) {
+  if (print === true || !group.collapsible) {
     return (
       <div className="card cat open">
         <div className="cat-body">
+          {group.findings.length > 1 && <p className="group-lede">{describeGroup(group)}</p>}
           {group.findings.map((finding, i) => (
             <FindingRow
               key={`${finding.ruleId}-${i}`}
               finding={finding}
               access={access}
+              {...(print === true ? { print: true } : {})}
               {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
               {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
             />
           ))}
+          <Consequences
+            group={group}
+            access={access}
+            ordinals={ordinals}
+            {...(print === true ? { print: true } : {})}
+            {...(commentaryOf === undefined ? {} : { commentaryOf })}
+            {...(commentBox === undefined ? {} : { commentBox })}
+          />
         </div>
       </div>
     );
@@ -1244,7 +1276,64 @@ function GroupCard({
             {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
           />
         ))}
+        <Consequences
+          group={group}
+          access={access}
+          ordinals={ordinals}
+          {...(commentaryOf === undefined ? {} : { commentaryOf })}
+          {...(commentBox === undefined ? {} : { commentBox })}
+        />
       </div>
+    </div>
+  );
+}
+
+/**
+ * What one failed retrieval stopped being knowable (D-164).
+ *
+ * Nested under the observation that caused them rather than repeated beside it. Each consequence
+ * still renders its own findings verbatim, because each carries the reason *it* could not be
+ * evaluated — a nested row reading "see above" would claim the two said the same thing, and they
+ * do not.
+ */
+function Consequences({
+  group,
+  access,
+  ordinals,
+  commentaryOf,
+  commentBox,
+  print,
+}: {
+  readonly group: FindingGroup;
+  readonly access: EvidenceAccess;
+  readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  readonly print?: boolean;
+}): JSX.Element | null {
+  if (group.consequences.length === 0) return null;
+
+  return (
+    <div className="conseq">
+      <p className="conseq-head">
+        Because nothing readable was served, {group.consequences.length}{' '}
+        {group.consequences.length === 1 ? 'further rule' : 'further rules'} could not be evaluated:{' '}
+        {group.consequences.map((c) => `${c.ruleId} (${c.title})`).join(', ')}.
+      </p>
+      {group.consequences.map((child) => (
+        <div key={child.ruleId} className="conseq-item">
+          {child.findings.map((finding, i) => (
+            <FindingRow
+              key={`${child.ruleId}-${i}`}
+              finding={finding}
+              access={access}
+              {...(print === true ? { print: true } : {})}
+              {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
+              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
