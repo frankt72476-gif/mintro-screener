@@ -36,9 +36,7 @@ import type {
 } from '@mintro/engine';
 import { NO_SIGNUP_FORM } from '@mintro/engine';
 import { establishDocument } from './locate.js';
-import { renderPage } from './render.js';
-import { withDeadline } from './deadline.js';
-import { extractSignupForm, type RawSignupForm } from './extract.js';
+import { PROBE_IDLE_MS, renderPage } from './render.js';
 
 /**
  * Paths a sign-up form lives at, most specific first.
@@ -98,6 +96,34 @@ const PAYMENT_PATHS = [
   '/return-policy',
 ];
 const PAYMENT_LINK_HINTS = ['payment', 'refund', 'return', 'chargeback'];
+
+/**
+ * How many homepage links a surface will follow before it stops adding candidates (D-155).
+ *
+ * The linked set was uncapped, and unbounded work in a crawl is a hang waiting for the right
+ * storefront. Each candidate is a full page render — measured at 201 network requests on one of
+ * the validation storefronts — so twenty matching footer links would have added twelve minutes to
+ * a single surface.
+ *
+ * **Four**, and the number comes from measurement rather than taste. Matches are ordered by
+ * document position, and the links a visitor would actually follow — the footer policy links —
+ * come first and come in ones and twos. Measured across the two validation storefronts and all
+ * four surfaces: **0 to 3 matches**, maximum 3. Four is that maximum plus one.
+ *
+ * Beyond about four, a match is no longer a policy link: it is an unrelated URL that happens to
+ * contain `return` or `payment`. Paying a full page render for each of those is the cost this cap
+ * exists to stop.
+ *
+ * Truncating is also the *safe* direction if the number is ever wrong. A document not reached is
+ * `not_exposed` — outstanding, and never a `pass` — so a cap that bites produces a coverage gap
+ * that says so, not a false clearance.
+ *
+ * Truncation is **reported, never silent**. A surface that stopped adding candidates says so in
+ * its attempts, because "we did not look" and "we looked and found nothing" are different claims
+ * and a reader must be able to tell them apart. That is the same rule Layer 0 follows for its
+ * sitemap cap.
+ */
+export const MAX_LINKED_CANDIDATES = 4;
 
 export interface Layer3Discovery {
   readonly signup: SignupForm;
@@ -187,10 +213,27 @@ async function findSignupForm(
 
   for (const path of REGISTER_PATHS) {
     const url = `${origin}${path}`;
+    /*
+      One visit, not two (D-155).
+
+      This used to render the page and then navigate to it a second time to read the form, which
+      doubled the cost of the whole sign-up probe. `readSignupForm` reads it out of the page that
+      is already open, in the same visit — so the form, the DOM snapshot and the screenshot all
+      describe one state of one page rather than three fetches that might differ.
+
+      The capture is kept only for the page that actually yields a form. The rest are conventional
+      paths that returned a themed 404, and a screenshot of one is not evidence of anything.
+    */
     const rendered = await renderPage(browser, url, {
       runId: options.runId,
       pacer: options.pacer,
       timeoutMs: options.timeoutMs ?? 30_000,
+      idleMs: PROBE_IDLE_MS,
+      readSignupForm: true,
+      keepCapture: (candidate) =>
+        candidate.renderError === undefined &&
+        candidate.httpStatus >= 200 &&
+        candidate.httpStatus < 400,
     });
     artifacts.push(...rendered.artifacts);
 
@@ -203,8 +246,8 @@ async function findSignupForm(
     attempts.push({ url, status: page.httpStatus });
     if (page.httpStatus < 200 || page.httpStatus >= 400) continue;
 
-    const raw = await readForm(browser, page.finalUrl, options);
-    if (raw === null) continue;
+    const raw = rendered.signupForm;
+    if (raw === undefined) continue;
     if (!raw.found) {
       if (raw.candidateForms > 0) closest = `${page.finalUrl} — ${raw.locatedBy}`;
       continue;
@@ -229,35 +272,30 @@ async function findSignupForm(
 }
 
 /**
- * Reads the form out of a page that is already known to load.
+ * The homepage links a surface will follow, and how many it declined to (D-155).
  *
- * A second navigation rather than folding this into `renderPage`: the sign-up form is a Layer 3
- * concern and every other surface would pay for the extraction. It goes through the pacer like
- * everything else.
+ * Pure, and separated from the fetching loop so the cap can be tested without a browser. Deduped
+ * before the slice, so the budget counts distinct pages rather than the same policy link appearing
+ * in a header and a footer.
  */
-async function readForm(
-  browser: Browser,
-  url: string,
-  options: DiscoverOptions,
-): Promise<RawSignupForm | null> {
-  await options.pacer.before();
-  const context = await browser.newContext();
-  try {
-    const timeout = options.timeoutMs ?? 30_000;
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
-    // Bounded: `page.evaluate` honours no default and takes no timeout (D-153). The `catch` below
-    // already turns a failure into "could not read the form", which is the honest answer.
-    return (await withDeadline(
-      page.evaluate(extractSignupForm),
-      timeout,
-      `page.evaluate() reading the sign-up form at ${url}`,
-    )) as RawSignupForm;
-  } catch {
-    return null;
-  } finally {
-    await context.close().catch(() => undefined);
-  }
+export function selectLinkedCandidates(
+  homepageLinks: readonly { readonly href: string; readonly text: string }[],
+  linkHints: readonly string[],
+  origin: string,
+): { readonly followed: readonly string[]; readonly dropped: number; readonly matched: number } {
+  const distinct = [
+    ...new Set(
+      homepageLinks
+        .filter((link) => {
+          const haystack = `${link.href} ${link.text}`.toLowerCase();
+          return linkHints.some((hint) => haystack.includes(hint));
+        })
+        .map((link) => link.href),
+    ),
+  ].filter((url) => url.startsWith(origin));
+
+  const followed = distinct.slice(0, MAX_LINKED_CANDIDATES);
+  return { followed, dropped: distinct.length - followed.length, matched: distinct.length };
 }
 
 /**
@@ -288,22 +326,41 @@ async function findDocument(
   // A link on the homepage is how a visitor actually reaches the document, and it survives themes
   // that spell the path their own way. The path still has to name the surface — `establishDocument`
   // enforces that, so a "Return to shop" link cannot select `/shop/`.
-  const linked = (options.homepageLinks ?? [])
-    .filter((link) => {
-      const haystack = `${link.href} ${link.text}`.toLowerCase();
-      return what.linkHints.some((hint) => haystack.includes(hint));
-    })
-    .map((link) => link.href);
+  // Capped, and the cap is recorded when it bites (D-155).
+  const { followed: linked, dropped, matched: distinct } = selectLinkedCandidates(
+    options.homepageLinks ?? [],
+    what.linkHints,
+    origin,
+  );
+
+  if (dropped > 0) {
+    const line =
+      `${what.label}: ${distinct} homepage links matched this surface; the first ` +
+      `${MAX_LINKED_CANDIDATES} were followed and ${dropped} were not requested`;
+    attempts.push({ url: origin, status: 0, error: line });
+    say(`  ${line}`);
+  }
 
   const candidates = [...new Set([...linked, ...what.paths.map((path) => `${origin}${path}`)])];
 
   for (const url of candidates) {
     if (!url.startsWith(origin)) continue;
 
+    /*
+      Rendered as a probe, not as evidence (D-155).
+
+      The short idle wait and the deferred capture both follow from what this loop is: a guess at a
+      conventional path, wrong most of the time. `keepCapture` runs `establishDocument` on the page
+      before the screenshot is taken, so a themed 404 at a path the merchant never used costs a
+      render and not a capture. The candidate that *is* located is screenshotted on this same
+      visit — one fetch, so the capture shows the text the checks read.
+    */
     const rendered = await renderPage(browser, url, {
       runId: options.runId,
       pacer: options.pacer,
       timeoutMs: options.timeoutMs ?? 30_000,
+      idleMs: PROBE_IDLE_MS,
+      keepCapture: (page) => establishDocument(url, page, spec, []).located,
     });
     artifacts.push(...rendered.artifacts);
 

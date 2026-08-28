@@ -25,7 +25,13 @@ import {
   type StyledText,
   USER_AGENT,
 } from '@mintro/engine';
-import { extractPage, type RawExtraction, type RawStyledText } from './extract.js';
+import {
+  extractPage,
+  extractSignupForm,
+  type RawExtraction,
+  type RawSignupForm,
+  type RawStyledText,
+} from './extract.js';
 import { withDeadline } from './deadline.js';
 
 /** Payment method names looked for in the footer, carried forward for Layer 3 (PAY-001). */
@@ -63,12 +69,77 @@ export interface RenderOptions {
    * no parameter that could carry a session (D-039).
    */
   readonly context?: BrowserContext;
+  /**
+   * How long to wait for network quiet after DOM-ready. Defaults to `DEFAULT_IDLE_MS` (D-155).
+   *
+   * Shortened by the Layer 3 probes, which spend most of their time here waiting on themed 404
+   * pages that will never be used for anything.
+   */
+  readonly idleMs?: number;
+  /**
+   * Whether this render's capture is worth keeping, decided **after** the page is read (D-155).
+   *
+   * Called with the page as it stands — everything except the artifact keys, which is all any
+   * caller needs to judge it. Returning false skips the screenshot; the DOM snapshot is still
+   * retained, because it is cheap and it is the record of what was actually served.
+   *
+   * The predicate runs before the capture rather than after, so the decision costs nothing when
+   * the answer is no. Absent, every render is captured, which is the behaviour every other caller
+   * wants.
+   *
+   * **This cannot cause a finding to cite a capture that was not taken.** `screenshotKey` is set
+   * only when a screenshot exists, and `pageEvidence` reads the key from the page rather than
+   * assuming one (D-012). A page whose capture was skipped falls back to its DOM key.
+   */
+  readonly keepCapture?: (page: PageContext) => boolean;
+  /**
+   * Also read the sign-up form out of this page, in the same visit (D-155).
+   *
+   * Opt-in, and that is the whole of the original objection answered. `signup.ts` navigated twice
+   * — once to render, once to read the form — on the reasoning that folding the extraction into
+   * `renderPage` would make *every* surface pay for a Layer 3 concern. Behind a flag, only the
+   * sign-up probe pays, and the second navigation goes away.
+   */
+  readonly readSignupForm?: boolean;
 }
+
+/**
+ * How long to wait for network quiet after DOM-ready, for an ordinary render.
+ *
+ * Unchanged at 8s for the pages a report is built from. Measured settle on the two validation
+ * storefronts is 1.3-3.4s, so this is generous for a page that is going to be read.
+ */
+export const DEFAULT_IDLE_MS = 8_000;
+
+/**
+ * The same wait, for a Layer 3 probe render (D-155).
+ *
+ * A probe is a guess at a conventional path, and most guesses are wrong. Measured settle is
+ * 1.3-3.4s on the two validation storefronts, so 3s covers the observed range while cutting up to
+ * 5s per rejected candidate.
+ *
+ * ## The risk this carries, and how it is checked
+ *
+ * The located candidate is used as rendered — one fetch, so the capture and the text a check reads
+ * are the same visit. That is deliberate and it is why there is no re-read at the full wait: two
+ * fetches would put a screenshot in the report that does not show the text beside it.
+ *
+ * The cost is that a shorter wait could under-render a document and make `establishDocument`
+ * reject it on the 400-character floor — a *false absence*, which is the direction this project
+ * cares most about. The four surfaces this touches are server-rendered policy pages on WooCommerce
+ * and Shopify themes, present at DOM-ready (measured: 9,503 / 2,616 / 5,243 characters on the
+ * validation storefronts), so the floor is not close. It is verified rather than assumed: both
+ * storefronts are re-run against their recorded findings whenever this value moves, and a changed
+ * finding is a regression, not an optimisation.
+ */
+export const PROBE_IDLE_MS = 3_000;
 
 export interface RenderResult {
   readonly page: PageContext;
   /** Screenshot and DOM snapshot, ready for the evidence store. */
   readonly artifacts: readonly EvidenceArtifact[];
+  /** Present only when `readSignupForm` was asked for, and the page yielded a reading (D-155). */
+  readonly signupForm?: RawSignupForm;
 }
 
 /**
@@ -114,7 +185,11 @@ export async function renderPage(
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     // Give client-rendered storefronts a chance to paint. `networkidle` is unreliable on sites
     // with polling widgets, so this waits for quiet with a bounded fallback rather than hanging.
-    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
+    // Shortened for Layer 3 probe renders, which spend most of their time here on pages that are
+    // about to be discarded (D-155).
+    await page
+      .waitForLoadState('networkidle', { timeout: options.idleMs ?? DEFAULT_IDLE_MS })
+      .catch(() => undefined);
 
     const status = response?.status() ?? 0;
     const finalUrl = page.url();
@@ -139,9 +214,38 @@ export async function renderPage(
     const html = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
     const htmlSha256 = sha256(html);
 
+    /*
+      The sign-up form, read in this same visit when the caller asked for it (D-155).
+
+      Before the capture, so the page is in the state the screenshot will show.
+    */
+    const signupForm =
+      options.readSignupForm === true
+        ? ((await withDeadline(
+            page.evaluate(extractSignupForm),
+            timeout,
+            `page.evaluate() reading the sign-up form at ${url}`,
+          )) as RawSignupForm)
+        : undefined;
+
+    /*
+      Is this capture worth keeping (D-155)?
+
+      Asked here, with everything a caller needs to judge it and before the expensive part. A Layer
+      3 probe rejects most of what it renders — a themed 404 at a path the merchant never used —
+      and a screenshot of a page we discarded is not evidence of anything.
+
+      The DOM snapshot is kept either way: it is cheap, and it is the record of what was actually
+      served at a URL this run requested.
+    */
+    const provisional = toPageContext(url, finalUrl, status, extraction, html, htmlSha256, capturedAt);
+    const keep = options.keepCapture === undefined || options.keepCapture(provisional);
+
     // Captures happen before the keys are set. A key is only written onto the context once the
     // artifact actually exists, so no finding can cite a screenshot that was never taken (D-012).
-    const screenshot = await page.screenshot({ fullPage: true, type: 'png' }).catch(() => undefined);
+    const screenshot = keep
+      ? await page.screenshot({ fullPage: true, type: 'png' }).catch(() => undefined)
+      : undefined;
 
     const artifacts: EvidenceArtifact[] = [];
     let screenshotKey: string | undefined;
@@ -186,26 +290,12 @@ export async function renderPage(
 
     return {
       page: {
-        requestedUrl: url,
-        finalUrl,
-        httpStatus: status,
-        title: extraction.title,
-        text: extraction.text,
-        html,
-        htmlSha256,
-        footer: toRegion(extraction),
-        links: extraction.links as PageLink[],
-        styledText: extraction.styledText.map(toStyledText),
-        shop: toShopStructure(extraction),
-        footerPaymentTerms: extraction.footerPaymentTerms,
-        gate: extraction.gate,
-        selectorMatches: extraction.selectorMatches,
-        productTitle: extraction.productTitle,
-        capturedAt,
+        ...provisional,
         ...(screenshotKey === undefined ? {} : { screenshotKey }),
         ...(domKey === undefined ? {} : { domKey }),
       },
       artifacts,
+      ...(signupForm === undefined ? {} : { signupForm }),
     };
   } catch (error) {
     return {
@@ -217,6 +307,43 @@ export async function renderPage(
     // rest of the run anonymous without saying so.
     if (!borrowed) await context?.close().catch(() => undefined);
   }
+}
+
+/**
+ * The page as read, before anything is known about its captures.
+ *
+ * Built once and used twice: handed to `keepCapture` so a caller can judge the page before the
+ * screenshot is taken, then spread into the returned context with whatever keys resulted. One
+ * construction rather than two means the object a caller inspects and the object a check reads
+ * cannot disagree.
+ */
+function toPageContext(
+  requestedUrl: string,
+  finalUrl: string,
+  httpStatus: number,
+  extraction: RawExtraction,
+  html: string,
+  htmlSha256: string,
+  capturedAt: string,
+): PageContext {
+  return {
+    requestedUrl,
+    finalUrl,
+    httpStatus,
+    title: extraction.title,
+    text: extraction.text,
+    html,
+    htmlSha256,
+    footer: toRegion(extraction),
+    links: extraction.links as PageLink[],
+    styledText: extraction.styledText.map(toStyledText),
+    shop: toShopStructure(extraction),
+    footerPaymentTerms: extraction.footerPaymentTerms,
+    gate: extraction.gate,
+    selectorMatches: extraction.selectorMatches,
+    productTitle: extraction.productTitle,
+    capturedAt,
+  };
 }
 
 function failedPage(url: string, capturedAt: string, renderError: string): PageContext {

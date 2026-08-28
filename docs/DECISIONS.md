@@ -9021,6 +9021,31 @@ worst case of about sixteen minutes. Twenty-five leaves headroom for a slow-but-
 while ensuring that anything past it is not going to finish — the observed hang was already at
 twenty-four minutes when the investigation opened.
 
+> **Correction, 2026-08-28 — the paragraph above is wrong, and the error is instructive.**
+>
+> Sixteen minutes was **not** the full-crawl bound. It was the bound on the work *remaining after
+> the `layer 3:` line* — the gate block alone — computed in `docs/stuck-run-investigation.md` §3.3,
+> where it is correctly scoped and correctly labelled. Writing this decision, that figure was
+> carried across and restated as "a full crawl", which it never was.
+>
+> The real bound, summing every timeout in the code, is **3,555s — 59.3 minutes** (56.1 without the
+> post-login re-render). The largest terms are Layer 0 sitemaps 615s, `cartHoldsProduct` 584s, the
+> sign-up probe 544s, and the four Layer 3 document probes 1,026s.
+>
+> So the ruling above was not what it claimed to be. A twenty-five minute ceiling under a
+> fifty-nine minute bound is **not headroom over the worst case — it is a cap at 42% of it**, and a
+> legitimately slow but progressing run would be terminated and recorded as `watchdog_timeout`. Run
+> `5506488a` (sportstechnologylabs, 626s, completed normally, nothing wrong) already spent 42% of
+> the budget.
+>
+> This is the same defect the investigation was about, one level up: **a bound asserted rather than
+> established**. The number was carried from a place where it had been derived to a place where it
+> had not, and nothing in between checked that the scope still held. D-026's rule is about
+> preconditions in code; it applies just as well to a figure in a decision record.
+>
+> What the deadline is, and what it is not, is settled in D-155, which also brings the real bound
+> down far enough for a ceiling to sit above it.
+
 **The timeout resolves; it does not throw.** `Promise.race` between the crawl and a timer, with
 the timer resolving to a sentinel. Routing it through the `catch` would have been less code and
 would have recorded a fabricated exception against a run where nothing failed. The queue row gets
@@ -9185,5 +9210,139 @@ Deliberately **not** done: starting the second Fly machine. It exists, it is sto
 claim is safe for any number of workers — but a second machine doubles the Chromium memory bill and
 is a concurrency change, and the fix for "one job blocked everything" is to stop jobs blocking, not
 to add a lane.
+
+---
+
+## D-155 — Layer 3 probe cost, and the watchdog as a policy cap
+
+**2026-08-28 · engineering · prompted by run 5506488a**
+
+sportstechnologylabs completed normally in **626s**. Of that, **349s — 56% of the whole run — was
+the payment/refund probe**, which found nothing. The same step took 25s on comopeptides. Both
+observed hangs had occurred in this phase, so it was worth knowing whether 626s was normal.
+
+### What the probes actually do
+
+`findDocument` runs four times — terms, shipping, FAQ, payment/refund — after a fifth probe for the
+sign-up form. Each builds `candidates = (homepage links whose href+text contains a hint) ∪
+(conventional paths)`, then loops **sequentially**, stopping at the first candidate
+`establishDocument` accepts. Every candidate is a full `renderPage`.
+
+Measured, rather than assumed:
+
+| | sportstechnologylabs | comopeptides |
+|---|---|---|
+| candidates tried, payment | 8 | 8 |
+| candidates tried, all four surfaces | 8 / 6 / 7 / 8 | 8 / 7 / 6 / 8 |
+| **network requests per candidate** | **201** (52 third-party hosts) | 245 (6 third-party) |
+| requests *after* domcontentloaded | 41 | 9 |
+| cost per candidate, unthrottled | 5.7s | 2.7s |
+| └ of which `networkidle` | 3.4s | 1.3s |
+| └ of which extract + content + screenshot | 0.11s | 0.08s |
+
+**Catalogue size is not the driver.** 64 products and 37 products both cost 27-28 document
+candidates; the counts come from the path lists, which are fixed. What differs is the merchant's
+page weight and third-party fan-out, because `networkidle` waits on it.
+
+Within run 5506488a the per-candidate cost was 6s for surfaces found on the first candidate, 11.5s
+for shipping (6 candidates, all 404) and **43.6s** for payment (8 candidates, all 404) — eight
+times what the same work costs today. Raw HTTP to those same eight paths is flat at 1.5-1.75s, so
+the origin is not slow. The best-supported reading is CDN throttling under the volume the probe
+itself generates: ~1,600 requests for the payment phase alone, ~3,800 for the Layer 3 sweep.
+
+So: **no bug fired, and the design is still wrong.** It treats "try a path" as a cheap probe when
+each one is a full themed page render, and it does 27+ of them per run. The burst of speculative
+404s is exactly what makes a protected storefront slow down — the probe is self-penalising.
+
+### Four reductions
+
+1. **Linked candidates are capped at four.** The list was uncapped, and unbounded work in a crawl
+   is a hang waiting for the right storefront — twenty matching footer links would have added
+   twelve minutes to one surface. Four is the measured maximum across both storefronts and all
+   four surfaces (0-3) plus one. Beyond about four a match is no longer a policy link but an
+   unrelated URL containing `return` or `payment`. **Truncation is recorded in the attempts and
+   logged**, never silent, on the same rule Layer 0 follows for its sitemap cap — and if the number
+   is ever wrong it errs safe, because a document not reached is `not_exposed`, outstanding, never
+   a `pass`.
+
+2. **Probe renders wait 3s for network quiet, not 8s.** Measured settle is 1.3-3.4s. The located
+   candidate is used **as rendered** — one fetch — so the capture and the text a check reads are
+   the same visit; a re-read at the full wait would put a screenshot in the report that does not
+   show the text beside it. The risk this carries is a shorter wait under-rendering a document and
+   tripping the 400-character floor, a *false absence*. The four surfaces are server-rendered
+   policy pages present at DOM-ready (9,503 / 2,616 / 5,243 characters measured), so the floor is
+   nowhere near — and it is verified by re-run rather than argued.
+
+3. **A candidate that fails `establishDocument` is not screenshotted.** `renderPage` gained
+   `keepCapture`, a predicate run after the page is read and before the expensive part. A themed
+   404 at a path the merchant never used is not evidence of anything. The DOM snapshot is still
+   kept: it is cheap, and it is the record of what was actually served at a URL this run requested.
+   This cannot produce a finding citing a capture that was not taken — `screenshotKey` is set only
+   when a screenshot exists and `pageEvidence` reads the key rather than assuming one (D-012).
+
+4. **The sign-up probe visits once.** It rendered the page and then navigated to it again to read
+   the form. The original reasoning — that folding the extraction into `renderPage` would make
+   every surface pay for a Layer 3 concern — is answered by making it opt-in: only the sign-up
+   probe passes `readSignupForm`. The form, the DOM snapshot and the screenshot now describe one
+   state of one page instead of three fetches that might differ.
+
+### What it cost and what it saved
+
+Controlled A/B, same afternoon, same network, the four changes stashed and restored:
+
+| | before | after | change |
+|---|---|---|---|
+| comopeptides wall clock | 115s | 110s | −4% |
+| comopeptides artifacts | 64 · 6.1MB | 42 · 3.6MB | **−34% / −41%** |
+| sportstechnologylabs wall clock | 162s | 161s | −0.6% |
+| sportstechnologylabs artifacts | 53 · 10.3MB | 38 · 8.4MB | **−28% / −18%** |
+
+**Findings identical on every one of 54 rules, and on the note text of every finding** — 62 and 66
+respectively — on both storefronts. That was the acceptance condition: a cost reduction that
+changes what is observed is a regression, not an optimisation.
+
+Worth being plain about the wall-clock column: on a responsive site these changes save almost
+nothing, because the probe renders were already fast. The saving is in artifacts, in bytes, and —
+the point — in what happens on a slow day, where an uncapped list and an 8s idle wait per rejected
+candidate is where the 349s came from.
+
+### The bound, and the correction to D-152
+
+Recomputed from the timeouts in the code:
+
+| | |
+|---|---|
+| before | **unbounded** — the linked list had no cap, so no ceiling existed. 3,555s (59.3 min) was a *floor*, computed at zero linked candidates |
+| after | **3,668s — 61.1 min**, a real ceiling for the first time |
+
+The cap therefore *raises* the computed worst case while removing the unbounded one, which is the
+honest direction. D-152's claim of a sixteen-minute full-crawl bound is corrected in place: that
+figure was the bound on the gate block alone, carried across from the investigation and restated
+as something it never was.
+
+### The watchdog is a policy cap, not a safety bound
+
+**30 minutes**, and it sits *below* the 61-minute worst case deliberately.
+
+A ceiling above the arithmetic bound could not catch what the watchdog exists for. The observed
+hang ran 29 minutes and was still going when an operator's restart ended it; a 75-minute cap would
+have let it run. And the bound assumes all ~90 navigations time out at 30s, which describes a run
+that is already broken.
+
+So it is sized against measurement: observed runs are 110-163s normally and 626s on a throttled
+day, making 30 minutes 2.9x the worst legitimate run seen. **The exposure is stated rather than
+hidden** — a legitimate run between 30 and 61 minutes would be terminated, and none has been
+observed within a factor of three of that.
+
+Bringing the arithmetic bound under the cap is possible but not free: the remaining bulk is Layer 0
+sitemaps (615s), `cartHoldsProduct` (584s) and the Layer 3 sweep (1,683s). Cutting the first
+changes catalogue coverage and the second is D-056's cart confirmation, bought with the most
+consequential false pass this project has found. Neither is worth a tidier number.
+
+**A termination is a statement about the run, never about the merchant.** Nothing derived from it
+may reach a report as a property of the storefront. It says this crawl did not come back in time
+and says nothing about what the site does, contains or permits — and because a run is written once
+after the crawl returns, a terminated run produces no findings at all, so there is no observation
+available to misattribute.
 
 ---
