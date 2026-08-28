@@ -12,7 +12,12 @@ playwright-report/
 test-results/
 
 # Local worker output, copied into apps/web/public for development.
-reports/
+#
+# Root-anchored, for the same reason the HEIC rules below are: an unanchored `reports/` matches a
+# directory of that name at any depth, and it was silently swallowing `fixtures/reports/` — the
+# tracked report fixtures three tests read. A test whose inputs are gitignored passes on a clean
+# checkout by having nothing to check.
+/reports/
 apps/web/public/reports/
 apps/web/public/evidence/
 dist-types/

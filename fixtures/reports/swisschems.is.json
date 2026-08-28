@@ -1,0 +1,3173 @@
+{
+  "runId": "74eefa47-8483-4f92-828c-4bce3100e01f",
+  "merchantDomain": "swisschems.is",
+  "merchantName": "SwissChems - Home",
+  "platform": "woocommerce",
+  "mode": "public",
+  "rulesetVersion": "2.9.0",
+  "rulesetEffective": "2026-05-26",
+  "startedAt": "2026-08-23T15:15:19.504Z",
+  "finishedAt": "2026-08-23T15:16:25.985Z",
+  "counts": {
+    "fail": 7,
+    "review": 14,
+    "pass": 36,
+    "not_evaluable": 40
+  },
+  "coverage": {
+    "evaluable": 57,
+    "total": 97,
+    "noCheckBuilt": 0,
+    "notReachable": 12,
+    "notExposed": 17,
+    "notApplicable": 11,
+    "notRetrieved": 0,
+    "kindNotRecorded": 0,
+    "resolved": 68,
+    "outstanding": 29
+  },
+  "sameObservation": [
+    {
+      "ruleIds": [
+        "GATE-002",
+        "GATE-004"
+      ],
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://swisschems.is/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/collections/all",
+              "sourceSha256": "d735f26ad66336e2d460691af56d77b231422810603e0a951bc83e9c3934aaad",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:16:16.738Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://swisschems.is/shop",
+              "matchedUrls": [
+                "https://swisschems.is/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Terms acknowledged at sign-up",
+          "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "ruleIds": [
+        "GATE-002",
+        "GATE-005"
+      ],
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://swisschems.is/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/collections/all",
+              "sourceSha256": "d735f26ad66336e2d460691af56d77b231422810603e0a951bc83e9c3934aaad",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:16:16.738Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://swisschems.is/shop",
+              "matchedUrls": [
+                "https://swisschems.is/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Research field required at sign-up",
+          "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    }
+  ],
+  "verdict": "7 rule(s) were observed to fail, including footer disclaimer is legible; no therapeutic categories, and 5 other failure(s). 14 finding(s) are queued for review. 40 could not be evaluated from the crawled surface.",
+  "categories": [
+    {
+      "id": "gate",
+      "name": "Access and identity gating",
+      "n": 1,
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://swisschems.is/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/collections/all",
+              "sourceSha256": "d735f26ad66336e2d460691af56d77b231422810603e0a951bc83e9c3934aaad",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:16:16.738Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://swisschems.is/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://swisschems.is/shop",
+              "matchedUrls": [
+                "https://swisschems.is/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-003",
+          "state": "fail",
+          "note": "Adding a product to the cart and going to checkout reached a payment form, which this rule treats as a violation. Steps: opened /product/longevity-research-bundle/ → clicked add to cart → cart confirmed to hold the product → proceeded to checkout → payment field observed (input[autocomplete=\"cc-number\"]). The flow was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/checkout/",
+              "sourceSha256": "cc1817e35d91fd6080c6bbeb6b7be493a88ff74f6a550407914621d5340d30ff",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:16:18.969Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/checkout/",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "payment field observed (input[autocomplete=\"cc-number\"])"
+            }
+          ],
+          "title": "Guest checkout disabled",
+          "clause": "Guest checkout must be disabled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "flow_probe",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-001",
+          "state": "review",
+          "note": "No entry interstitial and no age affirmation signal were observed on the rendered page.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z"
+            }
+          ],
+          "title": "Age affirmation before entry",
+          "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "GATE-007",
+          "state": "review",
+          "note": "1 of 5 required phrases were not observed: 'diagnos'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/term-conditions/",
+              "sourceSha256": "d8f984936fa38b651b17be886aff593361409bb6386a6f4fff33fd70d2d4cef9",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/16be58002d4e0381e5981bb42840d8705968459dfaa7996f7b28dfc4219bf696.png",
+              "capturedAt": "2026-08-23T15:16:03.060Z"
+            }
+          ],
+          "title": "Terms cover all required clauses",
+          "clause": "Research-only use restriction; prohibition on human consumption; not for diagnosis/treatment/prevention; indemnification of the seller; buyer is a qualified professional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Terms acknowledged at sign-up",
+          "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://swisschems.is/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Research field required at sign-up",
+          "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Order records are server-side. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Order records are server-side. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Research field stored with each order",
+          "clause": "Store the selected field with every order in your database.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    },
+    {
+      "id": "disclose",
+      "name": "Site-wide disclosure",
+      "n": 2,
+      "findings": [
+        {
+          "ruleId": "DISC-002",
+          "state": "fail",
+          "note": "The footer disclaimer at body.home > footer.footer > div.wrap > div.bottom was contrast ratio 2.94:1 against its background, below the 4.5:1 threshold. Text measured: \"FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reser…\"",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z",
+              "matchedValue": "selector=body.home > footer.footer > div.wrap > div.bottom font-size=12px color=rgb(138,150,143) background=rgb(247,251,248) contrast=2.94:1 visible=true collapsed-ancestor=false"
+            }
+          ],
+          "title": "Footer disclaimer is legible",
+          "clause": "In legible font, not hidden or collapsed.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "computed_style",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-001",
+          "state": "review",
+          "note": "The footer does not contain the required wording verbatim. The closest text observed is: \"FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved.\" Required: \"For research and laboratory use only. Not for human or animal consumption.\"",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            }
+          ],
+          "title": "Footer disclaimer wording",
+          "clause": "For research and laboratory use only. Not for human or animal consumption.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-003",
+          "state": "pass",
+          "note": "The footer carries text matching the required disclaimer: \"FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved.\" Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z",
+              "matchedValue": "FDA Disclaimer: All products are for laboratory developmental research USE ONLY. Not for human consumption. © Swiss Chems — All Rights Reserved."
+            }
+          ],
+          "title": "Disclaimer on every page",
+          "clause": "Must appear in the footer of every page of the website.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "name": "Product page content",
+      "n": 3,
+      "findings": [
+        {
+          "ruleId": "PROD-008",
+          "state": "review",
+          "note": "Observed: 'cure', 'heal', 'condition'. Observed on 5 of 5 sampled product page(s), including /product/longevity-research-bundle/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z",
+              "matchedValue": "cure, heal, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z",
+              "matchedValue": "cure, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z",
+              "matchedValue": "cure, heal, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z",
+              "matchedValue": "cure, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z",
+              "matchedValue": "cure, heal, condition"
+            }
+          ],
+          "title": "No disease or benefit claims",
+          "clause": "No references to treating, curing, preventing or diagnosing any disease or condition.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/longevity-research-bundle/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-blend/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/hcg-5000-iu/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/healing-research/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "/product/longevity-research-bundle/ — Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-blend/ — Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "/product/hcg-5000-iu/ — Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "/product/healing-research/ — Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/product/longevity-research-bundle/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/product/healing-research/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/longevity-research-bundle/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/hcg-5000-iu/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/healing-research/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/longevity-research-bundle/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/hcg-5000-iu/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/healing-research/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-006",
+          "state": "pass",
+          "note": "None of 8 prohibited term(s) was observed in the rendered text of this sampled page: 'Ozempic', 'Wegovy', 'Mounjaro', 'Zepbound', 'Rybelsus'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No pharmaceutical brand names",
+          "clause": "Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-007",
+          "state": "pass",
+          "note": "None of 5 prohibited term(s) was observed in the rendered text of this sampled page: 'injectable', 'nasal spray', 'for injection', 'subcutaneous', 'intramuscular'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No route-of-administration labels",
+          "clause": "Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "/product/longevity-research-bundle/ — The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "/product/hcg-5000-iu/ — The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "/product/healing-research/ — The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-010",
+          "state": "pass",
+          "note": "None of 4 prohibited term(s) was observed in the rendered text of this sampled page: 'Sema', 'Tirz', 'Reta', 'Cagri'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No community abbreviations",
+          "clause": "Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/hcg-5000-iu/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — A region labelled 'storage', 'store at' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z",
+              "matchedValue": "storage, store at"
+            }
+          ],
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "naming",
+      "name": "Naming and taxonomy",
+      "n": 4,
+      "findings": [
+        {
+          "ruleId": "NAME-001",
+          "state": "fail",
+          "note": "1 of 16 URLs in scope 'collections' matched a prohibited pattern: https://swisschems.is/product-category/longevity-research/ (matched 'longevity').",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z",
+              "matchedValue": "longevity",
+              "matchedUrls": [
+                "https://swisschems.is/product-category/longevity-research/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No therapeutic categories",
+          "clause": "Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-002",
+          "state": "fail",
+          "note": "2 of 134 URLs in scope 'products' matched a prohibited pattern: https://swisschems.is/product/bpc-157-tb-500-blend/ (matched 'blend'); https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/ (matched 'stack').",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z",
+              "matchedValue": "blend, stack",
+              "matchedUrls": [
+                "https://swisschems.is/product/bpc-157-tb-500-blend/",
+                "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No marketing terms in product names",
+          "clause": "No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/longevity-research-bundle/ — Observed 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z",
+              "matchedValue": "TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-blend/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/hcg-5000-iu/ — Observed 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z",
+              "matchedValue": "TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/healing-research/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: none of the compounds this rule names were observed on the page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "none of the compounds this rule names were observed on the page",
+          "notEvaluableKind": "not_applicable",
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "name": "Catalog composition",
+      "n": 5,
+      "findings": [
+        {
+          "ruleId": "CATG-003",
+          "state": "fail",
+          "note": "1 of 134 URLs in scope 'products' matched a prohibited pattern: https://swisschems.is/product/hcg-5000-iu/ (matched 'hcg').",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z",
+              "matchedValue": "hcg",
+              "matchedUrls": [
+                "https://swisschems.is/product/hcg-5000-iu/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No HCG or HGH",
+          "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/longevity-research-bundle/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-blend/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/hcg-5000-iu/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/healing-research/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/longevity-research-bundle/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-blend/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/hcg-5000-iu/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/healing-research/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-001",
+          "state": "pass",
+          "note": "134 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No needles or syringes",
+          "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-002",
+          "state": "pass",
+          "note": "134 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No alcohol wipes",
+          "clause": "Associated with injection site preparation. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-004",
+          "state": "pass",
+          "note": "134 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No tablets or pills",
+          "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        }
+      ]
+    },
+    {
+      "id": "coa",
+      "name": "Quality documentation",
+      "n": 6,
+      "findings": [
+        {
+          "ruleId": "COA-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/independent-test-results/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:15:38.787Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/independent-test-results/",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://swisschems.is/independent-test-results",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA updated within 60 days",
+          "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/independent-test-results/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:15:38.787Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/independent-test-results/",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://swisschems.is/independent-test-results",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "Purity at or above 98%",
+          "clause": "98% purity for all products.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Lab is accredited and independent",
+          "clause": "From an accredited independent third-party testing laboratory.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COA-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/independent-test-results/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:15:38.787Z",
+              "attempts": [
+                {
+                  "url": "https://swisschems.is/independent-test-results/",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://swisschems.is/independent-test-results",
+                  "status": 200,
+                  "error": "served 130781 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 2 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA contains all required fields",
+          "clause": "COA must identify batch/lot number, testing date, compound identity, purity %, method used (HPLC preferred).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/longevity-research-bundle/ — Observed on the rendered page: 'test results', 'test-results', 'independent test'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — Observed on the rendered page: 'test results', 'test-results', 'independent test'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — Observed on the rendered page: 'test results', 'test-results', 'independent test'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/hcg-5000-iu/ — Observed on the rendered page: 'test results', 'test-results', 'independent test'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/healing-research/ — Observed on the rendered page: 'test results', 'test-results', 'independent test'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "fulfil",
+      "name": "Fulfillment and screening",
+      "n": 7,
+      "findings": [
+        {
+          "ruleId": "FULF-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal record. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal record. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Ban list maintained",
+          "clause": "Any customer who hints at human consumption must be permanently banned with no appeal option.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "No PO boxes",
+          "clause": "No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Carrier configuration. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Carrier configuration. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Adult signature on first orders",
+          "clause": "All first-time customer orders must require an adult signature upon delivery (21+ confirmed).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Physical document. Requires a test order or merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Physical document. Requires a test order or merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Packing slip disclaimers",
+          "clause": "Include RUO disclaimer and research-professional acknowledgement in shipment.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-001",
+          "state": "pass",
+          "note": "Observed: 'us only'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/shipping/",
+              "sourceSha256": "6653cad33afd60be137f02a6ac4a3c4ae16c79d918d08e863c7a27cc62d8d3e9",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/9fd692ac079fe75e9498de4e83a07264b83cab14967634e6562e79201aadd071.png",
+              "capturedAt": "2026-08-23T15:16:05.576Z",
+              "matchedValue": "us only"
+            }
+          ],
+          "title": "Ships to USA only",
+          "clause": "Ship to USA only. No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "id": "offsite",
+      "name": "Off-site presence",
+      "n": 8,
+      "findings": [
+        {
+          "ruleId": "OFFS-007",
+          "state": "review",
+          "note": "2 of 116 link(s) in the rendered homepage have visible text matching 'affiliate', 'ambassador', 'referral program', 'partner program': \"Affiliate Program\" → /; \"Affiliate Login\" → /login. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z",
+              "matchedValue": "Affiliate Program (affiliate), Affiliate Login (affiliate)",
+              "matchedUrls": [
+                "https://partners.swisschems.is/",
+                "https://partners.swisschems.is/login"
+              ]
+            }
+          ],
+          "title": "Affiliate program linked from the homepage",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "OFFS-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Social post content",
+          "clause": "Every social media post must follow the same rules as product pages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal process. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal process. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Monthly social audits",
+          "clause": "Reviews of all social media channels at minimum monthly.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-001",
+          "state": "pass",
+          "note": "22 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "No affiliate program",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/longevity-research-bundle/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/longevity-research-bundle/",
+              "sourceSha256": "606b4cd6a4a9f5979bd5be05361f83bdf0a01fa08b58b949db3f18ff7402296c",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/3fedd8bc3f8eafaf0506292e6b6ed939426d6298b817afcb0332e8da2e7e478c.png",
+              "capturedAt": "2026-08-23T15:15:24.805Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-blend/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/bpc-157-tb-500-blend/",
+              "sourceSha256": "72354b3b36635a6d1e262a2244fd92331177bfeea70012409696d1c91f5f98a5",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/a638782e6df082e99438741bd000ef15973f3fe4b09960aea11b76c229e0bff8.png",
+              "capturedAt": "2026-08-23T15:15:27.285Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/s4-andarine-gw-501516-cardarine-stack/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/s4-andarine-gw-501516-cardarine-stack/",
+              "sourceSha256": "801abeadaa3c72193b687799854aedf9d269dd66d8e41d7dd57b1968a4849f86",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/c2b7cc2d174a3c28a5b8b4b56d1b95b2059263be8e779e3986de71841216864f.png",
+              "capturedAt": "2026-08-23T15:15:29.737Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/hcg-5000-iu/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/hcg-5000-iu/",
+              "sourceSha256": "e6f6a9167f75810e859bc3f6a87d1e4d47615d51b9162cb9d6475d0b68e31eb7",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/093b4103ad31e77080853e48167ca8f0268f743f53817ebe0fd46ed053c92c13.png",
+              "capturedAt": "2026-08-23T15:15:32.181Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/healing-research/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/product/healing-research/",
+              "sourceSha256": "29ef57fb2c35ce564eb5d7fc01b8dbb93892fd2ab8d767e226c39ff3e584afc6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/1380e4e407b4ad3b1790cec8257dcab3e8172eb1f0a321db6c528d526ab77170.png",
+              "capturedAt": "2026-08-23T15:15:34.572Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-006",
+          "state": "pass",
+          "note": "22 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/sitemap_index.xml",
+              "sourceSha256": "984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/984ae4b70319f5430296b801d9e2e228c224fd8806162ea7c2641013edd90423",
+              "capturedAt": "2026-08-23T15:15:19.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/page-sitemap.xml",
+              "sourceSha256": "2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/2d7e4035bbf9a338dfcff26fbf3d91befae7eebbb7f8ad8360d0f6d7a85503e6",
+              "capturedAt": "2026-08-23T15:15:20.233Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product-sitemap.xml",
+              "sourceSha256": "32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/32809bcc81131c71496bf15a3e7642fcc703de24d12508e93e371ed65a92ebea",
+              "capturedAt": "2026-08-23T15:15:20.733Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://swisschems.is/product_cat-sitemap.xml",
+              "sourceSha256": "1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer0/1dbdcbd65719ac6cd8b14c234eab70acb0447c4343e9ec9bc996286b09e67b97",
+              "capturedAt": "2026-08-23T15:15:21.383Z"
+            }
+          ],
+          "title": "Editorial content on therapeutic topics",
+          "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-003",
+          "state": "pass",
+          "note": "No social media links were observed on the rendered homepage.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z"
+            }
+          ],
+          "title": "Social links point to the home page only",
+          "clause": "Social media should link only to your website home page.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "Payments",
+      "n": 9,
+      "findings": [
+        {
+          "ruleId": "PAY-001",
+          "state": "fail",
+          "note": "Observed on the payment or refund policy (https://swisschems.is/payments/) (Zelle): Zelle. 5 public surface(s) were read: the homepage footer, the terms document (https://swisschems.is/term-conditions/), the shipping policy (https://swisschems.is/shipping/), the FAQ (https://swisschems.is/faqs/), the payment or refund policy (https://swisschems.is/payments/).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:16:16.736Z",
+              "matchedValue": "Zelle"
+            }
+          ],
+          "title": "No peer-to-peer payment methods",
+          "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "PAY-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Card processing through a merchant account",
+          "clause": "Acceptance of credit/debit cards through a legitimate merchant processor that conducts proper KYC.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Risk monitoring plugin installed",
+          "clause": "All merchants are required to use our plugin for additional risk monitoring purposes.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-003",
+          "state": "pass",
+          "note": "Observed link text matching 'refund', 'return', 'chargeback'. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/",
+              "sourceSha256": "a91aec4d14b0e8e03e2e833a5d4d68d675245b27171711c4ca2b4b63dd7cea71",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/e567f810e47e837564c5de260caa23e3b24f0e3426566c057f76d1510255a8c0.png",
+              "capturedAt": "2026-08-23T15:15:22.003Z"
+            }
+          ],
+          "title": "Refund and chargeback policy published",
+          "clause": "Clearly documented refund/chargeback policy.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "id": "comms",
+      "name": "Customer communications",
+      "n": 10,
+      "findings": [
+        {
+          "ruleId": "COMM-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Support channels free of human-use language",
+          "clause": "Including email, chat, phone, and social media direct messages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COMM-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal training. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal training. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Staff do not help with protocols",
+          "clause": "Don't have staff offer to help customers 'figure out' protocols.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COMM-001",
+          "state": "pass",
+          "note": "In the rendered text of the faq surface, no quantity term (mg, ml, mcg, iu) was observed within 20 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://swisschems.is/faqs/",
+              "sourceSha256": "71e3b2f146bab6828deb75311b5ed64cd65ba25f50f8fbc438627b57dbea8498",
+              "evidenceKey": "74eefa47-8483-4f92-828c-4bce3100e01f/layer1/2b094dfac3625f84d31b20ce2fbdb4e0617090122d8c0622e16b4af0cc6ee1a7.png",
+              "capturedAt": "2026-08-23T15:16:07.966Z"
+            }
+          ],
+          "title": "FAQ free of dosing or administration advice",
+          "clause": "Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 3
+        }
+      ]
+    }
+  ],
+  "strip": [
+    {
+      "ruleId": "GATE-002",
+      "title": "Products hidden until an account exists",
+      "state": "fail"
+    },
+    {
+      "ruleId": "GATE-003",
+      "title": "Guest checkout disabled",
+      "state": "fail"
+    },
+    {
+      "ruleId": "GATE-001",
+      "title": "Age affirmation before entry",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-007",
+      "title": "Terms cover all required clauses",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-004",
+      "title": "Terms acknowledged at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-005",
+      "title": "Research field required at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-006",
+      "title": "Research field stored with each order",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "DISC-002",
+      "title": "Footer disclaimer is legible",
+      "state": "fail"
+    },
+    {
+      "ruleId": "DISC-001",
+      "title": "Footer disclaimer wording",
+      "state": "review"
+    },
+    {
+      "ruleId": "DISC-003",
+      "title": "Disclaimer on every page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-008",
+      "title": "No disease or benefit claims",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-006",
+      "title": "No pharmaceutical brand names",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-007",
+      "title": "No route-of-administration labels",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-010",
+      "title": "No community abbreviations",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "NAME-001",
+      "title": "No therapeutic categories",
+      "state": "fail"
+    },
+    {
+      "ruleId": "NAME-002",
+      "title": "No marketing terms in product names",
+      "state": "fail"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-003",
+      "title": "No HCG or HGH",
+      "state": "fail"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-001",
+      "title": "No needles or syringes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-002",
+      "title": "No alcohol wipes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-004",
+      "title": "No tablets or pills",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-002",
+      "title": "COA updated within 60 days",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-003",
+      "title": "Purity at or above 98%",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-005",
+      "title": "Lab is accredited and independent",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-004",
+      "title": "COA contains all required fields",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "FULF-005",
+      "title": "Ban list maintained",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-002",
+      "title": "No PO boxes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-003",
+      "title": "Adult signature on first orders",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-004",
+      "title": "Packing slip disclaimers",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-001",
+      "title": "Ships to USA only",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-007",
+      "title": "Affiliate program linked from the homepage",
+      "state": "review"
+    },
+    {
+      "ruleId": "OFFS-004",
+      "title": "Social post content",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-005",
+      "title": "Monthly social audits",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-001",
+      "title": "No affiliate program",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-006",
+      "title": "Editorial content on therapeutic topics",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-003",
+      "title": "Social links point to the home page only",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PAY-001",
+      "title": "No peer-to-peer payment methods",
+      "state": "fail"
+    },
+    {
+      "ruleId": "PAY-002",
+      "title": "Card processing through a merchant account",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-004",
+      "title": "Risk monitoring plugin installed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-003",
+      "title": "Refund and chargeback policy published",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COMM-002",
+      "title": "Support channels free of human-use language",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-003",
+      "title": "Staff do not help with protocols",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-001",
+      "title": "FAQ free of dosing or administration advice",
+      "state": "pass"
+    }
+  ],
+  "truncations": [],
+  "politeness": "robots.txt declared no Crawl-delay; requests were not additionally spaced.",
+  "access": {
+    "mode": "public",
+    "wall": false,
+    "usedCredential": false,
+    "note": "Every sampled product page was served to an anonymous request."
+  }
+}

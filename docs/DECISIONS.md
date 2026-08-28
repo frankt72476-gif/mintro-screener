@@ -10059,4 +10059,31 @@ how it is laid out, and neither is in this spec.
 
 All 54 rules render in both documents. Nothing disappeared.
 
+### Regenerating the pair
+
+The four PDFs are **not committed** — 18MB of binaries, and a rendering is not a ruling. They were
+written to `out/restructure/`, which is gitignored. To make them again:
+
+```
+# the report JSON is tracked; the CLI keys on domain, so copy it into place under that name
+cp fixtures/reports/run-c268f8d7.json reports/sportstechnologylabs.com.json
+cp fixtures/reports/run-5b29036d.json reports/www.comopeptides.com.json
+npm run pdf -- sportstechnologylabs.com --out out/restructure
+npm run pdf -- www.comopeptides.com    --out out/restructure
+
+# the "before" half is the same two commands at the commit before the restructure
+git stash && git checkout 78e86d5   # parent of 77c45a5, the first restructure commit
+```
+
+Two things this needs that the fixtures do not supply, and both will fail quietly if you assume
+otherwise. **Supabase credentials**: `report-pdf.ts` mints a signed URL per capture, so without them
+the pages render with the captures missing and the count is not comparable. **The domain
+collision**: `reports/sportstechnologylabs.com.json` is run `71bea35a` at 2.9.0, a *different* run
+from `c268f8d7` — the `cp` above overwrites it, and rendering without the `cp` silently produces a
+PDF of the wrong run. `fixtures/reports/README.md` has the full table.
+
+The recipe is read off `apps/worker/bin/report-pdf.ts` and the commit graph; it has not been run
+end to end since the pair was produced.
+
+
 ---

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
 import { composeInvitation } from '../src/invite.js';
 import { composeResponseNotice } from '../src/responseNotice.js';
@@ -46,11 +46,23 @@ function offending(text: string): string[] {
 }
 
 /** The most recent real run, when one has been produced. */
+/** Tracked, so there is always something to read. See `fixtures/reports/README.md`. */
+const REPORT_FIXTURES = 'fixtures/reports';
+
+/**
+ * The pinned reports, or an error.
+ *
+ * This read `reports/` — the worker's local output directory, which is gitignored — behind
+ * `if (!existsSync('reports')) return []`. On the machine that produced them it audited every
+ * report. On a clean checkout it audited **nothing** and said so by saying nothing, which is the
+ * vacuous pass this project exists to refuse. It throws now: no input is not a green audit.
+ */
 function storedReports(): ScreeningReport[] {
-  if (!existsSync('reports')) return [];
-  return readdirSync('reports')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => JSON.parse(readFileSync(`reports/${file}`, 'utf8')) as ScreeningReport);
+  const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  return files.map(
+    (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
+  );
 }
 
 describe('the audit catches what it is looking for', () => {
@@ -72,7 +84,7 @@ describe('generated report copy', () => {
 
   it('has a real run to audit', () => {
     // A green audit over zero reports would be a green audit over nothing.
-    expect(reports.length, 'run `npm run scan-full -- --report-dir ./reports <url>` first').toBeGreaterThan(0);
+    expect(reports.length, 'fixtures/reports/ is tracked and must not be empty').toBeGreaterThan(0);
   });
 
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(

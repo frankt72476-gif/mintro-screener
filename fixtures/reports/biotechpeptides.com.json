@@ -1,0 +1,3149 @@
+{
+  "runId": "63514a3b-3e85-445d-8401-3f1baae9957b",
+  "merchantDomain": "biotechpeptides.com",
+  "merchantName": "Buy Peptides for Scientific Research (USA Made)",
+  "platform": "woocommerce",
+  "mode": "public",
+  "rulesetVersion": "2.9.0",
+  "rulesetEffective": "2026-05-26",
+  "startedAt": "2026-08-23T15:18:39.368Z",
+  "finishedAt": "2026-08-23T15:20:18.353Z",
+  "counts": {
+    "fail": 2,
+    "review": 17,
+    "pass": 40,
+    "not_evaluable": 38
+  },
+  "coverage": {
+    "evaluable": 59,
+    "total": 97,
+    "noCheckBuilt": 0,
+    "notReachable": 12,
+    "notExposed": 13,
+    "notApplicable": 13,
+    "notRetrieved": 0,
+    "kindNotRecorded": 0,
+    "resolved": 72,
+    "outstanding": 25
+  },
+  "sameObservation": [],
+  "verdict": "2 rule(s) were observed to fail, including no marketing terms in product names; no route-of-administration labels. 17 finding(s) are queued for review. 38 could not be evaluated from the crawled surface.",
+  "categories": [
+    {
+      "id": "gate",
+      "name": "Access and identity gating",
+      "n": 1,
+      "findings": [
+        {
+          "ruleId": "GATE-007",
+          "state": "review",
+          "note": "1 of 5 required phrases were not observed: 'research use only'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/terms-and-conditions/",
+              "sourceSha256": "8782e83a0c8c93a685f8ddb8f8ed77279fe33d3ccc78b4262d9bea2c6f176f57",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/97baa94606676ab6f8e80eaa28176fa0864df560e4a423b4073c950881718298.png",
+              "capturedAt": "2026-08-23T15:19:14.657Z"
+            }
+          ],
+          "title": "Terms cover all required clauses",
+          "clause": "Research-only use restriction; prohibition on human consumption; not for diagnosis/treatment/prevention; indemnification of the seller; buyer is a qualified professional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no add-to-cart control was found on the product page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "ca4edb2252901b8a60d33c06fab08e7960fd01a81f21dd037851e026c7101c45",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:19:37.944Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+                  "status": 0,
+                  "error": "no add-to-cart control was found on the product page"
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              }
+            }
+          ],
+          "notEvaluableReason": "no add-to-cart control was found on the product page",
+          "notEvaluableKind": "not_exposed",
+          "title": "Guest checkout disabled",
+          "clause": "Guest checkout must be disabled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "flow_probe",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://biotechpeptides.com/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://biotechpeptides.com/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Terms acknowledged at sign-up",
+          "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached. The closest page found was https://biotechpeptides.com/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached. The closest page found was https://biotechpeptides.com/my-account/ — 1 form(s) on the page carried a password field, and none could be established as an account-creation form: no field declared autocomplete=\"new-password\" and none carried a second password field to confirm one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Research field required at sign-up",
+          "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Order records are server-side. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Order records are server-side. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Research field stored with each order",
+          "clause": "Store the selected field with every order in your database.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "GATE-002",
+          "state": "pass",
+          "note": "2 path(s) served content directly, returning 404; none matched the statuses this rule treats as a violation. 1 path(s) redirected away rather than serving content: /shop → /buy-peptides. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/collections/all",
+              "sourceSha256": "e0d620c86c8714a90d135693c17b459ebc507df942a9584d68474ca13ac8cf0b",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:19:34.958Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://biotechpeptides.com/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://biotechpeptides.com/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              }
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-001",
+          "state": "pass",
+          "note": "An entry interstitial was observed (dialog or role=dialog) containing '21+'. It covers the viewport or locks page scrolling.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z",
+              "matchedValue": "21+"
+            }
+          ],
+          "title": "Age affirmation before entry",
+          "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        }
+      ]
+    },
+    {
+      "id": "disclose",
+      "name": "Site-wide disclosure",
+      "n": 2,
+      "findings": [
+        {
+          "ruleId": "DISC-001",
+          "state": "review",
+          "note": "The footer does not contain the required wording verbatim. The closest text observed is: \"All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption.\" Required: \"For research and laboratory use only. Not for human or animal consumption.\"",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            }
+          ],
+          "title": "Footer disclaimer wording",
+          "clause": "For research and laboratory use only. Not for human or animal consumption.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-002",
+          "state": "pass",
+          "note": "The footer disclaimer at div.et_pb_column > div.et_pb_module > div.et_pb_text_inner > p > em > strong rendered at 14px with a contrast ratio of 21:1, visible and not collapsed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z",
+              "matchedValue": "selector=div.et_pb_column > div.et_pb_module > div.et_pb_text_inner > p > em > strong font-size=14px color=rgb(255,255,255) background=rgb(0,0,0) contrast=21:1 visible=true collapsed-ancestor=false"
+            }
+          ],
+          "title": "Footer disclaimer is legible",
+          "clause": "In legible font, not hidden or collapsed.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "computed_style",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-003",
+          "state": "pass",
+          "note": "The footer carries text matching the required disclaimer: \"All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption.\" Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."
+            }
+          ],
+          "title": "Disclaimer on every page",
+          "clause": "Must appear in the footer of every page of the website.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "name": "Product page content",
+      "n": 3,
+      "findings": [
+        {
+          "ruleId": "PROD-007",
+          "state": "fail",
+          "note": "Observed: 'subcutaneous'. Observed on 1 of 5 sampled product page(s), including /product/cjc-1295-ipamorelin-10mg-blend-2/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "subcutaneous"
+            }
+          ],
+          "title": "No route-of-administration labels",
+          "clause": "Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-008",
+          "state": "review",
+          "note": "Observed: 'treat', 'cure', 'prevent', 'heal', 'recovery', 'therapeutic', 'injury', 'disease', 'condition'. Observed on 5 of 5 sampled product page(s), including /product/bpc-157-tb-500-10mg-blend-2/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "treat, cure, prevent, heal, recovery, therapeutic, injury, disease, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "treat, cure, prevent, heal, injury, disease, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z",
+              "matchedValue": "treat, cure, prevent, heal, disease, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z",
+              "matchedValue": "treat, cure, prevent, heal, disease, condition"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "treat, cure, prevent, heal, disease, condition"
+            }
+          ],
+          "title": "No disease or benefit claims",
+          "clause": "No references to treating, curing, preventing or diagnosing any disease or condition.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Observed on the rendered page: 'doi.org'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "doi.org"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Observed on the rendered page: 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "pubmed, ncbi.nlm.nih.gov, doi.org"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "review",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Observed on the rendered page: 'ncbi.nlm.nih.gov', 'doi.org'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z",
+              "matchedValue": "ncbi.nlm.nih.gov, doi.org"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "review",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Observed on the rendered page: 'doi.org', 'pubmed', 'ncbi.nlm.nih.gov'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z",
+              "matchedValue": "doi.org, pubmed, ncbi.nlm.nih.gov"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "review",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Observed on the rendered page: 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "pubmed, ncbi.nlm.nih.gov, doi.org"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-006",
+          "state": "pass",
+          "note": "None of 8 prohibited term(s) was observed in the rendered text of this sampled page: 'Ozempic', 'Wegovy', 'Mounjaro', 'Zepbound', 'Rybelsus'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "No pharmaceutical brand names",
+          "clause": "Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Observed: 'molecular', 'formula'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "molecular, formula, molecular, formula"
+            }
+          ],
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Observed: 'molecular', 'formula'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "molecular, formula, molecular, formula, molecular"
+            }
+          ],
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Observed: 'molecular', 'formula'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z",
+              "matchedValue": "molecular, formula, molecular, formula"
+            }
+          ],
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Observed: 'molecular', 'formula'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z",
+              "matchedValue": "molecular, formula, molecular, formula"
+            }
+          ],
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Observed: 'molecular', 'formula'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "molecular, formula, molecular, formula"
+            }
+          ],
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-010",
+          "state": "pass",
+          "note": "None of 4 prohibited term(s) was observed in the rendered text of this sampled page: 'Sema', 'Tirz', 'Reta', 'Cagri'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "No community abbreviations",
+          "clause": "Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — A region labelled 'molecular weight', 'g/mol' was observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z",
+              "matchedValue": "molecular weight, g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "naming",
+      "name": "Naming and taxonomy",
+      "n": 4,
+      "findings": [
+        {
+          "ruleId": "NAME-002",
+          "state": "fail",
+          "note": "14 of 89 URLs in scope 'products' matched a prohibited pattern: https://biotechpeptides.com/product/mod-grf-1-29-ghrp-2-blend-10mg/ (matched 'blend'); https://biotechpeptides.com/product/mod-grf-1-29-ipamorelin-10mg-blend/ (matched 'blend'); https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/ (matched 'blend'); https://biotechpeptides.com/product/sermorelin-ghrp-6-ghrp-2-blend-9mg/ (matched 'blend'); https://biotechpeptides.com/product/fragment-cjc-1295-ipamorelin-12mg-blend/ (matched 'blend') and 9 more.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z",
+              "matchedValue": "blend",
+              "matchedUrls": [
+                "https://biotechpeptides.com/product/mod-grf-1-29-ghrp-2-blend-10mg/",
+                "https://biotechpeptides.com/product/mod-grf-1-29-ipamorelin-10mg-blend/",
+                "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+                "https://biotechpeptides.com/product/sermorelin-ghrp-6-ghrp-2-blend-9mg/",
+                "https://biotechpeptides.com/product/fragment-cjc-1295-ipamorelin-12mg-blend/",
+                "https://biotechpeptides.com/product/cjc-1295-ipamorelin-ghrp2-9mg-blend/",
+                "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+                "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+                "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+                "https://biotechpeptides.com/product/tesamorelin-ipamorelin-blend-8mg/",
+                "https://biotechpeptides.com/product/sermorelin-ipamorelin-10mg-blend-2/",
+                "https://biotechpeptides.com/product/tesamorelin-mod-grf-ipamorelin-blend-12mg/",
+                "https://biotechpeptides.com/product/klow-blend-80mg/",
+                "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No marketing terms in product names",
+          "clause": "No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no URLs in scope 'collections' were listed in the sitemap, so there was nothing to examine",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/robots.txt",
+              "sourceSha256": "cc55f2c87faef39bd649f9cb1d96f83c0927f9234c53a38df326b97c023ee76d",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/cc55f2c87faef39bd649f9cb1d96f83c0927f9234c53a38df326b97c023ee76d",
+              "capturedAt": "2026-08-23T15:18:39.368Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/wp-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/post-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/wp-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/post-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/wp-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/post-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/wp-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/post-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z",
+              "attempts": [
+                {
+                  "url": "https://biotechpeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/wp-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/post-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://biotechpeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no URLs in scope 'collections' were listed in the sitemap, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "No therapeutic categories",
+          "clause": "Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Not evaluable from the crawled surface: none of the compounds this rule names were observed on the page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "notEvaluableReason": "none of the compounds this rule names were observed on the page",
+          "notEvaluableKind": "not_applicable",
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Not evaluable from the crawled surface: none of the compounds this rule names were observed on the page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "notEvaluableReason": "none of the compounds this rule names were observed on the page",
+          "notEvaluableKind": "not_applicable",
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Not evaluable from the crawled surface: none of the compounds this rule names were observed on the page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "notEvaluableReason": "none of the compounds this rule names were observed on the page",
+          "notEvaluableKind": "not_applicable",
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "name": "Catalog composition",
+      "n": 5,
+      "findings": [
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-001",
+          "state": "pass",
+          "note": "89 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No needles or syringes",
+          "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-002",
+          "state": "pass",
+          "note": "89 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No alcohol wipes",
+          "clause": "Associated with injection site preparation. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-003",
+          "state": "pass",
+          "note": "89 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No HCG or HGH",
+          "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-004",
+          "state": "pass",
+          "note": "89 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No tablets or pills",
+          "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        }
+      ]
+    },
+    {
+      "id": "coa",
+      "name": "Quality documentation",
+      "n": 6,
+      "findings": [
+        {
+          "ruleId": "COA-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf",
+              "sourceSha256": "52d7181787b8167b2de4b6c3521b6a5525ca512224bfe51f74c7afb7a186a6b5",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/coa/52d7181787b8167b.pdf",
+              "capturedAt": "2026-08-23T15:18:50.679Z"
+            }
+          ],
+          "notEvaluableReason": "the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA updated within 60 days",
+          "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf",
+              "sourceSha256": "52d7181787b8167b2de4b6c3521b6a5525ca512224bfe51f74c7afb7a186a6b5",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/coa/52d7181787b8167b.pdf",
+              "capturedAt": "2026-08-23T15:18:50.679Z"
+            }
+          ],
+          "notEvaluableReason": "the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "notEvaluableKind": "not_exposed",
+          "title": "Purity at or above 98%",
+          "clause": "98% purity for all products.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Lab is accredited and independent",
+          "clause": "From an accredited independent third-party testing laboratory.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COA-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf",
+              "sourceSha256": "52d7181787b8167b2de4b6c3521b6a5525ca512224bfe51f74c7afb7a186a6b5",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/coa/52d7181787b8167b.pdf",
+              "capturedAt": "2026-08-23T15:18:50.679Z"
+            }
+          ],
+          "notEvaluableReason": "the certificate at https://biotechpeptides.com/wp-content/uploads/2020/03/COA_BPC-157_Thymosin-beta4_3141009_BP.pdf was fetched and stored, but no text could be read from it: the 25 decoded content stream(s) produced 2944 characters that are not readable text — the document's fonts carry their own encoding and no character map to resolve it, so what the certificate says could not be read",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA contains all required fields",
+          "clause": "COA must identify batch/lot number, testing date, compound identity, purity %, method used (HPLC preferred).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — Observed on the rendered page: 'coa'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — Observed on the rendered page: 'coa'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — Observed on the rendered page: 'coa'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — Observed on the rendered page: 'coa'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — Observed on the rendered page: 'coa'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "fulfil",
+      "name": "Fulfillment and screening",
+      "n": 7,
+      "findings": [
+        {
+          "ruleId": "FULF-001",
+          "state": "review",
+          "note": "None of the accepted phrases was observed: 'united states only', 'us only', 'domestic only', 'we do not ship internationally'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/shipping/",
+              "sourceSha256": "89e3dd6c437000a3e39bc53ea31c433abc51951ae1a4b9e2f3fb0d279cdd0a3f",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/99dab9fd6cb686d8bec1a081d1d4284e3ba36b431177fc3224b9bba83f39c746.png",
+              "capturedAt": "2026-08-23T15:19:16.033Z"
+            }
+          ],
+          "title": "Ships to USA only",
+          "clause": "Ship to USA only. No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "FULF-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal record. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal record. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Ban list maintained",
+          "clause": "Any customer who hints at human consumption must be permanently banned with no appeal option.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "No PO boxes",
+          "clause": "No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Carrier configuration. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Carrier configuration. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Adult signature on first orders",
+          "clause": "All first-time customer orders must require an adult signature upon delivery (21+ confirmed).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Physical document. Requires a test order or merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Physical document. Requires a test order or merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Packing slip disclaimers",
+          "clause": "Include RUO disclaimer and research-professional acknowledgement in shipment.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    },
+    {
+      "id": "offsite",
+      "name": "Off-site presence",
+      "n": 8,
+      "findings": [
+        {
+          "ruleId": "OFFS-006",
+          "state": "review",
+          "note": "32 of 192 content URLs have slugs matching this rule's patterns: https://biotechpeptides.com/ghrp-2-and-cjc-1295-blend-growth-hormone-deficiency-and-fat-metabolism/ (matched 'growth-hormone'); https://biotechpeptides.com/sermorelin-ipamorelin-blend-potential-analogues-of-growth-hormone/ (matched 'growth-hormone'); https://biotechpeptides.com/thyrotropin-and-research-regarding-metabolism/ (matched 'metabolism'); https://biotechpeptides.com/epithalon-overview-of-anti-aging-experiments/ (matched 'anti-aging'); https://biotechpeptides.com/sermorelin-studies-and-growth-hormone/ (matched 'growth-hormone') and 27 more. The content of these pages was not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z",
+              "matchedValue": "growth-hormone, metabolism, anti-aging, muscle-growth, healing, weight-loss, cognitive",
+              "matchedUrls": [
+                "https://biotechpeptides.com/ghrp-2-and-cjc-1295-blend-growth-hormone-deficiency-and-fat-metabolism/",
+                "https://biotechpeptides.com/sermorelin-ipamorelin-blend-potential-analogues-of-growth-hormone/",
+                "https://biotechpeptides.com/thyrotropin-and-research-regarding-metabolism/",
+                "https://biotechpeptides.com/epithalon-overview-of-anti-aging-experiments/",
+                "https://biotechpeptides.com/sermorelin-studies-and-growth-hormone/",
+                "https://biotechpeptides.com/cjc-1295-ipamorelin-ghrp-2-blend-research-into-growth-hormone-secretion/",
+                "https://biotechpeptides.com/comprehensive-research-on-ace-031-peptide-across-metabolism-cancer-and-muscle/",
+                "https://biotechpeptides.com/ghrp-2-peptide-research-in-growth-hormone-deficiency-diagnosis-and-hormonal-modulation/",
+                "https://biotechpeptides.com/sermorelin-peptide-potential-as-a-growth-hormone-secretagogue/",
+                "https://biotechpeptides.com/studies-in-ipamorelin-for-muscle-growth-and-bone-density/",
+                "https://biotechpeptides.com/tb-500-research-in-regards-to-blood-vessel-growth-and-wound-healing/",
+                "https://biotechpeptides.com/ipamorelin-ghrp-2-blend-research-into-growth-hormone-secretion/",
+                "https://biotechpeptides.com/tesamorelin-peptide-lipid-metabolism-and-muscular-tissue-modulation/",
+                "https://biotechpeptides.com/modified-grf-1-29-ipamorelin-blend-studies-in-growth-hormone-secretion-and-metabolic-regulation/",
+                "https://biotechpeptides.com/research-in-igf-1-and-igf-1-lr3-peptides-and-muscle-growth/",
+                "https://biotechpeptides.com/tesamorelin-peptide-weight-loss-and-research-in-hiv/",
+                "https://biotechpeptides.com/cjc-1295-and-ipamorelin-growth-hormone-releasing-hormones/",
+                "https://biotechpeptides.com/igf-1-lr3-a-synthetic-model-of-the-insulin-like-growth-hormone/",
+                "https://biotechpeptides.com/ghrp-2-pralmorelin-and-growth-hormone-synthesis/",
+                "https://biotechpeptides.com/n-acetyl-selank-studies-on-cognitive-impact/",
+                "https://biotechpeptides.com/adipotide-ftpp-and-metabolism-of-adipocytes/",
+                "https://biotechpeptides.com/pralmorelin-peptide-and-growth-hormone-secretegogue-receptors-ghs-rs/",
+                "https://biotechpeptides.com/aod-9604-research-into-fat-cell-metabolism-and-lipolysis/",
+                "https://biotechpeptides.com/tesamorelin-ipamorelin-blend-studying-their-potential-in-growth-hormone-production/",
+                "https://biotechpeptides.com/modified-grf-1-29-modulation-of-the-growth-hormone-axis/",
+                "https://biotechpeptides.com/frag-176-191-and-growth-hormone-interaction/",
+                "https://biotechpeptides.com/potential-of-sermorelin-and-ipamorelin-in-growth-hormone-regulation-and-systemic-outcomes/",
+                "https://biotechpeptides.com/sermorelin-overview-growth-hormone-and-igf-1-research/",
+                "https://biotechpeptides.com/ipamorelin-peptide-research-overview-into-growth-hormone-modulation-and-energy-homeostasis/",
+                "https://biotechpeptides.com/tesamorelin-molecular-characterization-growth-hormone-axis-modulation-and-metabolic-research/",
+                "https://biotechpeptides.com/tesamorelin-modified-grf-1-29-and-ipamorelin-peptide-blend-growth-hormone-axis-pharmacology-and-preclinical-research/",
+                "https://biotechpeptides.com/fragment-176-191-modified-grf-1-29-and-ipamorelin-blend-adipose-metabolism-gh-axis-modulation-and-receptor-signaling-research/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "Editorial content on therapeutic topics",
+          "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Social post content",
+          "clause": "Every social media post must follow the same rules as product pages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal process. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal process. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Monthly social audits",
+          "clause": "Reviews of all social media channels at minimum monthly.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-001",
+          "state": "pass",
+          "note": "192 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/sitemap_index.xml",
+              "sourceSha256": "07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/07547932545803a7bbb7cf64e0219d1cc49424bd6fbe2401a9aa04dd56df3810",
+              "capturedAt": "2026-08-23T15:18:39.740Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/post-sitemap.xml",
+              "sourceSha256": "ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/ef0d3074472760db55f1ff28a79d62ccea6153b2b67648e8acab4503f914074a",
+              "capturedAt": "2026-08-23T15:18:40.186Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/page-sitemap.xml",
+              "sourceSha256": "5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/5be40cc897b4c84cc65929dfc1a54386799c00681de34b34a141b8d24ae52217",
+              "capturedAt": "2026-08-23T15:18:40.398Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://biotechpeptides.com/product-sitemap.xml",
+              "sourceSha256": "27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer0/27e1ad228816dc0d4a556438e45da092fa9a6657bba138d263119c6a640bab04",
+              "capturedAt": "2026-08-23T15:18:40.577Z"
+            }
+          ],
+          "title": "No affiliate program",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-10mg-blend-2/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-10mg-blend-2/",
+              "sourceSha256": "2449a1c86b07a66f89316e002220dec9d69d2b0ea71fe3d457bc318687912f4e",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/0b74ffba087eace19dc7b68f193343f1166bb0df56c46a8fec423012f6992098.png",
+              "capturedAt": "2026-08-23T15:18:42.140Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/bpc-157-tb-500-ghk-cu-blend-70mg/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/bpc-157-tb-500-ghk-cu-blend-70mg/",
+              "sourceSha256": "e433cc8c59a57a68589c61c502ffc807a144e3424fb680b77dce21931e318fbf",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/59696b95fafc29270c9932d21db25c13e22530af32b243758371fc98bf50caba.png",
+              "capturedAt": "2026-08-23T15:18:43.905Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-2-blend-10mg/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-2-blend-10mg/",
+              "sourceSha256": "aa8339afb8c054dbcb359fb3b449dbe5444d66c706a4e9d1258b0ba0aa561a40",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/73c77bac099378882c341161fc8730e6b46a1ce914c7c1067c99745c0e2f8fe9.png",
+              "capturedAt": "2026-08-23T15:18:45.447Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ghrp-6-10mg-blend-2/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ghrp-6-10mg-blend-2/",
+              "sourceSha256": "8eb999a49878cf5162cf16455a910de5f6d3acc8a1be4cb7f65fd41c797126f6",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/127cccb2e14de30845d2297c8d688fabe7a4e5901efe12f7ec7af70cd0a2dc2c.png",
+              "capturedAt": "2026-08-23T15:18:47.061Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "/product/cjc-1295-ipamorelin-10mg-blend-2/ — No elements matching '[class*=review], [class*=testimonial], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/product/cjc-1295-ipamorelin-10mg-blend-2/",
+              "sourceSha256": "c4cd18825cd0712f6d2d62818897ebf69b640165b00deed8f0d74f2bd162f46b",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/5a0574a1142a1b50fa9313c6176bd04d5b18e04e4b622719c0a3ed0ed8135f86.png",
+              "capturedAt": "2026-08-23T15:18:48.689Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-007",
+          "state": "pass",
+          "note": "38 link(s) with visible text in the rendered homepage were examined for 'affiliate', 'ambassador', 'referral program', 'partner program'; none matched. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z"
+            }
+          ],
+          "title": "Affiliate program linked from the homepage",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "OFFS-003",
+          "state": "pass",
+          "note": "No social media links were observed on the rendered homepage.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z"
+            }
+          ],
+          "title": "Social links point to the home page only",
+          "clause": "Social media should link only to your website home page.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "Payments",
+      "n": 9,
+      "findings": [
+        {
+          "ruleId": "PAY-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Card processing through a merchant account",
+          "clause": "Acceptance of credit/debit cards through a legitimate merchant processor that conducts proper KYC.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Risk monitoring plugin installed",
+          "clause": "All merchants are required to use our plugin for additional risk monitoring purposes.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-001",
+          "state": "pass",
+          "note": "None of 'Zelle', 'Cash App', 'CashApp', 'Venmo', 'Friends & Family', 'friends and family' was observed in the rendered text of 4 public surface(s): the homepage footer, the terms document (https://biotechpeptides.com/terms-and-conditions/), the shipping policy (https://biotechpeptides.com/shipping/), the payment or refund policy (https://biotechpeptides.com/refunds-and-returns/). A checkout page behind a sign-in was not among the surfaces examined, and text not rendered on these pages was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:19:34.956Z"
+            }
+          ],
+          "title": "No peer-to-peer payment methods",
+          "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "PAY-003",
+          "state": "pass",
+          "note": "Observed link text matching 'refund', 'return', 'chargeback'. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://biotechpeptides.com/",
+              "sourceSha256": "43f0f56461cd6a6f72960f480aac45c9539ee630f85f3e5738b2a88a685a0af7",
+              "evidenceKey": "63514a3b-3e85-445d-8401-3f1baae9957b/layer1/3fcb23613cf2f714c2b26dc968b2814ccb7b86cf528fbcd3e84091dd4164db2e.png",
+              "capturedAt": "2026-08-23T15:18:40.737Z"
+            }
+          ],
+          "title": "Refund and chargeback policy published",
+          "clause": "Clearly documented refund/chargeback policy.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "id": "comms",
+      "name": "Customer communications",
+      "n": 10,
+      "findings": [
+        {
+          "ruleId": "COMM-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no FAQ was reached: no page was found at the FAQ paths tried, and no link on the homepage pointed to one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no FAQ was reached: no page was found at the FAQ paths tried, and no link on the homepage pointed to one",
+          "notEvaluableKind": "not_exposed",
+          "title": "FAQ free of dosing or administration advice",
+          "clause": "Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 3
+        },
+        {
+          "ruleId": "COMM-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Support channels free of human-use language",
+          "clause": "Including email, chat, phone, and social media direct messages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COMM-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal training. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal training. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Staff do not help with protocols",
+          "clause": "Don't have staff offer to help customers 'figure out' protocols.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    }
+  ],
+  "strip": [
+    {
+      "ruleId": "GATE-007",
+      "title": "Terms cover all required clauses",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-003",
+      "title": "Guest checkout disabled",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-004",
+      "title": "Terms acknowledged at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-005",
+      "title": "Research field required at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-006",
+      "title": "Research field stored with each order",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-002",
+      "title": "Products hidden until an account exists",
+      "state": "pass"
+    },
+    {
+      "ruleId": "GATE-001",
+      "title": "Age affirmation before entry",
+      "state": "pass"
+    },
+    {
+      "ruleId": "DISC-001",
+      "title": "Footer disclaimer wording",
+      "state": "review"
+    },
+    {
+      "ruleId": "DISC-002",
+      "title": "Footer disclaimer is legible",
+      "state": "pass"
+    },
+    {
+      "ruleId": "DISC-003",
+      "title": "Disclaimer on every page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-007",
+      "title": "No route-of-administration labels",
+      "state": "fail"
+    },
+    {
+      "ruleId": "PROD-008",
+      "title": "No disease or benefit claims",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-006",
+      "title": "No pharmaceutical brand names",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-010",
+      "title": "No community abbreviations",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "NAME-002",
+      "title": "No marketing terms in product names",
+      "state": "fail"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-001",
+      "title": "No therapeutic categories",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-001",
+      "title": "No needles or syringes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-002",
+      "title": "No alcohol wipes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-003",
+      "title": "No HCG or HGH",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-004",
+      "title": "No tablets or pills",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-002",
+      "title": "COA updated within 60 days",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-003",
+      "title": "Purity at or above 98%",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-005",
+      "title": "Lab is accredited and independent",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-004",
+      "title": "COA contains all required fields",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "FULF-001",
+      "title": "Ships to USA only",
+      "state": "review"
+    },
+    {
+      "ruleId": "FULF-005",
+      "title": "Ban list maintained",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-002",
+      "title": "No PO boxes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-003",
+      "title": "Adult signature on first orders",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-004",
+      "title": "Packing slip disclaimers",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-006",
+      "title": "Editorial content on therapeutic topics",
+      "state": "review"
+    },
+    {
+      "ruleId": "OFFS-004",
+      "title": "Social post content",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-005",
+      "title": "Monthly social audits",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-001",
+      "title": "No affiliate program",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-007",
+      "title": "Affiliate program linked from the homepage",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-003",
+      "title": "Social links point to the home page only",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PAY-002",
+      "title": "Card processing through a merchant account",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-004",
+      "title": "Risk monitoring plugin installed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-001",
+      "title": "No peer-to-peer payment methods",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PAY-003",
+      "title": "Refund and chargeback policy published",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COMM-001",
+      "title": "FAQ free of dosing or administration advice",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-002",
+      "title": "Support channels free of human-use language",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-003",
+      "title": "Staff do not help with protocols",
+      "state": "not_evaluable"
+    }
+  ],
+  "truncations": [],
+  "politeness": "robots.txt declared no Crawl-delay; requests were not additionally spaced.",
+  "access": {
+    "mode": "public",
+    "wall": false,
+    "usedCredential": false,
+    "note": "Every sampled product page was served to an anonymous request."
+  }
+}

@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { loadRulesetFile } from '@mintro/ruleset';
 import {
   DIRECTIVE_TERMS,
@@ -28,11 +28,23 @@ import {
 
 const ruleset = loadRulesetFile('rules/ruleset.json');
 
+/** Tracked, so there is always something to read. See `fixtures/reports/README.md`. */
+const REPORT_FIXTURES = 'fixtures/reports';
+
+/**
+ * The pinned reports, or an error.
+ *
+ * This read `reports/` — the worker's local output directory, which is gitignored — behind
+ * `if (!existsSync('reports')) return []`. On the machine that produced them it audited every
+ * report. On a clean checkout it audited **nothing** and said so by saying nothing, which is the
+ * vacuous pass this project exists to refuse. It throws now: no input is not a green audit.
+ */
 function storedReports(): ScreeningReport[] {
-  if (!existsSync('reports')) return [];
-  return readdirSync('reports')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => JSON.parse(readFileSync(`reports/${file}`, 'utf8')) as ScreeningReport);
+  const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  return files.map(
+    (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
+  );
 }
 
 describe('auditRequirement', () => {
@@ -184,7 +196,7 @@ describe('real runs', () => {
   const reports = storedReports();
 
   it('has a real run to audit', () => {
-    expect(reports.length, 'no reports/ to audit — run a scan first').toBeGreaterThan(0);
+    expect(reports.length, 'fixtures/reports/ is tracked and must not be empty').toBeGreaterThan(0);
   });
 
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(

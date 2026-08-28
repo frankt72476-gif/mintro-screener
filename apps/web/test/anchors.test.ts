@@ -18,18 +18,33 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import type { ScreeningReport } from '@mintro/engine';
 import { ReportView } from '../src/components/ReportView.js';
 import { NothingObservedCallout } from '../src/components/CommentPane.js';
 import { nothingObservedCount, nothingObservedSection } from '../src/lib/grouping.js';
 
-/** Reports from real storefronts. Fixtures would only prove the code agrees with itself. */
+/**
+ * Reports from real storefronts. These are pinned outputs, not written-to-suit inputs — a report
+ * shaped to please the renderer would only prove the code agrees with itself.
+ */
+/** Tracked, so there is always something to read. See `fixtures/reports/README.md`. */
+const REPORT_FIXTURES = 'fixtures/reports';
+
+/**
+ * The pinned reports, or an error.
+ *
+ * This read `reports/` — the worker's local output directory, which is gitignored — behind
+ * `if (!existsSync('reports')) return []`. On the machine that produced them it audited every
+ * report. On a clean checkout it audited **nothing** and said so by saying nothing, which is the
+ * vacuous pass this project exists to refuse. It throws now: no input is not a green audit.
+ */
 function storedReports(): ScreeningReport[] {
-  if (!existsSync('reports')) return [];
-  return readdirSync('reports')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => JSON.parse(readFileSync(`reports/${file}`, 'utf8')) as ScreeningReport);
+  const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  return files.map(
+    (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
+  );
 }
 
 const access = {

@@ -23,7 +23,7 @@ import {
 } from '../src/lib/grouping.js';
 
 const load = (name: string): ScreeningReport =>
-  JSON.parse(readFileSync(`apps/web/test/fixtures/${name}.json`, 'utf8')) as ScreeningReport;
+  JSON.parse(readFileSync(`fixtures/reports/${name}.json`, 'utf8')) as ScreeningReport;
 
 const RUNS = [
   ['c268f8d7 · sportstechnologylabs', load('run-c268f8d7')],

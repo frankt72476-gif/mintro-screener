@@ -1,0 +1,1463 @@
+{
+  "runId": "86b4dc3a-d167-42b4-80cd-b6e910541ab2",
+  "merchantDomain": "peptidesciences.com",
+  "merchantName": "Buy Peptides for Scientific Research and Development.",
+  "platform": "magento",
+  "mode": "public",
+  "rulesetVersion": "2.9.0",
+  "rulesetEffective": "2026-05-26",
+  "startedAt": "2026-08-23T15:16:26.149Z",
+  "finishedAt": "2026-08-23T15:18:39.278Z",
+  "counts": {
+    "fail": 0,
+    "review": 2,
+    "pass": 3,
+    "not_evaluable": 48
+  },
+  "coverage": {
+    "evaluable": 5,
+    "total": 53,
+    "noCheckBuilt": 0,
+    "notReachable": 12,
+    "notExposed": 36,
+    "notApplicable": 0,
+    "notRetrieved": 0,
+    "kindNotRecorded": 0,
+    "resolved": 5,
+    "outstanding": 48
+  },
+  "sameObservation": [],
+  "verdict": "No rule was observed to fail. 2 finding(s) are queued for review and 3 passed. 48 could not be evaluated from the crawled surface.",
+  "categories": [
+    {
+      "id": "gate",
+      "name": "Access and identity gating",
+      "n": 1,
+      "findings": [
+        {
+          "ruleId": "GATE-001",
+          "state": "review",
+          "note": "No entry interstitial and no age affirmation signal were observed on the rendered page.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "title": "Age affirmation before entry",
+          "clause": "Every visitor must be stopped before accessing the website. This requires age affirmation (21+).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "GATE-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: adding a product to the cart and going to checkout could not be started on this storefront",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:18:39.278Z",
+              "attempts": [
+                {
+                  "url": "",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              }
+            }
+          ],
+          "notEvaluableReason": "adding a product to the cart and going to checkout could not be started on this storefront",
+          "notEvaluableKind": "not_exposed",
+          "title": "Guest checkout disabled",
+          "clause": "Guest checkout must be disabled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "flow_probe",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached: no page carrying a password field was found at the account paths tried",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached: no page carrying a password field was found at the account paths tried",
+          "notEvaluableKind": "not_exposed",
+          "title": "Terms acknowledged at sign-up",
+          "clause": "Users must acknowledge 'I Agree' on the full Terms and Conditions before account creation.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no account-creation form was reached: no page carrying a password field was found at the account paths tried",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no account-creation form was reached: no page carrying a password field was found at the account paths tried",
+          "notEvaluableKind": "not_exposed",
+          "title": "Research field required at sign-up",
+          "clause": "Require the buyer to identify their research status. This must be a required field, not optional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Order records are server-side. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Order records are server-side. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Research field stored with each order",
+          "clause": "Store the selected field with every order in your database.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "GATE-007",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no terms document was reached: no page was found at the terms paths tried, and no link on the homepage pointed to one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no terms document was reached: no page was found at the terms paths tried, and no link on the homepage pointed to one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Terms cover all required clauses",
+          "clause": "Research-only use restriction; prohibition on human consumption; not for diagnosis/treatment/prevention; indemnification of the seller; buyer is a qualified professional.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-002",
+          "state": "pass",
+          "note": "No probed path served content directly. 3 path(s) redirected away rather than serving content: /collections/all → ; /products → ; /shop → . Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://peptidesciences.com/collections/all",
+              "sourceSha256": "1a60e7ac7f77db80fdd47b930eb0cdade18696a588a6bb69c4775ac97a6b58f8",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-23T15:18:38.363Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/collections/all",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/products",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/shop",
+                  "status": 403
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              }
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "All visitors prior to shopping for or purchasing any product must set up an account.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        }
+      ]
+    },
+    {
+      "id": "disclose",
+      "name": "Site-wide disclosure",
+      "n": 2,
+      "findings": [
+        {
+          "ruleId": "DISC-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no footer region could be identified on the rendered page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "notEvaluableReason": "no footer region could be identified on the rendered page",
+          "notEvaluableKind": "not_exposed",
+          "title": "Footer disclaimer wording",
+          "clause": "For research and laboratory use only. Not for human or animal consumption.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no footer region could be identified on the rendered page",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "notEvaluableReason": "no footer region could be identified on the rendered page",
+          "notEvaluableKind": "not_exposed",
+          "title": "Footer disclaimer is legible",
+          "clause": "In legible font, not hidden or collapsed.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "computed_style",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Disclaimer on every page",
+          "clause": "Must appear in the footer of every page of the website.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "name": "Product page content",
+      "n": 3,
+      "findings": [
+        {
+          "ruleId": "PROD-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No dosing information",
+          "clause": "Never include dosing information (mg, frequency, route of administration, injection schedule).",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No pharmaceutical brand names",
+          "clause": "Never use Ozempic, Wegovy, Mounjaro, Zepbound, Rybelsus or any other brand name.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-007",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No route-of-administration labels",
+          "clause": "Cannot label products as 'injectable' or 'nasal spray' — these are administration route claims.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-008",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No disease or benefit claims",
+          "clause": "No references to treating, curing, preventing or diagnosing any disease or condition.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "CAS number listed",
+          "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "e.g. C62H98N16O22 for BPC-157.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No study citations implying human benefit",
+          "clause": "Cannot cite or link to research studies that in any way imply human benefit or consumption.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-010",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No community abbreviations",
+          "clause": "Rename GLP-1 products using only chemical names — never 'Sema', 'Tirz', etc.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "e.g. 'Store at -20C, desiccated.'",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "naming",
+      "name": "Naming and taxonomy",
+      "n": 4,
+      "findings": [
+        {
+          "ruleId": "NAME-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No therapeutic categories",
+          "clause": "Cannot categorize products under 'Weight Loss', 'Obesity', 'Longevity', 'Cognitive Enhancement', 'Joint Healing', 'Anti-Aging'.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No marketing terms in product names",
+          "clause": "No: 'Lean Stack', 'Mass', 'PCT', 'CagriLean', 'Wolverine Peptide', 'Healing Stack', etc.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Proper chemical names used",
+          "clause": "BPC-157 = 'Body Protection Compound 157 (Pentadecapeptide)'; TB-500 = 'Thymosin Beta-4 Fragment'.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "name": "Catalog composition",
+      "n": 5,
+      "findings": [
+        {
+          "ruleId": "CATG-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No needles or syringes",
+          "clause": "Selling injection supplies alongside peptides directly establishes injection-use intent. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No alcohol wipes",
+          "clause": "Associated with injection site preparation. Prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No HCG or HGH",
+          "clause": "All Human Chorionic Gonadotropin (HCG) and Human Growth Hormone (HGH) prohibited.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No tablets or pills",
+          "clause": "Tablets or pills prohibited. Capsules may be sold if exclusively for research use and properly labeled.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Reconstitution solution labelling",
+          "clause": "May be sold as 'Reconstitution Solution for Laboratory Use' with no injection language and no branded pharmaceutical names.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Capsule labelling",
+          "clause": "You may sell labeled chemical names and CAS numbers only.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "coa",
+      "name": "Quality documentation",
+      "n": 6,
+      "findings": [
+        {
+          "ruleId": "COA-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA updated within 60 days",
+          "clause": "COAs must be updated at minimum every 60 days (bimonthly).",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "Purity at or above 98%",
+          "clause": "98% purity for all products.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Lab is accredited and independent",
+          "clause": "From an accredited independent third-party testing laboratory.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA linked on each product page",
+          "clause": "Each product page must be linked to the Certificate of Analysis for the current batch.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA contains all required fields",
+          "clause": "COA must identify batch/lot number, testing date, compound identity, purity %, method used (HPLC preferred).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "doc_parse",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "fulfil",
+      "name": "Fulfillment and screening",
+      "n": 7,
+      "findings": [
+        {
+          "ruleId": "FULF-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal record. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal record. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Ban list maintained",
+          "clause": "Any customer who hints at human consumption must be permanently banned with no appeal option.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no shipping policy was reached: no page was found at the shipping paths tried, and no link on the homepage pointed to one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no shipping policy was reached: no page was found at the shipping paths tried, and no link on the homepage pointed to one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Ships to USA only",
+          "clause": "Ship to USA only. No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "FULF-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "No PO boxes",
+          "clause": "No PO boxes or international addresses.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Carrier configuration. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Carrier configuration. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Adult signature on first orders",
+          "clause": "All first-time customer orders must require an adult signature upon delivery (21+ confirmed).",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Physical document. Requires a test order or merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Physical document. Requires a test order or merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Packing slip disclaimers",
+          "clause": "Include RUO disclaimer and research-professional acknowledgement in shipment.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    },
+    {
+      "id": "offsite",
+      "name": "Off-site presence",
+      "n": 8,
+      "findings": [
+        {
+          "ruleId": "OFFS-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "No affiliate program",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no product pages could be identified to sample",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no product pages could be identified to sample",
+          "notEvaluableKind": "not_exposed",
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before/after photos, recovery stories, or user reviews describing health outcomes.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Social post content",
+          "clause": "Every social media post must follow the same rules as product pages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal process. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal process. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Monthly social audits",
+          "clause": "Reviews of all social media channels at minimum monthly.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.peptidesciences.com/robots.txt",
+              "sourceSha256": "19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer0/19aba456e5ae59d78adc39f12ecb0c176c8d0383a22896c0b1488aac74141814",
+              "capturedAt": "2026-08-23T15:16:26.149Z",
+              "attempts": [
+                {
+                  "url": "https://peptidesciences.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap_index.xml",
+                  "status": 403
+                },
+                {
+                  "url": "https://peptidesciences.com/sitemap-index.xml",
+                  "status": 403
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no sitemap could be found or parsed at robots.txt or the well-known paths",
+          "notEvaluableKind": "not_exposed",
+          "title": "Editorial content on therapeutic topics",
+          "clause": "Off-site human-use claims will be used against the seller even if the website has proper disclaimers. Every social media post must follow the same rules as product pages.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-007",
+          "state": "pass",
+          "note": "5 link(s) with visible text in the rendered homepage were examined for 'affiliate', 'ambassador', 'referral program', 'partner program'; none matched. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "title": "Affiliate program linked from the homepage",
+          "clause": "No affiliate or influencer marketing program.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "OFFS-003",
+          "state": "pass",
+          "note": "No social media links were observed on the rendered homepage.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "title": "Social links point to the home page only",
+          "clause": "Social media should link only to your website home page.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "Payments",
+      "n": 9,
+      "findings": [
+        {
+          "ruleId": "PAY-003",
+          "state": "review",
+          "note": "No link with visible text matching 'refund', 'return', 'chargeback' was observed among 0 link(s) in the rendered homepage footer. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.peptidesciences.com/",
+              "sourceSha256": "52ebab1146858f51658d5e3ed30e20e097f0bda3824741687b0546a298779acd",
+              "evidenceKey": "86b4dc3a-d167-42b4-80cd-b6e910541ab2/layer1/94aa239ac656bd26d577d25cb18bd605f101a05d3691e67e4c7a515c0a82fc42.png",
+              "capturedAt": "2026-08-23T15:16:26.912Z"
+            }
+          ],
+          "title": "Refund and chargeback policy published",
+          "clause": "Clearly documented refund/chargeback policy.",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "PAY-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: none of the surfaces this rule names was read: no footer was identified on the homepage and no public payment or policy page was reached",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "none of the surfaces this rule names was read: no footer was identified on the homepage and no public payment or policy page was reached",
+          "notEvaluableKind": "not_exposed",
+          "title": "No peer-to-peer payment methods",
+          "clause": "Sellers who accept Venmo, Cash App, Zelle and PayPal Friends & Family signal that they are evading merchant account fraud detection.",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "PAY-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Card processing through a merchant account",
+          "clause": "Acceptance of credit/debit cards through a legitimate merchant processor that conducts proper KYC.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Program requirement, not a regulatory one. Confirm at onboarding. Keep separate from FDA-derived findings in the report.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Risk monitoring plugin installed",
+          "clause": "All merchants are required to use our plugin for additional risk monitoring purposes.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    },
+    {
+      "id": "comms",
+      "name": "Customer communications",
+      "n": 10,
+      "findings": [
+        {
+          "ruleId": "COMM-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no FAQ was reached: no page was found at the FAQ paths tried, and no link on the homepage pointed to one",
+          "evidenceKind": "rendered_page",
+          "evidence": [],
+          "notEvaluableReason": "no FAQ was reached: no page was found at the FAQ paths tried, and no link on the homepage pointed to one",
+          "notEvaluableKind": "not_exposed",
+          "title": "FAQ free of dosing or administration advice",
+          "clause": "Your FAQ, web info, messages and customer support must never provide dosing advice or administration guidance.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 3
+        },
+        {
+          "ruleId": "COMM-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Support channels free of human-use language",
+          "clause": "Including email, chat, phone, and social media direct messages.",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COMM-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal training. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal training. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Staff do not help with protocols",
+          "clause": "Don't have staff offer to help customers 'figure out' protocols.",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    }
+  ],
+  "strip": [
+    {
+      "ruleId": "GATE-001",
+      "title": "Age affirmation before entry",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-003",
+      "title": "Guest checkout disabled",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-004",
+      "title": "Terms acknowledged at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-005",
+      "title": "Research field required at sign-up",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-006",
+      "title": "Research field stored with each order",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-007",
+      "title": "Terms cover all required clauses",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-002",
+      "title": "Products hidden until an account exists",
+      "state": "pass"
+    },
+    {
+      "ruleId": "DISC-001",
+      "title": "Footer disclaimer wording",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "DISC-002",
+      "title": "Footer disclaimer is legible",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "DISC-003",
+      "title": "Disclaimer on every page",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-006",
+      "title": "No pharmaceutical brand names",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-007",
+      "title": "No route-of-administration labels",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-008",
+      "title": "No disease or benefit claims",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No study citations implying human benefit",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-010",
+      "title": "No community abbreviations",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-001",
+      "title": "No therapeutic categories",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-002",
+      "title": "No marketing terms in product names",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-001",
+      "title": "No needles or syringes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-002",
+      "title": "No alcohol wipes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-003",
+      "title": "No HCG or HGH",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-004",
+      "title": "No tablets or pills",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-002",
+      "title": "COA updated within 60 days",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-003",
+      "title": "Purity at or above 98%",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-005",
+      "title": "Lab is accredited and independent",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each product page",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-004",
+      "title": "COA contains all required fields",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-005",
+      "title": "Ban list maintained",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-001",
+      "title": "Ships to USA only",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-002",
+      "title": "No PO boxes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-003",
+      "title": "Adult signature on first orders",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-004",
+      "title": "Packing slip disclaimers",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-001",
+      "title": "No affiliate program",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-004",
+      "title": "Social post content",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-005",
+      "title": "Monthly social audits",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-006",
+      "title": "Editorial content on therapeutic topics",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-007",
+      "title": "Affiliate program linked from the homepage",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-003",
+      "title": "Social links point to the home page only",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PAY-003",
+      "title": "Refund and chargeback policy published",
+      "state": "review"
+    },
+    {
+      "ruleId": "PAY-001",
+      "title": "No peer-to-peer payment methods",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-002",
+      "title": "Card processing through a merchant account",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-004",
+      "title": "Risk monitoring plugin installed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-001",
+      "title": "FAQ free of dosing or administration advice",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-002",
+      "title": "Support channels free of human-use language",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-003",
+      "title": "Staff do not help with protocols",
+      "state": "not_evaluable"
+    }
+  ],
+  "truncations": [],
+  "politeness": "robots.txt declared Crawl-delay: 3s; requests were spaced accordingly.",
+  "access": {
+    "mode": "public",
+    "wall": false,
+    "usedCredential": false,
+    "note": "No product pages were attempted, so nothing can be said about a login wall."
+  }
+}

@@ -27,7 +27,7 @@
  */
 
 import { chromium, type Browser } from 'playwright';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import type { ScreeningReport } from '@mintro/engine';
 import { startReportServer } from '../src/reportServer.js';
 import { renderReportPdf } from '../src/pdf.js';
@@ -74,11 +74,24 @@ interface Shape {
   readonly report: ScreeningReport;
 }
 
+/** Tracked, so there is always something to check. See `fixtures/reports/README.md`. */
+const REPORT_FIXTURES = 'fixtures/reports';
+
+/**
+ * The pinned reports, or an error.
+ *
+ * This read the gitignored `reports/` behind `if (!existsSync('reports')) return []`, and on a
+ * clean checkout that returned nothing — which took the two synthetic shapes with it, since both
+ * are derived from the smallest and largest real report. The whole check then ran over an empty
+ * list and reported no problems. That is the conflation the header above objects to, in the
+ * function that feeds it.
+ */
 function stored(): ScreeningReport[] {
-  if (!existsSync('reports')) return [];
-  return readdirSync('reports')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => JSON.parse(readFileSync(`reports/${file}`, 'utf8')) as ScreeningReport);
+  const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  return files.map(
+    (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
+  );
 }
 
 /**
