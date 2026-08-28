@@ -33,7 +33,7 @@ import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
-import { formatReportDate, stateClass, STATE_LABEL } from '../lib/format.js';
+import { formatReportDate, rowSentence, stateClass, STATE_LABEL } from '../lib/format.js';
 
 export type Filter = State | 'all';
 
@@ -624,7 +624,20 @@ function Filters({
  *
  * Computed in the report, never a constant — the demo's "31 of 40" was placeholder copy.
  */
-function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element {
+/**
+ * Removed from the export, deliberately (D-167).
+ *
+ * Page one stated the coverage buckets three times: six labelled columns with a number and whose
+ * fact each is, this sentence restating all six in prose, and the headline paragraph. The columns
+ * are the version that scans and the only one that says whose limitation each gap is, so they are
+ * the version that stays.
+ *
+ * `CoverageLine` is kept and still used by `LegacyCoverageLine`'s caller path — a run recorded
+ * before D-044 has no buckets to draw columns from, and for those the sentence is all there is.
+ */
+function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  // Only where the columns cannot render: a run predating the four-way split.
+  if (typeof report.coverage.resolved === 'number') return null;
   return (
     <div className="filters">
       <span className="coverage" style={{ marginLeft: 0 }}>
@@ -752,14 +765,16 @@ function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.
     );
   }
 
-  // Each remaining bucket named as whose fact it is, never merged into the number above.
-  const rest: string[] = [];
-  if (c.notReachable > 0) rest.push(`${c.notReachable} need a surface no crawl reaches`);
-  if (c.notExposed > 0) rest.push(`${c.notExposed} were looked for and not found on the site`);
-  if (c.noCheckBuilt > 0)
-    rest.push(`${c.noCheckBuilt} ${plural(c.noCheckBuilt, 'is', 'are')} not yet built`);
-  if (rest.length > 0) sentences.push(`A further ${listOf(rest)}.`);
+  /*
+    The other three buckets are **not** restated here (D-167).
 
+    They are in the coverage columns below, each with its number and whose limitation it is, which
+    is both more scannable and more precise than a sentence. Repeating them was page one saying the
+    same six numbers three times over.
+
+    What stays here is what the columns cannot say: how thin the sample was, and that the requests
+    which failed are ours rather than the merchant's.
+  */
   if (sentences.length === 0) return null;
   return <p className="basis">{sentences.join(' ')}</p>;
 }
@@ -992,7 +1007,14 @@ function FindingRow({
             stays.
           */}
           {(!isOpen || finding.state === 'pass') && (
-            <span className={`find-note${isOpen ? ' full' : ''}`}>{finding.note}</span>
+            /*
+              The row says what was found; the disclosure says what was searched for (D-167).
+
+              `Requirement` renders the note verbatim a few lines below, so nothing is lost — and
+              every sentence stating the limits of the observation survives here too, because those
+              differ between checks and are the reason a reader can trust a line without opening it.
+            */
+            <span className={`find-note${isOpen ? ' full' : ''}`}>{rowSentence(finding.note)}</span>
           )}
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
         </span>

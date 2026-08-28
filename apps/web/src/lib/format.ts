@@ -87,3 +87,33 @@ export function formatClock(iso: string): string {
     .format(date)
     .replace(/\s?([AP])M$/i, (_match, meridiem: string) => meridiem.toLowerCase() + 'm');
 }
+
+/**
+ * A finding's note, trimmed to what the row needs (D-167).
+ *
+ * The row says **what was found or not found**. What was *searched for* — the eight brand names,
+ * the five selectors — belongs behind the disclosure, where `Requirement` renders the note
+ * verbatim. A row carrying the full list pushes the sentence that matters off the line.
+ *
+ * ## What it removes, and what it must never remove
+ *
+ * Two operations, both structural, neither a rewrite:
+ *
+ *   1. A colon-introduced quoted list is dropped. `None of 8 prohibited term(s) was claimed …:
+ *      'Ozempic', 'Wegovy', 'Mounjaro'.` becomes `None of 8 prohibited term(s) was claimed ….`
+ *      The count is already in the sentence, so nothing a reader needs is lost.
+ *   2. A long quoted run inside a sentence is elided to `'…'`, which keeps the sentence intact and
+ *      **marks** that something was cut rather than quietly rewriting around it.
+ *
+ * **Every sentence survives.** Nothing here drops a clause, and in particular nothing drops the
+ * sentences that state the boundary of the observation — *"Text not rendered on the page was not
+ * examined"*, *"Co-occurrences further apart than that window were not examined"*, *"The visible
+ * text of these links was examined; their destinations were not followed."* Those are why the
+ * report can be trusted line by line, they differ between checks, and they are not repetition.
+ *
+ * The full note is always one disclosure away, so this can only ever cost a reader a click.
+ */
+export function rowSentence(note: string): string {
+  const withoutList = note.replace(/:\s*'[^']*'(?:\s*,\s*'[^']*')*/g, '');
+  return withoutList.replace(/'([^']{60,})'/g, "'…'").replace(/\s+([.;])/g, '$1').trim();
+}

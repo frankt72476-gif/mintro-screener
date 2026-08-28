@@ -114,7 +114,7 @@ describe('merchant attestations are in the bundle', () => {
     ['the read path', 'merchant_attestations'],
     ['the section heading', 'Stated by the merchant'],
     ['the boundary sentence', 'was observed or verified by Mintro'],
-    ['the unanswered sentence', 'Not observable by Mintro'],
+    ['the unanswered sentence', 'not observable by Mintro'],
     ['the declination', 'declined to answer'],
     ['the merchant-side prompt', 'Prefer not to answer'],
   ];

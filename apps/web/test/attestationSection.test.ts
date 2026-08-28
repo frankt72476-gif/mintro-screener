@@ -121,14 +121,31 @@ describe('an unanswered question is a gap, not a blank', () => {
    */
   it('says it was not observable by Mintro and not answered', () => {
     const rendered = text(render());
-    expect(rendered).toContain('Not observable by Mintro, and not answered');
-    expect(rendered).toContain('Nothing in this report speaks to this requirement');
+    // Both halves, still. Either alone misleads, and that has not changed.
+    expect(rendered).toContain('not observable by Mintro and was not stated by the merchant');
+    expect(rendered).toContain('nothing in this report speaks to it');
   });
 
-  it('says it once per unanswered question, not once for the section', () => {
+  /*
+    Reversed by D-167, and the guarantee it was protecting is kept.
+
+    This asserted the sentence once per unanswered question — on the reference runs, nineteen
+    identical paragraphs in one section. The defect it guards against is an unanswered row
+    rendering as an empty space, and that is still guarded below: the row keeps its mark, its
+    question and its authority. What moved is the *meaning*, which a reader learns once and then
+    read eighteen more times, which is what teaches someone to skip a section.
+  */
+  it('states the meaning once for the section, not once per question', () => {
     const markup = render([answered('ban-list', 'Yes.')]);
-    const occurrences = markup.split('Not observable by Mintro').length - 1;
-    expect(occurrences).toBe(QUESTIONS.length - 1);
+    const occurrences = markup.split('not observable by Mintro').length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  it('still never renders an unanswered row as a blank', () => {
+    const rendered = text(render([answered('ban-list', 'Yes.')]));
+    // The row carries its mark and its question; only the repeated paragraph is gone.
+    expect(rendered).toContain('Not answered');
+    expect(rendered).toContain('Has any acquirer, processor or platform terminated you?');
   });
 
   it('is marked as not answered rather than left unlabelled', () => {
@@ -142,7 +159,8 @@ describe('an unanswered question is a gap, not a blank', () => {
   it('reads the same for a question no rule stands behind', () => {
     const rendered = text(render([answered('ban-list', 'Yes.')]));
     expect(rendered).toContain('Has any acquirer, processor or platform terminated you?');
-    expect(rendered).toContain('Not observable by Mintro, and not answered');
+    // Marked identically to every other unanswered question: no check, no statement, no coverage.
+    expect(rendered).toContain('Not answered');
   });
 });
 

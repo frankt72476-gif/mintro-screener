@@ -35,10 +35,18 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
         </div>
         <div className="slip-body">
           <div className="slip-txt">
+            {/*
+              Two words, not two sentences (D-167).
+
+              It read "This finding carries no stored evidence. It was produced before any surface
+              was reached" under every finding of this shape — on these runs, every attestation
+              rule. The second sentence is the same statement the section lede already makes about
+              all of them, and the first is what the label says. What a reader needs here is that
+              there is no capture, which is now what it says.
+            */}
             <div className="why">
               <b>No capture</b>
-              This finding carries no stored evidence. It was produced before any surface was
-              reached.
+              Nothing was retrieved for this rule, so there is nothing to cite.
             </div>
             {/*
               The clause, only where nothing else carries it (D-047).

@@ -44,14 +44,20 @@ const OUTCOME_LABEL: Readonly<Record<AttestationOutcome, string>> = {
 };
 
 /**
- * The sentence an unanswered question carries in place of a body.
+ * What an unanswered question means, said **once** in the section lede (D-167).
  *
- * Says both halves: Mintro could not observe it, and nobody stated it. Either alone invites the
+ * It says both halves: Mintro could not observe it, and nobody stated it. Either alone invites the
  * wrong reading — the first sounds like a tool limitation with the merchant off the hook, the
  * second like the merchant ignored something Mintro had otherwise covered.
+ *
+ * It used to sit under every unanswered question, which on these runs was nineteen identical
+ * paragraphs. The sentence is not wrong and the repetition was: a reader learns it once and then
+ * reads it eighteen more times, which teaches them to skip the section. The rows now carry only
+ * the mark that distinguishes them from each other.
  */
-const UNANSWERED_BODY =
-  'Not observable by Mintro, and not answered. Nothing in this report speaks to this requirement.';
+const UNANSWERED_MEANING =
+  'A question shown as not answered was not observable by Mintro and was not stated by the ' +
+  'merchant: nothing in this report speaks to it.';
 
 /**
  * Where the requirement comes from, spelled out rather than left as a code.
@@ -100,6 +106,8 @@ export function AttestationSection({
           {counts.answered} answered · {counts.declined} declined · {counts.unanswered} not answered
           · {counts.total} asked
         </p>
+        {/* Said once here rather than under each of nineteen rows (D-167). */}
+        {counts.unanswered > 0 && <p className="att-lede att-unanswered-note">{UNANSWERED_MEANING}</p>}
       </div>
 
       <ol className="att-list">
@@ -132,7 +140,8 @@ function AttestationRow({
       </div>
 
       {question.outcome === 'unanswered' ? (
-        <p className="att-gap">{UNANSWERED_BODY}</p>
+        // The meaning is in the section lede; the row carries only its mark (D-167).
+        null
       ) : (
         <div className="att-said">
           {question.outcome === 'declined' ? (

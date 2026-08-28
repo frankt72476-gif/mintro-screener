@@ -9974,3 +9974,89 @@ D-042 recorded is answered by the container rather than by a second structure �
 for one report was the thing that made them able to disagree.
 
 ---
+
+## D-167 — The quiet pass, and copy that says a thing once
+
+**2026-08-28 · business owner · report restructure step 7**
+
+The report was boxes inside boxes: a card per category, a card per group, a bordered panel per
+requirement, a bordered slip per evidence entry, a filled pill per state. Nothing was emphasised
+because everything was.
+
+**No cards, no filled panels, no borders as default.** Hierarchy is type size, weight and
+whitespace. Written as an override layer at the end of the stylesheet rather than edited through
+1,700 lines: one place to read, one place to revert, and the rules being answered stay legible.
+
+**State is a word in the margin, never a filled pill.** Colour distinguishes the four states and
+carries none of the layout — remove it entirely and the report is unchanged, because the word is
+still there, in the same place. That is the test that matters: these get printed and photocopied.
+
+**One accent, used once**, on the section a reader acts on.
+
+**Domain and screening date are the largest type after the domain.** An agent's only way to tell
+two reports apart is the date, so it is not set at eyebrow size.
+
+### The capture was the page count
+
+`.shot-img` was 240×280 in print, once per finding, **33 times in one document** — the single
+largest contributor to 36 pages. It is now 108×80.
+
+A reader does not verify a merchant from a thumbnail. They verify it from the source URL and the
+hash beside it, and from the stored capture the key points at. The thumbnail's job is to say *a
+capture exists and this is roughly what it shows*, and that is done at a sixth of the size. The
+fake browser chrome drawn around it is gone: it was never part of the observation.
+
+### Copy: say it once, and never cut a scope qualification
+
+Four repetitions removed, and the rule that decides is not "is this sentence long" but **does this
+sentence appear more than once with the same content**:
+
+- *"Not observable by Mintro, and not answered. Nothing in this report speaks to this
+  requirement."* — nineteen identical paragraphs in one section. Now once, in the section lede. The
+  rows keep their mark, their question and their authority, so the guarantee the old test protected
+  — an unanswered row is never a blank — still holds. **That test is reversed and says so.**
+- *"This finding carries no stored evidence. It was produced before any surface was reached."* —
+  under every finding of that shape. The second sentence is what the section lede already says
+  about all of them; the first is what the label says. It now reads "Nothing was retrieved for this
+  rule, so there is nothing to cite."
+- **Page one stated the coverage buckets three times**: six labelled columns, a prose sentence
+  restating all six, and the headline paragraph. The columns stay — they are the version that scans
+  and the only one that says whose limitation each gap is. The prose sentence is kept only for runs
+  predating D-044, which have no buckets to draw columns from and for which it is all there is.
+- **The row says what was found; the disclosure says what was searched for.** `rowSentence` drops a
+  colon-introduced quoted list and elides a long quoted run to `'…'`, which marks the cut rather
+  than rewriting around it. Both operations are structural; neither paraphrases. `Requirement`
+  renders the note verbatim one disclosure away, so this can only ever cost a reader a click.
+
+**What is never cut**: any sentence stating what a check could not see. *"Text not rendered on the
+page was not examined."* *"Co-occurrences further apart than that window were not examined."* *"The
+visible text of these links was examined; their destinations were not followed."* These differ
+between checks, they are the scope of the observation, and they are why the report can be trusted
+line by line. All six present in the reference runs were verified present in the re-rendered PDFs.
+
+### What the re-render found
+
+`report-pdf.ts` was rendering **without the attestation section**. `pdfJob` resolves and injects it;
+the CLI did not, so a PDF rendered there was missing nineteen questions the queue's PDF carries —
+and the two are meant to be the same document. Found only because a re-render was compared against
+a stored PDF and the comparison was not like for like. The CLI now injects it, with the same
+guard `pdfJob` uses: a failed read leaves the section out rather than printing nineteen unanswered
+questions, which would be a read failure of ours shown as the merchant's silence.
+
+### The page count, honestly
+
+| run | before | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 36 | **24** |
+| `5b29036d` comopeptides | 38 | **25** |
+
+A third off, and **short of the ~12 the spec named as a claim to test rather than a target to hit.**
+It is not hit, and the reason is that 33 and 36 captures survive at one per finding: the evidence is
+smaller but it is still per-finding, and one page holds roughly three findings with their clause,
+observation and capture. Reaching twelve would mean one capture per *rule* rather than per finding,
+or captures behind a link rather than inline — both are changes to what the export contains, not to
+how it is laid out, and neither is in this spec.
+
+All 54 rules render in both documents. Nothing disappeared.
+
+---

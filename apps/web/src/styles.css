@@ -1738,3 +1738,177 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .conseq { margin: 10px 0 2px; padding-left: 14px; border-left: 2px solid var(--line); }
 .conseq-head { font-size: 12px; color: var(--slate); margin: 0 0 6px; }
 .conseq-item { margin-bottom: 4px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   The quiet pass (D-167)
+
+   The report was boxes inside boxes: a card per category, a card per group, a bordered panel per
+   requirement, a bordered slip per evidence entry, a filled pill per state. Nothing was emphasised
+   because everything was.
+
+   Everything below removes a border, a fill or a shadow. What is left carries hierarchy in type
+   size, weight and space — which is also what survives a photocopier, and these get photocopied.
+
+   Written as an override layer rather than edited into the 1700 lines above: one place to read,
+   one place to revert, and the original rules stay legible as the thing being answered.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Identity. The date is how an agent tells two reports apart, so it is not small. ───────── */
+.rhead h1 { font-size: 30px; letter-spacing: -0.025em; }
+.rhead .eyebrow {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+/* Run id and rule set are subordinate: present, findable, not competing. */
+.rhead .sub { font-size: 12px; color: var(--slate); }
+
+/* ── No cards. Hierarchy from space. ──────────────────────────────────────────────────────── */
+.card.cat,
+.card.cat.group,
+.card.cat.open {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.cat-head,
+.cat-body { border: 0; }
+.cat-head:hover,
+.find-head:hover { background: none; }
+
+/* A rule is a line, not a block. The only rule left is a hairline between rows. */
+.find,
+.find:last-child { border-bottom: 0; }
+.find-head {
+  padding: 7px 0 6px 0;
+  border-left: 0 !important;
+  align-items: baseline;
+}
+.find.open .find-head { padding-top: 7px; padding-bottom: 4px; }
+
+/* ── State is a word in the margin, never a filled pill. ──────────────────────────────────── */
+.state {
+  background: none !important;
+  border-radius: 0;
+  padding: 0;
+  flex: 0 0 82px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: left;
+}
+/*
+  Colour distinguishes the four states and carries none of the layout. Remove it and the report is
+  unchanged: the word is still there, in the margin, in the same place. That is the photocopy test.
+*/
+.state.fail   { color: var(--rose); }
+.state.review { color: var(--amber); }
+.state.pass   { color: var(--jade); }
+.state.na     { color: var(--slate); }
+
+.find-title { font-weight: 600; font-size: 13px; }
+.find-note { color: var(--ink-mid); font-size: 12.5px; }
+.find-ev { color: var(--slate); font-size: 11px; }
+
+/* ── One accent, used once: the section a reader acts on. ─────────────────────────────────── */
+.sect { margin-bottom: 30px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.sect:first-of-type { border-top: 0; padding-top: 0; }
+.sect-head .state { flex: none; font-size: 12px; letter-spacing: 0.08em; }
+.sect.fail { border-top: 0; padding-top: 0; }
+.sect.fail .sect-head {
+  border-left: 3px solid var(--violet);
+  padding-left: 11px;
+  margin-left: -14px;
+}
+
+/* ── The clause is a quotation, not a panel. ──────────────────────────────────────────────── */
+.req {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0 0 2px 0;
+  gap: 20px;
+}
+.req-quote { border-left: 2px solid var(--line); color: var(--ink-mid); }
+.req-h { font-size: 9.5px; letter-spacing: 0.08em; }
+
+/* ── Evidence: compact and secondary. The main lever on page count. ───────────────────────── */
+.ev { padding: 2px 0 8px 82px; }
+
+.slip {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+.slip-bar {
+  background: none;
+  border-bottom: 0;
+  padding: 0;
+  gap: 10px;
+}
+.slip-body { padding: 4px 0 0 0; gap: 12px; align-items: flex-start; }
+.slip-txt { flex: 1 1 320px; }
+
+/* The hash and the source stay — they are what makes a finding checkable — set as one quiet line. */
+.kv { font-size: 10.5px; margin-bottom: 2px; }
+.kv .k { flex: 0 0 62px; font-size: 9px; }
+.kv .v { font-size: 10.5px; }
+
+/* One small thumbnail. It was full width, once per finding, 42 and 46 times a document. */
+.slip-body img,
+.capture img {
+  max-width: 132px;
+  max-height: 96px;
+  object-fit: cover;
+  object-position: top center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.capture { padding: 0; margin-top: 6px; background: none; border: 0; }
+
+/* ── Group rows and consequences ──────────────────────────────────────────────────────────── */
+.group-lede { font-size: 12.5px; color: var(--ink-mid); margin: 0 0 4px 82px; }
+.group-count { font-size: 11px; color: var(--slate); }
+.group-rule, .find-title .mono { color: var(--slate); font-size: 10.5px; font-weight: 400; }
+.conseq { border-left: 1px solid var(--line); margin-left: 82px; padding-left: 14px; }
+
+/* ── Print: compact but complete. Every instance inline, every capture cited. ─────────────── */
+@media print {
+  .sect { break-inside: auto; margin-bottom: 20px; }
+  .find { break-inside: avoid; }
+  .ev { padding-left: 82px; }
+  .slip-body img, .capture img { max-width: 108px; max-height: 78px; }
+  .card, .cat, .find-head { box-shadow: none !important; }
+}
+
+/*
+  The capture, sized as a reference rather than as an exhibit (D-167).
+
+  It was 240x280 in print, once per finding, thirty-three times in one document — the single
+  largest contributor to a 36-page report. A reader does not verify a merchant from a thumbnail;
+  they verify it from the source URL and the hash, which are beside it, and from the stored capture
+  itself, which is what the key points at. The thumbnail's job is to say *a capture exists and this
+  is roughly what it shows*, and that job is done at a sixth of the size.
+
+  Specificity is deliberate: `.printing .shot-img` above sets the print cap and would otherwise win.
+*/
+.slip .shot { flex: 0 0 122px; width: 122px; min-width: 0; max-width: 122px; }
+.slip .shot-img { max-height: 92px; border-radius: 3px; }
+.slip .shot-frame { border-radius: 3px; }
+.slip .shot-cap { font-size: 8.5px; margin-top: 3px; }
+
+.printing .shot,
+.printing .slip .shot { flex: 0 0 108px; width: 108px; max-width: 108px; }
+.printing .shot-img,
+.printing .slip .shot-img { max-height: 80px; }
+
+/* The chrome around the thumbnail was drawing a fake browser frame. It is not the observation. */
+.slip .shot-bar { display: none; }

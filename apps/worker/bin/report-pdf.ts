@@ -13,7 +13,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import type { ScreeningReport } from '@mintro/engine';
+import { readRunAttestations, resolveAttestations, type ScreeningReport } from '@mintro/engine';
 import { startReportServer } from '../src/reportServer.js';
 import { createWorkerSupabase, signEvidenceUrl } from '../src/store/supabase.js';
 import { renderReportPdf } from '../src/pdf.js';
@@ -56,10 +56,29 @@ async function main(argv: readonly string[]): Promise<number> {
     const evidence = await signEvidence(report, server.origin);
 
     const started = Date.now();
+    /*
+      The attestation section, which this CLI was rendering without.
+
+      `pdfJob` resolves it and injects it; this path did not, so a PDF rendered here was missing
+      nineteen questions the queue's PDF carries — and the two are supposed to be the same document.
+      Found while comparing a re-render against a stored PDF for the report restructure: the
+      comparison was not like for like, and the CLI was the half that was wrong.
+
+      A failed read leaves the section out rather than rendering nineteen unanswered questions,
+      which would be a read failure of ours printed as the merchant's silence — the same reasoning
+      `pdfJob` records.
+    */
+    const stored =
+      process.env['SUPABASE_URL'] === undefined || process.env['SUPABASE_SERVICE_KEY'] === undefined
+        ? null
+        : await readRunAttestations(createWorkerSupabase().client, report.runId);
+    const attestations =
+      stored === null ? undefined : resolveAttestations(report.attestationQuestions ?? [], stored);
+
     const pdf = await renderReportPdf(browser, {
       origin: server.origin,
       domain,
-      inject: { report, evidence },
+      inject: { report, evidence, ...(attestations === undefined ? {} : { attestations }) },
     });
 
     const path = resolve(outDir, attachmentName(report));
