@@ -196,6 +196,14 @@ export interface ScreeningReport {
    * drawn from the age of the file. Same rule as `notEvaluableKind` under D-044.
    */
   readonly blocking?: BlockingSummary;
+  /**
+   * How thin the sample was (D-162).
+   *
+   * **Optional, permanently.** Runs recorded before D-162 are immutable and frozen without it
+   * (D-002). A reader that finds it absent says the run predates the field; it never renders a
+   * denominator it does not have, and never reports "0 product pages" from an absent record.
+   */
+  readonly sample?: SampleBasis;
   /** Every finding in rule-set order, for the tick strip. */
   readonly strip: readonly { readonly ruleId: string; readonly title: string; readonly state: State }[];
   /** Coverage limits the run hit, in words. Empty when nothing was truncated. */
@@ -284,6 +292,31 @@ export interface ReportAccess {
   readonly note: string;
 }
 
+/**
+ * How much of the storefront the run actually looked at (D-162).
+ *
+ * `productsInScope` is the number the coverage line exists for. Layer 0 computed it, interpolated
+ * it into `url_pattern` note prose — *"64 URLs in scope 'products' were examined"* — and threw the
+ * value away, so a reader could see "26 passed" and had no structured way to learn that 26 rests on
+ * five pages out of sixty-four.
+ *
+ * **Passes and sample basis appear together or not at all.** A summary that reports what held
+ * without reporting how little it held over is misleading in aggregate even where every individual
+ * finding is candid, and every individual finding here is candid.
+ *
+ * `surfacesRead` names only what was reached. A surface that was not reached is absent from the
+ * list and is *not* reported as missing: a merchant with no FAQ and a run whose FAQ fetch failed
+ * are not distinguishable from this list, which is the distinction D-158 turns on.
+ */
+export interface SampleBasis {
+  /** Product URLs Layer 0 identified in scope, after reclassification. */
+  readonly productsInScope: number;
+  /** Product pages actually rendered and evaluated. */
+  readonly productsSampled: number;
+  /** Surfaces this run read, named. Only ones actually reached. */
+  readonly surfacesRead: readonly string[];
+}
+
 export interface AssembleInput {
   readonly runId: string;
   readonly merchantDomain: string;
@@ -303,6 +336,8 @@ export interface AssembleInput {
    */
   readonly attempts?: readonly FetchAttempt[];
   readonly access?: ReportAccess;
+  /** How thin the sample was, and which surfaces were read (D-162). */
+  readonly sample?: SampleBasis;
 }
 
 /**
@@ -385,6 +420,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     coverage: computeCoverage(enriched),
     sameObservation: pairSameObservation(enriched, ruleset),
     blocking: summariseBlocking(enriched, ruleset),
+    ...(input.sample === undefined ? {} : { sample: input.sample }),
     verdict: describeVerdict(enriched, counts),
     categories,
     strip: categories.flatMap((category) =>

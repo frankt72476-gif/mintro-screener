@@ -29,6 +29,7 @@ import {
 } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
+import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
@@ -239,7 +240,22 @@ export function ReportView({
         what the programme's own clause requires, what was observed, and where the captures are.
         Mintro shows; IQwallet concludes (D-001).
       */}
-      {!print && <BlockingPanel report={report} />}
+      {/*
+        When a stopping condition was observed, this **is** the document (D-163), so it prints.
+        The panel below it remains for the ordinary case, where the useful thing to say is that
+        none was observed and which could not be checked.
+      */}
+      {hasFailedStoppingConditions(report) ? (
+        <DeclineNotice report={report} print={print} />
+      ) : (
+        !print && <BlockingPanel report={report} />
+      )}
+
+      {/*
+        How thin the sample was, before the numbers it qualifies (D-162). Passes and sample basis
+        appear together or not at all.
+      */}
+      <SampleBasisLine report={report} />
 
       <VerdictBanner report={report} />
       <TickStrip report={report} />
@@ -682,6 +698,72 @@ function CoverageBreakdown({ report }: { readonly report: ScreeningReport }): JS
  * One component, used by both the screen and the print route, so the PDF and the report cannot
  * state different coverage.
  */
+/**
+ * How much of the storefront was read, and whose fact each shortfall is (D-162).
+ *
+ * One line, before anything it qualifies. It exists because a summary reporting "26 passed"
+ * without reporting that 26 rests on five pages out of sixty-four is misleading in aggregate even
+ * where every individual finding is candid — and every individual finding here is candid.
+ *
+ * ## The four buckets stay apart
+ *
+ * The obvious sentence — *"4 of 27 requests did not answer, leaving 22 rules unevaluated"* — is
+ * wrong, and wrong in the direction this project guards hardest. `rulesAffected` is **2**. The 22
+ * is every `not_evaluable`, and it decomposes into four facts belonging to four different parties:
+ * ours (the requests that failed), the merchant's (looked for, not on the site), nobody's (a
+ * surface no crawl reaches), and Mintro's (not built yet). Collapsing them would tell an agent our
+ * network trouble cost them twenty-two rules when it cost them two — the conflation D-136
+ * introduced `notEvaluableKind` to end and D-156 extended.
+ *
+ * ## What it does not say
+ *
+ * A run before D-162 carries no `sample`, and runs are immutable (D-002). The line then omits the
+ * sampling sentence rather than rendering a denominator it does not have. It never reports "0
+ * product pages" from an absent record — that would be a claim about the merchant drawn from the
+ * age of the file (D-044).
+ */
+function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  const sample = report.sample;
+  const obstruction = report.obstruction;
+  const c = report.coverage;
+
+  const sentences: string[] = [];
+
+  if (sample !== undefined) {
+    const surfaces = sample.surfacesRead.length > 0 ? `, plus ${listOf(sample.surfacesRead)}` : '';
+    sentences.push(
+      `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages${surfaces}.`,
+    );
+  }
+
+  if (obstruction !== undefined && obstruction.unanswered > 0) {
+    sentences.push(
+      `${obstruction.unanswered} of ${obstruction.attempted} page requests did not answer, ` +
+        `leaving ${obstruction.rulesAffected} ${plural(obstruction.rulesAffected, 'rule')} unevaluated.`,
+    );
+  }
+
+  // Each remaining bucket named as whose fact it is, never merged into the number above.
+  const rest: string[] = [];
+  if (c.notReachable > 0) rest.push(`${c.notReachable} need a surface no crawl reaches`);
+  if (c.notExposed > 0) rest.push(`${c.notExposed} were looked for and not found on the site`);
+  if (c.noCheckBuilt > 0)
+    rest.push(`${c.noCheckBuilt} ${plural(c.noCheckBuilt, 'is', 'are')} not yet built`);
+  if (rest.length > 0) sentences.push(`A further ${listOf(rest)}.`);
+
+  if (sentences.length === 0) return null;
+  return <p className="basis">{sentences.join(' ')}</p>;
+}
+
+const plural = (n: number, one: string, many?: string): string =>
+  n === 1 ? one : (many ?? `${one}s`);
+
+/** "a, b and c" — an Oxford-free list, because these are read aloud in meetings. */
+function listOf(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
 function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Element {
   const coverage = report.coverage;
 

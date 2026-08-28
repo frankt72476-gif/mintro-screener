@@ -43,6 +43,7 @@ import {
   selectSample,
   tally,
   assessWall,
+  wasServed,
   type EvidenceArtifact,
   type Finding,
   type Layer0Result,
@@ -348,6 +349,28 @@ export async function screenStorefront(
         could use to tell that from a bare storefront.
       */
       attempts: discovered.attempts,
+
+      /*
+        How thin the sample was (D-162).
+
+        Every number here was already computed and thrown away: `productUrls.length` reached the
+        report only inside `url_pattern` note prose, and which Layer 3 surfaces were reached reached
+        it not at all. `surfacesRead` names only what was actually read — a surface that was not
+        reached is simply absent, never reported as missing, because a merchant with no FAQ and a
+        failed FAQ fetch are not distinguishable from this list (D-158).
+      */
+      sample: {
+        productsInScope: productUrls.length,
+        productsSampled: sampled.filter((entry) => wasServed(entry.page)).length,
+        surfacesRead: [
+          'the homepage',
+          ...(discovered.signup.found ? ['the sign-up form'] : []),
+          ...(discovered.terms === undefined ? [] : ['the terms document']),
+          ...(discovered.shipping === undefined ? [] : ['the shipping policy']),
+          ...(discovered.faq === undefined ? [] : ['the FAQ']),
+          ...(discovered.payment === undefined ? [] : ['the payment or refund policy']),
+        ],
+      },
     },
     ruleset,
   );

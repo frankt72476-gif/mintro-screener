@@ -1,0 +1,2713 @@
+{
+ "mode": "public",
+ "runId": "c268f8d7-076e-41f6-98a2-752fde9fca85",
+ "strip": [
+  {
+   "state": "review",
+   "title": "Age affirmation before entry",
+   "ruleId": "GATE-001"
+  },
+  {
+   "state": "review",
+   "title": "Terms acknowledged at sign-up",
+   "ruleId": "GATE-004"
+  },
+  {
+   "state": "review",
+   "title": "Research field required at sign-up",
+   "ruleId": "GATE-005"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Products hidden until an account exists",
+   "ruleId": "GATE-002"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Guest checkout disabled",
+   "ruleId": "GATE-003"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Research field stored with each order",
+   "ruleId": "GATE-006"
+  },
+  {
+   "state": "pass",
+   "title": "Terms cover all required clauses",
+   "ruleId": "GATE-007"
+  },
+  {
+   "state": "fail",
+   "title": "Disclaimer on every sampled page",
+   "ruleId": "DISC-003"
+  },
+  {
+   "state": "review",
+   "title": "Footer disclaimer wording",
+   "ruleId": "DISC-001"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Footer disclaimer is legible",
+   "ruleId": "DISC-002"
+  },
+  {
+   "state": "review",
+   "title": "No disease or benefit claims",
+   "ruleId": "PROD-008"
+  },
+  {
+   "state": "review",
+   "title": "Storage conditions listed",
+   "ruleId": "PROD-004"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Molecular formula listed",
+   "ruleId": "PROD-002"
+  },
+  {
+   "state": "pass",
+   "title": "No dosing information",
+   "ruleId": "PROD-005"
+  },
+  {
+   "state": "pass",
+   "title": "No pharmaceutical brand names",
+   "ruleId": "PROD-006"
+  },
+  {
+   "state": "pass",
+   "title": "No route-of-administration labels",
+   "ruleId": "PROD-007"
+  },
+  {
+   "state": "pass",
+   "title": "CAS number listed",
+   "ruleId": "PROD-001"
+  },
+  {
+   "state": "pass",
+   "title": "CAS number listed",
+   "ruleId": "PROD-001"
+  },
+  {
+   "state": "pass",
+   "title": "CAS number listed",
+   "ruleId": "PROD-001"
+  },
+  {
+   "state": "pass",
+   "title": "CAS number listed",
+   "ruleId": "PROD-001"
+  },
+  {
+   "state": "pass",
+   "title": "CAS number listed",
+   "ruleId": "PROD-001"
+  },
+  {
+   "state": "pass",
+   "title": "No links to study databases",
+   "ruleId": "PROD-009"
+  },
+  {
+   "state": "pass",
+   "title": "No community abbreviations",
+   "ruleId": "PROD-010"
+  },
+  {
+   "state": "pass",
+   "title": "Molecular weight listed",
+   "ruleId": "PROD-003"
+  },
+  {
+   "state": "pass",
+   "title": "Molecular weight listed",
+   "ruleId": "PROD-003"
+  },
+  {
+   "state": "pass",
+   "title": "Molecular weight listed",
+   "ruleId": "PROD-003"
+  },
+  {
+   "state": "pass",
+   "title": "Molecular weight listed",
+   "ruleId": "PROD-003"
+  },
+  {
+   "state": "pass",
+   "title": "Molecular weight listed",
+   "ruleId": "PROD-003"
+  },
+  {
+   "state": "fail",
+   "title": "No marketing terms in product names",
+   "ruleId": "NAME-002"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Proper chemical names used",
+   "ruleId": "NAME-003"
+  },
+  {
+   "state": "pass",
+   "title": "No therapeutic categories",
+   "ruleId": "NAME-001"
+  },
+  {
+   "state": "review",
+   "title": "Non-peptide research compounds in the catalogue",
+   "ruleId": "CATG-007"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Reconstitution solution labelling",
+   "ruleId": "CATG-005"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Capsule labelling",
+   "ruleId": "CATG-006"
+  },
+  {
+   "state": "pass",
+   "title": "No needles or syringes",
+   "ruleId": "CATG-001"
+  },
+  {
+   "state": "pass",
+   "title": "No alcohol wipes",
+   "ruleId": "CATG-002"
+  },
+  {
+   "state": "pass",
+   "title": "No HCG or HGH",
+   "ruleId": "CATG-003"
+  },
+  {
+   "state": "pass",
+   "title": "No tablets or pills",
+   "ruleId": "CATG-004"
+  },
+  {
+   "state": "review",
+   "title": "Certificate links serve a readable certificate",
+   "ruleId": "COA-006"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Certificate reports a test date within 60 days",
+   "ruleId": "COA-002"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Certificate states purity at or above 98%",
+   "ruleId": "COA-003"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Lab is accredited and independent",
+   "ruleId": "COA-005"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "COA contains all required fields",
+   "ruleId": "COA-004"
+  },
+  {
+   "state": "pass",
+   "title": "COA linked on each sampled product page",
+   "ruleId": "COA-001"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Ban list maintained",
+   "ruleId": "FULF-005"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Shipping policy states USA only",
+   "ruleId": "FULF-001"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "No PO boxes",
+   "ruleId": "FULF-002"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Adult signature on first orders",
+   "ruleId": "FULF-003"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Packing slip disclaimers",
+   "ruleId": "FULF-004"
+  },
+  {
+   "state": "fail",
+   "title": "No affiliate or referral program URLs",
+   "ruleId": "OFFS-001"
+  },
+  {
+   "state": "review",
+   "title": "Affiliate program linked from the homepage",
+   "ruleId": "OFFS-007"
+  },
+  {
+   "state": "review",
+   "title": "Social accounts linked from the storefront",
+   "ruleId": "OFFS-003"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Social post content",
+   "ruleId": "OFFS-004"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Monthly social audits",
+   "ruleId": "OFFS-005"
+  },
+  {
+   "state": "pass",
+   "title": "No testimonials or outcome stories",
+   "ruleId": "OFFS-002"
+  },
+  {
+   "state": "pass",
+   "title": "Editorial content on therapeutic topics",
+   "ruleId": "OFFS-006"
+  },
+  {
+   "state": "review",
+   "title": "Refund and chargeback policy published",
+   "ruleId": "PAY-003"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Card processing through a merchant account",
+   "ruleId": "PAY-002"
+  },
+  {
+   "state": "pass",
+   "title": "No peer-to-peer payment methods named on public pages",
+   "ruleId": "PAY-001"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Support channels free of human-use language",
+   "ruleId": "COMM-002"
+  },
+  {
+   "state": "not_evaluable",
+   "title": "Staff do not help with protocols",
+   "ruleId": "COMM-003"
+  },
+  {
+   "state": "pass",
+   "title": "FAQ free of dosing or administration advice",
+   "ruleId": "COMM-001"
+  }
+ ],
+ "access": {
+  "mode": "public",
+  "note": "Every sampled product page was served to an anonymous request.",
+  "wall": false,
+  "usedCredential": false
+ },
+ "counts": {
+  "fail": 3,
+  "pass": 26,
+  "review": 11,
+  "not_evaluable": 22
+ },
+ "verdict": "3 rule(s) were observed to fail, including no marketing terms in product names; no affiliate or referral program urls, and 1 other failure(s). 11 finding(s) are queued for review. 22 could not be evaluated from the crawled surface.",
+ "blocking": {
+  "failed": [],
+  "passed": [
+   "PROD-006",
+   "PROD-007",
+   "NAME-001",
+   "CATG-001",
+   "CATG-002",
+   "CATG-003",
+   "CATG-004",
+   "PAY-001"
+  ],
+  "declared": 8,
+  "notEvaluable": []
+ },
+ "coverage": {
+  "total": 62,
+  "resolved": 42,
+  "evaluable": 40,
+  "notExposed": 6,
+  "outstanding": 20,
+  "noCheckBuilt": 1,
+  "notReachable": 11,
+  "notRetrieved": 2,
+  "notApplicable": 2,
+  "kindNotRecorded": 0
+ },
+ "platform": "woocommerce",
+ "startedAt": "2026-08-28T20:55:40.945Z",
+ "categories": [
+  {
+   "n": 1,
+   "id": "gate",
+   "name": "Access and identity gating",
+   "findings": [
+    {
+     "note": "No entry interstitial and no age affirmation signal were observed on the rendered page.",
+     "tier": "review_only",
+     "layer": 1,
+     "state": "review",
+     "title": "Age affirmation before entry",
+     "clause": "Every visitor must be stopped at the door and affirm they are 21 or older. This happens before products can be viewed — not at checkout.",
+     "ruleId": "GATE-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "major",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "The sign-up form at https://sportstechnologylabs.com/my-account/ was read in full and carried no checkbox. 2 field(s) were observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required).",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "review",
+     "title": "Terms acknowledged at sign-up",
+     "clause": "The user must actively check “I Agree” against the complete Terms and Conditions. Until they do, account creation cannot proceed.",
+     "ruleId": "GATE-004",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/my-account/",
+       "capturedAt": "2026-08-28T21:02:36.643Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "major",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "The sign-up form at https://sportstechnologylabs.com/my-account/ carried only fields used to create an account. All 2 field(s) observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required). No field beyond that set was present to identify research status.",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "review",
+     "title": "Research field required at sign-up",
+     "clause": "When the account is established, the buyer must identify their research status. This is a required field — never optional.",
+     "ruleId": "GATE-005",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/my-account/",
+       "capturedAt": "2026-08-28T21:02:36.643Z",
+       "evidenceKey": "",
+       "matchedValue": "\"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required)",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "major",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: none of the 3 probed path(s) answered, so nothing was observed either way",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "not_evaluable",
+     "title": "Products hidden until an account exists",
+     "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
+     "ruleId": "GATE-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "session": {
+        "mode": "unauthenticated",
+        "origin": "none"
+       },
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/collections/all",
+         "error": "page.goto: Timeout 20000ms exceeded.",
+         "status": 0
+        },
+        {
+         "url": "https://sportstechnologylabs.com/products",
+         "error": "page.goto: Timeout 20000ms exceeded.",
+         "status": 0
+        },
+        {
+         "url": "https://sportstechnologylabs.com/shop",
+         "error": "page.goto: Timeout 20000ms exceeded.",
+         "status": 0
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/collections/all",
+       "capturedAt": "2026-08-28T21:02:36.955Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "critical",
+     "checkType": "http_probe",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_retrieved",
+     "notEvaluableReason": "none of the 3 probed path(s) answered, so nothing was observed either way"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: page.goto: Timeout 20000ms exceeded.",
+     "tier": "auto_fail",
+     "layer": 3,
+     "state": "not_evaluable",
+     "title": "Guest checkout disabled",
+     "clause": "There is no anonymous path to purchase. Guest checkout must be turned off entirely.",
+     "ruleId": "GATE-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "session": {
+        "mode": "unauthenticated",
+        "origin": "none"
+       },
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+         "error": "page.goto: Timeout 20000ms exceeded.",
+         "status": 0
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T21:03:43.675Z",
+       "evidenceKey": "",
+       "sourceSha256": "b6735783e2dd37bd0e19451baa7a988a7d4f9eb96548271282b9232236bf2665"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "flow_probe",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_retrieved",
+     "notEvaluableReason": "page.goto: Timeout 20000ms exceeded."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Order records are server-side. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Research field stored with each order",
+     "clause": "The selected research field must be stored with every order in your database, not just captured at signup.",
+     "ruleId": "GATE-006",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Order records are server-side. Requires merchant attestation."
+    },
+    {
+     "note": "All 5 required phrases were observed.",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "pass",
+     "title": "Terms cover all required clauses",
+     "clause": "Five points, at minimum: use is restricted to research; human consumption is forbidden; the products play no part in diagnosing, treating or preventing any disease; the buyer indemnifies the seller; and the buyer confirms they are a qualified professional.",
+     "ruleId": "GATE-007",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/terms-of-service/",
+       "capturedAt": "2026-08-28T20:56:53.913Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/2a3d6a5b8bc97d7398471b0133ef31fabe04cacf16ab1ea1bc842bf4d26f6cc8.png",
+       "sourceSha256": "3b2439ed4312e9d5cb7f6f8e6e8cd6935e9c496c04d895c25f64bb962fea56db"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "id": "disclose",
+   "name": "Site-wide disclosure",
+   "findings": [
+    {
+     "note": "No text resembling the required disclaimer was observed in this page's footer. Observed on 5 of 5 sampled product page(s), including /product/mk-677-yk-11-lgd-4033-stack/.",
+     "tier": "auto_fail",
+     "layer": 2,
+     "state": "fail",
+     "title": "Disclaimer on every sampled page",
+     "clause": "This sentence belongs in the footer of every single page, set in a legible size.",
+     "ruleId": "DISC-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "The footer does not contain the required wording, and no comparable text was observed. Required: \"For research and laboratory use only. Not for human or animal consumption.\"",
+     "tier": "review_only",
+     "layer": 1,
+     "state": "review",
+     "title": "Footer disclaimer wording",
+     "clause": "For research and laboratory use only. Not for human or animal consumption.",
+     "ruleId": "DISC-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: the footer was rendered but no disclaimer element could be located within it, so nothing was measured",
+     "tier": "auto_fail",
+     "layer": 1,
+     "state": "not_evaluable",
+     "title": "Footer disclaimer is legible",
+     "clause": "It may not be hidden, shrunk past readability, or tucked inside a collapsed element.",
+     "ruleId": "DISC-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "computed_style",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "the footer was rendered but no disclaimer element could be located within it, so nothing was measured"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "id": "product",
+   "name": "Product page content",
+   "findings": [
+    {
+     "note": "Observed: 'prevent'. Not counted: 'treat', 'cure', 'prevent', 'disease' appeared only in negated or quoted sentences. Observed on 5 of 5 sampled product page(s), including /product/mk-677-yk-11-lgd-4033-stack/.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "review",
+     "title": "No disease or benefit claims",
+     "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
+     "ruleId": "PROD-008",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "matchedValue": "prevent",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "matchedValue": "prevent",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "matchedValue": "prevent",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "matchedValue": "prevent",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "matchedValue": "prevent",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "The expected value was not observed. Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "review",
+     "title": "Storage conditions listed",
+     "clause": "For example, “Store at -20°C, desiccated.”",
+     "ruleId": "PROD-004",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Molecular formula listed",
+     "clause": "For example, C62H98N16O22 for BPC-157.",
+     "ruleId": "PROD-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine"
+    },
+    {
+     "note": "In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined. Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "No dosing information",
+     "clause": "Never publish dosing information of any kind: milligram amounts, frequency, route of administration, or injection schedules.",
+     "ruleId": "PROD-005",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_cooccurrence",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "None of 8 prohibited term(s) was claimed in the rendered text of this sampled page: 'Ozempic', 'Wegovy', 'Mounjaro', 'Zepbound', 'Rybelsus'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+     "tier": "auto_fail",
+     "layer": 2,
+     "state": "pass",
+     "title": "No pharmaceutical brand names",
+     "clause": "Ozempic, Wegovy, Mounjaro, Zepbound and Rybelsus are off limits, as is every other brand name.",
+     "ruleId": "PROD-006",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "None of 5 prohibited term(s) was claimed in the rendered text of this sampled page: 'injectable', 'nasal spray', 'for injection', 'subcutaneous', 'intramuscular'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+     "tier": "auto_fail",
+     "layer": 2,
+     "state": "pass",
+     "title": "No route-of-administration labels",
+     "clause": "Products cannot be labeled “injectable” or “nasal spray.” These describe how a person would take the product, which makes them administration route claims.",
+     "ruleId": "PROD-007",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-yk-11-lgd-4033-stack/ — Observed: '159752-10-0', '1370003-76-1', '1165910-22-4'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "CAS number listed",
+     "clause": "The compound’s exact CAS registry number.",
+     "ruleId": "PROD-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "matchedValue": "159752-10-0, 1370003-76-1, 1165910-22-4",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-cardarine-sr-9009-stack/ — Observed: '159752-10-0', '317318-70-0', '1379686-30-2'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "CAS number listed",
+     "clause": "The compound’s exact CAS registry number.",
+     "ruleId": "PROD-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "matchedValue": "159752-10-0, 317318-70-0, 1379686-30-2",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-ostarine-rad-140-stack/ — Observed: '159752-10-0', '841205-47-8', '1182367-47-0'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "CAS number listed",
+     "clause": "The compound’s exact CAS registry number.",
+     "ruleId": "PROD-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "matchedValue": "159752-10-0, 841205-47-8, 1182367-47-0",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/lgd-4033-and-mk-677-stack/ — Observed: '1165910-22-4', '159752-10-0'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "CAS number listed",
+     "clause": "The compound’s exact CAS registry number.",
+     "ruleId": "PROD-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "matchedValue": "1165910-22-4, 159752-10-0",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/lgd-4033-and-yk-11-stack/ — Observed: '1165910-22-4', '1370003-76-1'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "CAS number listed",
+     "clause": "The compound’s exact CAS registry number.",
+     "ruleId": "PROD-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "matchedValue": "1165910-22-4, 1370003-76-1",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed. Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "No links to study databases",
+     "clause": "Research papers may not be cited or linked, and neither may off-site material of any kind, where doing so would suggest a benefit to a person or point toward human use.",
+     "ruleId": "PROD-009",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "None of 4 prohibited term(s) was claimed in the rendered text of this sampled page: 'Sema', 'Tirz', 'Reta', 'Cagri'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "No community abbreviations",
+     "clause": "Refer to GLP-1 products by chemical name or internal code only — “Semaglutide,” “Tirzepatide.” Never “Sema,” “Tirz,” or similar shorthand.",
+     "ruleId": "PROD-010",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-yk-11-lgd-4033-stack/ — Observed: '528.66 g/mol', '430.54 g/mol', '338.26 g/mol'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "Molecular weight listed",
+     "clause": "Expressed in g/mol.",
+     "ruleId": "PROD-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "matchedValue": "528.66 g/mol, 430.54 g/mol, 338.26 g/mol",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-cardarine-sr-9009-stack/ — Observed: '528.66 g/mol', '453.5 g/mol', '437.94 g/mol'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "Molecular weight listed",
+     "clause": "Expressed in g/mol.",
+     "ruleId": "PROD-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "matchedValue": "528.66 g/mol, 453.5 g/mol, 437.94 g/mol",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/mk-677-ostarine-rad-140-stack/ — Observed: '528.66 g/mol', '389.33 g/mol', '393.83 g/mol'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "Molecular weight listed",
+     "clause": "Expressed in g/mol.",
+     "ruleId": "PROD-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "matchedValue": "528.66 g/mol, 389.33 g/mol, 393.83 g/mol",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/lgd-4033-and-mk-677-stack/ — Observed: '338.26 g/mol', '528.66 g/mol'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "Molecular weight listed",
+     "clause": "Expressed in g/mol.",
+     "ruleId": "PROD-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "matchedValue": "338.26 g/mol, 528.66 g/mol",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "/product/lgd-4033-and-yk-11-stack/ — Observed: '338.26 g/mol', '430.54 g/mol'.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "Molecular weight listed",
+     "clause": "Expressed in g/mol.",
+     "ruleId": "PROD-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "matchedValue": "338.26 g/mol, 430.54 g/mol",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "id": "naming",
+   "name": "Naming and taxonomy",
+   "findings": [
+    {
+     "note": "15 of 64 URLs in scope 'products' matched a prohibited pattern: https://sportstechnologylabs.com/product/mk-677-and-ostarine-stack/ (matched 'stack'); https://sportstechnologylabs.com/product/rad-140-and-cardarine-stack/ (matched 'stack'); https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/ (matched 'stack'); https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/ (matched 'stack'); https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/ (matched 'stack') and 10 more.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "fail",
+     "title": "No marketing terms in product names",
+     "clause": "Names such as “Lean Stack,” “Mass,” “PCT,” “CagriLean,” “Wolverine Peptide” or “Healing Stack” are not permitted.",
+     "ruleId": "NAME-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "matchedUrls": [
+        "https://sportstechnologylabs.com/product/mk-677-and-ostarine-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-cardarine-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+        "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+        "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+        "https://sportstechnologylabs.com/product/ostarine-and-cardarine-stack/",
+        "https://sportstechnologylabs.com/product/cardarine-and-s4-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-mk-677-stack/",
+        "https://sportstechnologylabs.com/product/ostarine-cardarine-sr-9009-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-ru-58841-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-lgd-4033-stack/",
+        "https://sportstechnologylabs.com/product/bpc-157-tb-500-ghk-cu-glow-stack/",
+        "https://sportstechnologylabs.com/product/sr-9009-and-cardarine-stack/"
+       ],
+       "matchedValue": "stack",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Proper chemical names used",
+     "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+     "ruleId": "NAME-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "no_check_built",
+     "notEvaluableReason": "this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one"
+    },
+    {
+     "note": "5 URLs in scope 'collections' were examined; none matched the patterns for this rule.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "pass",
+     "title": "No therapeutic categories",
+     "clause": "Products cannot be filed under categories such as “Weight Loss,” “Obesity,” “Longevity,” “Cognitive Enhancement,” “Joint Healing” or “Anti-Aging.”",
+     "ruleId": "NAME-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "id": "catalog",
+   "name": "Catalog composition",
+   "findings": [
+    {
+     "note": "34 of 64 URLs in scope 'products' matched this rule's patterns: https://sportstechnologylabs.com/product/s23-20mg-ml/ (matched 's-23'); https://sportstechnologylabs.com/product/mk-677-and-ostarine-stack/ (matched 'ostarine'); https://sportstechnologylabs.com/product/mk-677-ibutamoren-25mg-ml/ (matched 'ibutamoren'); https://sportstechnologylabs.com/product/rad-140-and-cardarine-stack/ (matched 'rad-140'); https://sportstechnologylabs.com/product/sr9009-stenabolic-20mg-ml/ (matched 'sr-9009') and 29 more.",
+     "tier": "review_only",
+     "layer": 0,
+     "state": "review",
+     "title": "Non-peptide research compounds in the catalogue",
+     "clause": "The catalogue offered under a research peptide programme may contain compounds that are not peptides. This rule reports which of them are present and names them.",
+     "ruleId": "CATG-007",
+     "source": "mintro",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "matchedUrls": [
+        "https://sportstechnologylabs.com/product/s23-20mg-ml/",
+        "https://sportstechnologylabs.com/product/mk-677-and-ostarine-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-ibutamoren-25mg-ml/",
+        "https://sportstechnologylabs.com/product/rad-140-and-cardarine-stack/",
+        "https://sportstechnologylabs.com/product/sr9009-stenabolic-20mg-ml/",
+        "https://sportstechnologylabs.com/product/s4-andarine-50mg-ml/",
+        "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+        "https://sportstechnologylabs.com/product/gw501516-cardarine-20mg-ml/",
+        "https://sportstechnologylabs.com/product/lgd-4033-ligandrol-10mg-ml/",
+        "https://sportstechnologylabs.com/product/mk-2866-ostarine-25mg-ml/",
+        "https://sportstechnologylabs.com/product/liquid-testolone-rad-140-for-sale/",
+        "https://sportstechnologylabs.com/product/yk-11-10mg-ml/",
+        "https://sportstechnologylabs.com/product/ostarine-powder-mk-2866/",
+        "https://sportstechnologylabs.com/product/mk-677-powder-ibutamoren/",
+        "https://sportstechnologylabs.com/product/lgd-4033-powder-ligandrol/",
+        "https://sportstechnologylabs.com/product/rad-140-powder-testolone/",
+        "https://sportstechnologylabs.com/product/cardarine-powder-gw501516/",
+        "https://sportstechnologylabs.com/product/sr9009-powder-stenabolic/",
+        "https://sportstechnologylabs.com/product/andarine-powder-s4/",
+        "https://sportstechnologylabs.com/product/yk-11-powder/",
+        "https://sportstechnologylabs.com/product/s23-sarm-powder/",
+        "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+        "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+        "https://sportstechnologylabs.com/product/ostarine-and-cardarine-stack/",
+        "https://sportstechnologylabs.com/product/cardarine-and-s4-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-mk-677-stack/",
+        "https://sportstechnologylabs.com/product/ostarine-cardarine-sr-9009-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+        "https://sportstechnologylabs.com/product/rad-140-and-ru-58841-stack/",
+        "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+        "https://sportstechnologylabs.com/product/rad-150/",
+        "https://sportstechnologylabs.com/product/rad-150-powder/",
+        "https://sportstechnologylabs.com/product/rad-140-and-lgd-4033-stack/",
+        "https://sportstechnologylabs.com/product/sr-9009-and-cardarine-stack/"
+       ],
+       "matchedValue": "s-23, ostarine, ibutamoren, rad-140, sr-9009, andarine, gw-501516, lgd-4033, yk-11, s-4, rad-150",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Reconstitution solution labelling",
+     "clause": "Bacteriostatic water is permitted when it carries the label “Reconstitution Solution for Laboratory Use.” Keep injection language off the listing, and attach no pharmaceutical brand names such as Pfizer or Hospira.",
+     "ruleId": "CATG-005",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_applicable",
+     "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Capsule labelling",
+     "clause": "Capsules may be sold only where they are exclusively for research use and properly labeled, listed with chemical names and CAS numbers only. Anything short of that is prohibited.",
+     "ruleId": "CATG-006",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_applicable",
+     "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one"
+    },
+    {
+     "note": "64 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "pass",
+     "title": "No needles or syringes",
+     "clause": "Offering injection supplies next to peptides is itself evidence of intended injection.",
+     "ruleId": "CATG-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "64 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "pass",
+     "title": "No alcohol wipes",
+     "clause": "Their obvious purpose is preparing an injection site, which places the sale in a human-injection context.",
+     "ruleId": "CATG-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "64 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "pass",
+     "title": "No HCG or HGH",
+     "clause": "Human Chorionic Gonadotropin and Human Growth Hormone both require prescriptions.",
+     "ruleId": "CATG-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "64 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "pass",
+     "title": "No tablets or pills",
+     "clause": "Oral dosage forms are not permitted.",
+     "ruleId": "CATG-004",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "id": "coa",
+   "name": "Quality documentation",
+   "findings": [
+    {
+     "note": "A certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate, so nothing it would state can be read. 5 link(s) were requested, each listed with what it returned.",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "review",
+     "title": "Certificate links serve a readable certificate",
+     "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+     "ruleId": "COA-006",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/coas/",
+         "error": "served 574294 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2025/01/STL-COA-YK11.jpg",
+         "error": "served 48527 byte(s) as 'image/jpeg' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2019/10/STL-LGD-COA-1.webp",
+         "error": "served 41094 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2026/05/STL-MK-677-Certificate-of-Analysis.webp",
+         "error": "served 67402 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2025/09/STL-YK-11-Certificate-of-Analysis.webp",
+         "error": "served 48634 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/coas/",
+       "capturedAt": "2026-08-28T20:56:39.585Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "major",
+     "checkType": "doc_parse",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+     "tier": "auto_fail",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Certificate reports a test date within 60 days",
+     "clause": "Refresh COAs at least every 60 days. When a new batch arrives, update immediately rather than waiting for the cycle.",
+     "ruleId": "COA-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/coas/",
+         "error": "served 574294 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2025/01/STL-COA-YK11.jpg",
+         "error": "served 48527 byte(s) as 'image/jpeg' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2019/10/STL-LGD-COA-1.webp",
+         "error": "served 41094 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2026/05/STL-MK-677-Certificate-of-Analysis.webp",
+         "error": "served 67402 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2025/09/STL-YK-11-Certificate-of-Analysis.webp",
+         "error": "served 48634 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/coas/",
+       "capturedAt": "2026-08-28T20:56:39.585Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "critical",
+     "checkType": "doc_parse",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+     "tier": "auto_fail",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "Certificate states purity at or above 98%",
+     "clause": "A minimum of 98% purity for all products, and every purity figure must be backed by a Certificate of Analysis.",
+     "ruleId": "COA-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/coas/",
+         "error": "served 574294 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2025/01/STL-COA-YK11.jpg",
+         "error": "served 48527 byte(s) as 'image/jpeg' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2019/10/STL-LGD-COA-1.webp",
+         "error": "served 41094 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2026/05/STL-MK-677-Certificate-of-Analysis.webp",
+         "error": "served 67402 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2025/09/STL-YK-11-Certificate-of-Analysis.webp",
+         "error": "served 48634 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/coas/",
+       "capturedAt": "2026-08-28T20:56:39.585Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "critical",
+     "checkType": "doc_parse",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Lab is accredited and independent",
+     "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+     "ruleId": "COA-005",
+     "source": "programme",
+     "evidence": [],
+     "severity": "critical",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "not_evaluable",
+     "title": "COA contains all required fields",
+     "clause": "The COA must identify the batch or lot number, the testing date, the compound identity, the purity percentage, and the method used (HPLC preferred).",
+     "ruleId": "COA-004",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "attempts": [
+        {
+         "url": "https://sportstechnologylabs.com/coas/",
+         "error": "served 574294 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2025/01/STL-COA-YK11.jpg",
+         "error": "served 48527 byte(s) as 'image/jpeg' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://cdn-cmonbl.nitrocdn.com/NUCbccVTkrLnpEtPkYwTVaURtLIeNEHW/assets/images/optimized/rev-7751213/sportstechnologylabs.com/wp-content/uploads/2019/10/STL-LGD-COA-1.webp",
+         "error": "served 41094 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2026/05/STL-MK-677-Certificate-of-Analysis.webp",
+         "error": "served 67402 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        },
+        {
+         "url": "https://sportstechnologylabs.com/wp-content/uploads/2025/09/STL-YK-11-Certificate-of-Analysis.webp",
+         "error": "served 48634 byte(s) as 'image/webp' that do not begin with %PDF, so no certificate was retrieved",
+         "status": 200
+        }
+       ],
+       "sourceUrl": "https://sportstechnologylabs.com/coas/",
+       "capturedAt": "2026-08-28T20:56:39.585Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "major",
+     "checkType": "doc_parse",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned"
+    },
+    {
+     "note": "Observed on the rendered page: 'coa', 'certificate-of-analysis'. Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "COA linked on each sampled product page",
+     "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+     "ruleId": "COA-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "major",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    }
+   ]
+  },
+  {
+   "n": 7,
+   "id": "fulfil",
+   "name": "Fulfillment and screening",
+   "findings": [
+    {
+     "note": "Not evaluable from the crawled surface: Internal record. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Ban list maintained",
+     "clause": "Keep a live ban list. A customer who so much as hints at human consumption is removed for good, with no appeal, and the reason is written down.",
+     "ruleId": "FULF-005",
+     "source": "programme",
+     "evidence": [],
+     "severity": "critical",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Internal record. Requires merchant attestation."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: no shipping policy was reached: no page was found at the shipping paths tried, and no link on the homepage pointed to one",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "not_evaluable",
+     "title": "Shipping policy states USA only",
+     "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
+     "ruleId": "FULF-001",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page",
+     "notEvaluableKind": "not_exposed",
+     "notEvaluableReason": "no shipping policy was reached: no page was found at the shipping paths tried, and no link on the homepage pointed to one"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "No PO boxes",
+     "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
+     "ruleId": "FULF-002",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Carrier configuration. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Adult signature on first orders",
+     "clause": "Every first-time customer order must require an adult signature on delivery, with 21+ confirmed.",
+     "ruleId": "FULF-003",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Carrier configuration. Requires merchant attestation."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Physical document. Requires a test order or merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Packing slip disclaimers",
+     "clause": "Include the research-use-only disclaimer and the research-professional acknowledgement in the shipment itself.",
+     "ruleId": "FULF-004",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Physical document. Requires a test order or merchant attestation."
+    }
+   ]
+  },
+  {
+   "n": 8,
+   "id": "offsite",
+   "name": "Off-site presence",
+   "findings": [
+    {
+     "note": "3 of 22 content URLs have slugs matching this rule's patterns: https://sportstechnologylabs.com/affiliate-area/ (matched 'affiliate'); https://sportstechnologylabs.com/affiliate-login/ (matched 'affiliate'); https://sportstechnologylabs.com/affiliate-registration/ (matched 'affiliate'). The content of these pages was not examined.",
+     "tier": "auto_fail",
+     "layer": 0,
+     "state": "fail",
+     "title": "No affiliate or referral program URLs",
+     "clause": "Do not operate an affiliate or referral program.",
+     "ruleId": "OFFS-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "matchedUrls": [
+        "https://sportstechnologylabs.com/affiliate-area/",
+        "https://sportstechnologylabs.com/affiliate-login/",
+        "https://sportstechnologylabs.com/affiliate-registration/"
+       ],
+       "matchedValue": "affiliate",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    },
+    {
+     "note": "3 of 123 link(s) in the rendered homepage have visible text matching 'affiliate', 'ambassador', 'referral program', 'partner program': \"Affiliate Login\" → /affiliate-login/; \"Affiliate Registration\" → /affiliate-registration/; \"Affiliate Area\" → /affiliate-area/. The visible text of these links was examined; their destinations were not followed.",
+     "tier": "review_only",
+     "layer": 1,
+     "state": "review",
+     "title": "Affiliate program linked from the homepage",
+     "clause": "Do not operate an affiliate or referral program.",
+     "ruleId": "OFFS-007",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "matchedUrls": [
+        "https://sportstechnologylabs.com/affiliate-login/",
+        "https://sportstechnologylabs.com/affiliate-registration/",
+        "https://sportstechnologylabs.com/affiliate-area/"
+       ],
+       "matchedValue": "Affiliate Login (affiliate), Affiliate Registration (affiliate), Affiliate Area (affiliate)",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "2 social media link(s) were observed on the rendered homepage: https://www.facebook.com/SportsTechnologyLabs/, https://x.com/stechnologylabs. Where each link leads was not examined, and the content of these accounts was not read.",
+     "tier": "review_only",
+     "layer": 1,
+     "state": "review",
+     "title": "Social accounts linked from the storefront",
+     "clause": "From social profiles and posts, link to the site’s home page and nowhere deeper.",
+     "ruleId": "OFFS-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "matchedUrls": [
+        "https://www.facebook.com/SportsTechnologyLabs/",
+        "https://x.com/stechnologylabs"
+       ],
+       "matchedValue": "https://www.facebook.com/SportsTechnologyLabs/, https://x.com/stechnologylabs",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Post-level review needs platform API access or a commercial listening tool. Not covered.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Social post content",
+     "clause": "Whatever the channel, a post lives under the product-page rules — naming, claims, categories and disclaimers all carry over.",
+     "ruleId": "OFFS-004",
+     "source": "programme",
+     "evidence": [],
+     "severity": "critical",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Post-level review needs platform API access or a commercial listening tool. Not covered."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Internal process. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Monthly social audits",
+     "clause": "Sweep every channel at least once a month, and act on any post found carrying human-use language.",
+     "ruleId": "OFFS-005",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Internal process. Requires merchant attestation."
+    },
+    {
+     "note": "No elements matching '[itemtype*=\"schema.org/Review\"], [itemtype*=\"schema.org/AggregateRating\"], [itemprop=\"review\"], [itemprop=\"aggregateRating\"], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined. Observed on all 5 sampled product page(s).",
+     "tier": "review_only",
+     "layer": 2,
+     "state": "pass",
+     "title": "No testimonials or outcome stories",
+     "clause": "Do not post testimonials, before-and-after photos, recovery stories, or user reviews that describe health outcomes.",
+     "ruleId": "OFFS-002",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/",
+       "capturedAt": "2026-08-28T20:56:02.993Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/a1660f6c274fe71dd2b40607e66b50f14e941a6c48e6716726711151e60736a9.png",
+       "sourceSha256": "91f2a571ffb902f9818c81579777db26a22139939d9aa1a81ea391ed317d2ca2"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-cardarine-sr-9009-stack/",
+       "capturedAt": "2026-08-28T20:56:11.286Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/1bc80904bd9d6d711f595c1f4b88a84ef80d32c60e55ca009be91c43da63e921.png",
+       "sourceSha256": "e0c675b69ff2b2823e8618f5425047d1bacc7712e4cac9513a87aa83fd0c9adb"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/mk-677-ostarine-rad-140-stack/",
+       "capturedAt": "2026-08-28T20:56:17.912Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/33628641df7ddb988ca581810b76b44b26b6ef5e7bad74f43cb7ad5e1afe411d.png",
+       "sourceSha256": "0c1ed90607cbb9b1cce6725a714a87063c39af07e109eed5fdb81a374245836a"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-mk-677-stack/",
+       "capturedAt": "2026-08-28T20:56:25.137Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/42e5655db4150d1e9474791b00e8ea2770d64230e1a020cc4ef0508e13ff1ced.png",
+       "sourceSha256": "86ede57e5732c79f1fc9ecc36d39c7ff81b6ded397d77475697db669318f41c1"
+      },
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/product/lgd-4033-and-yk-11-stack/",
+       "capturedAt": "2026-08-28T20:56:31.726Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/517a9b3a32ea81ca3f43f39213529c214d50fe36919480779f78a6eb4953255b.png",
+       "sourceSha256": "11c0e5d9052a64c8f108f258f86531d94e55b7cccc26af02d7295b77db70cb65"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "22 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+     "tier": "review_only",
+     "layer": 0,
+     "state": "pass",
+     "title": "Editorial content on therapeutic topics",
+     "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
+     "ruleId": "OFFS-006",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/sitemap_index.xml",
+       "capturedAt": "2026-08-28T20:55:41.352Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e",
+       "sourceSha256": "707e78997a5cb311810bf03fcd65e95559f6eab3fb5b4efbbd9bf6409a38038e"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/post-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:42.624Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7",
+       "sourceSha256": "75adc3d0656e239f573e21da96eb20574b4705bc1af682816d2f86614cf1fbe7"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/page-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:43.828Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3",
+       "sourceSha256": "f0dea8d045b420b41b35e3f281a711873bd280be07758a2d5249de0f901dc1f3"
+      },
+      {
+       "kind": "document",
+       "sourceUrl": "https://sportstechnologylabs.com/product-sitemap.xml",
+       "capturedAt": "2026-08-28T20:55:45.091Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer0/f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a",
+       "sourceSha256": "f8b13f156a54a295005a3c727ed3927eb74aed3ebbc6474489dfe19ffea6468a"
+      }
+     ],
+     "severity": "major",
+     "checkType": "url_pattern",
+     "evidenceKind": "document"
+    }
+   ]
+  },
+  {
+   "n": 9,
+   "id": "payment",
+   "name": "Payments",
+   "findings": [
+    {
+     "note": "No link with visible text matching 'refund', 'return', 'chargeback' was observed among 21 link(s) in the rendered homepage footer. The visible text of these links was examined; their destinations were not followed.",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "review",
+     "title": "Refund and chargeback policy published",
+     "clause": "Publish a refund and chargeback policy, clearly written and easy to find.",
+     "ruleId": "PAY-003",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T20:55:46.288Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/9720dc25390252a9c913d85728daa3356f93a5124533d95f2c2c4b19df37c46e.png",
+       "sourceSha256": "9c84fd28b5547900201e605c429691b30bb44fd78c72dcb3241f533fadf38015"
+      }
+     ],
+     "severity": "minor",
+     "checkType": "dom_assert",
+     "evidenceKind": "rendered_page"
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Card processing through a merchant account",
+     "clause": "Card payments must run through a legitimate merchant processor that performs proper KYC. How a seller collects money is read as evidence of how the business is run.",
+     "ruleId": "PAY-002",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation."
+    },
+    {
+     "note": "None of 'Zelle', 'Cash App', 'CashApp', 'Venmo', 'Friends & Family', 'friends and family' was observed in the rendered text of 3 public surface(s): the homepage footer, the terms document (https://sportstechnologylabs.com/terms-of-service/), the FAQ (https://sportstechnologylabs.com/faqs/). A checkout page behind a sign-in was not among the surfaces examined, and text not rendered on these pages was not examined.",
+     "tier": "auto_fail",
+     "layer": 3,
+     "state": "pass",
+     "title": "No peer-to-peer payment methods named on public pages",
+     "clause": "To an investigator, a seller collecting through Venmo, Cash App, Zelle or PayPal Friends & Family looks like one sidestepping the fraud controls that come with a standard merchant account.",
+     "ruleId": "PAY-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/",
+       "capturedAt": "2026-08-28T21:02:36.644Z",
+       "evidenceKey": "",
+       "sourceSha256": ""
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_match",
+     "evidenceKind": "rendered_page"
+    }
+   ]
+  },
+  {
+   "n": 10,
+   "id": "comms",
+   "name": "Customer communications",
+   "findings": [
+    {
+     "note": "Not evaluable from the crawled surface: Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Support channels free of human-use language",
+     "clause": "This standard covers every channel — your FAQ and site copy, email, live chat, phone, and social media direct messages.",
+     "ruleId": "COMM-002",
+     "source": "programme",
+     "evidence": [],
+     "severity": "critical",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Not reachable by crawl. Sampled transcript review or mystery shopping only."
+    },
+    {
+     "note": "Not evaluable from the crawled surface: Internal training. Requires merchant attestation.",
+     "tier": "review_only",
+     "layer": null,
+     "state": "not_evaluable",
+     "title": "Staff do not help with protocols",
+     "clause": "Staff must never offer to help a customer “figure out” a protocol.",
+     "ruleId": "COMM-003",
+     "source": "programme",
+     "evidence": [],
+     "severity": "major",
+     "checkType": "manual",
+     "evidenceKind": "document",
+     "notEvaluableKind": "not_reachable",
+     "notEvaluableReason": "Internal training. Requires merchant attestation."
+    },
+    {
+     "note": "In the rendered text of the faq surface, no quantity term (mg, ml, mcg, iu) was observed within 20 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined.",
+     "tier": "review_only",
+     "layer": 3,
+     "state": "pass",
+     "title": "FAQ free of dosing or administration advice",
+     "clause": "No dosing advice, no administration guidance, and nothing a reader could take as instruction for using a drug — in any channel, by any staff member.",
+     "ruleId": "COMM-001",
+     "source": "programme",
+     "evidence": [
+      {
+       "kind": "rendered_page",
+       "sourceUrl": "https://sportstechnologylabs.com/faqs/",
+       "capturedAt": "2026-08-28T20:57:40.293Z",
+       "evidenceKey": "c268f8d7-076e-41f6-98a2-752fde9fca85/layer1/0061fd9548e5421eec5b4c276fa6c4de64e7da8b9cccca7453c7885e50de8719.png",
+       "sourceSha256": "a65a0e038329af2fe095d8f09d25c175ad12a29ad608134c47b8a1d3775895ec"
+      }
+     ],
+     "severity": "critical",
+     "checkType": "text_cooccurrence",
+     "evidenceKind": "rendered_page"
+    }
+   ]
+  }
+ ],
+ "finishedAt": "2026-08-28T21:04:05.917Z",
+ "notChecked": [
+  {
+   "why": "Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links to. FDA actively monitors social channels for claims that contradict a seller's own disclaimers, and the standards name off-site marketing as the highest-risk area, so nothing in this report speaks to what those accounts contain.",
+   "subject": "Social media accounts"
+  }
+ ],
+ "politeness": "robots.txt declared no Crawl-delay; requests were not additionally spaced.",
+ "obstruction": {
+  "urls": [
+   "https://sportstechnologylabs.com/collections/all",
+   "https://sportstechnologylabs.com/products",
+   "https://sportstechnologylabs.com/shop",
+   "https://sportstechnologylabs.com/product/mk-677-yk-11-lgd-4033-stack/"
+  ],
+  "attempted": 27,
+  "unanswered": 4,
+  "rulesAffected": 2
+ },
+ "truncations": [],
+ "merchantName": "High-Quality SARMs And Peptides For Sale Online | Fast Shipping USA",
+ "merchantDomain": "sportstechnologylabs.com",
+ "rulesetVersion": "3.1.0",
+ "sameObservation": [],
+ "rulesetEffective": "2026-08-26",
+ "attestationQuestions": [
+  {
+   "id": "shipping-destinations",
+   "sev": "critical",
+   "question": "Do you ship only within the USA, excluding PO boxes and international addresses?",
+   "authority": "programme"
+  },
+  {
+   "id": "shipping-to-clinics",
+   "sev": "critical",
+   "question": "Do you ship to gyms, med-spas, wellness clinics or weight-loss clinics?",
+   "authority": "law"
+  },
+  {
+   "id": "adult-signature",
+   "sev": "major",
+   "question": "Do first-time orders require an adult signature at 21+?",
+   "authority": "programme"
+  },
+  {
+   "id": "packing-slip-disclaimer",
+   "sev": "major",
+   "question": "Does the packing slip carry the RUO disclaimer and research acknowledgement?",
+   "authority": "programme"
+  },
+  {
+   "id": "ban-list",
+   "sev": "critical",
+   "question": "Do you maintain a permanent ban list for customers who indicate human use?",
+   "authority": "programme"
+  },
+  {
+   "id": "ban-list-permanence",
+   "sev": "major",
+   "question": "Are bans documented and permanent, with no appeal?",
+   "authority": "programme"
+  },
+  {
+   "id": "support-dosing-guidance",
+   "sev": "critical",
+   "question": "Do support staff ever provide dosing, administration or protocol guidance — by email, chat, phone or DM?",
+   "authority": "law"
+  },
+  {
+   "id": "support-dosing-response",
+   "sev": "major",
+   "question": "What is your standard support response to a dosing question?",
+   "authority": "law"
+  },
+  {
+   "id": "staff-protocol-help",
+   "sev": "critical",
+   "question": "Do staff offer to help customers \"figure out\" protocols?",
+   "authority": "law"
+  },
+  {
+   "id": "social-account-content",
+   "sev": "critical",
+   "question": "Do any social accounts contain human-use claims, testimonials or outcome stories?",
+   "authority": "law"
+  },
+  {
+   "id": "influencer-payment",
+   "sev": "critical",
+   "question": "Do you pay or barter with influencers?",
+   "authority": "law"
+  },
+  {
+   "id": "social-audit-cadence",
+   "sev": "major",
+   "question": "How often are social channels audited, and by whom?",
+   "authority": "programme"
+  },
+  {
+   "id": "brand-mention-monitoring",
+   "sev": "minor",
+   "question": "Do you monitor third-party brand mentions and issue cease-and-desist notices?",
+   "authority": "programme"
+  },
+  {
+   "id": "coa-lab-accreditation",
+   "sev": "major",
+   "question": "Is your COA lab independent and accredited? Which accreditation?",
+   "authority": "programme"
+  },
+  {
+   "id": "coa-batch-cadence",
+   "sev": "minor",
+   "question": "How often do you receive new batches, and how quickly are COAs updated?",
+   "authority": "programme"
+  },
+  {
+   "id": "payment-channels",
+   "sev": "critical",
+   "question": "Do you accept payment through any channel other than card processing?",
+   "authority": "network"
+  },
+  {
+   "id": "related-storefronts",
+   "sev": "critical",
+   "question": "Do you operate any other storefronts, brands or domains selling the same products?",
+   "authority": "network"
+  },
+  {
+   "id": "research-field-storage",
+   "sev": "major",
+   "question": "Do you store the declared research field with every order?",
+   "authority": "programme"
+  },
+  {
+   "id": "prior-termination",
+   "sev": "critical",
+   "question": "Has any acquirer, processor or platform terminated you?",
+   "authority": "network"
+  }
+ ]
+}

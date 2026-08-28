@@ -1730,3 +1730,6 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .blocking-cap { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .blocking-unseen, .blocking-source { font-size: 11px; color: var(--slate); margin: 8px 0 0; }
+
+/* The sample-basis line (D-162): plain type, above the numbers it qualifies. */
+.basis { font-size: 12.5px; color: var(--slate); margin: 6px 0 14px; max-width: 70ch; }
