@@ -252,6 +252,8 @@ export {
   type ReportCoverage,
   type ReportFinding,
   type SameObservationPair,
+  type BlockingSummary,
+  type BlockingFailure,
   type ScanMode,
   type ScreeningReport,
 } from './report.js';

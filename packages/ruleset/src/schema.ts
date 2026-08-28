@@ -76,6 +76,34 @@ const ruleCommon = {
    * both rules — a one-sided pair would render on one finding and not the other.
    */
   corroborates: z.array(z.string().regex(RULE_ID_PATTERN)).optional(),
+  /**
+   * Whether a failure of this rule is a stopping condition IQwallet wants surfaced (D-161).
+   *
+   * **Data, not code.** Hard constraint 1: adding or removing a blocker must never require
+   * touching the engine, and nothing anywhere may branch on a rule id to decide this. The report
+   * reads the flag; it does not know which rules carry it.
+   *
+   * It marks a rule for **operator attention**, not for an automatic decline. Nothing in this
+   * system declines a merchant, withholds a package, or tells a merchant or their agent anything
+   * on the strength of it — a person reads the failed blocking rules and their evidence and
+   * decides. Mintro shows; IQwallet concludes (D-001).
+   */
+  blocking: z.literal(true).optional(),
+  /**
+   * Who said it is a stopping condition, and when.
+   *
+   * Required whenever `blocking` is set, and `invariants.ts` enforces the pairing. A flag with
+   * this much consequence and no attribution is the shape `source` was added to prevent: an
+   * authority nobody stated, silently attributed to whoever reads it next.
+   */
+  blocking_source: z
+    .object({
+      /** The party who ruled it. */
+      authority: z.string().min(1),
+      /** ISO date, UTC, per CLAUDE.md. */
+      ruled_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be an ISO date, YYYY-MM-DD'),
+    })
+    .optional(),
 } as const;
 
 /**

@@ -536,6 +536,11 @@
         ],
         "word_boundary": true,
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -559,6 +564,11 @@
         ],
         "word_boundary": true,
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -662,6 +672,11 @@
         ],
         "scope": "collections",
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -728,6 +743,11 @@
         ],
         "scope": "products",
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -749,6 +769,11 @@
         ],
         "scope": "products",
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -772,6 +797,11 @@
         "scope": "products",
         "expect": "absent",
         "note": "Product URLs only. These terms appear routinely in research writing; matching editorial content would auto-fail a merchant for publishing, not selling. See D-010."
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -794,6 +824,11 @@
         "scope": "products",
         "expect": "absent",
         "note": "Covers tablets and pills only. Capsule labelling is CATG-006."
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {
@@ -1250,6 +1285,11 @@
           "friends and family"
         ],
         "expect": "absent"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-28"
       }
     },
     {

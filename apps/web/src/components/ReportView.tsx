@@ -230,6 +230,17 @@ export function ReportView({
       */}
       <ObstructionNote report={report} />
 
+      {/*
+        The stopping conditions IQwallet asked to see, and how this run stands against them (D-161).
+
+        Operator-facing and above the verdict, because it is what an operator opens the report for.
+        It decides nothing: no merchant or agent sees a decline from it, no package is withheld on
+        it, and it says nothing about what a failure means. It names which blocking rules failed,
+        what the programme's own clause requires, what was observed, and where the captures are.
+        Mintro shows; IQwallet concludes (D-001).
+      */}
+      {!print && <BlockingPanel report={report} />}
+
       <VerdictBanner report={report} />
       <TickStrip report={report} />
       <CoverageBreakdown report={report} />
@@ -366,6 +377,121 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
         {more > 0 && <li className="obs-more">and {more} more</li>}
       </ul>
     </div>
+  );
+}
+
+
+/**
+ * The stopping conditions, for the operator (D-161).
+ *
+ * Renders from `report.blocking`, which the engine built by reading the rule set's own flag. There
+ * is no list of rule ids here and there must not be — hard constraint 1 puts that in data.
+ *
+ * ## What it deliberately does not do
+ *
+ * It does not say "decline", "reject", "blocked" or "stop". Those are conclusions and they are
+ * IQwallet's (D-001, hard constraint 7). It says which rules the rule set marks as stopping
+ * conditions, which of them this run observed failing, and what backs each. A reader draws the
+ * conclusion.
+ *
+ * `notEvaluable` is shown beside the failures rather than folded away, because a stopping
+ * condition that could not be observed has not been cleared — and this panel is the one place an
+ * operator might otherwise take silence for an answer.
+ */
+function BlockingPanel({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  /*
+    A report from before the flag existed (D-161, D-044's rule).
+
+    Runs are immutable, so these reports are frozen without the field and always will be. Rendering
+    "0 of 0" would state that this merchant tripped no stopping condition, which is a claim drawn
+    from the age of the file rather than from anything observed.
+  */
+  if (report.blocking === undefined) {
+    return (
+      <section className="card blocking" aria-label="Stopping conditions">
+        <header className="blocking-head">
+          <span className="blocking-title">Stopping conditions</span>
+        </header>
+        <p className="blocking-none">
+          This run predates the stopping-condition flag, so it carries no summary. The findings
+          below are unaffected.
+        </p>
+      </section>
+    );
+  }
+
+  const { declared, failed, notEvaluable, passed } = report.blocking;
+  if (declared === 0) return null;
+
+  const authority = failed[0]?.authority;
+  const ruledOn = failed[0]?.ruledOn;
+
+  return (
+    <section className={`card blocking${failed.length > 0 ? ' hit' : ''}`} aria-label="Stopping conditions">
+      <header className="blocking-head">
+        <span className="blocking-title">Stopping conditions</span>
+        <span className="blocking-count">
+          {failed.length} of {declared} observed failing
+          {notEvaluable.length > 0 && ` · ${notEvaluable.length} not evaluable`}
+          {passed.length > 0 && ` · ${passed.length} observed and not violated`}
+        </span>
+      </header>
+
+      {failed.length === 0 ? (
+        <p className="blocking-none">
+          {notEvaluable.length === 0
+            ? `None of the ${declared} rules marked as stopping conditions was observed failing on this run.`
+            : `None was observed failing. ${notEvaluable.length} could not be observed: ${notEvaluable.join(', ')}.`}
+        </p>
+      ) : (
+        <ol className="blocking-list">
+          {failed.map((item) => (
+            <li key={item.ruleId} className={`blocking-item ${item.state}`}>
+              <div className="blocking-rule">
+                <span className={`state ${item.state}`}>{item.state}</span>
+                <span className="blocking-id">{item.ruleId}</span>
+                <span className="blocking-name">{item.title}</span>
+              </div>
+              {/* The programme's own words, so the requirement is readable beside the observation. */}
+              <p className="blocking-clause">{item.clause}</p>
+              <p className="blocking-note">{item.note}</p>
+              {/*
+                A pointer, not a second evidence slip.
+
+                The finding below carries the full slip with its capture. Rendering a second one
+                here would be the same evidence in two places, free to drift; this names where to
+                look and leaves the capture to the finding that owns it.
+              */}
+              <ul className="blocking-evidence">
+                {item.evidence.slice(0, 3).map((entry, i) => (
+                  <li key={`${item.ruleId}-${i}`}>
+                    <span className="blocking-src">{entry.sourceUrl || '(no source recorded)'}</span>
+                    {entry.matchedValue !== undefined && (
+                      <span className="blocking-matched">matched: {entry.matchedValue}</span>
+                    )}
+                    <span className="blocking-cap">
+                      {entry.evidenceKey === '' ? 'no capture retained' : entry.evidenceKey}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {notEvaluable.length > 0 && failed.length > 0 && (
+        <p className="blocking-unseen">
+          Not observed on this run, so not cleared: {notEvaluable.join(', ')}.
+        </p>
+      )}
+
+      {authority !== undefined && authority !== '' && (
+        <p className="blocking-source">
+          Marked as stopping conditions by {authority}, {ruledOn}.
+        </p>
+      )}
+    </section>
   );
 }
 

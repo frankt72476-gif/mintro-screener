@@ -14,7 +14,7 @@
  */
 
 import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State } from '@mintro/ruleset';
-import type { FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
+import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
@@ -117,6 +117,44 @@ export interface SameObservationPair {
   readonly findings: readonly ReportFinding[];
 }
 
+/**
+ * One stopping condition this run observed failing (D-161).
+ *
+ * Carries what a reader needs to judge it without leaving the summary: which rule, what it says,
+ * what was observed, and the captures behind it. The evidence is the finding's own — nothing is
+ * re-derived here, so this cannot disagree with the finding it points at.
+ */
+export interface BlockingFailure {
+  readonly ruleId: string;
+  readonly title: string;
+  /** The programme's own words for what the rule requires. */
+  readonly clause: string;
+  readonly state: State;
+  /** What was observed, verbatim from the finding. */
+  readonly note: string;
+  /** Who ruled this a stopping condition, and when. */
+  readonly authority: string;
+  readonly ruledOn: string;
+  readonly evidence: readonly Evidence[];
+}
+
+/**
+ * The stopping conditions and how this run stands against them.
+ *
+ * `failed` is the only list an operator has to read. `notEvaluable` is here because a stopping
+ * condition that could not be observed is not a stopping condition that passed, and a summary that
+ * showed only failures would let the difference disappear.
+ */
+export interface BlockingSummary {
+  /** How many rules the rule set marks as stopping conditions. */
+  readonly declared: number;
+  readonly failed: readonly BlockingFailure[];
+  /** Blocking rules that could not be observed on this run, by id. */
+  readonly notEvaluable: readonly string[];
+  /** Blocking rules observed and not violated, by id. */
+  readonly passed: readonly string[];
+}
+
 export interface ScreeningReport {
   readonly runId: string;
   readonly merchantDomain: string;
@@ -140,6 +178,24 @@ export interface ScreeningReport {
    * adjacency is the whole of it. Mintro shows; IQwallet concludes (D-001).
    */
   readonly sameObservation: readonly SameObservationPair[];
+  /**
+   * The stopping conditions, and which of them this run observed (D-161).
+   *
+   * Built by reading `blocking` off the rule set — the engine holds no list of blocker ids and
+   * cannot, per hard constraint 1. Adding or removing one is a data change.
+   *
+   * **Operator-facing, and it decides nothing.** It surfaces which blocking rules failed and what
+   * backs each, for a person to read. No merchant or agent sees a decline from it, no package is
+   * withheld on it, and the report says nothing about what a failure means. Mintro shows;
+   * IQwallet concludes (D-001).
+   *
+   * **Optional, and permanently so.** Runs recorded before D-161 do not carry it and never will:
+   * a completed run is immutable (D-002), so the stored reports in `reports/` and in `runs.report`
+   * are frozen without it. A reader that finds it absent must say the report predates the flag,
+   * never render "0 of 0 stopping conditions" — that would be an observation about the merchant
+   * drawn from the age of the file. Same rule as `notEvaluableKind` under D-044.
+   */
+  readonly blocking?: BlockingSummary;
   /** Every finding in rule-set order, for the tick strip. */
   readonly strip: readonly { readonly ruleId: string; readonly title: string; readonly state: State }[];
   /** Coverage limits the run hit, in words. Empty when nothing was truncated. */
@@ -328,6 +384,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     counts,
     coverage: computeCoverage(enriched),
     sameObservation: pairSameObservation(enriched, ruleset),
+    blocking: summariseBlocking(enriched, ruleset),
     verdict: describeVerdict(enriched, counts),
     categories,
     strip: categories.flatMap((category) =>
@@ -447,6 +504,60 @@ function kindForUnrun(rule: Rule): NotEvaluableKind {
  * Pairs come from `corroborates` in the rule set, and `invariants.ts` requires the relation on
  * both rules. An engine that noticed findings "going together" would start finding coincidences.
  */
+/**
+ * How this run stands against the rule set's stopping conditions (D-161).
+ *
+ * **Reads the flag; holds no list.** Which rules block is a property of `rules/ruleset.json`, and
+ * hard constraint 1 says adding one must never require touching the engine. There is deliberately
+ * no rule id anywhere in this function.
+ *
+ * A blocking rule can produce several findings — Layer 2 evaluates product-surface rules per page
+ * and the report already collapses them — so a rule is counted once, by its worst state, which is
+ * the state the collapsed finding carries.
+ *
+ * `not_evaluable` is kept apart from `passed` deliberately. A stopping condition that could not be
+ * observed has not been cleared, and folding the two would let the difference vanish from the one
+ * summary an operator reads.
+ */
+function summariseBlocking(
+  findings: readonly ReportFinding[],
+  ruleset: Ruleset,
+): BlockingSummary {
+  const blockingRules = ruleset.rules.filter((rule) => rule.blocking === true);
+  const declared = blockingRules.length;
+
+  const failed: BlockingFailure[] = [];
+  const notEvaluable: string[] = [];
+  const passed: string[] = [];
+
+  for (const rule of blockingRules) {
+    const forRule = findings.filter((finding) => finding.ruleId === rule.id);
+    if (forRule.length === 0) continue;
+
+    const violation = forRule.find((f) => f.state === 'fail') ?? forRule.find((f) => f.state === 'review');
+    if (violation !== undefined) {
+      failed.push({
+        ruleId: rule.id,
+        title: rule.title,
+        clause: rule.clause,
+        state: violation.state,
+        note: violation.note,
+        // Present by the invariant in `packages/ruleset/src/invariants.ts`: a blocking rule with
+        // no authority does not load.
+        authority: rule.blocking_source?.authority ?? '',
+        ruledOn: rule.blocking_source?.ruled_on ?? '',
+        evidence: violation.evidence,
+      });
+      continue;
+    }
+
+    if (forRule.every((f) => f.state === 'not_evaluable')) notEvaluable.push(rule.id);
+    else passed.push(rule.id);
+  }
+
+  return { declared, failed, notEvaluable, passed };
+}
+
 export function pairSameObservation(
   findings: readonly ReportFinding[],
   ruleset: Ruleset,

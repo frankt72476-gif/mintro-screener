@@ -191,6 +191,26 @@ function checkRule(
   }
 
   /*
+    A blocking flag must say who ruled it (D-161).
+
+    `blocking` is the highest-consequence field a rule carries: it puts the rule in front of an
+    operator as a stopping condition. Unattributed, it is an authority nobody stated — the exact
+    failure `source` exists to prevent, one field over. The pairing is checked here rather than in
+    the schema because a Zod refinement would report it as a shape error rather than as the rule
+    defect it is.
+  */
+  if (rule.blocking === true && rule.blocking_source === undefined) {
+    defects.push(
+      defect(rule.id, at('blocking'), 'is marked blocking but names no authority in blocking_source'),
+    );
+  }
+  if (rule.blocking !== true && rule.blocking_source !== undefined) {
+    defects.push(
+      defect(rule.id, at('blocking_source'), 'names a blocking authority but is not marked blocking'),
+    );
+  }
+
+  /*
     A corroboration pair must exist, be mutual, and not be a rule with itself (D-050).
 
     Mutual because the report renders the pair on **both** findings. A one-sided declaration

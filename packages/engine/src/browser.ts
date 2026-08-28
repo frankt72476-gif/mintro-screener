@@ -47,6 +47,8 @@ export type {
 export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
 
 export type {
+  BlockingSummary,
+  BlockingFailure,
   AssembleInput,
   ReportAccess,
   ReportCategory,

@@ -9611,3 +9611,169 @@ That sequence is the argument for the two-sided fixtures. It was not caught by r
 matcher; it was caught by re-running a real storefront and asking why one rule moved.
 
 ---
+
+## D-160 — DISC-003's false decline is not fixable from inside the check, and COA-002/003 do not have one
+
+**2026-08-28 · engineering · investigation, no code change**
+
+DISC-003 was named in D-159's matrix as the only rule whose degraded direction is a false decline:
+`critical`, `auto_fail`, `expect: present`, `threshold: all`. D-156 closed the acquisition half — a
+page that failed to render is now `not_evaluable`. It does not cover a page that rendered
+**successfully but incompletely**.
+
+### How the check establishes that a footer was rendered
+
+It does not, and nothing in it claims to. Two guards run:
+
+1. `isRendered(page)` — no `renderError`, HTTP 2xx. That is about the **navigation**, not the
+   content.
+2. `page.footer.found` — the extractor located a footer *element*: `<footer>`, then
+   `[role=contentinfo]`, then a footer class or id.
+
+`found` means an element existed at the moment `page.evaluate` ran. It says nothing about whether
+that element's contents had arrived.
+
+### What a partial render looks like from inside the check
+
+Identical to a merchant with no disclaimer. Both produce:
+
+- `page.footer.found === true`
+- `page.footer.text` short or empty, `styledText` sparse
+- `bestResemblance` returns nothing → `present === false` → **`violation`**
+
+There is no third signal. The check sees a footer with no resembling text and cannot tell whether
+more was coming.
+
+### Measured on the stored captures
+
+Four storefronts, every captured page:
+
+| site | footer element | footer chars | disclaimer text present |
+|---|---|---|---|
+| biotechpeptides | `<footer>` | 869 on every page (999 on `/my-account/`) | yes |
+| sportstechnologylabs | `<footer>` | 1049 on every page | **no** |
+| swisschems | `<footer>` | 660 on every page | yes |
+| peptidesciences | none | 0 | n/a — already `not_exposed` |
+
+Footers on these storefronts are **server-rendered and byte-identical across every page of a
+site**. The partial-render risk is not realised on any observed merchant, and STL's DISC-003 `fail`
+is a true positive. That does not make the risk hypothetical — it makes it unobserved.
+
+### Every completeness signal considered, and why each fails
+
+**A floor on footer text length.** There is precedent — `establishDocument` uses a 400-character
+floor to tell a document from a themed 404. It fails here: a genuinely minimal footer
+(`© 2026 Shop`) is a real merchant with no disclaimer and a real DISC-003 failure, and a floor turns
+it into `not_evaluable`. That trades an unobserved false decline for a manufactured **false clean**
+on an `auto_fail` rule, which this project ranks as its worst bug. The threshold would be a guess
+about how large a merchant's footer ought to be.
+
+**Cross-page consistency.** The strongest candidate and the one worth writing down, because it
+looks right and is not. DISC-003 is `all_sampled` with `threshold: all`, enforced by worst-state-wins
+in `runLayer2` — a `fail` on any one page fails the merchant. So *"the disclaimer is on four pages
+and missing from the fifth"* is precisely the observation the rule exists to make. Treating
+per-page variation as evidence of a render failure would make DISC-003 unable to detect the thing
+it is for. It also does not hold empirically: biotechpeptides' `/my-account/` footer is 999
+characters against 869 elsewhere, so footers legitimately differ.
+
+**Comparison against the homepage footer.** Same objection. The homepage is one of the pages the
+rule judges.
+
+**Whether `networkidle` settled or timed out.** Honest — an acquisition fact, not an inference
+about content — and useless as a gate: most complete pages never reach network quiet inside the
+budget (STL takes the full wait and is complete). Recording it would put a true statement next to
+the finding; branching on it would fail almost every run.
+
+**Structural emptiness — a footer element with descendants but no text.** Not currently extracted,
+and it catches only the empty-shell case, which is not the dangerous one. The dangerous one is a
+footer with nav links present and the disclaimer block not yet arrived, which is indistinguishable
+from a footer that never had one.
+
+### The ruling
+
+**There is no honest completeness signal available to DISC-003, and none is being added.**
+
+Every candidate is either constraint 9 in disguise — inferring completeness from the presence of
+the compliant form — or buys an unobserved false decline with a manufactured false clean on an
+`auto_fail` rule.
+
+So this is recorded as a **standing limitation, not a gap to be papered over**: DISC-003 can decline
+a merchant for a page that rendered incompletely, the condition is not detectable from inside the
+check, and no threshold will make it detectable without costing more than it saves. Anyone reading a
+DISC-003 failure should know that. It is the only rule in the set with this property.
+
+The honest routes out are outside the check and none is taken here: make the rule `review_only` so a
+person looks (a tier change, and D-157 says a tier change is its own decision), or capture the
+footer twice at different moments and compare (a crawl change, doubling a render per page for a
+condition never yet observed).
+
+### COA-002 and COA-003 do not have this shape
+
+Asked the same question and the answer is different, structurally.
+
+Both fail **on a value positively read** — a report date older than 60 days, a purity figure below
+98% — where DISC-003 fails on a value **not found**. That inverts the degraded direction. A
+certificate that could not be fetched, or whose text extracted empty, returns `unreadable`. A
+certificate whose text extracted but carries no recognisable date or purity figure returns
+`not_evaluable` with the reason stating exactly that: *"Its text was extracted and searched; no
+date in a recognised format was found near a date label."*
+
+There is no path from incomplete acquisition to a `fail` in either. They were flagged in D-159's
+matrix as candidates on the strength of being `auto_fail` and `critical`; examined, they are not.
+
+The one thing worth noting is the kind: a certificate whose text extracted but yielded no date is
+filed `not_exposed`, a statement about the document. That is right for a document that genuinely
+carries no date, and slightly generous to our extractor if the extraction was partial. `pdf.ts`
+reports a scanned certificate as unreadable rather than as text, which is what makes it defensible.
+
+---
+
+## D-161 — The blocking flag: data, and operator-visible only
+
+**2026-08-28 · IQwallet, 28 Aug 2026 · applied**
+
+Eight rules carry `blocking: true` and `blocking_source: { authority: 'IQwallet', ruled_on:
+'2026-08-28' }`: **CATG-001, CATG-002, CATG-003, CATG-004, PROD-006, PROD-007, NAME-001, PAY-001.**
+The list is D-157's, after the three `review_only` rules left it.
+
+### It is data, and the engine does not know which rules they are
+
+Hard constraint 1: adding a rule must never require touching the engine. The same holds for
+promoting one. `summariseBlocking` filters on `rule.blocking === true` and there is deliberately no
+rule id anywhere in it — adding or removing a stopping condition is an edit to
+`rules/ruleset.json` and a decision number, nothing else.
+
+Two schema fields rather than one. `blocking_source` is required whenever `blocking` is set and the
+pairing is checked in `invariants.ts`, not in the schema, so a violation reports as the rule defect
+it is rather than as a shape error. A flag with this much consequence and no attribution is exactly
+what `source` was added to prevent one field over: an authority nobody stated, silently attributed
+to whoever reads it next.
+
+### It decides nothing
+
+**The gate does not auto-decline.** The run surfaces which blocking rules failed and what backs
+each, and a person decides. No merchant or agent sees a decline from it. No package is withheld
+from IQwallet by it. Nothing in the report says "decline", "reject" or "blocked" — those are
+conclusions and they are IQwallet's (D-001, hard constraint 7). The panel names the rule, quotes
+the programme's own clause, states what was observed, and points at the captures.
+
+The panel is print-excluded. The exported document keeps the category structure and every finding
+individually (D-042); a summary that appeared only in the operator's view and not in the sent PDF
+is the right way round, because the summary is an operator's reading aid and the document is the
+record.
+
+### `not_evaluable` is shown beside the failures
+
+A stopping condition that could not be observed has not been cleared. Folding it in with the passes
+would let the difference vanish from the one summary an operator is most likely to read alone —
+which, given that this panel sits above the verdict, is the place it would do the most damage.
+
+### The field is optional, permanently
+
+Runs recorded before today do not carry the summary and never will: a completed run is immutable
+(D-002), so the five stored reports and every production run are frozen without it. The renderer
+says the report predates the flag rather than showing "0 of 0 stopping conditions" — that would be
+a statement about the merchant drawn from the age of the file. Same rule as `notEvaluableKind`
+under D-044, and the anchors test caught it.
+
+---
