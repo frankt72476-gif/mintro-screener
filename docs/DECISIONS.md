@@ -10828,3 +10828,163 @@ than restate the words; these two are the ones that would have gone quiet instea
 reason this section exists.
 
 ---
+
+## D-176 — Four sections, and the top band comes off
+
+**2026-08-29 · business owner · `docs/report-sections-spec.md`, built as `2f7a523` and `5afc9b0`**
+
+Recorded after the fact: `5afc9b0` cites this number and neither commit touched this file.
+
+The report was a list of findings with a band of summaries on top. It is four sections now, each
+answering one question, and the band is four lines.
+
+| # | Heading | Contains | The question it answers |
+|---|---|---|---|
+| 1 | Stopping conditions | The blocker-tier rules, and which were observed failing | Does this stop here? |
+| 2 | Questions only you can answer | The 19 attestations | What do you need from me? |
+| 3 | What we observed | Everything else in `fail` and `review` | What did you see? |
+| 4 | Not observed from the site | `not_evaluable`, plus the coverage account | What couldn't you see? |
+
+### Ordering is one parameter
+
+Merchant and agent read **1,2,3,4**; the IQwallet PDF reads **1,3,4,2**. Section 3 is a single list
+on the app surfaces and splits into *Not met* / *Needs a look* on the PDF.
+
+One `Surface` parameter, one component tree. Two trees would be two documents, and the surfaces are
+meant to differ in order and in what is collapsed, never in what exists. A test asserts the split
+and the single list carry an identical tally: same rows, different headings.
+
+The questions lead for the merchant because they are the only rows a merchant can act on. They come
+last for IQwallet, where an unanswered question is a gap in the record rather than a task.
+
+### Passes are furniture, not a section
+
+A count with a disclosure that expands them in place, inside section 4. Twenty-six passes above the
+fold is what made the document read as a list. Every one is still present and print opens the
+disclosure, so the export holds what the screen holds (D-042 as revised by D-166) — the count is not
+a substitute for them.
+
+### A cleared blocker is a passing row
+
+**The first cut of `reportParts` excluded every declared stopping condition from every other
+section, and silently dropped the eight cleared blockers on `c268f8d7`: 54 of 62 findings placed,
+and nothing said so.**
+
+"Every item belongs to exactly one" is about where a **row** is rendered, not about which sections
+may mention a rule. So:
+
+- A blocker **observed failing** is a row in section 1, and appears nowhere else.
+- A blocker that was **met** is a passing row in section 4's disclosure, like any other pass.
+- A blocker that could **not be observed** is a row in section 4's buckets, under whose limitation
+  it was.
+- Section 1 still *accounts* for all of them: `StoppingAccount` carries `passed` and `notEvaluable`
+  by id, and naming a rule in a summary line is not rendering its row.
+
+Partition asserted across all three surfaces: **62/62 and 66/66 findings placed, no duplicate rows.**
+
+The stopping set is read off `report.blocking` rather than the current rule set, deliberately. A run
+is immutable (D-002) and was screened against the rule set of its day, so a rule flagged since must
+not retroactively move a finding out of section 3 on a report written before the flag existed.
+
+### Section 1 renders at zero, and says which kind of zero
+
+*"None of the 8 stopping conditions was observed failing on this run."* A section that vanished
+would leave a reader unable to tell "checked, nothing found" from "not checked".
+
+**A run predating the flag says something different**: *"screened before stopping conditions were
+recorded, so which rules counted as one was not written down."* `5b29036d` is that case. Reporting
+"none of the 0" would be a clean sweep against conditions nobody had declared — an absent value
+rendered as an answer (D-044).
+
+**And it reads zero on the merchant and IQwallet surfaces by construction.** A package with a failed
+stopping condition goes to the agent only — no IQwallet send, no merchant comment link — so an empty
+section there is not evidence about the merchant. Recorded in `stoppingPart` and again in
+`Sections.tsx` so nobody rediscovers it as a bug.
+
+### Print had no group header at all
+
+`GroupCard` rendered its heading only inside the collapsible screen branch, so on paper a rule's
+title existed **only on its instances**, N times over, and the row a reader scans did not exist.
+
+Part 1 (`2f7a523`) gave every group a header on paper: 0 → 51 on both reference runs. Part 2
+narrowed it, and **the 51 is no longer the number** — a group of one *is* its row, carrying the same
+title, rule id and state, so heading it printed the same three things twice. Headers now render only
+where they head more than one row: **0 → 2 on `c268f8d7` and 0 → 3 on `5b29036d`**, with all 62 and
+66 rows rendered.
+
+That is adjacent to the outstanding revision 2 — *instances become compact rows under a single
+title* — and is not it. The collapsed screen branch still repeats the title beneath its header, as
+it always has. What this ruling covers is that part 1 must not make it worse.
+
+Section and group headings both carry `break-after: avoid`, and the section name repeats down long
+sections through a running header. A heading first met on page 4 of 24 is a heading the reader has
+already lost.
+
+### One derivation
+
+`tally(groups)` is the only place a section's numbers are computed; `reportTally(report)` is the same
+function over the whole report. The header lines and the section headings read the same tallies, so
+a line and the heading it points at cannot disagree — and a test asserts the section counts sum to
+the report tally.
+
+Built in part 1 before anything read it from the header, so that when part 2 arrived there was
+nothing to write and nothing to get subtly different.
+
+### The top band, and what replaced it
+
+Deleted: the verdict sentence, the tick strip and its legend, the six coverage columns, the coverage
+line under the filter chips, and `.card.blocking` as a floating panel — it is section 1 now. Those
+were four statements of one distribution; a reader had to parse three of them to learn what a
+numeral says. This closes revision 3 and most of revision 5.
+
+What replaced them is four lines, numerals first, each linking to its section:
+
+    0  stopping conditions observed
+   19  questions only you can answer
+    3  standards not met
+   11  need a look
+
+A zero line renders with its `0` and no link: an absent line reads as an absent section (D-044), and
+a link to a section with nothing in it lands a reader somewhere that does not answer them.
+
+**The filter chips stay.** They are the one thing on the page a reader can act on, and a filter is
+not a restatement of anything.
+
+**Nothing was moved into the space this vacated.** The point was air.
+
+### Coverage keeps our failure apart from the merchant's storefront
+
+Six labelled boxes become one sentence, inside the section it explains:
+
+> Of 66 findings, 38 were resolved from the crawled surface. 28 were not: 11 needed a surface no
+> crawl reaches, 13 were looked for and not found on the site, 3 are checks Mintro has not built
+> yet, and 1 could not be fetched on this run.
+
+**This departs from the spec's example, deliberately.** The spec wrote *"14 were looked for and not
+found"*; the sentence splits that into 13 not found **and 1 not fetched**. `not_exposed` is the
+merchant's storefront and `not_retrieved` is this run's own failure, and merging them is the
+conflation `notEvaluableKind` was introduced to end (D-136) and that D-158 turns on. Both total 28.
+
+Still counting findings rather than rules. D-170 made the header name both nouns rather than change
+the measure, and whether an underwriter should read "32 of 54 rules" is a question about what the
+report claims — deferred, as the spec says.
+
+### Page counts
+
+| run | original | now |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 36 | **24** |
+| `5b29036d` comopeptides | 38 | **25** |
+
+Rendered with credentials, so the captures are present and these compare to D-167's numbers.
+
+**The path was not monotonic and the record should say so.** D-167's restructure reached 24 and 25;
+part 1 went *back up* to 26 and 26 by giving print the headers it never had; part 2 returned to 24
+and 25. So the top band was costing about two pages of twenty-six, and the 36 → 24 figure spans
+everything since the original document rather than this change alone.
+
+**Short of the ~12 the spec named, and for the reason D-167 already gave**: the remaining volume is
+evidence, at one capture per finding, not layout. Reaching twelve means one capture per *rule*, or
+captures behind a link — changes to what the export contains, and neither is in this spec.
+
+---
