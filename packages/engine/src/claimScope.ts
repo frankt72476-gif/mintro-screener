@@ -93,6 +93,47 @@ function mentions(sentence: string, term: string, wordBoundary: boolean): boolea
 }
 
 /**
+ * How a term is separated from the next when a page writes it as one word or two (D-177).
+ *
+ * `weight loss`, `weight-loss` and `weightloss` are one claim written three ways, and a matcher
+ * that sees only the spelling it was handed is blind to the other two. On an `expect: absent` rule
+ * that blindness reads as *"no prohibited claim found"* — the false pass hard constraint 2 names,
+ * arrived at by exactly the route D-014 describes: recognising the form you were given rather than
+ * the subject you are looking for.
+ *
+ * So a separator in the **term** matches a separator, a hyphen, or nothing in the **page**. It runs
+ * in both directions: a term written `anti-aging` reaches `anti aging`, and `nasal spray` reaches
+ * `nasalspray`. `*` rather than `?` because page text is not normalised before this sees it, so a
+ * phrase broken across a line arrives with a newline and an indent between its words.
+ *
+ * This belongs here and not in each rule's term list. Variants written per rule are a tax every
+ * future rule pays and a list every author gets differently wrong — PAY-001 already carries
+ * `Cash App` *and* `CashApp` for want of this.
+ */
+const SEPARATOR = '[\\s-]*';
+
+/**
+ * The inflections a term is allowed, as a closed list.
+ *
+ * `-ly` earns its place on the evidence of the rules that already exist: it is what takes
+ * PROD-007's `subcutaneous` to `subcutaneously` and `intramuscular` to `intramuscularly`. Those are
+ * the same claim, and the rule was missing them.
+ *
+ * It does **not** reach `therapeutic` to `therapeutically` — English inserts `al`, and this list
+ * appends. PROD-008 does not see that adverb. Asserted in `termPattern.test.ts` rather than left as
+ * an assumption, because the comment here claimed it did before a test asked.
+ *
+ * **`-ity` is deliberately not here.** It would take `bioavailable` to `bioavailability`, which is
+ * wanted — and it would also take an unknown number of other adjectives to nouns that mean
+ * something else, on every rule at once, for the sake of one term. A rule that needs the noun lists
+ * the noun; that is one deliberate exception, visible in the rule, rather than a widening nobody
+ * can enumerate the consequences of. See D-177.
+ */
+const INFLECTIONS = '(?:s|es|d|ed|ing|ly)?';
+
+const escapeRegex = (part: string): string => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * The regex for one term.
  *
  * With `wordBoundary` the term is anchored at both ends **and allowed its regular inflections**:
@@ -106,13 +147,18 @@ function mentions(sentence: string, term: string, wordBoundary: boolean): boolea
  *   - the suffix list is closed, so `heal` does not reach `health` — `t` is not an inflection;
  *   - the trailing `\b` keeps `Cagri` out of `Cagrilintide`, which PROD-010 exists to encourage.
  *
- * Without `wordBoundary` the term is matched as written: a rule that did not ask for boundaries is
- * matching a proper noun or a phrase — `Cash App`, `friends and family` — where inflection is
- * meaningless and anchoring would be wrong.
+ * **The anchoring is unchanged by the separator widening**, and that is the whole reason the
+ * widening is safe: the term may be written as one word or two, but it still has to start where a
+ * word starts and end where one ends.
+ *
+ * Without `wordBoundary` the term is matched unanchored and uninflected — a rule that did not ask
+ * for boundaries is matching a proper noun or a phrase, `Cash App`, `friends and family`, where
+ * inflection is meaningless. It still gets the separator flexibility, because how a merchant spaces
+ * `Cash App` is not a different payment method.
  */
 function termPattern(term: string, wordBoundary: boolean): RegExp {
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(wordBoundary ? `\\b${escaped}(?:s|es|d|ed|ing)?\\b` : escaped, 'i');
+  const body = term.trim().split(/[\s-]+/).map(escapeRegex).join(SEPARATOR);
+  return new RegExp(wordBoundary ? `\\b${body}${INFLECTIONS}\\b` : body, 'i');
 }
 
 function isAttributed(sentence: string): boolean {
