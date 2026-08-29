@@ -1964,3 +1964,58 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .phase-said{font-family:'JetBrains Mono',monospace}
 /* The cap is stated, never counted down — it is a ceiling, not a prediction (D-152). */
 .phase-clock{margin-left:auto;color:var(--ink-mid);opacity:.75}
+
+/* ---------- four sections (spec §1) ---------- */
+
+.part { margin: 0 0 34px; }
+.part-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.part-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 0;
+}
+.part-head .sect-count { margin-left: auto; font-size: 11px; color: var(--slate); }
+
+.sect-block { margin-top: 14px; }
+.block-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+.block-lede { margin: 0 0 6px; font-size: 12px; color: var(--slate); max-width: 66ch; }
+
+/* Section 1 at zero is a sentence, not an empty space. It is not styled as a failure: nothing
+   failed, and colouring it as though something had would be a verdict the words do not carry. */
+.stopping-account { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-mid); }
+.stopping-account.clear { color: var(--slate); }
+
+/* The passes, as furniture. A count and a disclosure, never a heading of their own. */
+.passes { margin-top: 16px; border-top: 1px solid var(--line-soft); padding-top: 10px; }
+.passes-head {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+  font-size: 12.5px; color: var(--ink-mid);
+}
+.passes-head:disabled { cursor: default; }
+.passes-count { font-weight: 600; }
+
+/* A group header outside the collapsible screen row — the print branch, where nothing toggles. */
+.cat-head.static { display: flex; align-items: baseline; gap: 10px; padding: 0; }
+
+@media print {
+  /*
+    A heading that has left its content behind is worse than no heading.
+
+    `break-after: avoid` keeps a section or group heading on the page with the first thing it
+    introduces, and `break-inside: avoid` keeps a single row whole. The section name repeats down a
+    long section through the running header below, so a reader who turns to page 4 of 24 still
+    knows which of the four they are in — which is the thing the export did not have.
+  */
+  .part { break-inside: auto; }
+  .part-head,
+  .block-head,
+  .cat-head.static { break-after: avoid; break-inside: avoid; }
+  .find { break-inside: avoid; }
+
+  /* The running header: the section name, carried on every page the section covers. */
+  .part-name { string-set: section content(); }
+  @page { @top-left { content: string(section); font-size: 9px; color: #6B6880; } }
+
+  /* Print opens the disclosure, so the export holds what the screen holds (D-042 / D-166). */
+  .passes-head .caret { display: none; }
+}

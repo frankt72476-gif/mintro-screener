@@ -778,6 +778,7 @@ function OpenReport({
           the box they would add to.
         */}
         <ReportView
+          surface="merchant"
           report={opened.report}
           access={access}
           filter={filter}

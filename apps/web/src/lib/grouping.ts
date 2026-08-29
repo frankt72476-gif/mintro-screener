@@ -580,3 +580,301 @@ export function invitedFindings(report: ScreeningReport): readonly InvitedRef[] 
 
   return invited;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════════
+   Four sections (spec §1)
+   ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/** The four. Every item in the report belongs to exactly one. */
+export type SectionId = 'stopping' | 'questions' | 'observed' | 'not-observed';
+
+/**
+ * Who is reading.
+ *
+ * `agent` and `merchant` differ in what they may act on, not in how the document is ordered, so
+ * they order alike. `iqwallet` is the only surface that reorders — see `SECTION_ORDER`.
+ */
+export type Surface = 'merchant' | 'agent' | 'iqwallet';
+
+/**
+ * What a section header states, and what the header lines will state (spec §3).
+ *
+ * **One derivation, built now and read from two places later.** The section counts and the header
+ * lines are the same arithmetic over the same groups; deriving them separately is how a document
+ * comes to disagree with its own summary. Part 2 replaces the top band and will read `reportTally`.
+ * Nothing reads it from there yet — it is built now so that when it does, there is nothing to write
+ * and nothing to get subtly different.
+ */
+export interface SectionTally {
+  /** Rows. A rule is one row however many pages it was observed on (D-166). */
+  readonly rules: number;
+  /** Instances. What those rows expand to. */
+  readonly findings: number;
+  /** The distribution across the rows' worst states, so a header can say more than a total. */
+  readonly byState: Readonly<Record<State, number>>;
+}
+
+const EMPTY_BY_STATE: Record<State, number> = { fail: 0, review: 0, pass: 0, not_evaluable: 0 };
+
+/** The one place a section's numbers are computed. */
+export function tally(groups: readonly FindingGroup[]): SectionTally {
+  const byState = { ...EMPTY_BY_STATE };
+  for (const group of groups) byState[group.state] += 1;
+  return { rules: countRules(groups), findings: countFindings(groups), byState };
+}
+
+/** The same arithmetic over the whole report, for the header lines part 2 will add. */
+export function reportTally(report: ScreeningReport): SectionTally {
+  return tally(nestCascades(groupByRule(ungrouped(report))));
+}
+
+/**
+ * A heading and the rows under it.
+ *
+ * Most sections have exactly one. Section 3 has one on the app surfaces and two on the IQwallet
+ * PDF, which is the whole of what "grouping is a parameter" means: a merchant fixing a storefront
+ * works a single list, an underwriter reads *not met* and *needs a look* as different categories.
+ */
+export interface SectionBlock {
+  readonly key: string;
+  /** `null` where the section's own heading is the only one — no sub-heading is rendered. */
+  readonly heading: string | null;
+  readonly lede: string;
+  readonly state?: State;
+  readonly bucket?: Bucket;
+  readonly groups: readonly FindingGroup[];
+  readonly tally: SectionTally;
+}
+
+/** What the stopping-conditions section states, whether or not anything was observed failing. */
+export interface StoppingAccount {
+  /** How many rules the rule set declares as stopping conditions, or null on a run predating them. */
+  readonly declared: number | null;
+  readonly failed: readonly FindingGroup[];
+  /** Declared rules this run could not observe either way. Named, never counted as cleared. */
+  readonly notEvaluable: readonly string[];
+  readonly passed: readonly string[];
+}
+
+export interface ReportPart {
+  readonly id: SectionId;
+  readonly heading: string;
+  readonly lede: string;
+  readonly blocks: readonly SectionBlock[];
+  readonly tally: SectionTally;
+  /** Section 1 only. */
+  readonly stopping?: StoppingAccount;
+  /**
+   * Section 4 only: the passes, which are furniture rather than a section of their own.
+   *
+   * Twenty-six passes above the fold is what makes the document read as a list, so they are a count
+   * with a disclosure that expands them in place. Every one is still present — the count is not a
+   * substitute for them, and print opens the disclosure (D-042 as revised by D-166).
+   */
+  readonly passes?: { readonly groups: readonly FindingGroup[]; readonly tally: SectionTally };
+}
+
+const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
+  stopping: 'Stopping conditions',
+  questions: 'Questions only you can answer',
+  observed: 'What we observed',
+  'not-observed': 'Not observed from the site',
+};
+
+/**
+ * Reading order by surface (spec §1).
+ *
+ * One parameter, not two component trees. Merchant and agent read 1,2,3,4 — the questions are the
+ * merchant's own work and the only rows they can act on, so they come before anything observed.
+ * IQwallet reads 1,3,4,2: an unanswered question there is a gap in the record rather than a task,
+ * and it belongs after what was seen.
+ */
+const SECTION_ORDER: Readonly<Record<Surface, readonly SectionId[]>> = {
+  merchant: ['stopping', 'questions', 'observed', 'not-observed'],
+  agent: ['stopping', 'questions', 'observed', 'not-observed'],
+  iqwallet: ['stopping', 'observed', 'not-observed', 'questions'],
+};
+
+/**
+ * The stopping conditions this report renders as **rows in section 1**, by id.
+ *
+ * Only the ones observed failing. A stopping condition that was met is a passing row like any
+ * other and belongs in section 4's disclosure; one that could not be observed belongs in section
+ * 4's buckets, under whose limitation it was. Section 1 still *accounts* for all of them —
+ * `StoppingAccount` carries `passed` and `notEvaluable` by id — but accounting for a rule in a
+ * summary line is not the same as rendering its row, and only the row has to be unique.
+ *
+ * The first cut excluded every declared rule from every other section, which silently dropped the
+ * eight cleared blockers on `c268f8d7`: 54 of 62 findings placed, and nothing said so. "Every item
+ * belongs to exactly one" is about where a row is rendered, not about which sections may mention a
+ * rule.
+ *
+ * Read off `report.blocking` rather than the rule set deliberately: a run is immutable (D-002) and
+ * was screened against the rule set of its day, so a rule flagged since must not retroactively move
+ * a finding out of section 3 on a report written before the flag existed.
+ */
+function stoppingRuleIds(report: ScreeningReport): ReadonlySet<string> {
+  return new Set((report.blocking?.failed ?? []).map((entry) => entry.ruleId));
+}
+
+/**
+ * The four sections, in this surface's order.
+ *
+ * Every group lands in exactly one. A stopping condition that failed is in section 1 and nowhere
+ * else — it is not repeated under "What we observed", because a reader who has met it once has met
+ * it, and repeating it would put the same row in two sections with two different weights.
+ */
+export function reportParts(report: ScreeningReport, surface: Surface): readonly ReportPart[] {
+  const groups = nestCascades(groupByRule(ungrouped(report)));
+  const stoppingIds = stoppingRuleIds(report);
+  const isStopping = (group: FindingGroup): boolean => stoppingIds.has(group.ruleId);
+
+  const parts: Record<SectionId, ReportPart> = {
+    stopping: stoppingPart(
+      report,
+      groups.filter((group) => isStopping(group) && group.state === 'fail'),
+    ),
+    questions: questionsPart(report),
+    observed: observedPart(
+      groups.filter(
+        (group) => !isStopping(group) && (group.state === 'fail' || group.state === 'review'),
+      ),
+      surface,
+    ),
+    'not-observed': notObservedPart(
+      groups.filter((group) => !isStopping(group) && group.state === 'not_evaluable'),
+      groups.filter((group) => !isStopping(group) && group.state === 'pass'),
+    ),
+  };
+
+  return SECTION_ORDER[surface].map((id) => parts[id]);
+}
+
+/**
+ * Section 1, which renders at zero.
+ *
+ * *"None of the 8 stopping conditions was observed failing"* is worth saying, and a section that
+ * vanished when nothing failed would leave a reader unable to tell "checked, nothing found" from
+ * "not checked at all".
+ *
+ * ## Why it reads zero on the merchant and IQwallet surfaces by construction
+ *
+ * A package with a failed stopping condition **goes to the agent only** — no IQwallet send, no
+ * merchant comment link. So on those two surfaces this section is empty not because the storefront
+ * cleared every condition but because a package that had not would never have reached them. It
+ * carries content on an agent package and there alone.
+ *
+ * That is correct rather than a bug, and it is recorded here so nobody later reads an empty section
+ * on a merchant page as evidence about the merchant. On the agent surface
+ * `hasFailedStoppingConditions` routes to the decline notice, which is the document that carries
+ * the detail (D-163).
+ */
+function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]): ReportPart {
+  const blocking = report.blocking;
+  return {
+    id: 'stopping',
+    heading: SECTION_HEADING.stopping,
+    lede:
+      blocking === undefined
+        ? 'This run was screened before stopping conditions were recorded, so which rules counted as one was not written down.'
+        : 'Conditions an underwriter has stated it declines applications on, and what this run observed against each.',
+    blocks: [{ key: 'stopping', heading: null, lede: '', groups: failed, tally: tally(failed) }],
+    tally: tally(failed),
+    stopping: {
+      declared: blocking?.declared ?? null,
+      failed,
+      notEvaluable: blocking?.notEvaluable ?? [],
+      passed: blocking?.passed ?? [],
+    },
+  };
+}
+
+/**
+ * Section 2, which holds no findings at all.
+ *
+ * The attestations are the merchant's own statements about what no crawl can see. They are rendered
+ * by `AttestationSection`, which shares nothing with a finding row on purpose (D-134), so this part
+ * carries the heading and the count and the component supplies the rest.
+ */
+function questionsPart(report: ScreeningReport): ReportPart {
+  const asked = report.attestationQuestions?.length ?? 0;
+  return {
+    id: 'questions',
+    heading: SECTION_HEADING.questions,
+    lede:
+      asked === 0
+        ? 'This run carries no operational questions.'
+        : 'No crawl can answer these. They are the merchant’s own statements, quoted as given and verified by nobody.',
+    blocks: [],
+    tally: { rules: asked, findings: asked, byState: { ...EMPTY_BY_STATE } },
+  };
+}
+
+/**
+ * Section 3 — one heading on the app surfaces, two on the IQwallet PDF.
+ *
+ * A merchant fixing their storefront works a single list and does not care which bucket a row is
+ * in. An underwriter reads *not met* and *needs a look* as different categories, because one is an
+ * observation against a stated condition and the other is a judgement they have to make. Same rows,
+ * same order within each; only the headings differ.
+ */
+function observedPart(groups: readonly FindingGroup[], surface: Surface): ReportPart {
+  const blocks: SectionBlock[] =
+    surface === 'iqwallet'
+      ? (['fail', 'review'] as const)
+          .map((state) => {
+            const ofState = groups.filter((group) => group.state === state);
+            return {
+              key: `observed:${state}`,
+              heading: STATE_LABEL[state],
+              lede: '',
+              state,
+              groups: ofState,
+              tally: tally(ofState),
+            };
+          })
+          .filter((block) => block.groups.length > 0)
+      : [{ key: 'observed', heading: null, lede: '', groups, tally: tally(groups) }];
+
+  return {
+    id: 'observed',
+    heading: SECTION_HEADING.observed,
+    lede: 'What the crawl saw on the pages named, with the capture behind each. Stopping conditions are in section 1 and are not repeated here.',
+    blocks,
+    tally: tally(groups),
+  };
+}
+
+/**
+ * Section 4 — what could not be seen, and the passes as furniture.
+ *
+ * The `not_evaluable` rows keep their four-way split (D-044): whose limitation each gap is is the
+ * whole point of the section, and one undifferentiated pile would tell a merchant that Mintro's
+ * unbuilt check and their own missing page are the same kind of fact.
+ */
+function notObservedPart(
+  unevaluated: readonly FindingGroup[],
+  passes: readonly FindingGroup[],
+): ReportPart {
+  const blocks: SectionBlock[] = NOT_EVALUABLE_ORDER.map(({ bucket, heading, lede }) => {
+    const ofBucket = unevaluated.filter((group) => bucketOfGroup(group) === bucket);
+    return {
+      key: `not-observed:${bucket}`,
+      heading,
+      lede,
+      state: 'not_evaluable' as const,
+      bucket,
+      groups: ofBucket,
+      tally: tally(ofBucket),
+    };
+  }).filter((block) => block.groups.length > 0);
+
+  return {
+    id: 'not-observed',
+    heading: SECTION_HEADING['not-observed'],
+    lede: 'What this run could not establish, and whose limitation each one is.',
+    blocks,
+    tally: tally(unevaluated),
+    passes: { groups: passes, tally: tally(passes) },
+  };
+}

@@ -22,16 +22,16 @@ import {
 } from '@mintro/engine';
 import {
   describeGroup,
-  groupReport,
-  nothingObservedSection,
+  reportParts,
   ordinalsFor,
-  NOTHING_OBSERVED_ID,
   type FindingGroup,
+  type Surface,
 } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
+import { ReportSectionView } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
@@ -122,6 +122,14 @@ interface Props {
    * the section rather than rendering nineteen questions as unanswered (D-036).
    */
   readonly attestations?: RunAttestations;
+  /**
+   * Who this rendering is for (spec §1).
+   *
+   * Decides section order and whether section 3 splits — nothing else. Defaults to the IQwallet
+   * PDF when printing and to the agent screen otherwise, because those are what each path produces
+   * today; the merchant page passes its own.
+   */
+  readonly surface?: Surface;
 }
 
 export function ReportView({
@@ -134,11 +142,15 @@ export function ReportView({
   participation,
   filter: controlledFilter,
   onFilterChange,
+  surface: surfaceProp,
   commentBox,
   attestations,
 }: Props): JSX.Element {
   // Both branches read from this, so a comment keys the same way whichever view is rendering.
   const ordinals = useMemo(() => ordinalsFor(report), [report]);
+  // The default is the document each path actually produces today; a caller that knows better says
+  // so. One parameter decides order and section 3's grouping, and nothing else (spec §1).
+  const surface: Surface = surfaceProp ?? (print ? 'iqwallet' : 'agent');
   const [ownFilter, setOwnFilter] = useState<Filter>('all');
   const filter = controlledFilter ?? ownFilter;
   const setFilter = (next: Filter): void => {
@@ -287,72 +299,63 @@ export function ReportView({
         No `commentBox`, because a printed page has nowhere to type. That asymmetry is the entire
         difference between the two views, and it is why the props are separate rather than one.
       */}
-      {print ? (
-        /*
-          The export renders the **same structure** as the screen, with every instance expanded
-          inline (D-042 as revised by D-166).
+      {/*
+        Four sections, one tree, order as a parameter (spec §1).
 
-          D-042 kept the print view on the category structure because "a grouped export would
-          quietly hold less" — and that was right about the grouping it had, which collapsed
-          findings behind a disclosure the paper could not open. The group is now a *container*:
-          print opens every one, so the export holds exactly what the screen holds, in the order
-          the screen holds it. Two structures for one report was the thing that made them able to
-          disagree.
-        */
-        <div>
-          {groupReport(report).map((section) => (
-            <StateSection
-              key={section.key}
-              section={section}
-              access={access}
-              ordinals={ordinals}
-              print
-              {...(commentaryOf === undefined ? {} : { commentaryOf })}
-            />
-          ))}
-        </div>
-      ) : (
-        <div>
-          {(() => {
-            const sections = groupReport(report).filter(
-              (section) => filter === 'all' || section.state === filter,
-            );
+        The print and screen branches were two maps over the same data, which is how the export came
+        to have no group headers while the screen had them. There is one map now; `print` decides
+        what is open, never what exists.
 
-            /*
-              Where "jump to these" lands (D-067, fixed in D-069).
+        The attestations move **inside** section 2, which is why they no longer render below. On the
+        IQwallet PDF that section sorts last (1,3,4,2); on the merchant and agent surfaces it is
+        second, ahead of anything observed, because it is the only part a merchant can act on.
+      */}
+      <div>
+        {reportParts(report, surface).map((part) => {
+          const questions =
+            part.id === 'questions' && attestations !== undefined ? (
+              <AttestationSection attestations={attestations} print={print} />
+            ) : null;
 
-              `nothingObservedSection` is the same call the callout uses to decide whether to render
-              a link at all, so the link and the anchor cannot disagree about whether the target
-              exists. They were two computations and did: the callout counted with one rule, this
-              picked a section with another, and a report could satisfy the first and not the
-              second — which is what produced a link that did nothing.
-
-              Matched by key rather than by object identity, because `sections` here is filtered and
-              `nothingObservedSection` reads the unfiltered report.
-            */
-            const targetKey = nothingObservedSection(report)?.key;
-            const target = sections.find((section) => section.key === targetKey);
-
-            return sections.map((section) => (
-              <StateSection
-                key={section.key}
-                section={section}
+          const passes =
+            part.passes !== undefined && part.passes.groups.length > 0 ? (
+              <PassDisclosure
+                groups={part.passes.groups}
+                tally={part.passes.tally}
                 access={access}
-                anchored={section === target}
                 ordinals={ordinals}
+                print={print}
                 {...(commentaryOf === undefined ? {} : { commentaryOf })}
                 {...(commentBox === undefined ? {} : { commentBox })}
               />
-            ));
-          })()}
-        </div>
-      )}
+            ) : null;
 
-      {/*
-        After the findings, because they answer what the crawl could not reach — and outside the
-        category structure, because nothing in them is a finding (D-134).
-      */}
-      {attestations !== undefined && <AttestationSection attestations={attestations} print={print} />}
+          return (
+            <ReportSectionView
+              key={part.id}
+              part={part}
+              questions={questions}
+              passes={passes}
+            >
+              {(block) =>
+                block.groups
+                  .filter((group) => print || filter === 'all' || group.state === filter)
+                  .map((group) => (
+                    <GroupCard
+                      key={`${group.ruleId}-${group.state}`}
+                      group={group}
+                      access={access}
+                      ordinals={ordinals}
+                      {...(print === true ? { print: true } : {})}
+                      {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                      {...(commentBox === undefined ? {} : { commentBox })}
+                    />
+                  ))
+              }
+            </ReportSectionView>
+          );
+        })}
+      </div>
 
       {/*
         Read from the run rather than from today's rule set: a report reopened next year says what
@@ -1113,101 +1116,57 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
   );
 }
 
+
 /**
- * One state's findings.
+ * The passes, as furniture rather than a section (spec §1).
  *
- * The lede says what the section is and how it is grouped, because a reader who sees "×5" needs
- * to know whether that is five pages or five rules — and because a failure section that looks
- * grouped when it is not would be read as understating.
+ * Twenty-six passes above the fold is what makes the document read as a list, so they are a count
+ * with a disclosure that expands them **in place**. Every one is still here — the count is not a
+ * substitute for them, and print opens the disclosure so the export holds exactly what the screen
+ * holds (D-042 as revised by D-166).
  */
-function StateSection({
-  section,
+function PassDisclosure({
+  groups,
+  tally,
   access,
-  anchored = false,
   ordinals,
+  print,
   commentaryOf,
   commentBox,
-  print,
 }: {
-  readonly ordinals: ReadonlyMap<ReportFinding, number>;
-  /** Every instance expanded inline, for the export (D-042 as revised by D-166). */
-  readonly print?: boolean;
-  /** Carries the `#nothing-observed` anchor the merchant page jumps to (D-067). */
-  readonly anchored?: boolean;
-  readonly section: import('../lib/grouping.js').ReportSection;
+  readonly groups: readonly FindingGroup[];
+  readonly tally: { readonly rules: number; readonly findings: number };
   readonly access: EvidenceAccess;
+  readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  readonly print?: boolean;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
-  /**
-   * A run-level statement about commentary, when there is one to make (D-063).
-   *
-   * Two things need saying at the top of a report and cannot be said beneath a finding, because
-   * both are reasons the per-finding spaces are blank: **the responses could not be read**, and
-   * **the invitation was never transmitted**. Left to the finding rows, either would render as an
-   * absence of comment — Mintro's failure shown as the merchant's silence, which is D-044.
-   */
-  readonly commentaryNote?: string;
-  /**
-   * What the merchant's side of this looks like (D-063).
-   *
-   * Rendered above the findings, because an underwriter reading a response needs to know who wrote
-   * it and how much else went unanswered *before* they read it. Present on the analyst screen and
-   * in the PDF; absent on the merchant's own page, where it would narrate them back at themselves
-   * (D-067).
-   */
-  readonly participation?: Participation;
-  /**
-   * A controlled filter, when the caller needs one.
-   *
-   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
-   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
-   * filter first — which it can only do if it owns the value (D-069).
-   *
-   * Uncontrolled when omitted, which is every other caller.
-   */
-  readonly filter?: Filter;
-  readonly onFilterChange?: (filter: Filter) => void;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
 }): JSX.Element {
-  /*
-    The bucket is an attribute, not folded into the state class (D-044).
+  const [open, setOpen] = useState(false);
+  const shown = print === true || open;
 
-    All four not-evaluable sections keep the muted `na` palette, because none of them is a
-    failure. What separates them is a left rule and a label, so a reader scanning the report sees
-    that "Mintro has not built this yet" is a different kind of statement from "the site did not
-    carry it". Rendering them identically is the thing this fixes.
-  */
   return (
-    <section
-      className={`sect ${stateClass(section.state)}`}
-      data-bucket={section.bucket ?? undefined}
-      {...(anchored ? { id: NOTHING_OBSERVED_ID } : {})}
-    >
-      <div className="sect-head">
-        <span className={`state ${stateClass(section.state)}`}>{section.heading}</span>
-        {/*
-          Rows and findings, both (D-166). A section holds whole rules now, so "11 rules" is what a
-          reader is scanning and "14 findings" is what those rules produced. One number would have
-          to stand for the other and neither can.
-        */}
-        <span className="sect-count">
-          {section.rules} rule{section.rules === 1 ? '' : 's'}
-          {section.count !== section.rules && ` · ${section.count} findings`}
+    <div className="passes">
+      <button className="passes-head" onClick={() => setOpen(!open)} disabled={print}>
+        <span className="passes-count">
+          {tally.rules} rule{tally.rules === 1 ? '' : 's'} met
+          {tally.findings !== tally.rules && ` · ${tally.findings} findings`}
         </span>
-      </div>
-      <p className="sect-lede">{section.lede}</p>
-
-      {section.groups.map((group) => (
-        <GroupCard
-          key={`${group.ruleId}-${group.state}`}
-          group={group}
-          access={access}
-          ordinals={ordinals}
-          {...(print === true ? { print: true } : {})}
-          {...(commentaryOf === undefined ? {} : { commentaryOf })}
-          {...(commentBox === undefined ? {} : { commentBox })}
-        />
-      ))}
-    </section>
+        {print !== true && <span className="caret">{open ? '▾' : '▸'}</span>}
+      </button>
+      {shown &&
+        groups.map((group) => (
+          <GroupCard
+            key={`${group.ruleId}-pass`}
+            group={group}
+            access={access}
+            ordinals={ordinals}
+            {...(print === true ? { print: true } : {})}
+            {...(commentaryOf === undefined ? {} : { commentaryOf })}
+            {...(commentBox === undefined ? {} : { commentBox })}
+          />
+        ))}
+    </div>
   );
 }
 
@@ -1268,6 +1227,21 @@ function GroupCard({
   if (print === true || !group.collapsible) {
     return (
       <div className="card cat open">
+        {/*
+          The group header, which the export did not have (spec §1).
+
+          `cat-head` was rendered only in the collapsible screen branch, so on paper a rule's title
+          existed **only on its instances**, N times over, and the row that a reader is meant to
+          scan did not exist at all. It is a heading here rather than a button because there is
+          nothing to toggle: everything below it is already open.
+        */}
+        <div className="cat-head static">
+          <span className={`state ${stateClass(group.state)}`}>{STATE_LABEL[group.state]}</span>
+          <span className="cat-name">
+            {group.title} <span className="mono group-rule">{group.ruleId}</span>
+          </span>
+          {group.findings.length > 1 && <span className="group-count">×{group.findings.length}</span>}
+        </div>
         <div className="cat-body">
           {group.findings.length > 1 && <p className="group-lede">{describeGroup(group)}</p>}
           {group.findings.map((finding, i) => (
