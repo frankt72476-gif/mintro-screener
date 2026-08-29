@@ -10653,3 +10653,82 @@ RLS unchanged and none needed: `scan_requests_select` already limits reads to `i
 the only writer. Merchants and agents never see the queue and never trigger a run.
 
 ---
+
+## D-174 — Progress writes are serialised, and the phase clock moves only on a transition
+
+**2026-08-29 · business owner · reported live against comopeptides**
+
+Three symptoms on the run page, with two causes.
+
+### The clock
+
+`phase_started_at` was written on **every** progress event, so it reset on each one and
+elapsed-in-stage was always about zero.
+
+It must move only on a transition, and a transition is a comparison against what the row currently
+holds. **The comparison lives in the worker**, in the writer, as the phase last *written*.
+
+Doing it in SQL — `case when phase is distinct from $1 then now() else phase_started_at end` — reads
+the authoritative value and is immune to anything the client believes. It is also not expressible
+through `supabase-js`, so it would mean a database function: new machinery, migrated and versioned,
+for a display concern.
+
+Holding it client-side is sound because of two properties the writer establishes. Writes are
+**serialised**, so "the last phase written" is a fact rather than a guess — with concurrent writes
+no client-side belief could be trusted, which is why the two fixes here are one fix. And the worker
+is the **only writer**: 0012 revokes `update` from `authenticated` and `anon`.
+
+The remaining hole is a write that fails. It is closed by forgetting the phase on failure, so the
+next event re-stamps rather than leaving a row whose phase is current and whose clock belongs to the
+phase before it.
+
+### The counter and the sentence were one bug
+
+`note()` was `void`-ed: every event issued its own PATCH against the same row with no ordering. Two
+events in one tick raced, and the row kept whichever *request* returned last rather than whichever
+*event* happened last.
+
+`enter('surfaces')` in `screen.ts` and `step('sign-up form')` inside `discoverLayer3` fire in the
+same tick — `step` runs synchronously before the first `await`. The entry line won, so the row held
+the phase's own entry text with no count. That is precisely the reported screenshot: title *Reading
+policy pages*, sentence *reading the policy pages*, no counter.
+
+**The live run proves it independently of the screenshot.** `cf447050` finished `done` holding
+`phase: 'gate'`. `screen.ts` writes `gate` at line 358, the gate's sentence at 359, and `assembly`
+at 381 immediately before assembling; `finish()` never touches `phase`. The last phase written was
+`assembly`; the row ended on `gate`. The row's final state was not the run's final state.
+
+### Coalesced, not queued
+
+`progress` is a single value and last-writer-wins by design, so a backlog of superseded lines is
+worth nothing. While a write is in flight the newest event replaces any other waiting, and goes out
+when the current write returns. Ordered, bounded, and still off the crawl's critical path — a
+progress write must never block the scan, which is the property `note()` had and had to keep.
+
+Dropping a superseded event can skip a phase whose whole duration fell inside one slow write. That
+is acceptable for a display of *current* state and not acceptable for the clock, which is why the
+clock compares against the phase last **written** rather than last emitted.
+
+### Two further guards, from causes already in the record
+
+The write now carries `.eq('status', 'running')`, the guard `startHeartbeat` already uses: a
+straggler landing after the job finished must not replace `progress: 'complete'` with a line from a
+run that is over.
+
+And the writer is **drained before** `finish()`, not after. `finish()` moves the row off `running`,
+at which point that guard turns any in-flight write into a no-op — so draining afterwards would
+change nothing. Draining first is what makes the row's final phase the run's final phase.
+
+### The control that did not control
+
+The first version of the ordering test passed with the serialisation removed. `settled()` resolves
+on whichever promise was assigned last — the *fast* write — and returned before the slow write had
+landed, so the assertion ran against a row that had not yet been clobbered.
+
+Both ordering tests now wait past the slowest write and assert the full sequence. Verified by
+removing the in-flight guard (two failures) and by restoring the unconditional `phase_started_at`
+(one failure), each restored afterwards. This is the third time in this stretch of work that a
+control had to be re-made before it discriminated, and it keeps looking exactly like a passing one
+(D-172).
+
+---

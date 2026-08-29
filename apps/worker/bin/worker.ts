@@ -45,11 +45,10 @@ import { establishSession } from '../src/auth/login.js';
 import {
   createHttpFetcher,
   describePhase,
-  hasCount,
   RUN_DEADLINE_MS,
   runTimeoutMessage,
-  type ProgressEvent,
 } from '@mintro/engine';
+import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -503,6 +502,15 @@ async function handle(
   // Held for as long as this job is, so the sweep can tell a working worker from a dead one.
   const stopHeartbeat = startHeartbeat(supabase, request.id);
 
+  /*
+    One writer per request, so progress events land in the order they happened (D-174).
+
+    They were `void`-ed PATCHes racing each other on one row, and the row kept whichever request
+    returned last. `cf447050` finished holding `phase: 'gate'` when `assembly` was the last phase
+    written — the run page was showing a state the run had left.
+  */
+  const progress = createProgressWriter(supabase, request.id);
+
   try {
     const screening = screenStorefront(browser, request.url, ruleset, {
       runId,
@@ -514,7 +522,7 @@ async function handle(
         for (const step of established.steps) {
           console.log(`  ${step}`);
           // Sign-in is `escalate`, which has no denominator and never carries one (D-173).
-          void note(supabase, request.id, { phase: 'escalate', line: step });
+          progress.write({ phase: 'escalate', line: step });
         }
         held.context = established.context;
         return established.context;
@@ -522,7 +530,7 @@ async function handle(
 
       onProgress: (event) => {
         console.log(`  ${describePhase(event)} — ${event.line}`);
-        void note(supabase, request.id, event);
+        progress.write(event);
       },
     });
 
@@ -559,7 +567,7 @@ async function handle(
         `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
           `${minutes} minutes expired; the browser will be recycled before the next job`,
       );
-      await finish(supabase, request.id, { status: 'failed', error: message });
+      await settleThenFinish(progress, supabase, request.id, { status: 'failed', error: message });
       return { recycleBrowser: true };
     }
 
@@ -582,7 +590,7 @@ async function handle(
       throw new Error(`run closed but is not complete: ${after.problems.join('; ')}`);
     }
 
-    await finish(supabase, request.id, { status: 'done', runId });
+    await settleThenFinish(progress, supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
     return { recycleBrowser: false };
   } catch (error) {
@@ -591,12 +599,13 @@ async function handle(
 
     // The request records the failure. The run, if one was opened, is already marked `failed` with
     // `finished_at` null by persistRun, so it stays resumable rather than freezing broken.
-    await finish(supabase, request.id, { status: 'failed', error: message });
+    await settleThenFinish(progress, supabase, request.id, { status: 'failed', error: message });
     return { recycleBrowser: false };
   } finally {
     // Before anything else: a heartbeat outliving its job would keep refreshing the claim on a row
     // this worker is no longer touching, which is the exact lie the sweep depends on not being told.
     stopHeartbeat();
+
 
     // Left pending, this keeps the event loop alive for the full deadline after every successful
     // job — a worker that will not exit for 25 minutes after its last scan.
@@ -701,6 +710,25 @@ async function drainDeposits(supabase: WorkerSupabase, keys: SealedVaultKeys): P
   }
 }
 
+/**
+ * Closes the progress record, then the request (D-174).
+ *
+ * The order is the point. `finish()` moves the row off `status = 'running'`, and the writer refuses
+ * to write to a row that is not running — so a progress write still in flight at that moment is
+ * silently dropped. That is how `cf447050` came to hold `phase: 'gate'` when `assembly` was the
+ * last phase the run wrote: the row ended on whichever write won a race, not on where the run got
+ * to. Draining first makes the row's final state the run's final state.
+ */
+async function settleThenFinish(
+  progress: ProgressWriter,
+  supabase: WorkerSupabase,
+  requestId: string,
+  outcome: Parameters<typeof finish>[2],
+): Promise<void> {
+  await progress.settled();
+  await finish(supabase, requestId, outcome);
+}
+
 async function finish(
   supabase: WorkerSupabase,
   requestId: string,
@@ -724,40 +752,6 @@ async function finish(
   }
 }
 
-/**
- * A progress event, best-effort. A failure here must never affect the scan.
- *
- * The phase and its counts ride the update that was already being written on every event, so
- * structure costs no extra round trip (D-173). `progress` still carries the sentence: it is the
- * current-state line and says things no enum can.
- *
- * `phase_done` and `phase_total` are written as a pair or as a pair of nulls — never one of each.
- * A numerator with nothing under it is exactly the shape a display would render as progress, and
- * `scan_requests_counts_are_whole` refuses to store it. Writing null explicitly rather than
- * omitting the keys is what clears a count when a phase that had one is followed by a phase that
- * does not.
- */
-async function note(
-  supabase: WorkerSupabase,
-  requestId: string,
-  event: ProgressEvent,
-): Promise<void> {
-  const counted = hasCount(event);
-  await supabase.client
-    .from('scan_requests')
-    .update({
-      progress: event.line.slice(0, 400),
-      phase: event.phase,
-      phase_started_at: new Date().toISOString(),
-      phase_done: counted ? event.done : null,
-      phase_total: counted ? event.total : null,
-    })
-    .eq('id', requestId)
-    .then(
-      () => undefined,
-      () => undefined,
-    );
-}
 
 /**
  * Launches Chromium.
