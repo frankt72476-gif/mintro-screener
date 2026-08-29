@@ -17,6 +17,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { SCAN_PHASES, type ScanPhase } from '@mintro/engine';
 import { RUN_DEADLINE_MS as DEADLINE } from '@mintro/engine';
 
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed';
@@ -50,6 +51,21 @@ export interface ScanRequestSummary {
    */
   readonly claimedAt: string | null;
   readonly mode: ScanMode;
+  /**
+   * Which stage of the crawl is running, and how far through it, where that is knowable (D-173).
+   *
+   * `phase` is null before a worker claims the request and on runs written before 0047 — those are
+   * immutable and will never gain one, so a reader that finds it absent shows the progress sentence
+   * alone rather than a blank phase (D-044).
+   *
+   * `phaseDone` and `phaseTotal` are a pair or both null. **Null is the common case**: only a phase
+   * whose denominator is genuinely known at that moment carries one, which excludes discovery and
+   * sign-in entirely.
+   */
+  readonly phase: ScanPhase | null;
+  readonly phaseStartedAt: string | null;
+  readonly phaseDone: number | null;
+  readonly phaseTotal: number | null;
 }
 
 export interface ScanQueue {
@@ -77,6 +93,19 @@ export interface ScanQueue {
    * project keeps finding (D-026, D-036).
    */
   get(id: string): Promise<ScanRequestSummary | null>;
+  /**
+   * How many queued requests were created before this one (D-173).
+   *
+   * A real denominator — it is a count of rows, not an estimate — so it may be shown. What it is
+   * **not** is a wait: turning a position into a time needs a rate, and a rate over a sample of
+   * runs that varied between 110 and 626 seconds would be a prediction dressed as arithmetic.
+   *
+   * Zero is not rendered. "0 ahead" invites the reader to expect a start that a busy worker may
+   * still be minutes from, and the line already says what is true: waiting for a worker.
+   *
+   * Null means the count could not be read. Not zero — the distinction D-044 turns on.
+   */
+  queuePosition(id: string): Promise<number | null>;
 }
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
@@ -113,6 +142,27 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
       return { ok: true, id };
     },
 
+    async queuePosition(id) {
+      const { data: row } = await client
+        .from('scan_requests')
+        .select('created_at, status')
+        .eq('id', id)
+        .single();
+
+      const self = row as { created_at: string; status: string } | null;
+      // Only a queued request has a position. One being worked on is not waiting behind anything.
+      if (self === null || self.status !== 'queued') return null;
+
+      const { count, error } = await client
+        .from('scan_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'queued')
+        .lt('created_at', self.created_at);
+
+      if (error !== null || count === null) return null;
+      return count;
+    },
+
     async list(limit = 10) {
       const { data, error } = await client
         .from('scan_requests')
@@ -142,7 +192,10 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
   };
 }
 
-const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, claimed_at, mode';
+/* One string literal, not a concatenation: supabase-js infers the row type from the literal, and
+   splitting it across lines turns the result into `GenericStringError[]`. */
+// prettier-ignore
+const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, claimed_at, mode, phase, phase_started_at, phase_done, phase_total';
 
 function toSummary(row: RequestRow): ScanRequestSummary {
   return {
@@ -155,8 +208,17 @@ function toSummary(row: RequestRow): ScanRequestSummary {
     createdAt: row.created_at,
     claimedAt: row.claimed_at,
     mode: row.mode as ScanMode,
+    // A phase the frontend has no label for is treated as absent rather than rendered raw. The
+    // database constrains the vocabulary; this is what happens if the two ever disagree.
+    phase: isScanPhase(row.phase) ? row.phase : null,
+    phaseStartedAt: row.phase_started_at,
+    phaseDone: row.phase_done,
+    phaseTotal: row.phase_total,
   };
 }
+
+const isScanPhase = (value: string | null): value is ScanPhase =>
+  value !== null && (SCAN_PHASES as readonly string[]).includes(value);
 
 interface RequestRow {
   id: string;
@@ -168,6 +230,10 @@ interface RequestRow {
   created_at: string;
   claimed_at: string | null;
   mode: string;
+  phase: string | null;
+  phase_started_at: string | null;
+  phase_done: number | null;
+  phase_total: number | null;
 }
 
 /**

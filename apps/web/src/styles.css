@@ -1944,3 +1944,17 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 /* Quiet is not a failure and is not styled as one — amber is the same weight `.layer.stalled` uses. */
 .beat-quiet{color:var(--amber)}
+
+/* ---------- phase line (D-173) ---------- */
+
+/*
+  Subordinate to the phase, which heads the line above. The worker's sentence is the current state
+  and the clock is context; neither may compete with where the run actually is.
+*/
+.phase-detail{
+  display:flex;flex-wrap:wrap;gap:4px 12px;
+  margin:6px 0 0 27px;font-size:11px;color:var(--slate);
+}
+.phase-said{font-family:'JetBrains Mono',monospace}
+/* The cap is stated, never counted down — it is a ceiling, not a prediction (D-152). */
+.phase-clock{margin-left:auto;color:var(--ink-mid);opacity:.75}

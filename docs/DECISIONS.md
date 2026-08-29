@@ -10546,3 +10546,110 @@ keeps returning to: a control that does not discriminate is not a control, and i
 like a passing one.
 
 ---
+
+## D-173 — Phase and counters, and a count only where the denominator is real
+
+**2026-08-28 · business owner · progress model, step 2**
+
+D-171 answered *is anything still happening*. This answers *where is it, and how much is left* — as
+far as that can be answered honestly, which is not all the way.
+
+The worker knew all of this and told the UI none of it. `screenStorefront` emitted one free-text
+line per event; `note()` wrote it to `scan_requests.progress`; the run page showed whichever
+sentence was last, unable to say which phase it belonged to, unable to order two of them, unable to
+tell a line from Layer 1 from a line from Layer 3.
+
+### The denominator rule
+
+**No count unless the denominator is genuinely known at that moment.** No percentage, no time
+remaining, no bar across phases — they are wildly unequal, Layer 3 measured at 626 seconds against a
+163-second run elsewhere, so weighting them is an invented denominator wearing a different hat.
+
+A bar that invents a denominator is a determination rather than an observation (D-001), and it is
+wrong in the direction that reads as a hang.
+
+Two phases can never carry one, and are named in code rather than left to a caller's judgement:
+
+- **`discovery`** — the sitemap queue *grows* as index documents are parsed, bounded only by
+  `maxSitemaps`. There is no denominator until it finishes.
+- **`escalate`** — a sign-in attempt against an unknown form, which happens on observed evidence or
+  not at all. Nothing about it is countable in advance.
+
+Both render **phase name and elapsed only**.
+
+The rule is enforced three times: the emitter drops a count on an indeterminate phase, the migration
+refuses to store one, and the run page refuses to render one. Deliberate over-enforcement of the one
+error this model must not make. A count *was* passed to `escalate` in the state dump, and all three
+layers ignored it.
+
+### The thirty-minute cap is stated, never counted down
+
+It is a policy ceiling (D-152). "Runs are given 30 minutes" is a fact about the policy; "26 minutes
+remaining" asserts when this run will end, which nothing here knows.
+
+### Phase vocabulary
+
+`discovery, homepage, sample, escalate, surfaces, gate, assembly` — `screen.ts`'s own section names,
+not a new taxonomy invented for the display. The migration closes the set with a CHECK, because a
+phase the UI has no label for renders as a blank stage, which is an absent value shown as an answer
+(D-044).
+
+### Columns on the request, not the run
+
+0012 already drew this line: *"A request records that someone asked. A run records what was
+observed… a request can be retried, superseded or abandoned, and a run is immutable once finished
+(D-002)."* Phase is bookkeeping about an attempt in flight, overwritten many times per run —
+precisely what may never happen to a screening record, and precisely what a request row is for.
+Nothing here reaches a report.
+
+`phase_done`/`phase_total` are **null by default and null in the common case**, and constrained to
+be a pair: a numerator with nothing under it is exactly the shape a display renders as progress.
+
+The free-text line stays. It is the current-state sentence and says things no enum can; the phase
+heads the line and the sentence sits under it. `note()` already wrote on every event, so the columns
+ride the same update at no extra round trip.
+
+### Three rulings, as given
+
+- **Layer 3 shows one level**: the surfaces, `2 of 5`, with the surface named. Not per-path depth —
+  how many candidate URLs a surface tries is an implementation detail of that surface, and a counter
+  moving by paths would run at a rate nobody could read. The four documents became a table so the
+  denominator is **structural**: a surface added moves the count with it, rather than a literal `5`
+  maintained beside four hand-written calls.
+- **Queue position only above zero.** A count of rows is real and may be shown. Zero is not shown —
+  "0 ahead" invites the reader to expect a start a busy worker may still be minutes from — and null
+  ("could not read") is not zero (D-044). It is never turned into a wait: a rate over runs that
+  varied between 110 and 626 seconds is a prediction dressed as arithmetic.
+- **No scrollback.** Single-value progress, last-writer-wins, unchanged.
+
+### The D-162 duplication, resolved where it can be and named where it cannot
+
+D-162 stores `productsInScope`, `productsSampled` and `surfacesRead` on the finished report, noting
+every number in it "was already computed and thrown away". A live display would have thrown them
+away again and recomputed them — the same quantities derived twice, free to drift.
+
+`createScanProgress` now accumulates them as they become known and is read twice: by the progress
+events while the crawl runs, and by `sampleBasis()` when the report is assembled. `screen.ts` no
+longer builds the `SampleBasis` literal at all.
+
+**`productsInScope` and `surfacesRead` unify exactly** — one value, computed once, read twice.
+
+**`productsSampled` does not, and cannot.** The stored field counts pages that came back *served*;
+the live counter is how far through the sample loop the crawl has got. A page not yet rendered
+cannot be known to have been served, so mid-run there is no honest way to report the stored
+quantity, and reporting attempts as successes is the overstatement this whole model avoids.
+
+So they are two numbers about two different things, not one number computed twice. Both come from
+the accumulator; neither is recomputed anywhere else. The live one is named `attempted` for what it
+is, and a test pins the two apart so nobody later "fixes" them into agreement.
+
+`served` is **recomputed from the current sample rather than incremented**, because a login wall
+replaces the sample wholesale and an incremental counter would double-count the retry.
+
+### Still operator-only
+
+RLS unchanged and none needed: `scan_requests_select` already limits reads to `is_analyst()`, and
+`update`/`delete` are revoked from `authenticated` and `anon`, so the worker's service role remains
+the only writer. Merchants and agents never see the queue and never trigger a run.
+
+---

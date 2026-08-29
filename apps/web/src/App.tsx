@@ -44,6 +44,7 @@ import {
 } from '@mintro/engine';
 import { CredentialModal } from './components/CredentialModal.js';
 import { HeartbeatLine, LiveDot } from './components/Heartbeat.js';
+import { describePhaseLine, describeQueueLine } from './lib/phaseLine.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
@@ -286,6 +287,13 @@ function Screener({
     null,
   );
   const [watchedState, setWatchedState] = useState<ScanRequestSummary | null>(null);
+  /*
+    How many queued requests were created before this one (D-173).
+
+    Null is "not read", which is not zero — and zero is not rendered either, because "0 ahead"
+    invites the reader to expect a start a busy worker may still be minutes from.
+  */
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
   /** Whether the last poll saw work outstanding — see the polling effect. */
   const wasPending = useRef(false);
   const [available, setAvailable] = useState<readonly RunSummary[]>([]);
@@ -592,6 +600,16 @@ function Screener({
 
       setWatchedState(request);
 
+      // Only a queued request has a position; one being worked on is not waiting behind anything,
+      // and asking would be a round trip per tick for a number that does not exist.
+      if (request.status === 'queued') {
+        void queue.queuePosition(requestId).then((n) => {
+          if (live) setQueuePosition(n);
+        });
+      } else {
+        setQueuePosition(null);
+      }
+
       if (isPending(request.status)) {
         timer = setTimeout(() => void tick(), 3000);
         return;
@@ -747,7 +765,7 @@ function Screener({
           )}
 
           {stage === 'watching' && watching !== null && (
-            <ScanProgress url={watching.url} state={watchedState} />
+            <ScanProgress url={watching.url} state={watchedState} queuePosition={queuePosition} />
           )}
 
           {stage === 'running' && (
@@ -1114,13 +1132,16 @@ function ScanInput({
 function ScanProgress({
   url,
   state,
+  queuePosition,
 }: {
   readonly url: string;
   readonly state: ScanRequestSummary | null;
+  readonly queuePosition: number | null;
 }): JSX.Element {
   const status = state?.status ?? 'queued';
   // Null state is "not read yet", which is not stalled. `isStalled` needs a claim to measure from.
   const stale = state !== null && isStalled(state);
+  const phase = state === null || stale ? null : describePhaseLine(state);
 
   return (
     <div>
@@ -1137,11 +1158,30 @@ function ScanProgress({
         <div className={`layer ${stale ? 'stalled' : 'run'}`}>
           <LiveDot claimedAt={state?.claimedAt ?? null} stalled={stale} />
           {status === 'queued'
-            ? 'Waiting for the worker to claim this request'
+            ? describeQueueLine(queuePosition)
             : stale
               ? `No worker has touched this scan since ${formatReportDate(state?.claimedAt as string)}. It is past the ${Math.round(RUN_DEADLINE_MS / 60000)}-minute limit a run is given, so the claim will be released and the scan retried.`
-              : (state?.progress ?? 'Screening the storefront')}
+              : (phase?.title ?? state?.progress ?? 'Screening the storefront')}
         </div>
+
+        {/*
+          Where the run is, how long it has been there, and what the worker last said (D-173).
+
+          The phase heads the line because it is the durable fact; the free-text sentence sits under
+          it as the current state, which is what it always was. A phase with no denominator shows a
+          name and an elapsed and nothing else — that is discovery and sign-in, permanently, and it
+          is the constraint the whole model was built under.
+        */}
+        {phase !== null && (
+          <p className="phase-detail">
+            {state?.progress !== null && state?.progress !== undefined && (
+              <span className="phase-said">{state.progress}</span>
+            )}
+            <span className="phase-clock">
+              {[phase.elapsed, phase.cap].filter((part) => part !== null).join(' · ')}
+            </span>
+          </p>
+        )}
         {/*
           The fact the page was missing (D-171). `claimed_at` was already here and fed one bit —
           `isStalled`, at thirty minutes — so a beat eight seconds old and one twenty-nine minutes

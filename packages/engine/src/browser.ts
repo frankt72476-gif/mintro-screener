@@ -45,6 +45,16 @@ export type {
   disagreeing with the machine about what is happening.
 */
 export {
+  SCAN_PHASES,
+  INDETERMINATE_PHASES,
+  PHASE_LABEL,
+  hasCount,
+  describePhase,
+  type ScanPhase,
+  type ProgressEvent,
+} from './progress.js';
+
+export {
   HEARTBEAT_MS,
   HEARTBEAT_QUIET_MS,
   RUN_DEADLINE_MS,

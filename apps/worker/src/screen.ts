@@ -22,6 +22,8 @@
  */
 
 import type { Browser, BrowserContext } from 'playwright';
+import type { ProgressEvent } from '@mintro/engine';
+import { createScanProgress } from './scanProgress.js';
 import type { Ruleset } from '@mintro/ruleset';
 import {
   createHttpFetcher,
@@ -68,7 +70,13 @@ export const SAMPLE_SIZE = 5;
 export interface ScreenOptions {
   readonly runId: string;
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
-  readonly onProgress?: (line: string) => void;
+  /**
+   * Progress, with structure (D-173).
+   *
+   * Was `(line: string) => void`. The sentence is unchanged and still the current-state line; what
+   * the event adds is the phase it belongs to and, where one is genuinely known, a count.
+   */
+  readonly onProgress?: (event: ProgressEvent) => void;
   /**
    * Establishes a merchant session, when one turns out to be needed (D-040).
    *
@@ -103,7 +111,9 @@ export async function screenStorefront(
   options: ScreenOptions,
 ): Promise<ScreenResult> {
   const { runId } = options;
-  const say = options.onProgress ?? ((): void => undefined);
+  const progress = createScanProgress(options.onProgress ?? ((): void => undefined));
+  const say = (line: string, count?: { done: number; total: number }): void =>
+    progress.say(line, count);
   const startedAt = new Date().toISOString();
   const artifacts: EvidenceArtifact[] = [];
 
@@ -115,7 +125,7 @@ export async function screenStorefront(
   const delay = resolveCrawlDelay(layer0.robots.crawlDelaySeconds);
   const pacer = createPacer(delay);
 
-  say(`${layer0.origin} · politeness ${describeCrawlDelay(delay)}`);
+  progress.enter('discovery', `${layer0.origin} · politeness ${describeCrawlDelay(delay)}`);
 
   // ---- Layer 1 -------------------------------------------------------------------------
   const homepage = `${layer0.origin}/`;
@@ -125,7 +135,8 @@ export async function screenStorefront(
   const rendered = await renderPage(browser, homepage, { runId, pacer, timeoutMs: 30_000 });
   artifacts.push(...rendered.artifacts);
 
-  say(
+  progress.enter(
+    'homepage',
     rendered.page.renderError !== undefined
       ? `homepage render FAILED — ${rendered.page.renderError}`
       : `homepage HTTP ${rendered.page.httpStatus} · footer ${rendered.page.footer.found ? 'located' : 'NOT FOUND'}`,
@@ -153,7 +164,10 @@ export async function screenStorefront(
   const scored = scoreProductUrls(productUrls, ruleset);
   const selected = selectSample(scored, SAMPLE_SIZE);
 
-  say(`sampling ${selected.length} of ${productUrls.length} product page(s)`);
+  // The denominator the sample is drawn from, recorded once and read twice: by the count on every
+  // page below, and by `sampleBasis()` when the report is assembled (D-162, D-173).
+  progress.scopeIs(productUrls.length);
+  progress.enter('sample', `sampling ${selected.length} of ${productUrls.length} product page(s)`);
 
   const selectors = ruleSelectors(ruleset);
 
@@ -169,6 +183,18 @@ export async function screenStorefront(
       });
       artifacts.push(...result.artifacts);
       pages.push({ selection: pick, page: result.page });
+      /*
+        A real denominator: the sample was chosen before the loop and its size cannot change here.
+
+        This counts pages **attempted**, which is not the same quantity as `productsSampled` on the
+        report — that one counts pages that came back served, and a page not yet rendered cannot be
+        known to have been served. Reporting attempts as successes is the overstatement the whole
+        model exists to avoid, so they stay two numbers about two things (D-173).
+      */
+      progress.say(`product page ${pages.length} of ${selected.length}`, {
+        done: pages.length,
+        total: selected.length,
+      });
     }
     return pages;
   };
@@ -179,6 +205,7 @@ export async function screenStorefront(
   let usedCredential = false;
   let mode: ScanMode = 'public';
 
+  progress.sampleIs(sampled.filter((entry) => wasServed(entry.page)).length);
   say(wall.reason);
 
   /*
@@ -200,9 +227,15 @@ export async function screenStorefront(
     const context = await options.escalate();
 
     if (context === null) {
-      say('a login wall was met and no screening account is stored for this merchant');
+      progress.enter(
+        'escalate',
+        'a login wall was met and no screening account is stored for this merchant',
+      );
     } else {
-      say('a login wall was met; re-rendering the sample with the stored screening account');
+      progress.enter(
+        'escalate',
+        'a login wall was met; re-rendering the sample with the stored screening account',
+      );
       const retried = await renderSample(context);
       const afterWall = assessWall(retried.map((entry) => entry.page));
 
@@ -214,6 +247,8 @@ export async function screenStorefront(
         wall = afterWall;
         usedCredential = true;
         mode = 'screening_account';
+        // The sample was replaced wholesale, so `served` is recomputed rather than incremented.
+        progress.sampleIs(retried.filter((entry) => wasServed(entry.page)).length);
         say(`signed in: ${afterWall.reason}`);
       } else {
         say('the screening account did not reach the product pages either; keeping the public crawl');
@@ -254,12 +289,27 @@ export async function screenStorefront(
   //
   // Placed before the gate block and taking no part in it. GATE-002 and GATE-003 are decided by
   // `runGateRules` from requests carrying no session, and nothing here touches that (D-039).
+  progress.enter('surfaces', 'reading the policy pages');
   const discovered = await discoverLayer3(browser, layer0.origin, {
     runId,
     pacer,
     homepageLinks: rendered.page.links.map((link) => ({ href: link.href, text: link.text })),
-    onProgress: say,
+    onProgress: (line, count) => say(line, count),
   });
+
+  /*
+    Which surfaces were actually read, recorded once (D-162, D-173).
+
+    Named only where one was reached. A surface that was not is absent from the list and is never
+    reported as missing: a merchant with no FAQ and a run whose FAQ fetch failed are not
+    distinguishable from here, which is the distinction D-158 turns on.
+  */
+  progress.surfaceRead('the homepage');
+  if (discovered.signup.found) progress.surfaceRead('the sign-up form');
+  if (discovered.terms !== undefined) progress.surfaceRead('the terms document');
+  if (discovered.shipping !== undefined) progress.surfaceRead('the shipping policy');
+  if (discovered.faq !== undefined) progress.surfaceRead('the FAQ');
+  if (discovered.payment !== undefined) progress.surfaceRead('the payment or refund policy');
   artifacts.push(...discovered.artifacts);
 
   const layer3 = runLayer3(
@@ -305,6 +355,7 @@ export async function screenStorefront(
     ...(firstProduct === undefined ? {} : { productUrl: firstProduct }),
   });
 
+  progress.enter('gate', 'evaluating the gate rules without a session');
   say(`gate rules evaluated without a session: ${gate.map((f) => `${f.ruleId} ${f.state}`).join(', ')}`);
 
   // Order matters for readability only — `assembleReport` sorts by the rule set. What matters is
@@ -327,6 +378,7 @@ export async function screenStorefront(
       `· ${artifacts.length} capture(s)`,
   );
 
+  progress.enter('assembly', 'assembling the report');
   const report = assembleReport(
     {
       runId,
@@ -359,18 +411,12 @@ export async function screenStorefront(
         reached is simply absent, never reported as missing, because a merchant with no FAQ and a
         failed FAQ fetch are not distinguishable from this list (D-158).
       */
-      sample: {
-        productsInScope: productUrls.length,
-        productsSampled: sampled.filter((entry) => wasServed(entry.page)).length,
-        surfacesRead: [
-          'the homepage',
-          ...(discovered.signup.found ? ['the sign-up form'] : []),
-          ...(discovered.terms === undefined ? [] : ['the terms document']),
-          ...(discovered.shipping === undefined ? [] : ['the shipping policy']),
-          ...(discovered.faq === undefined ? [] : ['the FAQ']),
-          ...(discovered.payment === undefined ? [] : ['the payment or refund policy']),
-        ],
-      },
+      /*
+        Read from the accumulator that fed the run page, rather than derived a second time here
+        (D-173). These numbers were computed, discarded and recomputed before; now the live display
+        and the stored record cannot disagree, because there is one of each fact.
+      */
+      sample: progress.sampleBasis(),
     },
     ruleset,
   );

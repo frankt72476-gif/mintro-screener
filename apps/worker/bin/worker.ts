@@ -42,7 +42,14 @@ import { assessRun } from '../src/store/completeness.js';
 import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { establishSession } from '../src/auth/login.js';
-import { createHttpFetcher, RUN_DEADLINE_MS, runTimeoutMessage } from '@mintro/engine';
+import {
+  createHttpFetcher,
+  describePhase,
+  hasCount,
+  RUN_DEADLINE_MS,
+  runTimeoutMessage,
+  type ProgressEvent,
+} from '@mintro/engine';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -506,15 +513,16 @@ async function handle(
         const established = await signIn(supabase, browser, request, keys);
         for (const step of established.steps) {
           console.log(`  ${step}`);
-          void note(supabase, request.id, step);
+          // Sign-in is `escalate`, which has no denominator and never carries one (D-173).
+          void note(supabase, request.id, { phase: 'escalate', line: step });
         }
         held.context = established.context;
         return established.context;
       },
 
-      onProgress: (line) => {
-        console.log(`  ${line}`);
-        void note(supabase, request.id, line);
+      onProgress: (event) => {
+        console.log(`  ${describePhase(event)} — ${event.line}`);
+        void note(supabase, request.id, event);
       },
     });
 
@@ -716,11 +724,34 @@ async function finish(
   }
 }
 
-/** A progress line, best-effort. A failure here must never affect the scan. */
-async function note(supabase: WorkerSupabase, requestId: string, line: string): Promise<void> {
+/**
+ * A progress event, best-effort. A failure here must never affect the scan.
+ *
+ * The phase and its counts ride the update that was already being written on every event, so
+ * structure costs no extra round trip (D-173). `progress` still carries the sentence: it is the
+ * current-state line and says things no enum can.
+ *
+ * `phase_done` and `phase_total` are written as a pair or as a pair of nulls — never one of each.
+ * A numerator with nothing under it is exactly the shape a display would render as progress, and
+ * `scan_requests_counts_are_whole` refuses to store it. Writing null explicitly rather than
+ * omitting the keys is what clears a count when a phase that had one is followed by a phase that
+ * does not.
+ */
+async function note(
+  supabase: WorkerSupabase,
+  requestId: string,
+  event: ProgressEvent,
+): Promise<void> {
+  const counted = hasCount(event);
   await supabase.client
     .from('scan_requests')
-    .update({ progress: line.slice(0, 400) })
+    .update({
+      progress: event.line.slice(0, 400),
+      phase: event.phase,
+      phase_started_at: new Date().toISOString(),
+      phase_done: counted ? event.done : null,
+      phase_total: counted ? event.total : null,
+    })
     .eq('id', requestId)
     .then(
       () => undefined,

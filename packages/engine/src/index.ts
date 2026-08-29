@@ -93,6 +93,17 @@ export {
 } from './politeness.js';
 
 export {
+  SCAN_PHASES,
+  INDETERMINATE_PHASES,
+  PHASE_LABEL,
+  hasCount,
+  describePhase,
+  type ScanPhase,
+  type ProgressEvent,
+} from './progress.js';
+export type { SampleBasis } from './report.js';
+
+export {
   HEARTBEAT_MS,
   HEARTBEAT_QUIET_MS,
   RUN_DEADLINE_MS,

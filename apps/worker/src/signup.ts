@@ -142,7 +142,15 @@ export interface DiscoverOptions {
   readonly timeoutMs?: number;
   /** Links seen on the rendered homepage, used to find the terms document. */
   readonly homepageLinks?: readonly { readonly href: string; readonly text: string }[];
-  readonly onProgress?: (line: string) => void;
+  /**
+   * Progress within the surfaces phase (D-173).
+   *
+   * The optional count is `done of total` over the **surfaces**, one level only — the sign-up form
+   * plus the four documents. Not per-path depth: how many candidate URLs a surface will try is an
+   * implementation detail of that surface, and a counter that moved by paths would run at a rate
+   * nobody could read while telling a reader nothing about how much of the crawl is left.
+   */
+  readonly onProgress?: (line: string, count?: { readonly done: number; readonly total: number }) => void;
 }
 
 /**
@@ -161,31 +169,45 @@ export async function discoverLayer3(
   const attempts: FetchAttempt[] = [];
   const artifacts: EvidenceArtifact[] = [];
 
+  /*
+    The four documents as a table, so the denominator is structural (D-173).
+
+    They were four hand-written calls, which meant the surface count a progress line would report
+    had to be a literal `5` maintained beside them. A surface added here now moves the denominator
+    with it, and a denominator that can fall out of step with the work is the one this model must
+    not have.
+  */
+  const documents = [
+    { label: 'terms document', paths: TERMS_PATHS, linkHints: TERMS_LINK_HINTS },
+    { label: 'shipping policy', paths: SHIPPING_PATHS, linkHints: SHIPPING_LINK_HINTS },
+    { label: 'FAQ', paths: FAQ_PATHS, linkHints: FAQ_LINK_HINTS },
+    { label: 'payment or refund policy', paths: PAYMENT_PATHS, linkHints: PAYMENT_LINK_HINTS },
+  ] as const;
+
+  const total = documents.length + 1; // the sign-up form is the first of them
+  let done = 0;
+
+  /** Announces the surface about to be read, with how many of them are behind it. */
+  const step = (label: string): void => {
+    say(`looking for the ${label}`, { done, total });
+  };
+
+  step('sign-up form');
   const signup = await findSignupForm(browser, origin, options, attempts, artifacts, say);
+  done += 1;
 
-  const terms = await findDocument(browser, origin, options, attempts, artifacts, say, {
-    label: 'terms document',
-    paths: TERMS_PATHS,
-    linkHints: TERMS_LINK_HINTS,
-  });
+  const found = new Map<string, PageContext | undefined>();
+  for (const what of documents) {
+    step(what.label);
+    found.set(what.label, await findDocument(browser, origin, options, attempts, artifacts, say, what));
+    done += 1;
+  }
+  say('policy pages read', { done, total });
 
-  const shipping = await findDocument(browser, origin, options, attempts, artifacts, say, {
-    label: 'shipping policy',
-    paths: SHIPPING_PATHS,
-    linkHints: SHIPPING_LINK_HINTS,
-  });
-
-  const faq = await findDocument(browser, origin, options, attempts, artifacts, say, {
-    label: 'FAQ',
-    paths: FAQ_PATHS,
-    linkHints: FAQ_LINK_HINTS,
-  });
-
-  const payment = await findDocument(browser, origin, options, attempts, artifacts, say, {
-    label: 'payment or refund policy',
-    paths: PAYMENT_PATHS,
-    linkHints: PAYMENT_LINK_HINTS,
-  });
+  const terms = found.get('terms document');
+  const shipping = found.get('shipping policy');
+  const faq = found.get('FAQ');
+  const payment = found.get('payment or refund policy');
 
   return {
     signup,
