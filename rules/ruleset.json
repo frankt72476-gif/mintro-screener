@@ -1,5 +1,5 @@
 {
-  "version": "3.2.0",
+  "version": "3.3.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -259,6 +259,11 @@
         "flow": "add_to_cart_then_checkout",
         "unauthenticated": true,
         "fail_if": "payment_step_reached"
+      },
+      "blocking": true,
+      "blocking_source": {
+        "authority": "IQwallet",
+        "ruled_on": "2026-08-29"
       }
     },
     {
@@ -792,7 +797,9 @@
           "hgh",
           "chorionic-gonadotropin",
           "somatropin",
-          "growth-hormone"
+          "growth-hormone",
+          "semaglutide",
+          "tirzepatide"
         ],
         "scope": "products",
         "expect": "absent",

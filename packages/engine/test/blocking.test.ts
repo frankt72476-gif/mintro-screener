@@ -25,7 +25,33 @@ const ruleFor = (id: string) => {
   return found;
 };
 
-const EXPECTED = ['CATG-001', 'CATG-002', 'CATG-003', 'CATG-004', 'PROD-006', 'PROD-007', 'NAME-001', 'PAY-001'];
+/*
+  The stopping conditions, pinned by id.
+
+  A tripwire on a deliberate change, in the shape D-139 describes: adding one is something somebody
+  meant to do, and this is where they are asked whether they meant this much of it.
+
+  **GATE-003 is here and GATE-002 is not, and the asymmetry is the ruling (D-178).** Both were
+  flagged while the authority was unconfirmed and both were held unrecorded for it, because the
+  decline notice tells a reader *"the conditions are IQwallet's as stated"* and an inferred
+  attribution would be putting words in their mouth.
+
+  IQwallet confirmed on 2026-08-29, and confirmed one of them. Guest checkout disabled **is** the
+  gate before checkout, which is what the plugin stops on. GATE-002 is about products being visible
+  before an account exists — catalogue browsing, not checkout — so its flag was withdrawn rather
+  than kept on the strength of having already been written.
+*/
+const EXPECTED = [
+  'CATG-001',
+  'CATG-002',
+  'CATG-003',
+  'CATG-004',
+  'GATE-003',
+  'NAME-001',
+  'PAY-001',
+  'PROD-006',
+  'PROD-007',
+];
 
 const report = (findings: readonly Finding[]) =>
   assembleReport(
@@ -57,15 +83,24 @@ const blockingOf = (findings: readonly Finding[]): BlockingSummary => {
 };
 
 describe('the rule set declares its stopping conditions', () => {
-  it('marks exactly the eight', () => {
+  it('marks exactly the nine', () => {
     const flagged = ruleset.rules.filter((r) => r.blocking === true).map((r) => r.id).sort();
     expect(flagged).toEqual([...EXPECTED].sort());
   });
 
+  /**
+   * The invariant is that a stopping condition is **attributed**, not that every one was ruled on
+   * the same day.
+   *
+   * This pinned `ruled_on` to a single literal, which held only while the eight were declared
+   * together. GATE-002 and GATE-003 were flagged later, and a date is a fact about each rule —
+   * asserting one literal for all of them would have forced a later flag to carry an earlier date,
+   * which is the one thing this field must never do.
+   */
   it('every flagged rule names who ruled it and when', () => {
     for (const rule of ruleset.rules.filter((r) => r.blocking === true)) {
-      expect(rule.blocking_source?.authority).toBe('IQwallet');
-      expect(rule.blocking_source?.ruled_on).toBe('2026-08-28');
+      expect(rule.blocking_source?.authority, rule.id).toBe('IQwallet');
+      expect(rule.blocking_source?.ruled_on, rule.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 

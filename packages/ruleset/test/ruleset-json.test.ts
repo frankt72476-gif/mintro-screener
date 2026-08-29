@@ -43,7 +43,7 @@ describe('rules/ruleset.json', () => {
       report feeds. `effective` does not move — the standards did not change, only what Mintro
       screens against them.
     */
-    expect(ruleset.version).toBe('3.2.0');
+    expect(ruleset.version).toBe('3.3.0');
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(59);
     expect(ruleset.categories).toHaveLength(10);

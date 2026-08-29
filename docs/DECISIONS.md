@@ -11146,3 +11146,132 @@ claims and is in neither half of the split. Not silently folded into PROD-011, b
 belongs in is a judgement about how ambiguous the wording is, and that is not mine to make.
 
 ---
+
+## D-178 — GATE-003 is a stopping condition, GATE-002 is not, and the denylist gains two APIs
+
+**2026-08-29 · business owner · rule set 3.2.0 → 3.3.0 · IQwallet confirmed 2026-08-29**
+
+Three data changes, one commit, and the authority that was outstanding since the flags were first
+written is now stated.
+
+### The flags were held unrecorded, and this is why that was right
+
+GATE-002 and GATE-003 were both flagged `blocking: true` in an earlier pass, and both were left
+uncommitted and unrecorded because `blocking_source.authority` read `IQwallet` on an inference. The
+reason offered for them was a compliance plugin specification, not anything IQwallet had said, and
+the decline notice tells a reader *"the conditions are IQwallet's as stated"*. Attributing an
+unconfirmed condition to a named party is the failure `blocking_source` exists one field over to
+prevent.
+
+IQwallet confirmed on 2026-08-29 — **and confirmed one of the two.**
+
+- **GATE-003 keeps the flag.** *Guest checkout disabled* is the gate before checkout, which is what
+  the plugin stops on. `authority: IQwallet`, `ruled_on: 2026-08-29`.
+- **GATE-002 loses it.** *Products hidden until an account exists* is about catalogue browsing, not
+  checkout. It was written on the same inference and withdrawn on the same confirmation.
+
+Holding the pair rather than shipping them is what made the withdrawal cheap: nothing had to be
+un-said to a reader, because nothing had been said. Nine stopping conditions now, not ten; the pin
+in `blocking.test.ts` moves with it and carries the asymmetry as its reasoning.
+
+GATE-002 is unchanged in every other respect — still `auto_fail`, still `critical`, still
+corroborating GATE-004 and GATE-005. Withdrawing a stopping-condition flag is not a statement that
+the rule matters less.
+
+### CATG-003 gains two prescription-drug APIs
+
+`semaglutide` and `tirzepatide`, alongside `hcg`, `hgh`, `chorionic-gonadotropin`, `somatropin` and
+`growth-hormone`. IQwallet declines on prescription-drug APIs, and these are the two the catalogue
+actually carries under their generic names. Data, not a new rule — hard constraint 1.
+
+**They close a gap between two rules that both looked like they covered it.** PROD-006 carries the
+brand names (`Ozempic`, `Wegovy`, `Mounjaro`, `Zepbound`) and PROD-010 the community abbreviations
+(`Sema`, `Tirz`) — but both are `text_match` over rendered page text. Neither reaches a catalogue
+URL. A storefront listing `/products/semaglutide-5mg` was matched by none of the three until now.
+
+### The patterns need no whole-token treatment, because they already have it
+
+`url_pattern` does not use `termPattern` at all. `findMatches` tokenises through `tokenizePath` and
+compares with `containsTokenSequence`, which already:
+
+- splits on every non-alphanumeric, so `semaglutide-5mg` is three tokens;
+- splits letter runs from digit runs, so `semaglutide5mg` is too (`splitAlphaNumeric`);
+- compares on `inflectionKey`, so `semaglutides` matches (D-159).
+
+So both patterns are the bare generic name and nothing else. Verified against constructed URLs:
+
+    HIT   /products/semaglutide                  HIT   /products/semaglutides
+    HIT   /products/semaglutide-5mg              HIT   /products/tirzepatide-10mg
+    HIT   /products/semaglutide5mg               HIT   /products/semaglutide-tirzepatide-stack
+    HIT   /products/glp-1-semaglutide-vial
+    miss  /products/semaphore-peptide            miss  /products/bpc-157
+
+`semaphore` not matching is the whole-token treatment working: a substring matcher would have hit
+it, and CATG-003 is `auto_fail`.
+
+**What they do not reach: the abbreviations.** `/products/sema-5mg` and `/products/tirz-blend` are
+misses. `Sema` and `Tirz` are PROD-010's, in page text, at `review_only` — deliberately, because
+they are substrings of legitimate chemical names. Adding them to a `url_pattern` rule would be
+safer than in prose, since whole-token matching bounds them, but it is a different decision about a
+different rule and is not taken here.
+
+### GATE-004, GATE-005 and GATE-007 stay `review_only`
+
+IQwallet declines on a signup form that collects no research-status or intended-use attestation, and
+the question was whether these three should be reclassified to `auto_fail` to carry that weight. A
+blocking flag could not do it — a flag never overrides hard constraint 4 — so the only route was the
+tier itself, with justification.
+
+**Ruled: no. All three stay `review_only`.**
+
+All three are `expect: present` checks, and every one **locates its subject by the compliant form**.
+That is constraint 9 and D-014 in the inverted direction: where an `expect: absent` rule that cannot
+locate its subject produces a false *pass*, a required-presence rule that cannot locate its subject
+produces a false *fail*.
+
+- **GATE-004** looks for `input[type=checkbox][required]` near *"I Agree"* or *"Terms"*. A form that
+  acknowledges terms by any other mechanism reads as absent.
+- **GATE-005** is the same shape, and concedes the ambiguity in its own params: `note_if_freetext`
+  exists because what counts as a research field is not settled.
+- **GATE-007 is the clearest case.** `require_all` over five substrings — `research use only`,
+  `human consumption`, `diagnos`, `indemnif`, `qualified` — every one required, against a document
+  with no standard wording. It already reports *"3 of 5 required phrases were not observed"* on
+  `5b29036d`. As `auto_fail` that is Mintro asserting a determination its matcher cannot support.
+
+On the two reference runs the reclassification would turn five current reviews into five failures
+across two merchants, and nothing has established whether those forms genuinely lack the attestation
+or merely express it differently.
+
+### The general form, which is the part worth keeping
+
+**A business fact about what an underwriter declines on does not require Mintro's check to assert
+`fail`.** `review_only` already puts the observation in front of a person. Hard constraint 4 exists
+because false positives on ambiguous checks cost more than the weight they buy — and the cost lands
+on the tool's credibility, which is the thing every other finding depends on.
+
+When something genuinely needs more weight, the honest levers are:
+
+- **`sev`**, which orders the report without touching state (D-009), and
+- **a `blocking` flag**, once a check is reliable enough to carry one.
+
+Neither asks the matcher to claim more than it saw.
+
+**The second-order effect is declined too, deliberately.** `auto_fail` is what makes a rule eligible
+to be flagged `blocking` — every flagged rule is asserted to be `auto_fail`. So refusing the
+reclassification also closes that door for these three, and it is closed on purpose: a check that
+cannot reliably locate its subject has no business being a stopping condition either.
+
+**What reclassifying would have cost, for the record.** Only one thing reads a rule's tier —
+`stateForViolation`, which is the whole of D-009. Everything downstream follows from the state, and
+less of it than expected: `invitesComment` treats `fail` and `review` identically, so the merchant is
+invited either way, and nothing in the ruleset invariants would have refused the change — only
+`text_cooccurrence` and `manual` are forced to `review_only`. What would have moved is where the
+findings render (section 3's *Not met* rather than *Needs a look*), the header line counts, and the
+verdict. The cheapness of the change is not an argument for it.
+
+### Housekeeping
+
+Version `3.2.0` → `3.3.0`, and the version pin with it. The rule count is unchanged at 59: nothing
+was added or removed, only a flag withdrawn and two patterns appended.
+
+---
