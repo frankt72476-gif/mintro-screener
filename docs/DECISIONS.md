@@ -11275,3 +11275,92 @@ Version `3.2.0` → `3.3.0`, and the version pin with it. The rule count is unch
 was added or removed, only a flag withdrawn and two patterns appended.
 
 ---
+
+## D-179 — A cascade child inherits its parent's capture, and a broken elision comes out
+
+**2026-08-29 · business owner · restructure revisions 1 and 4; revision 2 dropped**
+
+### Revision 1 — the shared request block is printed once
+
+One failed retrieval produced four findings: COA-006, plus COA-002, COA-003 and COA-004 nested under
+it (D-164). Every one rendered the full **Requests attempted** block — the same five URLs, four
+times, and on `c268f8d7` nearly two pages of it.
+
+A child now rests on its parent's capture and says so in one line:
+
+> Backed by the same request as **COA-006**, above.
+
+**How the difference is told: the same relation that nested it.** `nestCascades` groups on
+`retrievalFingerprint` — the source URL plus the exact set of attempts, each with its status and
+error. A child is under that parent precisely because it reports on the request that parent reports
+on, so inheritance asks the same question rather than a second, differently-shaped one about whether
+the evidence "looks the same". Two definitions of one relation are free to disagree.
+
+**When a child holds evidence the parent does not, it renders in full.** Sharing a failed retrieval
+does not prove a child cites nothing else — a rule could carry the shared request *and* a capture of
+its own. So the fingerprint match is necessary and not sufficient: inheritance is refused the moment
+the child cites anything outside the parent's set. On both reference runs every child cites exactly
+the parent's one entry and nothing more, so this branch is exercised by a constructed case rather
+than by the corpus, and the control confirms it discriminates.
+
+**What is never inherited is the child's own sentence.** Only the request block is shared. What each
+rule could not establish is its own observation, rendered under "Not assessed" for every child, and
+that is what distinguishes COA-002 from COA-003 from COA-004. Inheriting the capture and inheriting
+the finding are different things.
+
+**D-042 as revised by D-166 is kept.** The export still holds what the screen holds. The pointer
+names the parent rather than saying "see above", so a reader meeting the row alone knows which
+finding carries the evidence; `.conseq-item` is held whole across a page break and `.conseq` will not
+start a page orphaned from what precedes it. The parent's capture is at most one slip above the
+child that points at it, not three pages.
+
+### Revision 4 — the quoted-run elision never worked, and comes out entirely
+
+`rowSentence` ran `'([^']{60,})'` → `'…'`, documented as eliding a long quoted run while keeping the
+sentence intact. **It cannot tell which quotes pair.** On a note listing several quoted items it
+matched the *closing* quote of one against the *opening* quote of the next and elided the sentence's
+own words between them:
+
+    full  15 of 64 URLs in scope 'products' matched a prohibited pattern:
+          https://…/mk-677-and-ostarine-stack/ (matched 'stack'); https://… (matched 'stack'); …
+    row   15 of 64 URLs in scope 'products'…'stack'…'stack'…'stack'…'stack'…'stack') and 10 more.
+
+The verb is gone, every URL is gone, and a stray `)` is left behind.
+
+**Surveyed across both reference runs before changing it, because it is a general rule.** It fired
+on five rules and mangled the sentence on four: NAME-002, CATG-007 and OFFS-001 on `c268f8d7`,
+NAME-002 on `5b29036d`. OFFS-002 was the fifth and the only one where the quotes genuinely paired —
+and there it elided the five-selector list, which is **what the check searched for**. The row stated
+an absence without stating the search that established it, which is exactly the scope qualification
+this function is forbidden to remove.
+
+So the operation had no correct remaining use: broken where it fired by accident, wrong where it
+fired by design. Removed. What is left is the colon-introduced list drop, which is well-formed and
+does what it says — the count it introduces is already in the sentence.
+
+The cost is row length: +1165 characters across `c268f8d7`, +233 across `5b29036d`, worst case
+NAME-002 at 87 → 515. Those rows were shorter because they were incoherent.
+
+### Revision 2 — dropped
+
+*Group renders its title and summary once; instances become compact rows.*
+
+**Dropped deliberately, and recorded here so it stops appearing on lists.** The summary already
+renders once. What remains is a design preference about how much of a title and a state a repeated
+instance should carry, and that is better formed after the first agent package has been read by
+somebody who has to work from it than argued from two fixtures now.
+
+Part 1 of the section architecture stopped it getting worse: the group header renders only where it
+heads more than one row, so a group of one is its own row rather than being titled twice.
+
+### Page counts
+
+| run | before | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 25 | **23** |
+| `5b29036d` comopeptides | 25 | **24** |
+
+Two pages and one page, against a longer row sentence pulling the other way. "Requests attempted"
+blocks fell from 6 to 3 and from 7 to 4 — in each case the cascade's four became one.
+
+---

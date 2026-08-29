@@ -2130,3 +2130,29 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   /* The accent survives a photocopy as a rule; the colour is a bonus, not the signal. */
   .part-questions { break-inside: auto; }
 }
+
+/* ---------- inherited cascade evidence (D-179) ---------- */
+
+/*
+  A child that rests on its parent's capture says so in a line instead of reprinting the request
+  block. Subordinate type, because it is a pointer rather than an observation.
+*/
+.ev-inherited {
+  margin: 2px 0 8px;
+  font-size: 11.5px;
+  color: var(--slate);
+}
+.ev-inherited .mono { font-family: 'JetBrains Mono', monospace; color: var(--ink-mid); }
+
+@media print {
+  /*
+    The parent's evidence must stay reachable from the child that points at it.
+
+    Each child row is kept whole, and the cascade's own container is not allowed to start a page
+    with nothing above it — so the line naming the parent is never the first thing on a page whose
+    parent is on the one before. D-042 as revised by D-166: the export holds what the screen holds,
+    and a pointer three pages from its target holds less.
+  */
+  .conseq-item { break-inside: avoid; }
+  .conseq { break-before: avoid; }
+}

@@ -340,6 +340,36 @@ function retrievalFingerprint(group: FindingGroup): string | null {
   return `${first.sourceUrl}::${set}`;
 }
 
+/** Every evidence entry a group cites, by the identity that makes two of them the same capture. */
+const evidenceKeys = (group: FindingGroup): Set<string> =>
+  new Set(
+    group.findings.flatMap((finding) =>
+      finding.evidence.map((entry) => `${entry.sourceUrl}|${entry.evidenceKey}`),
+    ),
+  );
+
+/**
+ * Whether a child rests entirely on its parent's evidence (D-179).
+ *
+ * **The same relation that nested it.** `nestCascades` groups on `retrievalFingerprint` — the source
+ * URL plus the exact set of attempts — so a child is here precisely because it reports on the
+ * request its parent reports on. Asking a second, differently-shaped question about whether the
+ * evidence "looks the same" would be two definitions of one relation, free to disagree.
+ *
+ * The subset check is the second half and it is not redundant. Sharing a failed retrieval does not
+ * prove a child cites nothing else: a rule could carry the shared request *and* a capture of its
+ * own. Inheritance is refused whenever the child cites anything the parent does not, so evidence a
+ * reader would otherwise never see is never suppressed — the direction hard constraint 3 cares
+ * about.
+ */
+export function inheritsEvidence(parent: FindingGroup, child: FindingGroup): boolean {
+  const fingerprint = retrievalFingerprint(parent);
+  if (fingerprint === null || retrievalFingerprint(child) !== fingerprint) return false;
+
+  const held = evidenceKeys(parent);
+  return [...evidenceKeys(child)].every((key) => held.has(key));
+}
+
 /**
  * Nests rules that could not be evaluated because one shared retrieval failed (D-164).
  *

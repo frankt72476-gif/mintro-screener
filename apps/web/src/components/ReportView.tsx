@@ -22,6 +22,7 @@ import {
 } from '@mintro/engine';
 import {
   describeGroup,
+  inheritsEvidence,
   coverageSentence,
   headerLines,
   reportParts,
@@ -527,6 +528,7 @@ function FindingRow({
   commentary,
   commentBox,
   print = false,
+  evidenceFrom,
 }: {
   readonly finding: ReportFinding;
   readonly access: EvidenceAccess;
@@ -535,6 +537,14 @@ function FindingRow({
   /** The merchant's own view supplies a box; the analyst's and the PDF do not. */
   readonly commentBox?: JSX.Element;
   readonly print?: boolean;
+  /**
+   * The rule whose capture backs this finding, when it is not this finding's own (D-179).
+   *
+   * Set only on a cascade child that rests entirely on its parent's evidence. The slip is replaced
+   * by a line naming the parent, because printing the same five-URL request block four times is
+   * four copies of one fact.
+   */
+  readonly evidenceFrom?: string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const source = finding.evidence[0]?.sourceUrl;
@@ -582,7 +592,21 @@ function FindingRow({
       </button>
       <div className="ev">
         <Requirement finding={finding} />
-        <EvidenceSlip finding={finding} access={access} />
+        {evidenceFrom === undefined ? (
+          <EvidenceSlip finding={finding} access={access} />
+        ) : (
+          /*
+            The capture is the one immediately above, under the rule named here (D-179).
+
+            Not "see above": the parent is named, so a reader who does meet this row alone knows
+            exactly which finding holds the evidence. What this rule could not establish is its own
+            sentence and is stated in full in the row and the requirement pair — only the shared
+            request block is inherited, and it is inherited because it is identical.
+          */
+          <p className="ev-inherited">
+            Backed by the same request as <span className="mono">{evidenceFrom}</span>, above.
+          </p>
+        )}
         {/*
           After the evidence, never inside it (D-063). The slip holds what Mintro captured; a
           merchant's words placed in it would read as evidence we gathered rather than an account
@@ -880,6 +904,7 @@ function Consequences({
               key={`${child.ruleId}-${i}`}
               finding={finding}
               access={access}
+              {...(inheritsEvidence(group, child) ? { evidenceFrom: group.ruleId } : {})}
               {...(print === true ? { print: true } : {})}
               {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
               {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
