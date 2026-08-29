@@ -55,6 +55,19 @@ export type Located<T> =
       readonly reason: string;
       /** Every request made looking for it, and what each returned. */
       readonly attempts: readonly FetchAttempt[];
+      /**
+       * True when **our request failed** rather than the surface being absent (D-181).
+       *
+       * Same meaning as `FlowObservation.obstructed`, and it exists here for the same reason: a
+       * locator that timed out reading a page and a locator that read the page and found no signal
+       * both return `located: false`, and the caller needs to know which before it can choose a
+       * `notEvaluableKind`. `establishCheckout` collapsed both into one return, so the caller could
+       * not tell — and filed our timeout as the merchant having no checkout page.
+       *
+       * Set by the locator at the point the failure happens. Absent means the surface was read and
+       * genuinely did not carry what identifies it, which is an observation about the merchant.
+       */
+      readonly obstructed?: true;
     };
 
 /** A located surface, for a caller that has already checked. */
@@ -65,11 +78,22 @@ export const located = <T>(value: T, url: string, how: string): Located<T> => ({
   how,
 });
 
-/** A surface that was not established, with the record of what was tried. */
-export const unreachable = <T>(reason: string, attempts: readonly FetchAttempt[]): Located<T> => ({
+/**
+ * A surface that was not established, with the record of what was tried.
+ *
+ * `obstructed` is opt-in so that every existing caller keeps its meaning: absent says the surface
+ * was read and did not carry what identifies it. A locator that could not read it at all passes
+ * `true` (D-181).
+ */
+export const unreachable = <T>(
+  reason: string,
+  attempts: readonly FetchAttempt[],
+  obstructed = false,
+): Located<T> => ({
   located: false,
   reason,
   attempts,
+  ...(obstructed ? { obstructed: true as const } : {}),
 });
 
 /**

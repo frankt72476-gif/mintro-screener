@@ -132,10 +132,17 @@ export async function runCheckoutFlow(
 
     if (cart === null) {
       steps.push('the cart could not be read');
+      /*
+        Ours, exhaustively (D-181). `cartHoldsProduct` returns `null` only when every source
+        failed: Shopify's `/cart.js`, the WooCommerce Store API, and the rendered cart page. Its
+        own doc says `null` is "could not tell" — and this call site then filed it as a fact about
+        the storefront, which is the sentence immediately below contradicting its own kind.
+      */
       return await observe(
         'unestablished',
         'the cart could not be read, so it is not known whether anything was added — and a ' +
           'checkout reached with an empty cart says nothing about guest checkout',
+        true,
       );
     }
 
@@ -224,7 +231,9 @@ export async function runCheckoutFlow(
     const where = await establishCheckout(page, timeout);
     if (!where.located) {
       steps.push(where.reason);
-      return await observe('unestablished', where.reason);
+      // The locator now says whether it read the page or could not (D-181). Passed through rather
+      // than re-derived: it is set where the failure happened.
+      return await observe('unestablished', where.reason, where.obstructed === true);
     }
 
     steps.push(`no payment field observed on ${where.how}`);

@@ -8,9 +8,8 @@
 
 import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
-import { isRendered } from '../page.js';
 import { notEvaluable, satisfied, unsettled, violation, type Evidence, type Finding } from '../findings.js';
-import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
+import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
 import { bestResemblance, splitStatements } from '../textSimilarity.js';
 
 /**
@@ -26,15 +25,20 @@ export function checkDomAssert(
   /** Phrases identifying the rule's subject, resolved from `target_phrases_from` by the runner. */
   targetPhrases: readonly string[] = [],
 ): Finding {
-  if (!isRendered(page)) {
-    return notEvaluable(
-      rule,
-      page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
-      RENDERED,
-      'not_exposed',
-      renderFailureEvidence(page),
-    );
-  }
+  /*
+    A render failure is not automatically the merchant's (D-181).
+
+    This branch filed all three ways `isRendered` can be false as `not_exposed` — *the merchant did
+    not present this* — while printing `page.renderError` as the reason. The header of this file
+    states the rule the code broke: not seeing an age gate because the page never loaded is not the
+    same as seeing a page that has none.
+
+    The decision now lives in `renderFailure`, because this block existed byte-identically in four
+    handlers and fixing one of them is what let the other three survive.
+  */
+  const unrendered = renderFailure(rule, page);
+  if (unrendered !== null) return unrendered;
+
 
   const { collect, detect, expect } = rule.params;
 

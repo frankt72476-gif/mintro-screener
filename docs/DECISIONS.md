@@ -11364,3 +11364,212 @@ Two pages and one page, against a longer row sentence pulling the other way. "Re
 blocks fell from 6 to 3 and from 7 to 4 — in each case the cascade's four became one.
 
 ---
+
+## D-180 — Deployed code is dated from stored evidence, not from commit timestamps
+
+**2026-08-29 · business owner · profiling method**
+
+Two runs of comopeptides at rule set 3.1.0, both `public`, both 66 findings, 33s and 163s. A 5×
+spread on a baseline makes every subsequent measurement meaningless, so the cause had to be found
+before anything was optimised.
+
+**It was not variance. It was before and after a change we shipped.**
+
+### The comparison
+
+The two runs did identical work: the same 30 distinct URLs rendered, the same Layer 3 surfaces found
+(sign-up at `/my-account/`, terms at `/termsandconditions/`, nothing for shipping, FAQ or payment),
+the same 37 products in scope and 5 sampled, neither escalated.
+
+**The DOM snapshots are byte-identical, URL for URL** — every rejected candidate is the same
+~28,950-byte themed 404 on both days. The merchant's origin served the same bytes.
+
+What differed was the artifact mix: **8 screenshots against 23**, over the same 30 renders.
+
+### The fingerprint
+
+`868bcce` — *"Cut Layer 3 probe cost, bound it for the first time"* — introduced `keepCapture`, so a
+Layer 3 candidate about to be discarded is rendered but not screenshotted. It also cut probe idle
+from `DEFAULT_IDLE_MS` 8s to `PROBE_IDLE_MS` 3s across roughly twenty-four probe renders, which is
+the bulk of the 130 seconds.
+
+So the **ratio of screenshots to DOM snapshots dates the code that produced a run**:
+
+    screenshots ≈ DOM snapshots     ran before 868bcce
+    screenshots ≪ DOM snapshots     ran after it
+
+By that marker the change went live **between 18:09 and 18:53 UTC on 2026-08-28**.
+
+### Why the marker rather than the commit date
+
+A commit timestamp is when something was authored, not when it reached the machine that produced a
+run — and on this evidence the two disagree: `868bcce` carries an author date of 19:32 UTC, after a
+run at 18:53 UTC that already shows the post-change fingerprint. Author dates can precede or follow
+the commit, survive a rebase, and say nothing about deployment.
+
+**The stored evidence is the only record of what actually ran.** Runs are immutable (D-002), so the
+artifact set a run wrote is a permanent statement about the code that wrote it. Where a change alters
+*what gets stored* rather than only what gets computed, it leaves a marker that can be read back
+years later — and it is the honest way to date behaviour when a git log cannot.
+
+The technique generalises: any change to what is persisted — a capture skipped, a field added, a
+kind recorded — becomes a fingerprint. Where a change leaves no such trace, this does not work, and
+nothing in the database will say when it landed.
+
+### Standing caveat: sportstechnologylabs is not a baseline
+
+Two runs of that storefront, both after the change, both doing the same work:
+
+    2026-08-28T21:03:40   48s   9 screenshots / 24 DOM
+    2026-08-29T14:15:34   14s   9 screenshots / 23 DOM
+
+**3.4× on identical code.** That is the merchant's origin, or the network between Fly and it, and it
+is not ours to fix. A 20% improvement measured there would be invisible.
+
+Comopeptides is tight over the same period — 26s, 32s, 33s, a spread of 1.27× — and is the site to
+measure our own changes against. **Sportstechnologylabs stays in the fixture matrix for coverage and
+must not be used as a performance baseline.**
+
+### And a caveat on local measurement
+
+Profiling from a developer machine gave 111s and 158s for runs that take 26–48s on Fly, roughly 4×,
+because almost all of the time is network wait. **Proportions transfer between the two; totals do
+not.** Any figure quoted as seconds from a local profile has to say so.
+
+---
+
+## D-181 — A `notEvaluableKind` is read from a producer-set signal, or it is not decided
+
+**2026-08-29 · engineering · four fixes, one extraction, and a second sweep that was not empty**
+
+`not_exposed` says *the merchant did not present this*. `not_retrieved` says *we did not obtain it*.
+D-136 introduced the field; D-156 settled that a check which does not fully obtain its data returns
+`not_evaluable` and named the signal — a flag set by the producer where the failure happens, never
+inferred from the wording of an error message, which hard constraint 9 forbids.
+
+What stayed wrong were the places that read no signal at all, and chose `not_exposed` by default.
+That prints our own timeout as a fact about the merchant, in a document forwarded to an underwriter
+under Mintro's name.
+
+### What set this off, and the mistake in the survey that found it
+
+Two stored runs — `63514a3b` and `e3e80bd3` — showed `GATE-003` as `not_exposed` alongside an
+attempt reading `status: 0`, which looked like a failed request filed as a merchant fact.
+
+**Both findings were correctly kinded.** Their reasons are *"no add-to-cart control was found on the
+product page"* and *"the add-to-cart control was clicked but the cart remained empty"*, which are
+observations about the storefront. The `status: 0` came from `flowProbe.ts`:
+
+    status: observation.error === undefined ? 200 : 0
+
+— a number that looks like an HTTP status, derived from the one field D-156 had already established
+carries two different kinds of thing. **The survey classified on exactly the signal the code had
+been fixed for using**, one layer out, and reached the opposite conclusion from the one the findings
+stated. That is the whole argument for the fourth fix below, and it is recorded because the next
+reader will arrive at the same field and be misled the same way.
+
+Also worth stating plainly: the run cited as the *correct* example, `5b29036d`, is the wrong one.
+Its `not_retrieved` on an empty cart is the pre-D-156 behaviour, and `flowProbe.ts` names that run by
+id as the defect. The two paths that appeared to be a live split were before and after a fix.
+
+### The four changes
+
+**1. The cart that could not be read is ours.** `flow.ts` filed `cartHoldsProduct` returning `null`
+without the flag. `null` is reached only when *every* source failed — Shopify's `/cart.js`, the
+WooCommerce Store API, and the rendered cart page — and `cart.ts` says so itself: *"`null` is 'could
+not tell'"*. The sentence it emitted, *"it is not known whether anything was added"*, contradicted
+its own kind.
+
+**2. A timeout is not an absence of checkout markers.** `establishCheckout` wrapped its
+`page.evaluate` in `withDeadlineOr(..., null)`, so a wedged page and a page carrying no checkout
+signals produced the same `null` and left through the same `unreachable`. The caller could not set
+the flag because **the distinction had already been destroyed** before it saw the result. The
+timeout now returns a distinct sentinel, and `Located<T>` carries an optional `obstructed` for the
+locator to say which happened.
+
+That return also fabricated `[{ url, status: 200 }]` — asserting an origin had answered 200 on a
+path nothing in the function ever requested. `establishCheckout` issues no request; it reads the
+page the flow is standing on. It now carries no attempts, and the URL is in the reason.
+
+The unparseable-URL return is marked obstructed too, by the same test: an address we cannot parse is
+an address we cannot ask about, and it establishes nothing about the merchant.
+
+**3. A render failure is not automatically the merchant's.** `isRendered` is false for three things
+that are not one fact:
+
+| condition | party | kind |
+|---|---|---|
+| `renderError` set | the browser threw — ours | `not_retrieved` |
+| `5xx` | the origin failed to serve a page it may well carry | `not_retrieved` |
+| `4xx` | the origin answered, and its answer is that it has no such page | `not_exposed` |
+
+A 503 establishes nothing about what a merchant publishes. A 404 is the origin's own statement about
+what it carries, and widening `not_retrieved` to swallow it would lose a real observation.
+
+**4. A field that looks like an HTTP status carries one, or it does not exist.** The synthesised
+attempt is gone rather than corrected. A flow issues no single request — it drives a browser through
+several navigations, and the failures it reports have no status at all, so there was no real number
+to put there. Nothing was lost with it: `url` duplicated `sourceUrl` and `error` duplicated the
+reason, and the invented status was the only thing it added.
+
+Hard constraint 3 still requires a `not_evaluable` finding to evidence *why*, so the flow's **step
+trace** now reaches the reason. Unlike the attempt it replaced, every step in it actually happened.
+
+### The extraction, which is the part that matters
+
+Fix 3 was written against `domAssert.ts`. The follow-up sweep found the identical block — byte for
+byte, `not_exposed` hard-coded with `page.renderError` printed on the line above — in
+`computedStyle.ts`, `textMatch.ts` and `textCooccurrence.ts`.
+
+**Four copies of one decision. The first sweep fixed one and left three.** So the decision now lives
+in a single `renderFailure(rule, page)` in `pageEvidence.ts`, and the handlers call it. Fixing three
+more copies in place would have preserved the thing that made this survivable.
+
+### Proving it, with no corpus to prove it against
+
+**No stored run exercises this branch.** Every `not_evaluable` finding from these four handlers
+across all seven reference runs arrives through `layer2.ts`, which already discriminates. The defect
+was live and untriggered on every run in the corpus — which is precisely why it lasted.
+
+So the constructed cases are the only evidence, and they were written to fail first: four red on the
+kind and the fabricated attempt, with the 4xx control and the two producer-flag cases green from the
+start, so the suite discriminates rather than merely failing. The render-failure tests are
+parameterised across all four handlers — a version covering only `dom_assert` would have gone green
+over three live copies. Verified by reverting one handler alone: the suite goes red naming that
+handler.
+
+The worker fixes are driven against a stubbed page rather than a browser, because the failures under
+test are acquisition failures and a live storefront will not produce one on demand.
+
+### The second sweep was not empty, and the pattern is now legible
+
+Reading a producer signal, correctly: `docParse` (`why`, set in `coa.ts` from `sawBroken` /
+`sawTransport`), `layer2.ts:105` (`noneToSample`), `urlPattern.ts:68` (`complete`), `httpProbe`,
+`payment`. Correct by construction, where the page rendered and the content is simply absent:
+`domAssert`'s footer and social branches, `textMatch`, `textCooccurrence`, `urlPattern:83`.
+`no_check_built` and `not_applicable` are statements about our own code and cannot be wrong in this
+direction.
+
+**Three sites remain that cannot decide, and all three have the shape just fixed twice** — a
+producer hands back a "could not" with no field saying which party failed, so the consumer guesses,
+and it guesses `not_exposed`:
+
+- **`urlPattern.ts:40`** — `layer0.usable` merges *"robots.txt declared sitemaps but none of them
+  could be fetched and parsed"* (ours) with *"no sitemap could be found"* and *"parsed but listed no
+  URLs"* (the merchant's). `discover.ts` has the attempts with real statuses; it has no flag.
+- **`signupForm.ts:177`** — `unlocated` cannot tell *"the account pages were read and none carried a
+  registration form"* from *"no account page loaded"*.
+- **`layer3.ts:249`** — `page === undefined` is an unconditional `not_exposed`, already known and
+  already scoped to the Layer 3 probe work.
+
+Not fixed here: each needs its own producer to start carrying the flag, which is a change to that
+producer rather than to the handler, and folding three more into this commit would repeat the
+mistake the extraction above exists to correct. Recorded so the next sweep starts from a list rather
+than from a survey.
+
+**The general form, which is the part worth keeping:** a consumer that must name which party failed
+cannot derive it from prose, from a status it synthesised, or from a default. Either the producer
+states it at the point the failure happens, or the distinction does not exist and the honest move is
+to give the producer somewhere to say so.
+
+---

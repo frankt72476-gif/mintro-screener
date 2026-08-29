@@ -50,7 +50,9 @@ export async function establishCheckout(page: Page, timeoutMs = 20_000): Promise
   try {
     path = new URL(url).pathname.toLowerCase();
   } catch {
-    return unreachable(`the flow ended at an address that could not be parsed: ${url}`, []);
+    // Nothing here says anything about the merchant: an address we cannot parse is an address we
+    // cannot ask about (D-181).
+    return unreachable(`the flow ended at an address that could not be parsed: ${url}`, [], true);
   }
 
   if (path.includes('checkout')) {
@@ -66,7 +68,17 @@ export async function establishCheckout(page: Page, timeoutMs = 20_000): Promise
     nothing for a call that never settles, and this one runs on a checkout page reached by a flow
     that has already clicked things, which is where a page is most likely to be busy.
   */
-  const collects = await withDeadlineOr(
+  /*
+    A timeout and "this page carries no checkout markers" are different facts (D-181).
+
+    `withDeadlineOr(..., null)` returned the same `null` for both, and both left through one
+    `unreachable` — so the caller could not tell whether the page had been read, and filed a page
+    we never got an answer from as a merchant with no checkout. The sentinel below is distinct from
+    every value `page.evaluate` can return, which is a string or `null`.
+  */
+  const UNREAD = Symbol('page.evaluate did not answer');
+
+  const collects = await withDeadlineOr<string | null | symbol>(
     page.evaluate(
       ({ tokens, containers }) => {
         const byAutocomplete = tokens.find(
@@ -81,17 +93,34 @@ export async function establishCheckout(page: Page, timeoutMs = 20_000): Promise
     ),
     timeoutMs,
     'page.evaluate() while establishing the checkout page',
-    null,
+    UNREAD,
   );
 
-  if (collects !== null) {
-    return located(true, url, `${url}, which collects checkout details — ${collects}`);
+  if (collects === UNREAD) {
+    return unreachable(
+      `the page the flow ended at (${url}) did not answer when it was read for checkout ` +
+        `details, so it was not established what it carries`,
+      [],
+      true,
+    );
   }
 
+  if (collects !== null) {
+    return located(true, url, `${url}, which collects checkout details — ${collects as string}`);
+  }
+
+  /*
+    Read, and it carries nothing that identifies checkout. That is an observation about the page.
+
+    No attempts: this function issues no request. It evaluates the page the flow is already
+    standing on, and the `[{ url, status: 200 }]` that used to sit here asserted that an origin had
+    answered 200 on a path nothing in this function ever asked for (D-181). The URL is in the
+    reason, and how the flow arrived at it is in the step trace the observation carries.
+  */
   return unreachable(
     `the flow ended at ${url}, which neither names checkout in its path nor collects payment or ` +
       `address details, so no checkout page was reached`,
-    [{ url, status: 200 }],
+    [],
   );
 }
 

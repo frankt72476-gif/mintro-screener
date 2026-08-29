@@ -89,6 +89,7 @@ describe('a flow that never started is told apart from one that found nothing', 
       observation: {
         flow: 'checkout',
         reached: 'not_started',
+        steps: [],
         error: 'page.goto: Timeout 20000ms exceeded',
         // D-156: the signal is this flag, not the presence of `error`. The producer sets it where
         // the failure happens; the classifier never infers it from wording.
@@ -108,6 +109,7 @@ describe('a flow that never started is told apart from one that found nothing', 
       observation: {
         flow: 'checkout',
         reached: 'not_started',
+        steps: [],
         error: 'the add-to-cart control was clicked but the cart remained empty, so the flow never began',
         capturedAt: '2026-08-26T00:00:00.000Z',
       },
@@ -128,6 +130,7 @@ describe('a flow that never started is told apart from one that found nothing', 
       observation: {
         flow: 'checkout',
         reached: 'unestablished',
+        steps: [],
         capturedAt: '2026-08-26T00:00:00.000Z',
       },
       session: SESSION,

@@ -25,10 +25,9 @@
 
 import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext, PageRegion, StyledText } from '../page.js';
-import { isRendered } from '../page.js';
 import { contrastRatio, formatRatio } from '../contrast.js';
 import { notEvaluable, satisfied, violation, type Finding } from '../findings.js';
-import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
+import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
 import { resembles } from '../textSimilarity.js';
 
 /** One way a measured element fell short. */
@@ -71,15 +70,9 @@ export function checkComputedStyle(
   page: PageContext,
   targets: readonly StyledText[],
 ): Finding {
-  if (!isRendered(page)) {
-    return notEvaluable(
-      rule,
-      page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
-      RENDERED,
-      'not_exposed',
-      renderFailureEvidence(page),
-    );
-  }
+  // One decision, in one place (D-181). A render failure is not automatically the merchant's.
+  const unrendered = renderFailure(rule, page);
+  if (unrendered !== null) return unrendered;
 
   if (!page.footer.found) {
     return notEvaluable(

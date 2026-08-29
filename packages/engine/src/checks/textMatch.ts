@@ -10,9 +10,8 @@
 
 import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext, PageRegion } from '../page.js';
-import { isRendered } from '../page.js';
 import { notEvaluable, satisfied, violation, type Finding } from '../findings.js';
-import { pageEvidence, renderFailureEvidence, RENDERED } from './pageEvidence.js';
+import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
 import { bestResemblance, splitStatements } from '../textSimilarity.js';
 import { scopeTerms, termsAt } from '../claimScope.js';
 
@@ -30,15 +29,9 @@ const RENDERED_SURFACES = new Set([
 ]);
 
 export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext): Finding {
-  if (!isRendered(page)) {
-    return notEvaluable(
-      rule,
-      page.renderError ?? `the page returned HTTP ${page.httpStatus} and was not rendered`,
-      RENDERED,
-      'not_exposed',
-      renderFailureEvidence(page),
-    );
-  }
+  // One decision, in one place (D-181). A render failure is not automatically the merchant's.
+  const unrendered = renderFailure(rule, page);
+  if (unrendered !== null) return unrendered;
 
   const { surface } = rule.params;
   if (!RENDERED_SURFACES.has(surface)) {

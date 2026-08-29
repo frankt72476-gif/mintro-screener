@@ -150,9 +150,14 @@ export function checkFlowProbe(rule: RuleOfType<'flow_probe'>, input: FlowProbeI
       changed.
     */
     const obstructed = observation.obstructed === true;
+    const why = observation.error ?? `${flowName(observation.flow)} could not be started on this storefront`;
+
     return notEvaluable(
       rule,
-      observation.error ?? `${flowName(observation.flow)} could not be started on this storefront`,
+      // The step trace is the record of what was attempted, and hard constraint 3 requires a
+      // `not_evaluable` finding to carry one. It replaces the fabricated fetch attempt that used
+      // to stand in for it (D-181) — unlike that entry, every step here actually happened.
+      observation.steps.length === 0 ? why : `${why}. Steps: ${observation.steps.join(' → ')}.`,
       RENDERED,
       obstructed ? 'not_retrieved' : 'not_exposed',
       [flowEvidence(observation, session)],
@@ -210,6 +215,28 @@ function describeClean(
   return `${capitalise(flowName(observation.flow))} did not reach ${stageName(rule.params.fail_if)}: ${stopped}. Steps: ${observation.steps.join(' → ')}. The flow was ${describeSession(session)}. Only this one path through checkout was exercised.`;
 }
 
+/**
+ * The capture behind a flow finding.
+ *
+ * **No `attempts`, deliberately (D-181).** There used to be one synthesised entry:
+ *
+ *     status: observation.error === undefined ? 200 : 0
+ *
+ * A number that looks like an HTTP status, derived from a prose field — and from the one field
+ * D-156 established carries two different kinds of thing, our failures and the merchant's. So a
+ * finding correctly kinded `not_exposed` carried an attempt reading `status: 0`, and a reader
+ * auditing kinds by that number reached the opposite conclusion from the one the finding stated.
+ * That is not hypothetical; it is how the survey that opened D-181 went wrong.
+ *
+ * The rule it broke: a field that looks like an HTTP status must carry one or not exist. A flow
+ * issues no single request — it drives a browser through several navigations, and the failures it
+ * reports ("the cart remained empty") have no status at all. There is no real number to put here,
+ * so the field is gone rather than filled.
+ *
+ * Nothing was lost with it. `url` duplicated `sourceUrl` and `error` duplicated the reason; the
+ * status was the only thing it added, and it was invented. What a reader needs — what the flow
+ * did, in order — is the step trace, which is real and now reaches the finding's reason.
+ */
 function flowEvidence(observation: FlowObservation, session: SessionDescriptor): Evidence {
   return {
     kind: RENDERED,
@@ -217,13 +244,6 @@ function flowEvidence(observation: FlowObservation, session: SessionDescriptor):
     sourceSha256: observation.sha256 ?? '',
     evidenceKey: observation.screenshotKey ?? '',
     capturedAt: observation.capturedAt,
-    attempts: [
-      {
-        url: observation.finalUrl,
-        status: observation.error === undefined ? 200 : 0,
-        ...(observation.error === undefined ? {} : { error: observation.error }),
-      },
-    ],
     session,
   };
 }
