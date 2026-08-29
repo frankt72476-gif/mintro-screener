@@ -56,7 +56,7 @@ import {
   nothingObservedSection,
 } from '../lib/grouping.js';
 import { AttestationForm } from './Attestations.js';
-import { ReportView, type Filter } from './ReportView.js';
+import { ReportView } from './ReportView.js';
 import { formatClock, formatStamp } from '../lib/format.js';
 
 /** `?comment=<token>` — the merchant's whole credential. */
@@ -228,20 +228,15 @@ function OpenReport({
   const jumpTarget = useMemo(() => nothingObservedSection(opened.report), [opened.report]);
 
   /*
-    The filter is held here, not inside `ReportView`.
+    The filter is gone, and the dance it required with it.
 
-    A section hidden by the filter cannot be scrolled to, so jumping clears the filter first and
-    scrolls on the next frame, once the section is in the document. The alternative was a link that
-    worked until someone touched a filter chip — the same failure, waiting.
+    A section hidden by the filter could not be scrolled to, so jumping had to clear the filter
+    first and scroll on the next frame. With the chips deleted every section is always in the
+    document, so this is a scroll and nothing else.
   */
-  const [filter, setFilter] = useState<Filter>('all');
-
   const jump = (event: { preventDefault: () => void }): void => {
     event.preventDefault();
-    setFilter('all');
-    requestAnimationFrame(() => {
-      document.getElementById(NOTHING_OBSERVED_ID)?.scrollIntoView({ behavior: 'smooth' });
-    });
+    document.getElementById(NOTHING_OBSERVED_ID)?.scrollIntoView({ behavior: 'smooth' });
   };
 
   /*
@@ -781,8 +776,6 @@ function OpenReport({
           surface="merchant"
           report={opened.report}
           access={access}
-          filter={filter}
-          onFilterChange={setFilter}
           commentBox={(finding, ordinal) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}

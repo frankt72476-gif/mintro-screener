@@ -85,15 +85,28 @@ describe.each(RUNS)('%s', (_label, report) => {
     ]);
   });
 
-  it('keeps section 3 a single list on the app surfaces and splits it for IQwallet', () => {
-    const single = reportParts(report, 'agent').find((p) => p.id === 'observed');
-    expect(single?.blocks).toHaveLength(1);
-    expect(single?.blocks[0]?.heading).toBeNull();
+  /**
+   * Section 3 splits on **every** surface.
+   *
+   * It split only on the IQwallet PDF, which left the app surfaces showing one list in rule-set
+   * order with the two states interleaved — nothing but the badge in the margin told them apart,
+   * so a reader scanning for what failed had to read every row to find three of them.
+   *
+   * The surface parameter controls section order and nothing else now.
+   */
+  it.each(SURFACES)('splits section 3 into two labelled subsections on %s', (surface) => {
+    const observed = reportParts(report, surface).find((p) => p.id === 'observed');
+    expect(observed?.blocks.map((b) => b.heading)).toEqual(['Not met', 'Needs a look']);
+    // Not met first: the list that is work, before the list that is a conversation.
+    expect(observed?.blocks[0]?.state).toBe('fail');
+    expect(observed?.blocks[1]?.state).toBe('review');
+  });
 
-    const split = reportParts(report, 'iqwallet').find((p) => p.id === 'observed');
-    expect(split?.blocks.map((b) => b.heading)).toEqual(['Not met', 'Needs a look']);
-    // Same rows either way. Only the headings differ.
-    expect(split?.tally).toEqual(single?.tally);
+  it('carries the same rows in section 3 whoever is reading', () => {
+    const forAgent = reportParts(report, 'agent').find((p) => p.id === 'observed');
+    const forIqwallet = reportParts(report, 'iqwallet').find((p) => p.id === 'observed');
+    expect(forIqwallet?.tally).toEqual(forAgent?.tally);
+    expect(forIqwallet?.blocks.map((b) => b.tally)).toEqual(forAgent?.blocks.map((b) => b.tally));
   });
 
   it('holds the passes as furniture rather than a section', () => {
@@ -176,7 +189,7 @@ describe('print carries both headers, which it did not', () => {
       'Stopping conditions',
       'What we observed',
       'Not observed from the site',
-      'Questions only you can answer',
+      'Operational questions',
     ]);
   });
 

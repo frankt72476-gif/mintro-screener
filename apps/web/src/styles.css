@@ -2067,3 +2067,66 @@ a.headline-label:hover { color: var(--ink); border-bottom-color: var(--ink-mid);
   .headlines { break-inside: avoid; }
   a.headline-label { border-bottom: 0; }
 }
+
+/* ---------- navigation and emphasis (sections revision) ---------- */
+
+/*
+  The header lines are the document's navigation now — the filter chips are deleted, and these did
+  the chips' work already. So they stop reading as a quiet list.
+
+  Weight comes from size, space and the one accent already in the palette. No new colour, no fill,
+  no border box: the same rules the quiet pass set (D-167), applied to make four lines louder rather
+  than to add another panel.
+*/
+.headlines { margin: 30px 0 40px; max-width: 46ch; }
+.headlines li { gap: 18px; padding: 9px 0; align-items: baseline; }
+
+/* The numeral is the thing being scanned, so it is the largest text outside the domain itself. */
+.headline-n {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  min-width: 2.2ch;
+}
+
+/*
+  A link that looks like a link. The underline is an offset rule rather than a border on the box, so
+  the descenders stay legible and the row keeps its baseline.
+*/
+.headline-label { font-size: 14px; color: var(--ink); }
+a.headline-label {
+  border-bottom: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+a.headline-label:hover { text-decoration-color: var(--violet); color: var(--violet); }
+
+/* A zero line is still a line, and still says which section it stands for — it just does not lead
+   anywhere, so it is not dressed as something to click (D-044). */
+.headlines li.zero .headline-n { font-weight: 500; }
+.headlines li.zero .headline-n,
+.headlines li.zero .headline-label { color: var(--slate); }
+
+/*
+  Section 2 carries more weight than the other three, because it is the only one asking a person to
+  do something. Everything else reports what was seen.
+
+  Type, space, and the accent that already exists — the same 3px violet rule used on a stalled queue
+  row and a merchant response. Used once here, on the one section that is somebody's outstanding
+  work. No fill, no box, no new hue.
+*/
+.part-questions {
+  margin-top: 48px;
+  padding-left: 18px;
+  border-left: 3px solid var(--violet);
+}
+.part-questions .part-name { font-size: 20px; }
+/* The lede names who has to answer, so it is read rather than skimmed past. */
+.part-questions .sect-lede { color: var(--ink); font-size: 13px; max-width: 62ch; }
+
+@media print {
+  /* The accent survives a photocopy as a rule; the colour is a bonus, not the signal. */
+  .part-questions { break-inside: auto; }
+}

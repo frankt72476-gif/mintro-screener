@@ -40,8 +40,6 @@ import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
 
-export type Filter = State | 'all';
-
 /**
  * What an operator can do with a report. Never available on the merchant route (D-066).
  */
@@ -104,17 +102,6 @@ interface Props {
    * (D-067).
    */
   readonly participation?: Participation;
-  /**
-   * A controlled filter, when the caller needs one.
-   *
-   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
-   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
-   * filter first — which it can only do if it owns the value (D-069).
-   *
-   * Uncontrolled when omitted, which is every other caller.
-   */
-  readonly filter?: Filter;
-  readonly onFilterChange?: (filter: Filter) => void;
   /** The merchant's own view supplies a box; nothing else does. */
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
   /**
@@ -144,8 +131,6 @@ export function ReportView({
   commentaryOf,
   commentaryNote,
   participation,
-  filter: controlledFilter,
-  onFilterChange,
   surface: surfaceProp,
   commentBox,
   attestations,
@@ -158,13 +143,6 @@ export function ReportView({
   // Derived once and read twice — by the header lines and by the sections themselves. Two calls
   // would be two derivations, which is the thing part 1 built the tally to prevent (spec §3).
   const parts = useMemo(() => reportParts(report, surface), [report, surface]);
-  const [ownFilter, setOwnFilter] = useState<Filter>('all');
-  const filter = controlledFilter ?? ownFilter;
-  const setFilter = (next: Filter): void => {
-    setOwnFilter(next);
-    onFilterChange?.(next);
-  };
-
   return (
     <div>
       <div className="rhead">
@@ -278,12 +256,6 @@ export function ReportView({
       <HeaderLines parts={parts} />
 
       {/*
-        The chips stay. They are the one thing on the page a reader can act on, and a filter is not
-        a restatement of anything (spec §3).
-      */}
-      {!print && <Filters filter={filter} onChange={setFilter} />}
-
-      {/*
         Two renderings of the same findings (D-042).
 
         **Print keeps the category structure and every finding individually.** The exported
@@ -345,9 +317,7 @@ export function ReportView({
               passes={passes}
             >
               {(block) =>
-                block.groups
-                  .filter((group) => print || filter === 'all' || group.state === filter)
-                  .map((group) => (
+                block.groups.map((group) => (
                     <GroupCard
                       key={`${group.ruleId}-${group.state}`}
                       group={group}
@@ -420,13 +390,6 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
 
 
 /**
- * Filter chips and the coverage line.
- *
- * Coverage is read from the report, where it is computed from the findings themselves. It is
- * never a constant — the demo's "31 of 40" was placeholder copy, and a hardcoded coverage figure
- * would claim a run examined more than it did.
- */
-/**
  * The header lines (spec §3).
  *
  * One line per section, numerals first, each a link to the section it counts. A zero line renders
@@ -456,36 +419,6 @@ function HeaderLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.
   );
 }
 
-function Filters({
-  filter,
-  onChange,
-}: {
-  readonly filter: Filter;
-  readonly onChange: (next: Filter) => void;
-}): JSX.Element {
-  const chips: readonly { readonly value: Filter; readonly label: string }[] = [
-    { value: 'all', label: 'Everything' },
-    { value: 'fail', label: STATE_LABEL.fail },
-    { value: 'review', label: STATE_LABEL.review },
-    { value: 'pass', label: STATE_LABEL.pass },
-    { value: 'not_evaluable', label: STATE_LABEL.not_evaluable },
-  ];
-
-  return (
-    <div className="filters">
-      {chips.map((chip) => (
-        <button
-          key={chip.value}
-          className="chip"
-          aria-pressed={filter === chip.value}
-          onClick={() => onChange(chip.value)}
-        >
-          {chip.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /**
  * The coverage line on its own, for print mode where there are no filter chips to sit beside.
@@ -580,73 +513,6 @@ function listOf(parts: readonly string[]): string {
 }
 
 
-function CategoryCard({
-  category,
-  index,
-  filter,
-  access,
-  print = false,
-  commentaryOf,
-  ordinals,
-}: {
-  readonly category: ReportCategory;
-  readonly index: number;
-  readonly filter: Filter;
-  readonly access: EvidenceAccess;
-  readonly print?: boolean;
-  /**
-   * What the merchant said about each finding (D-063).
-   *
-   * This component had no such prop, and the print branch passed one anyway — a spread of a
-   * conditional object, `{...(x === undefined ? {} : { x })}`, which JSX accepts without an
-   * excess-property check. The call site read as correct and the value went nowhere, so the PDF
-   * that reaches IQwallet carried no merchant responses at all.
-   */
-  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
-  /** Decided once for the whole report, because this view and the reading view traverse it
-   *  differently and a positional ordinal would key the same comment two ways. */
-  readonly ordinals?: ReadonlyMap<ReportFinding, number>;
-}): JSX.Element | null {
-  const visible = useMemo(
-    () => category.findings.filter((finding) => filter === 'all' || finding.state === filter),
-    [category.findings, filter],
-  );
-
-  // Matches the demo: open when filtering, or when the category contains a failure.
-  const [open, setOpen] = useState<boolean | null>(null);
-  const defaultOpen = filter !== 'all' || category.findings.some((f) => f.state === 'fail');
-  const isOpen = print ? true : (open ?? defaultOpen);
-
-  if (visible.length === 0) return null;
-
-  return (
-    <div className={`card cat ${isOpen ? 'open' : ''}`}>
-      <button className="cat-head" onClick={() => setOpen(!isOpen)} disabled={print}>
-        <span className="cat-idx">{String(index + 1).padStart(2, '0')}</span>
-        <span className="cat-name">{category.name}</span>
-        <span className="pips">
-          {category.findings.map((finding, i) => (
-            <span key={`${finding.ruleId}-${i}`} className={`pip ${stateClass(finding.state)}`} />
-          ))}
-        </span>
-        <span className="caret">▶</span>
-      </button>
-      <div className="cat-body">
-        {visible.map((finding, i) => (
-          <FindingRow
-            key={`${finding.ruleId}-${i}`}
-            finding={finding}
-            access={access}
-            print={print}
-            {...(commentaryOf === undefined
-              ? {}
-              : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * Which finding of a rule this is, for rules that produce one per sampled page.
@@ -882,17 +748,6 @@ function GroupCard({
    * (D-067).
    */
   readonly participation?: Participation;
-  /**
-   * A controlled filter, when the caller needs one.
-   *
-   * The merchant page does: its callout jumps to a section, and a section hidden by the filter
-   * cannot be scrolled to. Rather than let the link fail in that state, the caller clears the
-   * filter first — which it can only do if it owns the value (D-069).
-   *
-   * Uncontrolled when omitted, which is every other caller.
-   */
-  readonly filter?: Filter;
-  readonly onFilterChange?: (filter: Filter) => void;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
   /** The export expands every instance inline (D-042 as revised by D-166). */
   readonly print?: boolean;

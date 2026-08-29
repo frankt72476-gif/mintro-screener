@@ -676,7 +676,7 @@ export interface ReportPart {
 
 const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
   stopping: 'Stopping conditions',
-  questions: 'Questions only you can answer',
+  questions: 'Operational questions',
   observed: 'What we observed',
   'not-observed': 'Not observed from the site',
 };
@@ -739,7 +739,6 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
       groups.filter(
         (group) => !isStopping(group) && (group.state === 'fail' || group.state === 'review'),
       ),
-      surface,
     ),
     'not-observed': notObservedPart(
       report,
@@ -802,40 +801,50 @@ function questionsPart(report: ScreeningReport): ReportPart {
   return {
     id: 'questions',
     heading: SECTION_HEADING.questions,
+    /*
+      The lede names who answers, because this is the only section that asks anyone to do anything.
+
+      Every other section reports what was seen. This one is outstanding work, and a reader who does
+      not know whether it is theirs will leave it for somebody else. It still describes rather than
+      instructs (D-001): it says where an answer has to come from, not that anyone must give one.
+    */
     lede:
       asked === 0
         ? 'This run carries no operational questions.'
-        : 'No crawl can answer these. They are the merchant’s own statements, quoted as given and verified by nobody.',
+        : 'No crawl can answer these. Input is needed from the agent or the merchant; the answers are their own statements, quoted as given and verified by nobody.',
     blocks: [],
     tally: { rules: asked, findings: asked, byState: { ...EMPTY_BY_STATE } },
   };
 }
 
 /**
- * Section 3 — one heading on the app surfaces, two on the IQwallet PDF.
+ * Section 3 — two labelled subsections, on every surface.
  *
- * A merchant fixing their storefront works a single list and does not care which bucket a row is
- * in. An underwriter reads *not met* and *needs a look* as different categories, because one is an
- * observation against a stated condition and the other is a judgement they have to make. Same rows,
- * same order within each; only the headings differ.
+ * *Not met* and *needs a look* are different questions. One is an observation against a stated
+ * condition; the other is a judgement somebody still has to make. A merchant fixing a storefront
+ * needs that separation as much as an underwriter does — arguably more, since the first list is the
+ * work and the second is the conversation.
+ *
+ * It was split only on the IQwallet PDF, which left the app surfaces showing one list in rule-set
+ * order with the two states **interleaved** and nothing but the badge in the margin telling them
+ * apart. A reader scanning for what failed had to read every row to find three of them.
+ *
+ * The surface parameter no longer touches this. It controls **section order and nothing else**.
  */
-function observedPart(groups: readonly FindingGroup[], surface: Surface): ReportPart {
-  const blocks: SectionBlock[] =
-    surface === 'iqwallet'
-      ? (['fail', 'review'] as const)
-          .map((state) => {
-            const ofState = groups.filter((group) => group.state === state);
-            return {
-              key: `observed:${state}`,
-              heading: STATE_LABEL[state],
-              lede: '',
-              state,
-              groups: ofState,
-              tally: tally(ofState),
-            };
-          })
-          .filter((block) => block.groups.length > 0)
-      : [{ key: 'observed', heading: null, lede: '', groups, tally: tally(groups) }];
+function observedPart(groups: readonly FindingGroup[]): ReportPart {
+  const blocks: SectionBlock[] = (['fail', 'review'] as const)
+    .map((state) => {
+      const ofState = groups.filter((group) => group.state === state);
+      return {
+        key: `observed:${state}`,
+        heading: STATE_LABEL[state],
+        lede: '',
+        state,
+        groups: ofState,
+        tally: tally(ofState),
+      };
+    })
+    .filter((block) => block.groups.length > 0);
 
   return {
     id: 'observed',
@@ -920,12 +929,17 @@ export interface HeaderLine {
  *
  * Not the section headings verbatim. A heading names a part of a document; these name what the
  * numeral counts, which is a different sentence — "3 standards not met" rather than "3 What we
- * observed". Section 3 is split across two lines for the same reason the IQwallet PDF splits it:
+ * observed". Section 3 is split across two lines for the same reason the section itself splits:
  * *not met* and *needs a look* are different questions, and one number over both answers neither.
+ *
+ * Where a line names its section rather than its contents it uses the section's own words. It read
+ * "questions only you can answer" after that section was renamed, so a reader following the link
+ * arrived somewhere with a different name on it — a navigation label that does not match its
+ * destination is the same defect as a count that disagrees with its heading.
  */
 const HEADER_LABEL: Readonly<Record<string, string>> = {
   stopping: 'stopping conditions observed',
-  questions: 'questions only you can answer',
+  questions: 'operational questions',
   fail: 'standards not met',
   review: 'need a look',
 };
