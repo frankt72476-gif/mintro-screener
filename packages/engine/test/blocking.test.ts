@@ -13,6 +13,7 @@ import {
   notEvaluable,
   satisfied,
   violation,
+  summariseBlocking,
   type BlockingSummary,
   type Finding,
 } from '@mintro/engine';
@@ -178,5 +179,70 @@ describe('the report surfaces them without knowing which they are', () => {
     const summary = blockingOf(findings);
     expect(summary.failed.filter((f: { ruleId: string }) => f.ruleId === 'PROD-006')).toHaveLength(1);
     expect(summary.passed).not.toContain('PROD-006');
+  });
+});
+
+/**
+ * The three lists partition the declared set (D-183).
+ *
+ * The summary states arithmetic a reader checks — *"7 of 9 stopping conditions were observed"* — so
+ * the parts have to add up for the sentence to be true. `summariseBlocking` used to `continue` past
+ * a flagged rule with no findings, dropping it from all three lists.
+ *
+ * **That was already unreachable through `assembleReport`,** and finding out why is the point of
+ * the first test below: the backfill twelve lines above the call gives every rule at least one
+ * finding, so a blocking rule no layer ran arrives as `not_evaluable` and is named rather than
+ * lost. The hole was closed by a loop written for a different reason.
+ *
+ * The assertion is kept for the dependency that fact rests on — two functions in one file with
+ * nothing but adjacency between them — and it is tested directly rather than through the caller,
+ * because an assertion nobody can reach is an assertion nobody has checked.
+ */
+describe('a stopping condition that produced no finding', () => {
+  /** Every blocking rule cleared, which is the shape the guard must not fire on. */
+  const allNine = (): Finding[] =>
+    EXPECTED.map((id) => satisfied(ruleFor(id), 'observed clear', 'rendered_page', []));
+
+  it('is disclosed as not evaluable by the time it reaches the summary, not dropped', () => {
+    // The real behaviour, and the one that protects the count. `assembleReport` backfills the
+    // missing rule with a synthesised `not_evaluable`, so it is named in the sentence.
+    const summary = blockingOf(allNine().filter((f) => f.ruleId !== 'PAY-001'));
+
+    expect(summary.notEvaluable).toContain('PAY-001');
+    expect(summary.passed).not.toContain('PAY-001');
+    expect(summary.failed.length + summary.notEvaluable.length + summary.passed.length).toBe(summary.declared);
+  });
+
+  it('is refused outright if it ever reaches the summary unaccounted for', () => {
+    /*
+      Driven directly, because `assembleReport` cannot produce this state — which is exactly why
+      the assertion needs its own test. Anything that narrowed the backfill would reopen the gap
+      silently, and the symptom would be a stopping condition missing from a summary rather than
+      an error.
+    */
+    const short = allNine()
+      .filter((f) => f.ruleId !== 'PAY-001')
+      .map((f) => ({ ...f, title: '', clause: '', source: 'programme' as const, severity: 'critical' as const, tier: 'auto_fail' as const, checkType: 'text_match' as const, layer: 1 }));
+
+    expect(() => summariseBlocking(short, ruleset)).toThrow(/did not partition/);
+    expect(() => summariseBlocking(short, ruleset)).toThrow(/PAY-001/);
+  });
+
+  it('does not fire when every declared condition produced a finding', () => {
+    // The control. A guard that fired on the normal case would be worse than the hole it closes.
+    expect(() => report(allNine())).not.toThrow();
+    expect(blockingOf(allNine()).passed).toHaveLength(EXPECTED.length);
+  });
+
+  it('does not fire when conditions were not evaluable, which is an accounted-for outcome', () => {
+    const mixed = allNine().map((f) =>
+      f.ruleId === 'GATE-003' || f.ruleId === 'NAME-001'
+        ? notEvaluable(ruleFor(f.ruleId), 'nothing was observed either way', 'rendered_page', 'not_exposed')
+        : f,
+    );
+
+    const summary = blockingOf(mixed);
+    expect(summary.notEvaluable).toEqual(['GATE-003', 'NAME-001']);
+    expect(summary.failed.length + summary.notEvaluable.length + summary.passed.length).toBe(summary.declared);
   });
 });

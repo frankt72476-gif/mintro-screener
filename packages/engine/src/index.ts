@@ -268,6 +268,7 @@ export {
 
 export {
   assembleReport,
+  summariseBlocking,
   computeCoverage,
   distinctRuleCount,
   pairSameObservation,

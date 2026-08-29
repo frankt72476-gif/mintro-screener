@@ -686,6 +686,53 @@ export interface StoppingAccount {
   readonly passed: readonly string[];
 }
 
+/**
+ * The stopping-conditions sentence, leading with what was determined (D-183).
+ *
+ * It used to open on the clean sweep and disclose the gap second:
+ *
+ *     None of the 9 stopping conditions was observed failing on this run.
+ *     Not observed either way, so not cleared: GATE-003, NAME-001.
+ *
+ * A reader takes the reassurance from the first line and has to withdraw it at the second. Same
+ * facts, and the order decides whether the sentence misleads for a moment. The denominator comes
+ * first, so the gap is part of the claim rather than a qualification of it.
+ *
+ * **The parts are counted, never assumed to add up.** `summariseBlocking` now refuses to assemble a
+ * run whose lists do not partition the declared set, but a report stored before that guard existed
+ * could carry a hole, and runs are immutable. So a shortfall is stated rather than absorbed: the
+ * alternative is a sentence claiming "7 of 9 were observed" on a report where the ninth is simply
+ * missing, which is the flattering direction and the one worth being loud about.
+ */
+export function stoppingSentence(account: StoppingAccount): readonly string[] {
+  if (account.declared === null) return [];
+
+  const failed = account.failed.length;
+  const observed = failed + account.passed.length;
+  const unaccounted = account.declared - observed - account.notEvaluable.length;
+
+  const were = observed === 1 ? 'was' : 'were';
+  const lines = [
+    `${observed} of ${account.declared} stopping conditions ${were} observed, and ` +
+      (failed === 0 ? 'none was failing.' : `${failed} ${failed === 1 ? 'was' : 'were'} failing.`),
+  ];
+
+  if (account.notEvaluable.length > 0) {
+    const n = account.notEvaluable.length;
+    lines.push(`${n} could not be evaluated: ${account.notEvaluable.join(', ')}.`);
+  }
+
+  if (unaccounted > 0) {
+    // Never expected. Said plainly rather than hidden inside the arithmetic above.
+    lines.push(
+      `${unaccounted} produced no finding on this run and ${unaccounted === 1 ? 'is' : 'are'} ` +
+        `unaccounted for, so this run did not observe every condition it declares.`,
+    );
+  }
+
+  return lines;
+}
+
 export interface ReportPart {
   readonly id: SectionId;
   readonly heading: string;
@@ -787,17 +834,22 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
  * vanished when nothing failed would leave a reader unable to tell "checked, nothing found" from
  * "not checked at all".
  *
- * ## Why it reads zero on the merchant and IQwallet surfaces by construction
+ * ## An empty section 1 means what it says, on every surface
  *
- * A package with a failed stopping condition **goes to the agent only** — no IQwallet send, no
- * merchant comment link. So on those two surfaces this section is empty not because the storefront
- * cleared every condition but because a package that had not would never have reached them. It
- * carries content on an agent package and there alone.
+ * This comment used to claim that a package with a failed stopping condition **goes to the agent
+ * only**, and that section 1 was therefore empty on the merchant and IQwallet surfaces by
+ * construction. **That routing rule was a design intention that never became code, and should not
+ * (D-183).** No send path reads `report.blocking`, and `documentsSend.ts` states the ruling it
+ * would break: send is never blocked, because a tool that withheld a report on the strength of its
+ * own findings would be making the determination that is IQwallet's to make (D-001).
  *
- * That is correct rather than a bug, and it is recorded here so nobody later reads an empty section
- * on a merchant page as evidence about the merchant. On the agent surface
- * `hasFailedStoppingConditions` routes to the decline notice, which is the document that carries
- * the detail (D-163).
+ * So section 1 can be empty on any surface, for the ordinary reason — this run observed no failing
+ * stopping condition. Which is exactly what the account line says, and why it renders at zero
+ * rather than vanishing.
+ *
+ * What `hasFailedStoppingConditions` decides is **which document renders**, not who receives it: a
+ * failed condition makes the decline notice the document rather than the full report (D-163). That
+ * is a presentation choice about the same package going to the same place.
  */
 function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]): ReportPart {
   const blocking = report.blocking;

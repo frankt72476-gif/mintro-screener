@@ -138,7 +138,10 @@ describe('section 1 renders at zero', () => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report: load('run-c268f8d7'), access, surface: 'agent' }),
     );
-    expect(markup).toContain('None of the 8 stopping conditions was observed failing on this run.');
+    // Leads with the count determined, not with the clean sweep (D-183). On this run all eight
+    // were observed, so the two readings coincide — which is exactly when the old wording was
+    // harmless and why the defect only showed on a run with a gap.
+    expect(markup).toContain('8 of 8 stopping conditions were observed, and none was failing.');
   });
 
   /**

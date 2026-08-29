@@ -19,7 +19,7 @@
 
 import type { JSX } from 'react';
 import type { ReportPart, SectionBlock } from '../lib/grouping.js';
-import { NOTHING_OBSERVED_ID, sectionAnchor } from '../lib/grouping.js';
+import { NOTHING_OBSERVED_ID, sectionAnchor, stoppingSentence } from '../lib/grouping.js';
 
 /** `4 rules · 7 findings` — from the part's own tally, never recounted here (spec §1). */
 function TallyLine({ rules, findings }: { readonly rules: number; readonly findings: number }): JSX.Element | null {
@@ -36,12 +36,17 @@ function TallyLine({ rules, findings }: { readonly rules: number; readonly findi
  * Section 1's account, which renders whether or not anything failed.
  *
  * At zero it says so in words. A section that vanished would leave a reader unable to tell
- * "checked, nothing found" from "not checked" — and on the merchant and IQwallet surfaces it is
- * *always* zero by construction, because a package with a failed stopping condition goes to the
- * agent only. See `stoppingPart` in `grouping.ts` for why that is correct rather than empty.
+ * "checked, nothing found" from "not checked at all", and that is true on every surface — see
+ * `stoppingPart` in `grouping.ts`.
  *
  * A condition that could not be observed is named rather than folded into the cleared count: it is
- * not a condition that passed, and the difference is the whole of D-161.
+ * not a condition that passed, and the difference is the whole of D-161. The sentence leads with
+ * the count that *was* determined so the gap is part of the claim rather than a correction to it
+ * (D-183); `stoppingSentence` builds it, because the arithmetic has one right answer and this
+ * component is not the place to derive it a second time.
+ *
+ * The `clear` class follows the failure count alone. A run with conditions it could not evaluate is
+ * not a clean sweep, so it does not get the treatment that reads as one.
  */
 function StoppingAccountLine({ part }: { readonly part: ReportPart }): JSX.Element | null {
   const account = part.stopping;
@@ -51,20 +56,17 @@ function StoppingAccountLine({ part }: { readonly part: ReportPart }): JSX.Eleme
     return <p className="sect-lede">{part.lede}</p>;
   }
 
-  const cleared = account.failed.length === 0;
+  const clear = account.failed.length === 0 && account.notEvaluable.length === 0;
   return (
     <>
       <p className="sect-lede">{part.lede}</p>
-      <p className={`stopping-account${cleared ? ' clear' : ''}`}>
-        {cleared
-          ? `None of the ${account.declared} stopping conditions was observed failing on this run.`
-          : `${account.failed.length} of ${account.declared} stopping conditions was observed failing.`}
-        {account.notEvaluable.length > 0 && (
-          <>
-            {' '}
-            Not observed either way, so not cleared: {account.notEvaluable.join(', ')}.
-          </>
-        )}
+      <p className={`stopping-account${clear ? ' clear' : ''}`}>
+        {stoppingSentence(account).map((line, i) => (
+          <span key={line} className="stopping-line">
+            {i > 0 && ' '}
+            {line}
+          </span>
+        ))}
       </p>
     </>
   );

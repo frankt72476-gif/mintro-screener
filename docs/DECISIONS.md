@@ -11726,3 +11726,91 @@ between fetches on unchanged code, because the storefront serves something per-r
 control that would have read as evidence drift caused by this change.
 
 ---
+
+## D-183 — The stopping-conditions sentence leads with what was determined, and the routing rule it assumed was never real
+
+**2026-08-29 · engineering · sentence order, a partition assertion, and a design intention deleted**
+
+### The sentence
+
+A live comopeptides run at `b90db74` read:
+
+> None of the 9 stopping conditions was observed failing on this run.
+> Not observed either way, so not cleared: GATE-003, NAME-001.
+
+Both sentences are true. **The order makes them mislead for a moment**: a reader takes the clean
+sweep from the first and has to withdraw it at the second. Now:
+
+> 7 of 9 stopping conditions were observed, and none was failing.
+> 2 could not be evaluated: GATE-003, NAME-001.
+
+Same facts, and the gap is part of the claim rather than a correction to it. The `clear` class now
+follows the failure count *and* the unevaluated count — a run with conditions it could not observe is
+not a clean sweep and does not get the styling that reads as one.
+
+Worth noting when the old wording was harmless: on `c268f8d7`, where all eight were observed, the two
+readings coincide. The defect only shows on a run with a gap, which is the run where it matters.
+
+### The assertion, and what it turned out to be
+
+Leading with the denominator means the sentence now *asserts* a count. `summariseBlocking` had
+`if (forRule.length === 0) continue`, so a flagged rule with no findings landed in none of the three
+lists — and the parts could sum to less than `declared`, in the flattering direction: a condition
+nobody evaluated would be missing from the "could not be evaluated" list.
+
+**That was already unreachable, and finding out why is the useful part.** `assembleReport` backfills
+twelve lines above the call — *"every rule in the set appears in the report, exactly once at
+minimum"* — so a blocking rule no layer ran arrives as `not_evaluable` and is named in the sentence
+under its own id. The hole was closed by a loop written for a different reason entirely.
+
+The assertion is kept anyway, because that is a **dependency between two functions with nothing but
+adjacency holding it together**. Anything narrowing the backfill would reopen the gap silently, and
+the symptom would be a stopping condition vanishing from a summary rather than an error. It throws
+rather than reports: a failed condition is visible and acted on, an absent one is not, and runs are
+immutable (D-002) so a report with a hole in it is permanent.
+
+`summariseBlocking` is exported for its own test. Driving the assertion through `assembleReport` is
+impossible by construction, and **an assertion nobody can reach is an assertion nobody has checked** —
+the lesson D-177 paid for with the `-ity` test.
+
+The renderer states a shortfall rather than absorbing it, for the same reason in the other direction:
+a report stored before this guard could carry a hole, and the sentence must not claim the missing
+rule was observed.
+
+### The routing rule that never existed
+
+Two comments — `grouping.ts` and `Sections.tsx` — claimed that **a package with a failed stopping
+condition goes to the agent only**, and `stoppingPart` used it to explain why section 1 is empty on
+the merchant and IQwallet surfaces: *"a package that had not would never have reached them."*
+
+**No send path reads `report.blocking`.** It was a design intention that never became code.
+
+**And it should not.** `documentsSend.ts` already states the ruling it would break:
+
+> Send is never blocked (D-001). Nothing here consults the fail count. Mintro's role is triage and
+> evidence; the determination is IQwallet's, and a tool that withheld a report on the strength of its
+> own findings would be making one.
+
+A gate withholding a package on Mintro's own findings is a determination, whatever it is called in
+the code — and it would create a record of Mintro deciding what an underwriter does and does not get
+to see. `report.ts` says the same of the summary itself: *"operator-facing, and it decides nothing."*
+
+What `hasFailedStoppingConditions` actually decides is **which document renders** — the decline
+notice instead of the full report (D-163). Same package, same recipient, different presentation.
+
+The correction is not cosmetic. `stoppingPart` told a future reader that an empty section 1 on those
+surfaces *cannot mean anything*, so nobody would read it as evidence about the merchant. Since no
+gate exists, section 1 can be empty on any surface for the ordinary reason — no failing condition was
+observed — which is what the account line says. The comment was pre-emptively explaining away a true
+reading.
+
+### Noted, not fixed
+
+`NAME-001`'s `not_evaluable` on this run comes from `urlPattern.ts:40`, one of the three sites D-181
+listed as structurally unable to decide. Here the merchant's sitemap genuinely lists no
+`collections` URLs. But that site conflates *"robots.txt declared sitemaps and none could be fetched"*
+(ours) with *"none published"* (theirs), so a stopping condition reported as
+unobservable-because-merchant could be unobservable-because-us — and leading with the count gives
+that reading more prominence than the old wording did. That producer is next.
+
+---

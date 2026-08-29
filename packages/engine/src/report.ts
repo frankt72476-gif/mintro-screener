@@ -555,7 +555,7 @@ function kindForUnrun(rule: Rule): NotEvaluableKind {
  * observed has not been cleared, and folding the two would let the difference vanish from the one
  * summary an operator reads.
  */
-function summariseBlocking(
+export function summariseBlocking(
   findings: readonly ReportFinding[],
   ruleset: Ruleset,
 ): BlockingSummary {
@@ -566,9 +566,21 @@ function summariseBlocking(
   const notEvaluable: string[] = [];
   const passed: string[] = [];
 
+  /**
+   * A flagged rule this run produced no finding for.
+   *
+   * Kept rather than skipped, so the partition assertion below can see it. The old `continue`
+   * dropped such a rule from all three lists silently, and the summary then read "9 declared"
+   * beside parts summing to eight (D-183).
+   */
+  const unaccounted: string[] = [];
+
   for (const rule of blockingRules) {
     const forRule = findings.filter((finding) => finding.ruleId === rule.id);
-    if (forRule.length === 0) continue;
+    if (forRule.length === 0) {
+      unaccounted.push(rule.id);
+      continue;
+    }
 
     const violation = forRule.find((f) => f.state === 'fail') ?? forRule.find((f) => f.state === 'review');
     if (violation !== undefined) {
@@ -589,6 +601,43 @@ function summariseBlocking(
 
     if (forRule.every((f) => f.state === 'not_evaluable')) notEvaluable.push(rule.id);
     else passed.push(rule.id);
+  }
+
+  /*
+    The three lists partition the declared set, or this run does not produce a report (D-183).
+
+    The summary now states arithmetic a reader can check — *"7 of 9 stopping conditions were
+    observed"* — and the parts have to add up for that sentence to be true. A rule that fell out of
+    every list would make the count quietly wrong in the most flattering direction: a condition
+    nobody evaluated would be missing from the "could not be evaluated" list, and the run would read
+    as more thoroughly screened than it was.
+
+    **Through `assembleReport` this cannot happen, and the reason is worth knowing rather than
+    trusting.** The backfill twelve lines above the call site — *"every rule in the set appears in
+    the report, exactly once at minimum"* — gives any rule no layer ran a synthesised
+    `not_evaluable`, so a blocking rule always arrives here with at least one finding and lands in
+    `notEvaluable` under its own name. The hole this looks like it closes was already closed, by a
+    loop written for a different reason.
+
+    It is kept because that is a **dependency between two functions with nothing but adjacency
+    holding it together**. Anything that narrowed the backfill — skipping rules of a certain type,
+    or moving it after this call — would reopen the gap silently, and the failure would be a
+    stopping condition disappearing from a summary rather than an error. So this states the
+    invariant where it is relied on.
+
+    **Throwing rather than reporting it**, which is the harsher choice and the right one. A
+    stopping condition is a rule an underwriter has said it declines on, and one that vanished from
+    the summary is worse than one that failed: a failure is visible and acted on, an absence is not.
+    Runs are immutable (D-002), so a report written with a hole in it is a permanent artifact.
+
+    Exported for its own test. An assertion nobody can reach is an assertion nobody has checked.
+  */
+  if (unaccounted.length > 0) {
+    throw new Error(
+      `stopping conditions did not partition: ${unaccounted.length} of ${declared} flagged rule(s) ` +
+        `produced no finding on this run (${unaccounted.join(', ')}). ` +
+        `${failed.length} failed, ${notEvaluable.length} not evaluable, ${passed.length} observed clear.`,
+    );
   }
 
   return { declared, failed, notEvaluable, passed };
