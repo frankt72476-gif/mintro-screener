@@ -92,7 +92,13 @@ export {
   type PacerClock,
 } from './politeness.js';
 
-export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
+export {
+  HEARTBEAT_MS,
+  HEARTBEAT_QUIET_MS,
+  RUN_DEADLINE_MS,
+  RUN_TIMEOUT_CODE,
+  runTimeoutMessage,
+} from './runDeadline.js';
 
 export { scopeTerms, termsAt, type ClaimScope, type ScopedHit } from './claimScope.js';
 

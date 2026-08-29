@@ -43,6 +43,7 @@ import {
   type RunCommentary,
 } from '@mintro/engine';
 import { CredentialModal } from './components/CredentialModal.js';
+import { HeartbeatLine, LiveDot } from './components/Heartbeat.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
 import { ReportView } from './components/ReportView.js';
 import { SendModal } from './components/SendModal.js';
@@ -1134,13 +1135,19 @@ function ScanProgress({
 
       <div className={`card prog${stale ? ' stalled' : ''}`}>
         <div className={`layer ${stale ? 'stalled' : 'run'}`}>
-          <span className="dot" />
+          <LiveDot claimedAt={state?.claimedAt ?? null} stalled={stale} />
           {status === 'queued'
             ? 'Waiting for the worker to claim this request'
             : stale
               ? `No worker has touched this scan since ${formatReportDate(state?.claimedAt as string)}. It is past the ${Math.round(RUN_DEADLINE_MS / 60000)}-minute limit a run is given, so the claim will be released and the scan retried.`
               : (state?.progress ?? 'Screening the storefront')}
         </div>
+        {/*
+          The fact the page was missing (D-171). `claimed_at` was already here and fed one bit —
+          `isStalled`, at thirty minutes — so a beat eight seconds old and one twenty-nine minutes
+          old rendered the same. This says which, and draws no conclusion from it.
+        */}
+        <HeartbeatLine claimedAt={state?.claimedAt ?? null} stalled={stale} />
       </div>
     </div>
   );

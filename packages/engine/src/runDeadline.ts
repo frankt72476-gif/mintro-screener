@@ -45,6 +45,35 @@
 export const RUN_DEADLINE_MS = 30 * 60 * 1000;
 
 /**
+ * How often a working worker refreshes its claim (D-154).
+ *
+ * Lives here rather than in the worker's `reclaim.ts`, which is where it was written and where it
+ * is still enforced, because the run page now *displays* the age of the last beat and has to know
+ * what cadence to expect. The alternative was a second literal in the frontend, and the note on
+ * `RUN_DEADLINE_MS` above says why that is not acceptable: a rule expressed in two places drifts,
+ * and this drift would read as the display calling a healthy worker quiet.
+ *
+ * `reclaim.ts` re-exports it, so the worker's timer and the browser's threshold are one number.
+ */
+export const HEARTBEAT_MS = 60 * 1000;
+
+/**
+ * How long without a beat before the run page stops calling the worker live (D-171).
+ *
+ * **Two consecutive missed beats**, derived rather than chosen. One missed beat is ordinary — the
+ * write is fire-and-forget, the browser polls on its own 3-second clock, and a beat landing a few
+ * seconds late is a slow round trip rather than a dead process. Two in a row is not something a
+ * working heartbeat produces.
+ *
+ * It is not a second staleness rule. `isStalled` still owns the 30-minute question and its answer
+ * is unchanged; this only decides when the page stops *reassuring* and states the silence instead.
+ * Between the two the honest reading is "nothing has been heard for a while", which is neither
+ * "working" nor "stalled" — and inventing a verdict for that gap is what this avoids.
+ */
+export const HEARTBEAT_QUIET_MS = 2 * HEARTBEAT_MS;
+
+
+/**
  * The token a watchdog termination writes into `scan_requests.error`.
  *
  * Stable and machine-readable on purpose. A timeout is **not** an exception — nothing threw, and

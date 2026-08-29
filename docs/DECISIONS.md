@@ -10344,3 +10344,205 @@ names the correct form. This is D-168's placement rule applied to arguments: the
 the value is read, not at the point somebody remembers to check it.
 
 ---
+
+## D-171 — The heartbeat is shown as a fact, and the indicator moves only when one arrives
+
+**2026-08-28 · business owner · progress model, step 1 of 1 shipped**
+
+A running scan looked stuck and said nothing about how much was left. The second half needs a
+progress model the worker does not emit yet. The first half was already answerable from data the
+browser had held all along.
+
+`claimed_at` is refreshed every `HEARTBEAT_MS` by a worker that is working and by nothing else
+(D-154). It reached the browser, was mapped to `claimedAt`, and fed **one bit**: `isStalled`, at
+thirty minutes. So a beat eight seconds old and a beat twenty-nine minutes old rendered
+identically, and the page could not answer the only question somebody watching it has.
+
+This adds the fact. **It reinterprets nothing** — `isStalled`'s thirty-minute rule is untouched, and
+is still the only thing on this page that draws a conclusion.
+
+### Why two minutes
+
+`HEARTBEAT_QUIET_MS = 2 * HEARTBEAT_MS`, **derived rather than chosen**, so it follows if the
+worker's timer changes.
+
+One missed beat is ordinary: the write is fire-and-forget, the browser polls on its own three-second
+clock, and a beat landing late is a slow round trip rather than a dead process. Two consecutive
+missed beats is not something a working heartbeat produces. It sits two orders inside the
+thirty-minute rule, so the two thresholds answer different questions rather than racing.
+
+Past it **the number stops being the message.** "Last heartbeat 14m ago" has the same shape as "8s
+ago" and invites the same reading — a measurement of something ongoing — when what is true is that
+nothing has been heard. So the sentence changes instead: *"No heartbeat for over 2m. A working
+worker refreshes its claim every 60s, so at least two have been missed."* It names the cadence,
+because "over two minutes" means nothing to a reader who does not know beats come every minute.
+
+It stops short of a verdict. The claim may be released and retried, the worker may be inside a slow
+call, or it may be gone; the page has not been told which. Not failed, not stalled, not dead.
+
+**It never says "working" either.** The heartbeat runs on its own timer, independent of the job loop
+— which is exactly what lets it detect a stuck loop, and exactly what stops it being evidence of
+progress. It reports when the last beat arrived. The reader draws the rest (D-001).
+
+### The pulse was a lie in the same family as an invented denominator
+
+`.layer.run .dot` carried `animation: pulse 1s ease-in-out infinite`. It ran whether or not
+anything was happening, so a worker that died at minute three pulsed contentedly for
+twenty-seven more.
+
+The stylesheet had already made this argument, five hundred lines down, for the stalled case:
+*"an animation that keeps running over dead work is the display lying quietly."* That was right,
+and it was applied at one threshold when it holds at every moment.
+
+The animation is now one-shot and keyed on `claimed_at`. A changed value is a beat that landed; it
+remounts the element, which replays the animation. An unchanged value leaves it finished and still.
+**What moves is a beat being observed, not a stylesheet running.** Quiet holds still and the ring
+turns amber.
+
+The age itself ticks once a second. That is not the same thing: elapsed time is a real quantity that
+genuinely changes every second, and displaying it at the rate it changes is an observation. When the
+worker is gone the counter keeps climbing, which is the correct reading and the opposite of a
+reassuring loop.
+
+### A beat cannot arrive in the future
+
+The age is `now - claimed_at` across **two machines that cannot check each other**: `startHeartbeat`
+writes `new Date().toISOString()`, the worker process's clock, not Postgres's `now()`. A retry can
+also rewrite `claimed_at` from a different machine.
+
+A negative age is not a measurement, so it is never rendered as one. `SKEW_TOLERANCE_MS = 5_000`:
+within it the beat clamps to `0s ago`, beyond it the page reports **no age at all**. A clamped
+fifteen-minute skew would be a number nobody measured, and an indicator showing an impossible value
+is worse than an absent one.
+
+**Why five seconds.** NTP-disciplined hosts hold within tens of milliseconds and the worker is one;
+a browser on a consumer machine is normally within a second or two, and can be a few seconds out
+after a sleep/resume before it re-syncs. Five absorbs that and nothing else — the failures that
+actually produce wrong times are an unsynchronised machine, a wrong timezone or a DST error, which
+are minutes to whole hours out. It also has to stay small against the cadence, because skew absorbed
+by the clamp silently shifts the quiet decision: five seconds is a twelfth of the cadence and a
+twenty-fourth of `HEARTBEAT_QUIET_MS`, so the worst a clamped beat moves that call is five seconds
+out of a hundred and twenty. Asserted, not left as arithmetic in a comment.
+
+`skewed` is its own state and borrows nothing. Not `quiet`, whose amber asserts a silence that has
+not been observed; not `unclaimed`, which means there is no worker to report on. The dot matches no
+stylesheet rule and stays a grey ring that does not move.
+
+**A retry is handled by the same rule rather than a special case.** A re-claim writes a *newer*
+timestamp, so the age drops — going backwards between renders is a beat arriving, not an error. What
+a re-claim can do is write it from a machine whose clock differs, and that is skew again.
+
+**Only one direction is detectable, and this does not pretend otherwise.** A browser clock behind the
+worker's makes a beat look like it arrived in the future — impossible, and caught. A browser clock
+ahead makes every beat look older than it is, which is a plausible number indistinguishable from a
+genuinely quiet worker from a single sample. This catches the impossible case; it does not solve
+clock skew, and nothing available on this page could.
+
+### Two constants, one definition
+
+`HEARTBEAT_MS` moved from the worker's `reclaim.ts` to `@mintro/engine`, re-exported there and
+enforced there still. The browser needs the same number to know what cadence to expect, and the note
+on `RUN_DEADLINE_MS` already says why a second literal is not acceptable: a rule expressed in two
+places drifts, and this drift would read as the display calling a healthy worker quiet. Exported
+from `browser.ts` as well as `index.ts`, for the reason the deadline is.
+
+### What is not here
+
+No percentage, no time remaining, no phase, no counts. The worker records `status` only —
+`queued | running | done | failed` — and flattens its structured phase and counters into one
+free-text `progress` line, so the UI cannot recover them. That is step 2 and needs a migration.
+
+`App.tsx` already carried the rule this obeys: the demo's card listed seven crawl layers with
+counts, and the note there says the UI *"shows that line and says nothing it has not been told."*
+Still true. What changed is that it is now told one more thing, and that thing is a fact.
+
+### Operator-only, by the same policy that already governed it
+
+`scan_requests` RLS is `select ... to authenticated using (public.is_analyst())`, with
+`update, delete` revoked from `authenticated` and `anon`. Merchants and agents never see the queue
+and never trigger a run. No new surface, no new policy.
+
+---
+
+## D-172 — The browser entry is checked by a test, not by the bundler
+
+**2026-08-28 · business owner**
+
+Two symbols have now been exported from `packages/engine/src/index.ts` and forgotten in
+`browser.ts`: `distinctRuleCount` (D-170) and `HEARTBEAT_MS` (D-171). Both typechecked. Both passed
+every test. Both failed at `vite build`, which is a real check standing in the wrong place —
+it arrives after the mistake has stopped being cheap, and it arrives as a rollup stack trace rather
+than as a sentence naming the symbol.
+
+### Why it is easy to get wrong
+
+One specifier resolves three different ways, depending on who is asking:
+
+| asks | resolves to | via |
+|---|---|---|
+| `vite build apps/web` | `packages/engine/src/browser.ts` | alias in `apps/web/vite.config.ts` |
+| `tsc --build` | `packages/engine/dist/src/index.d.ts` | `package.json` `exports` |
+| `vitest` | `packages/engine/src/index.ts` | alias in `vitest.config.ts` |
+
+The third row is the one that makes this invisible. **A web test importing an index-only symbol
+proves nothing about the browser entry**, because vitest reads `index.ts` too — `heartbeat.test.ts`
+importing `HEARTBEAT_MS` is green either way. So the check reads `browser.ts` as a **file**. An
+import would resolve through the very alias it exists to check.
+
+### The ruling
+
+Every symbol `apps/web/src` imports **as a value** from an aliased workspace package must be
+exported by the browser entry that package aliases to. Asserted in
+`apps/web/test/browserEntry.test.ts`, over `@mintro/engine` and `@mintro/ruleset` alike — the split
+exists in both, and generalising it cost nothing.
+
+### Type-only imports are excluded, and that is what makes it correct
+
+The first version flagged three imports as missing exports: `documents` from `@mintro/engine`,
+`Attestation` and `NotChecked` from `@mintro/ruleset`. All three are genuinely absent from the
+browser entries, and all three are fine — they are `import type`, erased by esbuild before the
+bundle resolves anything, with the type supplied by `index.d.ts` through `tsc`. A different
+question, with a different and correct answer.
+
+Excluding them is reliable rather than approximate because `tsconfig.base.json` sets
+`verbatimModuleSyntax: true`: an import not marked `type` is emitted as a real import, so what is
+written is exactly what is bundled. Without that flag this check would be a heuristic.
+
+### Read syntactically, and `export *` followed rather than refused
+
+The TypeScript parser rather than regular expressions, so `export { a as b }` contributes `b` and
+`import { type T }` is not counted as a value. No program and no package resolution is needed: the
+names are all in the source.
+
+`packages/ruleset/src/browser.ts` uses `export * from './vocabulary.js'`, so the traversal follows
+it one relative file at a time. An `export *` from a *package* rather than a relative path would
+defeat that and throws instead of silently contributing nothing.
+
+**The traversal is pinned by its own assertion**, because nothing else would have caught it
+breaking: every value import `apps/web/src` makes from `@mintro/ruleset` arrives through an explicit
+clause, so a traversal that silently returned nothing would leave the check passing, having simply
+not known about a whole file. That is D-168's shape occurring inside the check written to prevent
+this one. `STATES` is declared in `vocabulary.ts` and reaches the entry only through the star.
+
+### Scope
+
+`apps/web/src` only — precisely the set `vite build` compiles. `apps/web/test` is deliberately
+excluded: those files are run by vitest against `index.ts` and are never bundled, so an index-only
+import there is legitimate and flagging it would be a false failure.
+
+### Made to fail before being trusted
+
+Three controls, each restored afterwards and the tree verified clean:
+
+- `distinctRuleCount` removed from `browser.ts` → *"packages/engine/src/browser.ts does not export
+  these, so `vite build apps/web` will fail: distinctRuleCount — imported by
+  apps/web/src/components/ReportView.tsx"*.
+- `HEARTBEAT_MS` removed → the same, naming `apps/web/src/lib/heartbeat.ts`.
+- `STATES` un-exported from `vocabulary.ts` → the `export *` assertion goes red.
+
+The first attempt at the third control un-exported a symbol the web app does not import as a value,
+and the suite stayed green. That is recorded because it is the failure this whole class of work
+keeps returning to: a control that does not discriminate is not a control, and it looks exactly
+like a passing one.
+
+---

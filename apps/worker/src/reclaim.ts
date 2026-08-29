@@ -16,6 +16,7 @@
  * existed was correct and never ran, because it sat inside the loop that was stuck.
  */
 
+import { HEARTBEAT_MS } from '@mintro/engine';
 import type { WorkerSupabase } from './store/supabase.js';
 
 /**
@@ -28,8 +29,14 @@ export const STALE_CLAIM_MS = 15 * 60 * 1000;
 /** How often the sweep runs. Independent of the job loop, which is the whole point (D-154). */
 export const RECLAIM_SWEEP_MS = 60 * 1000;
 
-/** How often a working worker refreshes its own claim. Comfortably inside `STALE_CLAIM_MS`. */
-export const HEARTBEAT_MS = 60 * 1000;
+/*
+  The heartbeat cadence moved to `@mintro/engine` and is re-exported here.
+
+  It is still enforced here and nowhere else — what changed is that the run page displays the age
+  of the last beat, so the browser needs the same number to know what cadence to expect. One
+  definition, for the reason `RUN_DEADLINE_MS` gives (D-171).
+*/
+export { HEARTBEAT_MS };
 
 /**
  * Refreshes this worker's claim while it is working.

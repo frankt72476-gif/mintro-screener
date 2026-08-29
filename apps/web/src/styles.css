@@ -165,7 +165,23 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   width:16px;height:16px;border-radius:50%;flex:0 0 16px;
   border:2px solid var(--line);position:relative;
 }
-.layer.run .dot{border-color:var(--purple);animation:pulse 1s ease-in-out infinite}
+/*
+  The dot moves when a beat arrives, and at no other time (D-171).
+
+  This was `animation: pulse 1s ease-in-out infinite`, which runs whether or not anything is
+  happening — a worker that died at minute three pulsed contentedly until the thirty-minute
+  staleness rule noticed. The argument against it is already written 500 lines down, for the
+  stalled case: "an animation that keeps running over dead work is the display lying quietly."
+  That was right, and it was applied at one threshold when it holds at every moment.
+
+  One shot, not infinite. `LiveDot` keys the element on `claimed_at`, so a beat that landed
+  remounts it and replays the animation; an unchanged value leaves it finished and still.
+*/
+.layer.run .dot{border-color:var(--purple)}
+.layer.run .dot[data-beat="beating"]{animation:pulse .9s ease-out 1}
+
+/* Quiet: no beat has arrived for two cadences, so nothing moves and the ring says so. */
+.layer.run .dot[data-beat="quiet"]{border-color:var(--amber);animation:none}
 .layer.run{color:var(--ink);font-weight:500}
 .layer.done .dot{border-color:var(--jade);background:var(--jade)}
 .layer.done .dot::after{
@@ -174,7 +190,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 .layer.done{color:var(--ink-mid)}
 .layer .cnt{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate)}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(160,60,232,.35)}50%{box-shadow:0 0 0 5px rgba(160,60,232,0)}}
+@keyframes pulse{from{box-shadow:0 0 0 0 rgba(160,60,232,.45)}to{box-shadow:0 0 0 7px rgba(160,60,232,0)}}
 
 /* ---------- report head ---------- */
 .rhead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
@@ -1912,3 +1928,19 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 /* The chrome around the thumbnail was drawing a fake browser frame. It is not the observation. */
 .slip .shot-bar { display: none; }
+
+/* ---------- heartbeat (D-171) ---------- */
+
+/*
+  Subordinate to the progress line by design. It reports that the worker is there, not what it is
+  doing, and typography that gave it equal weight would invite it to be read as progress.
+*/
+.beat{
+  margin:6px 0 0 27px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--slate);
+}
+
+/* Quiet is not a failure and is not styled as one — amber is the same weight `.layer.stalled` uses. */
+.beat-quiet{color:var(--amber)}

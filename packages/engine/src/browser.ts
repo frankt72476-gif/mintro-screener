@@ -44,7 +44,13 @@ export type {
   would drift, and the drift would show as a queue calling a healthy run stalled — the display
   disagreeing with the machine about what is happening.
 */
-export { RUN_DEADLINE_MS, RUN_TIMEOUT_CODE, runTimeoutMessage } from './runDeadline.js';
+export {
+  HEARTBEAT_MS,
+  HEARTBEAT_QUIET_MS,
+  RUN_DEADLINE_MS,
+  RUN_TIMEOUT_CODE,
+  runTimeoutMessage,
+} from './runDeadline.js';
 
 export type {
   BlockingSummary,
