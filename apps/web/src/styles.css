@@ -2019,3 +2019,51 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   /* Print opens the disclosure, so the export holds what the screen holds (D-042 / D-166). */
   .passes-head .caret { display: none; }
 }
+
+/* ---------- header lines (spec §3) ---------- */
+
+/*
+  What replaced the top band. Four lines where there were a verdict paragraph, a 62-square strip
+  with a legend, six bordered boxes and a prose restatement of all six.
+
+  No border, no fill, no rule. The numerals carry it: right-aligned in a monospace column so four
+  of them read at a glance instead of being parsed.
+
+  Nothing else moved into this space, and nothing should. The point of removing the band was air.
+*/
+.headlines {
+  list-style: none;
+  margin: 22px 0 26px;
+  padding: 0;
+  max-width: 44ch;
+}
+.headlines li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 5px 0;
+}
+.headline-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 2.5ch;
+  text-align: right;
+}
+.headline-label { font-size: 13px; color: var(--ink-mid); text-decoration: none; }
+a.headline-label { border-bottom: 1px solid var(--line); }
+a.headline-label:hover { color: var(--ink); border-bottom-color: var(--ink-mid); }
+
+/*
+  A zero line renders and does not link. Muted, because nothing was observed — but present, because
+  an absent line reads as an absent section, which is an absent value shown as an answer (D-044).
+*/
+.headlines li.zero .headline-n,
+.headlines li.zero .headline-label { color: var(--slate); }
+
+@media print {
+  /* The lines are the summary the export opens on, so they stay whole. */
+  .headlines { break-inside: avoid; }
+  a.headline-label { border-bottom: 0; }
+}

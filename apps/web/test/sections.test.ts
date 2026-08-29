@@ -143,17 +143,27 @@ describe('section 1 renders at zero', () => {
 });
 
 describe('print carries both headers, which it did not', () => {
-  it.each(RUNS)('%s: every rendered group has a header on paper', (_label, report) => {
+  it.each(RUNS)('%s: every multi-row group is headed on paper', (_label, report) => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report, access, surface: 'iqwallet', print: true }),
     );
 
     const groupHeaders = (markup.match(/class="cat-head/g) ?? []).length;
-    const groups = rendered(report, 'iqwallet').length;
+    const groups = rendered(report, 'iqwallet');
+    const multiRow = groups.filter((g) => g.findings.length > 1).length;
 
-    // Print opens every disclosure, so every row is rendered and every row is headed.
-    expect(groupHeaders).toBe(groups);
-    expect(groupHeaders).toBeGreaterThan(0);
+    /*
+      A group of one **is** its row — the row already carries the title, the rule id and the state,
+      so heading it would print the same three things twice. What the export lacked was a header
+      over the groups that genuinely have several rows: there, the title existed only on the
+      instances, N times, and the row a reader scans did not exist at all.
+    */
+    expect(groupHeaders).toBe(multiRow);
+    expect(multiRow).toBeGreaterThan(0);
+
+    // And print opens every disclosure, so every finding is on the page.
+    const rows = (markup.match(/class="find /g) ?? []).length;
+    expect(rows).toBe(ungrouped(report).length);
   });
 
   it.each(RUNS)('%s: all four section headings appear, in the print order', (_label, report) => {

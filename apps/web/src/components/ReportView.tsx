@@ -22,9 +22,13 @@ import {
 } from '@mintro/engine';
 import {
   describeGroup,
+  coverageSentence,
+  headerLines,
   reportParts,
+  sectionAnchor,
   ordinalsFor,
   type FindingGroup,
+  type ReportPart,
   type Surface,
 } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
@@ -151,6 +155,9 @@ export function ReportView({
   // The default is the document each path actually produces today; a caller that knows better says
   // so. One parameter decides order and section 3's grouping, and nothing else (spec §1).
   const surface: Surface = surfaceProp ?? (print ? 'iqwallet' : 'agent');
+  // Derived once and read twice — by the header lines and by the sections themselves. Two calls
+  // would be two derivations, which is the thing part 1 built the tally to prevent (spec §3).
+  const parts = useMemo(() => reportParts(report, surface), [report, surface]);
   const [ownFilter, setOwnFilter] = useState<Filter>('all');
   const filter = controlledFilter ?? ownFilter;
   const setFilter = (next: Filter): void => {
@@ -245,24 +252,11 @@ export function ReportView({
       <ObstructionNote report={report} />
 
       {/*
-        The stopping conditions IQwallet asked to see, and how this run stands against them (D-161).
-
-        Operator-facing and above the verdict, because it is what an operator opens the report for.
-        It decides nothing: no merchant or agent sees a decline from it, no package is withheld on
-        it, and it says nothing about what a failure means. It names which blocking rules failed,
-        what the programme's own clause requires, what was observed, and where the captures are.
-        Mintro shows; IQwallet concludes (D-001).
+        A failed stopping condition makes the decline notice **the** document (D-163), so it prints
+        and nothing else is rendered beside it. When none failed there is no floating panel any
+        more: section 1 is where stopping conditions live now (spec §3).
       */}
-      {/*
-        When a stopping condition was observed, this **is** the document (D-163), so it prints.
-        The panel below it remains for the ordinary case, where the useful thing to say is that
-        none was observed and which could not be checked.
-      */}
-      {hasFailedStoppingConditions(report) ? (
-        <DeclineNotice report={report} print={print} />
-      ) : (
-        !print && <BlockingPanel report={report} />
-      )}
+      {hasFailedStoppingConditions(report) && <DeclineNotice report={report} print={print} />}
 
       {/*
         How thin the sample was, before the numbers it qualifies (D-162). Passes and sample basis
@@ -270,11 +264,24 @@ export function ReportView({
       */}
       <SampleBasisLine report={report} />
 
-      <VerdictBanner report={report} />
-      <TickStrip report={report} />
-      <CoverageBreakdown report={report} />
+      {/*
+        What replaces the top band (spec §3).
 
-      {print ? <Coverage report={report} /> : <Filters filter={filter} onChange={setFilter} report={report} />}
+        Deleted with it: the verdict sentence, the tick strip and its legend, the six coverage
+        columns, and the coverage line under the chips. Those were four statements of one
+        distribution — a reader had to parse three of them to learn what a numeral says.
+
+        The counts come from the same tallies the section headings render, so a line and the section
+        it points at cannot disagree. **Nothing was moved into the space this vacated**: the point is
+        fewer things and more air.
+      */}
+      <HeaderLines parts={parts} />
+
+      {/*
+        The chips stay. They are the one thing on the page a reader can act on, and a filter is not
+        a restatement of anything (spec §3).
+      */}
+      {!print && <Filters filter={filter} onChange={setFilter} />}
 
       {/*
         Two renderings of the same findings (D-042).
@@ -311,7 +318,7 @@ export function ReportView({
         second, ahead of anything observed, because it is the only part a merchant can act on.
       */}
       <div>
-        {reportParts(report, surface).map((part) => {
+        {parts.map((part) => {
           const questions =
             part.id === 'questions' && attestations !== undefined ? (
               <AttestationSection attestations={attestations} print={print} />
@@ -410,181 +417,7 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
 }
 
 
-/**
- * The stopping conditions, for the operator (D-161).
- *
- * Renders from `report.blocking`, which the engine built by reading the rule set's own flag. There
- * is no list of rule ids here and there must not be — hard constraint 1 puts that in data.
- *
- * ## What it deliberately does not do
- *
- * It does not say "decline", "reject", "blocked" or "stop". Those are conclusions and they are
- * IQwallet's (D-001, hard constraint 7). It says which rules the rule set marks as stopping
- * conditions, which of them this run observed failing, and what backs each. A reader draws the
- * conclusion.
- *
- * `notEvaluable` is shown beside the failures rather than folded away, because a stopping
- * condition that could not be observed has not been cleared — and this panel is the one place an
- * operator might otherwise take silence for an answer.
- */
-function BlockingPanel({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
-  /*
-    A report from before the flag existed (D-161, D-044's rule).
 
-    Runs are immutable, so these reports are frozen without the field and always will be. Rendering
-    "0 of 0" would state that this merchant tripped no stopping condition, which is a claim drawn
-    from the age of the file rather than from anything observed.
-  */
-  if (report.blocking === undefined) {
-    return (
-      <section className="card blocking" aria-label="Stopping conditions">
-        <header className="blocking-head">
-          <span className="blocking-title">Stopping conditions</span>
-        </header>
-        <p className="blocking-none">
-          This run predates the stopping-condition flag, so it carries no summary. The findings
-          below are unaffected.
-        </p>
-      </section>
-    );
-  }
-
-  const { declared, failed, notEvaluable, passed } = report.blocking;
-  if (declared === 0) return null;
-
-  const authority = failed[0]?.authority;
-  const ruledOn = failed[0]?.ruledOn;
-
-  return (
-    <section className={`card blocking${failed.length > 0 ? ' hit' : ''}`} aria-label="Stopping conditions">
-      <header className="blocking-head">
-        <span className="blocking-title">Stopping conditions</span>
-        <span className="blocking-count">
-          {failed.length} of {declared} observed failing
-          {notEvaluable.length > 0 && ` · ${notEvaluable.length} not evaluable`}
-          {passed.length > 0 && ` · ${passed.length} observed and not violated`}
-        </span>
-      </header>
-
-      {failed.length === 0 ? (
-        <p className="blocking-none">
-          {notEvaluable.length === 0
-            ? `None of the ${declared} rules marked as stopping conditions was observed failing on this run.`
-            : `None was observed failing. ${notEvaluable.length} could not be observed: ${notEvaluable.join(', ')}.`}
-        </p>
-      ) : (
-        <ol className="blocking-list">
-          {failed.map((item) => (
-            <li key={item.ruleId} className={`blocking-item ${item.state}`}>
-              <div className="blocking-rule">
-                <span className={`state ${item.state}`}>{item.state}</span>
-                <span className="blocking-id">{item.ruleId}</span>
-                <span className="blocking-name">{item.title}</span>
-              </div>
-              {/* The programme's own words, so the requirement is readable beside the observation. */}
-              <p className="blocking-clause">{item.clause}</p>
-              <p className="blocking-note">{item.note}</p>
-              {/*
-                A pointer, not a second evidence slip.
-
-                The finding below carries the full slip with its capture. Rendering a second one
-                here would be the same evidence in two places, free to drift; this names where to
-                look and leaves the capture to the finding that owns it.
-              */}
-              <ul className="blocking-evidence">
-                {item.evidence.slice(0, 3).map((entry, i) => (
-                  <li key={`${item.ruleId}-${i}`}>
-                    <span className="blocking-src">{entry.sourceUrl || '(no source recorded)'}</span>
-                    {entry.matchedValue !== undefined && (
-                      <span className="blocking-matched">matched: {entry.matchedValue}</span>
-                    )}
-                    <span className="blocking-cap">
-                      {entry.evidenceKey === '' ? 'no capture retained' : entry.evidenceKey}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {notEvaluable.length > 0 && failed.length > 0 && (
-        <p className="blocking-unseen">
-          Not observed on this run, so not cleared: {notEvaluable.join(', ')}.
-        </p>
-      )}
-
-      {authority !== undefined && authority !== '' && (
-        <p className="blocking-source">
-          Marked as stopping conditions by {authority}, {ruledOn}.
-        </p>
-      )}
-    </section>
-  );
-}
-
-/**
- * The verdict banner.
- *
- * Descriptive, never directive (D-001). The copy comes from the report, which is assembled in
- * the engine — the renderer never composes a verdict of its own, because two places writing
- * verdict copy is two places for it to drift back into a recommendation.
- */
-function VerdictBanner({ report }: { readonly report: ScreeningReport }): JSX.Element {
-  const failed = report.counts.fail;
-  return (
-    <div className={`verdict ${failed > 0 ? 'fail' : ''}`}>
-      {/*
-        The word, not an alarm (D-175). It read `{failed} FAILED` — a red badge shouting a verdict
-        Mintro does not reach. It states the count and the label the rest of the report uses.
-      */}
-      <span className="v-badge" style={failed === 0 ? { background: 'var(--jade)' } : undefined}>
-        {failed} {STATE_LABEL_LOWER.fail}
-      </span>
-      <span className="v-text" style={failed === 0 ? { color: 'var(--ink-mid)' } : undefined}>
-        {report.verdict}
-      </span>
-    </div>
-  );
-}
-
-/** The tick strip — one mark per finding, in rule-set order. */
-function TickStrip({ report }: { readonly report: ScreeningReport }): JSX.Element {
-  const legend: readonly { readonly state: State; readonly label: string; readonly swatch: string }[] = [
-    // Labels read from the shared set, never spelled again here (D-175). Lower case because they
-    // sit mid-sentence after a count: "3 not met".
-    { state: 'fail', label: STATE_LABEL_LOWER.fail, swatch: 'var(--rose)' },
-    { state: 'review', label: STATE_LABEL_LOWER.review, swatch: 'var(--amber)' },
-    { state: 'pass', label: STATE_LABEL_LOWER.pass, swatch: '#B7E7D2' },
-    { state: 'not_evaluable', label: STATE_LABEL_LOWER.not_evaluable, swatch: '#DCD8E8' },
-  ];
-
-  return (
-    <div className="strip-wrap">
-      <div className="strip-top">
-        <span className="eyebrow">All {report.strip.length} findings</span>
-      </div>
-      <div className="strip">
-        {report.strip.map((tick, index) => (
-          <span
-            key={`${tick.ruleId}-${index}`}
-            className={`tick ${stateClass(tick.state)}`}
-            title={`${tick.ruleId} — ${tick.title} — ${STATE_LABEL[tick.state]}`}
-          />
-        ))}
-      </div>
-      <div className="legend">
-        {legend.map((entry) => (
-          <span className="lg" key={entry.state}>
-            <span className="sw" style={{ background: entry.swatch }} />
-            <b>{report.counts[entry.state]}</b> {entry.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * Filter chips and the coverage line.
@@ -593,14 +426,42 @@ function TickStrip({ report }: { readonly report: ScreeningReport }): JSX.Elemen
  * never a constant — the demo's "31 of 40" was placeholder copy, and a hardcoded coverage figure
  * would claim a run examined more than it did.
  */
+/**
+ * The header lines (spec §3).
+ *
+ * One line per section, numerals first, each a link to the section it counts. A zero line renders
+ * its `0` and does not link — an absent line would read as an absent section, which is an absent
+ * value shown as an answer (D-044), and a link to a section with nothing in it lands a reader
+ * somewhere that does not answer their question.
+ *
+ * Right-aligned numerals in a monospace column, because the point of numerals over prose is that
+ * four of them can be read at a glance without being parsed.
+ */
+function HeaderLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
+  return (
+    <ul className="headlines">
+      {headerLines(parts).map((entry) => (
+        <li key={`${entry.id}-${entry.label}`} className={entry.count === 0 ? 'zero' : undefined}>
+          <span className="headline-n">{entry.count}</span>
+          {entry.href === null ? (
+            <span className="headline-label">{entry.label}</span>
+          ) : (
+            <a className="headline-label" href={entry.href}>
+              {entry.label}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Filters({
   filter,
   onChange,
-  report,
 }: {
   readonly filter: Filter;
   readonly onChange: (next: Filter) => void;
-  readonly report: ScreeningReport;
 }): JSX.Element {
   const chips: readonly { readonly value: Filter; readonly label: string }[] = [
     { value: 'all', label: 'Everything' },
@@ -622,9 +483,6 @@ function Filters({
           {chip.label}
         </button>
       ))}
-      <span className="coverage">
-        <CoverageLine report={report} />
-      </span>
     </div>
   );
 }
@@ -634,95 +492,8 @@ function Filters({
  *
  * Computed in the report, never a constant — the demo's "31 of 40" was placeholder copy.
  */
-/**
- * Removed from the export, deliberately (D-167).
- *
- * Page one stated the coverage buckets three times: six labelled columns with a number and whose
- * fact each is, this sentence restating all six in prose, and the headline paragraph. The columns
- * are the version that scans and the only one that says whose limitation each gap is, so they are
- * the version that stays.
- *
- * `CoverageLine` is kept and still used by `LegacyCoverageLine`'s caller path — a run recorded
- * before D-044 has no buckets to draw columns from, and for those the sentence is all there is.
- */
-function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
-  // Only where the columns cannot render: a run predating the four-way split.
-  if (typeof report.coverage.resolved === 'number') return null;
-  return (
-    <div className="filters">
-      <span className="coverage" style={{ marginLeft: 0 }}>
-        <CoverageLine report={report} />
-      </span>
-    </div>
-  );
-}
 
 
-/**
- * Whose limitation each gap is, said directly (D-049).
- *
- * The coverage line states the numbers; this states what they mean. A reader had to work out for
- * themselves that "not checked" is Mintro's shortfall while "not exposed" is the merchant's, and
- * the two were adjacent in one sentence. They are the difference between a report that overstates
- * what was screened and one that does not.
- *
- * Descriptive throughout, and it draws no conclusion from the split (D-001). It says who could
- * have answered each rule, not what anyone should do about it.
- *
- * Absent on a run recorded before the kinds existed: those reports cannot say which bucket
- * applies and must not appear to (D-047).
- */
-function CoverageBreakdown({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
-  const c = report.coverage;
-  const ruleCount = distinctRuleCount(report);
-  if (typeof c.resolved !== 'number') return null;
-
-  const columns: readonly {
-    readonly n: number;
-    readonly head: string;
-    readonly whose: string;
-    readonly tone: string;
-  }[] = [
-    { n: c.evaluable, head: 'Evaluated', whose: 'observed from the crawled surface', tone: 'done' },
-    { n: c.notApplicable, head: 'Does not apply', whose: "the rule's subject is not on these pages", tone: 'done' },
-    { n: c.noCheckBuilt, head: 'Not checked', whose: 'Mintro has not built these yet', tone: 'ours' },
-    { n: c.notReachable, head: 'Not reachable', whose: 'no crawl of a website could answer these', tone: 'nobody' },
-    { n: c.notExposed, head: 'Not exposed', whose: 'this storefront did not carry them', tone: 'merchant' },
-    { n: c.notRetrieved ?? 0, head: 'Not retrieved', whose: 'this run could not fetch them', tone: 'run' },
-    { n: c.kindNotRecorded, head: 'Not recorded', whose: 'screened before Mintro separated these', tone: 'legacy' },
-  ];
-
-  const shown = columns.filter((column) => column.n > 0);
-
-  return (
-    <div className="cov-break">
-      <div className="cov-head">
-        <span className="eyebrow">Coverage</span>
-        {/*
-          Two nouns, because these are two numbers (D-170).
-
-          Every figure in this card counts **findings** — `computeCoverage` is handed the finding
-          list. This line read `{c.total} rules`, so a card whose columns say 40/2/1/11/6/2 was
-          headed "62 rules" while the rule set holds 54. The section headers below already keep the
-          two apart in exactly this shape (D-166); coverage now does too.
-        */}
-        <span className="cov-split">
-          <b>{c.resolved}</b> resolved · <b>{c.outstanding}</b> outstanding · {ruleCount} rules ·{' '}
-          {c.total} findings
-        </span>
-      </div>
-      <div className="cov-cols">
-        {shown.map((column) => (
-          <div className={`cov-col ${column.tone}`} key={column.head}>
-            <span className="cov-n">{column.n}</span>
-            <span className="cov-t">{column.head}</span>
-            <span className="cov-w">{column.whose}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * What the crawl could speak to, and what is still open (D-044).
@@ -808,102 +579,6 @@ function listOf(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
-function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Element {
-  const coverage = report.coverage;
-
-  /*
-    A run recorded before D-044 stored only `evaluable`, `total`, `notReachable` and
-    `notObserved`. Its report is immutable (D-002), so those fields will never appear — and the
-    first draft of this component rendered `{resolved} of {total}` as a blank number followed by
-    "of 97 resolved", which is the shape of defect this whole decision is about.
-
-    The type says these are present because every report assembled from now on has them. What
-    arrives here is JSONB written in the past, so the check is on the value.
-  */
-  if (typeof coverage.resolved !== 'number' || typeof coverage.outstanding !== 'number') {
-    return <LegacyCoverageLine coverage={coverage} />;
-  }
-
-  const {
-    total,
-    resolved,
-    outstanding,
-    evaluable,
-    notApplicable,
-    noCheckBuilt,
-    notReachable,
-    notExposed,
-    notRetrieved,
-    kindNotRecorded,
-  } = coverage;
-
-  const itemise = (parts: readonly (readonly [number, string])[]): string =>
-    parts
-      .filter(([n]) => n > 0)
-      .map(([n, text]) => `${n} ${text}`)
-      .join(', ');
-
-  const resolvedParts = itemise([
-    [evaluable, 'evaluated'],
-    [notApplicable, 'do not apply here'],
-  ]);
-
-  const outstandingParts = itemise([
-    [noCheckBuilt, 'not checked — Mintro has not built these yet'],
-    [notReachable, 'need a surface no crawl reaches'],
-    [notExposed, 'looked for and not found on the site'],
-    [notRetrieved ?? 0, 'this run could not fetch'],
-    [kindNotRecorded, 'recorded before this distinction existed'],
-  ]);
-
-  return (
-    <>
-      <b>
-        {resolved} of {total}
-      </b>{' '}
-      findings resolved ({resolvedParts})
-      {outstanding > 0 && (
-        <>
-          {' · '}
-          <b>{outstanding}</b> outstanding ({outstandingParts})
-        </>
-      )}
-    </>
-  );
-}
-
-/**
- * Coverage for a run recorded before the four-way split (D-044).
- *
- * States exactly what that run recorded and says plainly that the rest was not written down.
- * It does **not** reconstruct the split from the finding text — the wording is all that survives
- * and classifying by wording is the thing D-044 forbids. A number the run never recorded is not
- * one this report gets to infer.
- */
-function LegacyCoverageLine({
-  coverage,
-}: {
-  readonly coverage: ScreeningReport['coverage'];
-}): JSX.Element {
-  const { evaluable, total } = coverage;
-  const unevaluated = total - evaluable;
-
-  return (
-    <>
-      <b>
-        {evaluable} of {total}
-      </b>{' '}
-      evaluated
-      {unevaluated > 0 && (
-        <>
-          {' · '}
-          {unevaluated} not evaluated — this run was screened before Mintro separated the reasons,
-          so which applies was not recorded
-        </>
-      )}
-    </>
-  );
-}
 
 function CategoryCard({
   category,
@@ -1235,13 +910,23 @@ function GroupCard({
           scan did not exist at all. It is a heading here rather than a button because there is
           nothing to toggle: everything below it is already open.
         */}
-        <div className="cat-head static">
-          <span className={`state ${stateClass(group.state)}`}>{STATE_LABEL[group.state]}</span>
-          <span className="cat-name">
-            {group.title} <span className="mono group-rule">{group.ruleId}</span>
-          </span>
-          {group.findings.length > 1 && <span className="group-count">×{group.findings.length}</span>}
-        </div>
+        {/*
+          Only where it heads more than one row.
+
+          A group of one **is** its row: the row already carries the title, the rule id and the
+          state, so a header above it would print the same three things twice. That is the
+          duplication the outstanding revision 2 is about — instances becoming compact rows under a
+          single title — and this is not the change that fixes it, but it must not make it worse.
+        */}
+        {group.findings.length > 1 && (
+          <div className="cat-head static">
+            <span className={`state ${stateClass(group.state)}`}>{STATE_LABEL[group.state]}</span>
+            <span className="cat-name">
+              {group.title} <span className="mono group-rule">{group.ruleId}</span>
+            </span>
+            <span className="group-count">×{group.findings.length}</span>
+          </div>
+        )}
         <div className="cat-body">
           {group.findings.length > 1 && <p className="group-lede">{describeGroup(group)}</p>}
           {group.findings.map((finding, i) => (

@@ -19,7 +19,7 @@
 
 import type { JSX } from 'react';
 import type { ReportPart, SectionBlock } from '../lib/grouping.js';
-import { NOTHING_OBSERVED_ID } from '../lib/grouping.js';
+import { NOTHING_OBSERVED_ID, sectionAnchor } from '../lib/grouping.js';
 
 /** `4 rules · 7 findings` — from the part's own tally, never recounted here (spec §1). */
 function TallyLine({ rules, findings }: { readonly rules: number; readonly findings: number }): JSX.Element | null {
@@ -119,10 +119,16 @@ export function ReportSectionView({
   const anchored = part.id === 'not-observed';
   return (
     <section
+      id={sectionAnchor(part.id)}
       className={`part part-${part.id}`}
       data-section={part.id}
-      {...(anchored ? { id: NOTHING_OBSERVED_ID } : {})}
     >
+      {/*
+        The merchant callout's older anchor, kept beside the section id rather than replacing it.
+        A link mailed before the sections existed still lands (D-069), and the two ids name the
+        same element rather than two places that could drift apart.
+      */}
+      {anchored && <span id={NOTHING_OBSERVED_ID} />}
       <div className="part-head">
         <h2 className="part-name">{part.heading}</h2>
         <TallyLine rules={part.tally.rules} findings={part.tally.findings} />

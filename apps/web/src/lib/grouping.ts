@@ -742,6 +742,7 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
       surface,
     ),
     'not-observed': notObservedPart(
+      report,
       groups.filter((group) => !isStopping(group) && group.state === 'not_evaluable'),
       groups.filter((group) => !isStopping(group) && group.state === 'pass'),
     ),
@@ -853,6 +854,7 @@ function observedPart(groups: readonly FindingGroup[], surface: Surface): Report
  * unbuilt check and their own missing page are the same kind of fact.
  */
 function notObservedPart(
+  report: ScreeningReport,
   unevaluated: readonly FindingGroup[],
   passes: readonly FindingGroup[],
 ): ReportPart {
@@ -872,9 +874,147 @@ function notObservedPart(
   return {
     id: 'not-observed',
     heading: SECTION_HEADING['not-observed'],
-    lede: 'What this run could not establish, and whose limitation each one is.',
+    /*
+      Coverage lives here now, as one sentence (spec §4).
+
+      It was six labelled boxes above the fold stating the same six numbers in the same order, plus
+      a prose restatement of all six under the filter chips. The sentence sits inside the section it
+      explains, where a reader meets it while reading about what could not be seen rather than
+      before they know there is anything to explain.
+    */
+    lede: `What this run could not establish, and whose limitation each one is. ${coverageSentence(report)}`,
     blocks,
     tally: tally(unevaluated),
     passes: { groups: passes, tally: tally(passes) },
   };
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════════
+   The header lines, and coverage as a sentence (spec §3, §4)
+   ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * One line per section, above the fold.
+ *
+ * Replaces the whole top band: the verdict sentence, the tick strip and its legend, the six
+ * coverage columns and the coverage line under the chips. Those were four statements of one
+ * distribution, and a reader had to parse three of them to learn what a numeral says.
+ *
+ * **Counts come from the section's own tally**, so a line and the heading it points at cannot
+ * disagree. That is what the derivation in part 1 was for; this is the second reader.
+ *
+ * A zero section still renders its line, with `0` and no link. An absent line reads as an absent
+ * section, which is an absent value shown as an answer (D-044).
+ */
+export interface HeaderLine {
+  readonly id: SectionId;
+  readonly count: number;
+  /** `stopping conditions observed` — the section's own name, in the reader's terms. */
+  readonly label: string;
+  /** The anchor to jump to, or null at zero: there is nothing to arrive at. */
+  readonly href: string | null;
+}
+
+/**
+ * What each line calls its count.
+ *
+ * Not the section headings verbatim. A heading names a part of a document; these name what the
+ * numeral counts, which is a different sentence — "3 standards not met" rather than "3 What we
+ * observed". Section 3 is split across two lines for the same reason the IQwallet PDF splits it:
+ * *not met* and *needs a look* are different questions, and one number over both answers neither.
+ */
+const HEADER_LABEL: Readonly<Record<string, string>> = {
+  stopping: 'stopping conditions observed',
+  questions: 'questions only you can answer',
+  fail: 'standards not met',
+  review: 'need a look',
+};
+
+/** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
+export const sectionAnchor = (id: SectionId): string => `section-${id}`;
+
+/**
+ * The four lines, in the order the sections are read.
+ *
+ * Section 3 contributes two lines — *not met* and *need a look* — because those are the two
+ * numbers a reader is looking for, and both point at the same section. Sections 4's own count is
+ * deliberately absent: what could not be seen is explained in a sentence inside the section, not
+ * announced as a headline number, because a large "19 not observed" above the fold reads as a
+ * verdict on the crawl.
+ */
+export function headerLines(parts: readonly ReportPart[]): readonly HeaderLine[] {
+  const lines: HeaderLine[] = [];
+
+  for (const part of parts) {
+    if (part.id === 'stopping') {
+      lines.push(line('stopping', part.tally.rules, part.id));
+    } else if (part.id === 'questions') {
+      lines.push(line('questions', part.tally.rules, part.id));
+    } else if (part.id === 'observed') {
+      lines.push(line('fail', part.tally.byState.fail, part.id));
+      lines.push(line('review', part.tally.byState.review, part.id));
+    }
+  }
+
+  return lines;
+}
+
+const line = (key: string, count: number, id: SectionId): HeaderLine => ({
+  id,
+  count,
+  label: HEADER_LABEL[key] as string,
+  href: count === 0 ? null : `#${sectionAnchor(id)}`,
+});
+
+/**
+ * Coverage, as one sentence, in Mintro's own vocabulary (spec §4).
+ *
+ * Replaces six labelled boxes that stated the same six numbers the sentence does, in the same
+ * order, one screen higher. The sentence goes **inside section 4**, where a reader meets it while
+ * reading about what could not be seen rather than before they know there is anything to explain.
+ *
+ * Whose limitation each gap is survives the compression, because that is the whole point of the
+ * four-way split (D-044) and the reason the columns existed: *"needed a surface no crawl reaches"*
+ * is nobody's fault, *"looked for and not found on the site"* is the merchant's storefront, and
+ * *"checks Mintro has not built yet"* is ours. A sentence that said only "28 were not resolved"
+ * would have thrown that away.
+ *
+ * **Deliberately still counting findings, not rules.** D-170 made the header name both nouns rather
+ * than change the measure; whether an underwriter should read "32 of 54 rules" is a question about
+ * what the report claims and is a separate decision (spec §4).
+ *
+ * A run recorded before the four-way split has no buckets to name, and inventing them from the
+ * finding wording is exactly what D-044 forbids. It gets a sentence that says so instead of one
+ * that reads as an account of gaps nobody recorded.
+ */
+export function coverageSentence(report: ScreeningReport): string {
+  const c = report.coverage;
+  if (typeof c.resolved !== 'number' || typeof c.outstanding !== 'number') {
+    const unevaluated = c.total - c.evaluable;
+    return unevaluated > 0
+      ? `Of ${c.total} findings, ${c.evaluable} were evaluated. ${unevaluated} were not, and this run was screened before Mintro separated the reasons, so which applies was not recorded.`
+      : `Of ${c.total} findings, all ${c.evaluable} were evaluated.`;
+  }
+
+  const parts: string[] = [];
+  /** Singular and plural, because "1 are checks" is the sort of thing a reader stops on. */
+  const push = (n: number, one: string, many: string): void => {
+    if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`);
+  };
+
+  push(c.notReachable, 'needed a surface no crawl reaches', 'needed a surface no crawl reaches');
+  push(c.notExposed, 'was looked for and not found on the site', 'were looked for and not found on the site');
+  push(c.noCheckBuilt, 'is a check Mintro has not built yet', 'are checks Mintro has not built yet');
+  push(c.notRetrieved ?? 0, 'could not be fetched on this run', 'could not be fetched on this run');
+  push(c.kindNotRecorded, 'was recorded before this distinction existed', 'were recorded before this distinction existed');
+
+  const resolved = `Of ${c.total} findings, ${c.resolved} were resolved from the crawled surface.`;
+  if (c.outstanding === 0 || parts.length === 0) return resolved;
+
+  const listed =
+    parts.length === 1
+      ? (parts[0] as string)
+      : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1] as string}`;
+
+  return `${resolved} ${c.outstanding} were not: ${listed}.`;
 }

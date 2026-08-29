@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
-import { distinctRuleCount, STATE_LABEL_LOWER, type ScreeningReport } from '@mintro/engine';
+import { distinctRuleCount, type ScreeningReport } from '@mintro/engine';
+import { reportParts } from '../src/lib/grouping.js';
 import { ReportView } from '../src/components/ReportView.js';
 
 const access = { description: 'none needed for markup', urlFor: async () => null };
@@ -43,8 +44,17 @@ describe.each(RUNS)('%s', (_label, report, rules, findings) => {
     expect(rules).not.toBe(findings);
   });
 
-  it('heads the coverage card with both numbers, each under its own noun', () => {
-    expect(text(report)).toContain(`${rules} rules · ${findings} findings`);
+  /*
+    The coverage card is deleted (spec §3, §4). It stated the same six numbers the sentence now
+    states, one screen higher, and the header line it carried is what D-170 fixed.
+
+    What survives is the reason D-170 existed: coverage counts **findings**, and the sentence that
+    replaced the card says so in words rather than leaving a noun to be inferred.
+  */
+  it('names findings in the coverage sentence, where the card used to name both', () => {
+    expect(text(report)).toContain(`Of ${findings} findings,`);
+    // Section headings are where "rules" is the right noun, and they still say it.
+    expect(text(report)).toMatch(/[0-9]+ rules? /);
   });
 
   it('never prints the finding count as a rule count', () => {
@@ -73,23 +83,32 @@ describe.each(RUNS)('%s', (_label, report, rules, findings) => {
   });
 });
 
-describe('the badge and the legend cannot disagree', () => {
+describe('the top band is gone, and the count it carried is stated once', () => {
   /**
-   * Both read `report.counts.fail`. This pins that they keep reading one field: a badge fed from
-   * anywhere else — the count of `blocking: true` rules is the tempting one, and it is 8 on
-   * c268f8d7 where three findings failed — would put a second number under the same word.
+   * The badge and the legend both rendered `<count> not met`, and this asserted the two agreed.
+   * Both are deleted with the top band (spec §3): the verdict banner, the tick strip and its legend
+   * are gone, and the header lines say it in numerals.
+   *
+   * So the assertion inverts. There is **one** statement of the failure count now, and the thing
+   * worth pinning is that nothing reintroduces a second one — which is how the four restatements
+   * accumulated in the first place.
    */
-  it.each(RUNS)('%s: one number, rendered twice', (_label, report) => {
+  it.each(RUNS)('%s: the failure count is stated once, in the header lines', (_label, report) => {
     const rendered = text(report);
-    /*
-      Badge and legend both render `<count> not met`, so the assertion is that it appears **twice**
-      rather than that two different strings each appear once — which is what it checked while the
-      badge shouted `3 FAILED` and the legend said `3 failed` (D-175).
-    */
-    const phrase = `${report.counts.fail} ${STATE_LABEL_LOWER.fail}`;
-    expect(rendered.split(phrase).length - 1).toBeGreaterThanOrEqual(2);
+    const parts = reportParts(report, 'agent');
+    const observed = parts.find((p) => p.id === 'observed');
+
+    // The header line, in numerals: "3  standards not met".
+    expect(rendered).toContain(`${observed?.tally.byState.fail} standards not met`);
+
+    // And none of what it replaced.
+    expect(rendered).not.toContain('FAILED');
+    expect(rendered).not.toContain('were observed to fail,');
+    expect(rendered).not.toMatch(/All [0-9]+ findings/);
     if (report.blocking !== undefined && report.blocking.declared !== report.counts.fail) {
-      expect(rendered).not.toContain(`${report.blocking.declared} ${STATE_LABEL_LOWER.fail}`);
+      // The tempting wrong feed for a failure count is the number of declared stopping conditions.
+      // It is 8 on c268f8d7 where three findings failed, and it must appear under no such label.
+      expect(rendered).not.toContain(`${report.blocking.declared} standards not met`);
     }
   });
 });
