@@ -50,6 +50,14 @@ function offending(text: string): string[] {
 const REPORT_FIXTURES = 'fixtures/reports';
 
 /**
+ * Seven, and a **floor** rather than a total: a corpus that shrinks fails as loudly as one that
+ * vanishes. Delete four fixtures and every assertion below still runs, still passes, and covers
+ * three reports instead of seven — the same defect, quieter, and nothing else would catch it.
+ * Growth does not touch this number. `fixtures/reports/README.md` has the corpus.
+ */
+const REPORT_FIXTURE_FLOOR = 7;
+
+/**
  * The pinned reports, or an error.
  *
  * This read `reports/` — the worker's local output directory, which is gitignored — behind
@@ -59,7 +67,15 @@ const REPORT_FIXTURES = 'fixtures/reports';
  */
 function storedReports(): ScreeningReport[] {
   const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  // Two diagnoses, not one. An empty directory is a checkout or a working-directory problem; a
+  // short one is a fixture somebody removed. Same remedy, different thing to go and look at.
   if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  if (files.length < REPORT_FIXTURE_FLOOR) {
+    throw new Error(
+      `${REPORT_FIXTURES}/ holds ${files.length} reports; at least ${REPORT_FIXTURE_FLOOR} are expected. ` +
+        `Restore the missing fixture, or lower the floor deliberately and record why.`,
+    );
+  }
   return files.map(
     (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
   );

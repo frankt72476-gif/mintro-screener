@@ -1,8 +1,16 @@
 /**
  * Renders a report to PDF and, optionally, sends it.
  *
- *     npm run pdf -- swisschems.is
- *     npm run pdf -- swisschems.is --send underwriting@iqwallet.com
+ *     npm run pdf -- 74eefa47                              # by run id
+ *     npm run pdf -- swisschems.is                         # by domain, where it names one run
+ *     npm run pdf -- c268f8d7 --report-dir fixtures/reports
+ *     npm run pdf -- 74eefa47 --send underwriting@iqwallet.com
+ *
+ * **The run id is the key.** This read `reports/<domain>.json`, which was fine while one storefront
+ * meant one file and wrong as soon as it did not: `fixtures/reports/` holds two runs of
+ * sportstechnologylabs.com at different rule-set versions, and keying on domain would render one of
+ * them without saying which. A domain still works where it names exactly one run; where it names
+ * more, `selectRun` refuses and lists them (D-169).
  *
  * The PDF is `page.pdf()` against the report route — the same component the analyst sees. Sending
  * uses the dry-run mailer unless `RESEND_API_KEY` is set, because the sending domain is not
@@ -14,6 +22,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { readRunAttestations, resolveAttestations, type ScreeningReport } from '@mintro/engine';
+import { describeRun, readStoredRuns, selectRun } from '../src/selectRun.js';
+import { flagValue, positionals } from '../src/cliArgs.js';
 import { startReportServer } from '../src/reportServer.js';
 import { createWorkerSupabase, signEvidenceUrl } from '../src/store/supabase.js';
 import { renderReportPdf } from '../src/pdf.js';
@@ -25,31 +35,45 @@ import {
   subjectFor,
   bodyFor,
 } from '../src/send.js';
+import type { StoredRun } from '../src/selectRun.js';
+
+/** Flags that consume the token after them, so it is never read as the run selector. */
+const VALUE_FLAGS = ['--send', '--out', '--report-dir'] as const;
 
 async function main(argv: readonly string[]): Promise<number> {
-  const domain = argv.find((arg) => !arg.startsWith('--'));
-  if (domain === undefined) {
-    console.error('usage: npm run pdf -- <merchant-domain> [--send <email>] [--out <dir>]');
+  const selector = positionals(argv, VALUE_FLAGS)[0];
+  if (selector === undefined) {
+    console.error(
+      'usage: npm run pdf -- <run-id|domain> [--report-dir <dir>] [--send <email>] [--out <dir>]',
+    );
     return 2;
   }
 
-  const sendIndex = argv.indexOf('--send');
-  const recipient = sendIndex === -1 ? null : argv[sendIndex + 1] ?? null;
-  const outIndex = argv.indexOf('--out');
-  const outDir = outIndex === -1 ? 'out' : argv[outIndex + 1] ?? 'out';
+  const recipient = argv.includes('--send') ? flagValue(argv, '--send', '') || null : null;
+  const outDir = flagValue(argv, '--out', 'out');
+  const reportDir = flagValue(argv, '--report-dir', 'reports');
+
+  // Resolved before anything is launched: an ambiguous selector should cost nothing but the message.
+  let chosen: StoredRun;
+  try {
+    chosen = selectRun(readStoredRuns(reportDir), selector);
+  } catch (error) {
+    console.error(`${(error as Error).message}
+`);
+    return 1;
+  }
+  const report = chosen.report;
+  const slug = chosen.file.replace(/\.json$/, '');
 
   const server = await startReportServer({
     webRoot: 'apps/web/dist',
-    mounts: { '/reports/': 'reports', '/evidence/': 'evidence' },
+    mounts: { '/reports/': reportDir, '/evidence/': 'evidence' },
   });
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
 
   try {
-    console.log(`report route  ${server.origin}/?report=${domain}&print=1`);
-
-    const report = (await fetch(`${server.origin}/reports/${domain}.json`).then((r) =>
-      r.json(),
-    )) as ScreeningReport;
+    console.log(`run           ${describeRun(chosen)}`);
+    console.log(`report route  ${server.origin}/?report=${slug}&print=1`);
 
     // Pre-mint a signed URL for every capture the report cites. The headless browser therefore
     // needs no session of its own — see the note on `PdfOptions.inject`.
@@ -77,7 +101,8 @@ async function main(argv: readonly string[]): Promise<number> {
 
     const pdf = await renderReportPdf(browser, {
       origin: server.origin,
-      domain,
+      domain: report.merchantDomain,
+      slug,
       inject: { report, evidence, ...(attestations === undefined ? {} : { attestations }) },
     });
 

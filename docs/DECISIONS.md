@@ -10065,25 +10065,188 @@ The four PDFs are **not committed** — 18MB of binaries, and a rendering is not
 written to `out/restructure/`, which is gitignored. To make them again:
 
 ```
-# the report JSON is tracked; the CLI keys on domain, so copy it into place under that name
-cp fixtures/reports/run-c268f8d7.json reports/sportstechnologylabs.com.json
-cp fixtures/reports/run-5b29036d.json reports/www.comopeptides.com.json
-npm run pdf -- sportstechnologylabs.com --out out/restructure
-npm run pdf -- www.comopeptides.com    --out out/restructure
-
-# the "before" half is the same two commands at the commit before the restructure
-git stash && git checkout 78e86d5   # parent of 77c45a5, the first restructure commit
+# after: run ids, straight from the tracked corpus
+npm run pdf -- c268f8d7 --report-dir fixtures/reports --out out/restructure
+npm run pdf -- 5b29036d --report-dir fixtures/reports --out out/restructure
 ```
 
-Two things this needs that the fixtures do not supply, and both will fail quietly if you assume
-otherwise. **Supabase credentials**: `report-pdf.ts` mints a signed URL per capture, so without them
-the pages render with the captures missing and the count is not comparable. **The domain
-collision**: `reports/sportstechnologylabs.com.json` is run `71bea35a` at 2.9.0, a *different* run
-from `c268f8d7` — the `cp` above overwrites it, and rendering without the `cp` silently produces a
-PDF of the wrong run. `fixtures/reports/README.md` has the full table.
+The **before** half is the same two runs rendered at the commit before the restructure. Neither
+`--report-dir` nor run-id selection exists there, and neither does `fixtures/reports/`, so the two
+runs have to be materialised under the domain names that CLI expects:
+
+```
+git stash && git checkout 78e86d5   # parent of 77c45a5, the first restructure commit
+git show f87c478:fixtures/reports/run-c268f8d7.json > reports/sportstechnologylabs.com.json
+git show f87c478:fixtures/reports/run-5b29036d.json > reports/www.comopeptides.com.json
+npm run pdf -- sportstechnologylabs.com --out out/restructure
+npm run pdf -- www.comopeptides.com     --out out/restructure
+```
+
+That overwrites `reports/sportstechnologylabs.com.json`, which is run `71bea35a` at 2.9.0. Nothing
+is lost — `reports/` is scratch, and that run is itself in `fixtures/reports/` now.
+
+**Supabase credentials are required.** `report-pdf` mints a signed URL per capture, so without them
+both halves render with the captures missing and the page counts are not comparable to the numbers
+above.
+
+The domain collision this recipe used to warn about is fixed rather than documented: the "after"
+half keys on run id, and an ambiguous domain is refused with both candidates named (D-169).
 
 The recipe is read off `apps/worker/bin/report-pdf.ts` and the commit graph; it has not been run
 end to end since the pair was produced.
 
+
+---
+
+## D-168 — A check that iterates a collection fails when the collection is short or absent
+
+**2026-08-28 · business owner · follow-up to the report-fixture commit**
+
+`anchors.test.ts` renders the merchant page, collects every `href="#x"` the render produced and
+requires a matching `id="x"` in the same markup. It read its reports from `reports/`, the worker's
+local output directory, behind `if (!existsSync('reports')) return []`.
+
+On the machine that produced those reports it checks a great deal. On a clean checkout it iterates
+an empty list, asserts nothing, and passes — the vacuous pass the blocker audit was about, in the
+suite that audits for it. Its own header records the same defect one level down: an earlier version
+rendered `ReportView` alone, which emits no anchors at all, so *"a check that never saw a single
+anchor reported that every anchor resolved."* The `existsSync` return reinstated it around the fix.
+
+`compose-check.ts` was the worse instance, because the shortfall compounds. Its two synthetic
+shapes — a report far shorter than any held, and one twice as long — are derived from the smallest
+and largest real report, so with no reports they are skipped too. Three shapes become zero, the loop
+runs over nothing, and it prints *"All shapes compose within the ceiling."* In a file whose own
+header objects to precisely this: *"a check that cannot fail"*, reported rather than skipped,
+because *"this number does not tell you anything here"* and *"this number is fine"* are different
+statements (D-036).
+
+### The ruling
+
+**A check that iterates a collection must fail when the collection is short or absent, and the
+guard belongs at the load site rather than inside the assertion.**
+
+At the load site for two reasons. It cannot be forgotten at one of several call sites —
+`copy.test.ts` and `requirement.test.ts` each carried a non-empty assertion and `anchors.test.ts`
+did not, which is exactly what the placement decides. And a loader that throws means `it.each` never
+receives an empty array, so the failure arrives at collection naming its cause, rather than as a
+suite that quietly contains fewer tests than it did yesterday.
+
+**Absent and short are both failures, and they are different diagnoses.** An empty directory is a
+checkout or a working-directory problem; a short one is a fixture somebody removed. The two
+messages say which. `REPORT_FIXTURE_FLOOR = 7` is a **floor, not an equality**: a corpus that
+shrinks fails, a corpus that grows needs no bump.
+
+That is the one place this departs from D-139, and deliberately. There the pinned count is a
+relation between two files that must move together, so equality is the assertion. Here it is a
+minimum for a corpus expected to grow, and an equality would make every added fixture a failing
+build — a tripwire on the thing we want to encourage.
+
+### The precedent
+
+D-139 is this ruling reached from the other end. Of the four things the clause-corpus check asserts,
+**three exist only because the membership check alone would pass vacuously** — every string is a
+substring of a corpus nobody read. So it asserts that the corpus is readable and non-empty,
+"reported once as an empty corpus rather than as 53 individually missing clauses", and that the
+number of `source: programme` rules equals the number of clause lines.
+
+D-139 also settled where such a pin lives: **not in the validator**, because hard constraint 1 says
+adding a rule must never require touching the engine, and a validator carrying
+`EXPECTED_CLAUSE_LINES = 53` has to be renumbered for every rule added. The floor here sits in the
+loaders and in one test. It never reaches the engine.
+
+### The corpus had to be tracked first, and the ignore rule had to be anchored
+
+Seven real reports now live in `fixtures/reports/`, tracked. Five at 2.9.0 are deliberately old:
+they predate `notEvaluableKind` (D-044), the obstruction banner (D-136), the blocking summary
+(D-161) and the sample basis (D-162), so they are what exercises every "this report predates the
+field" path — the one thing a freshly generated fixture cannot test, and immutability (D-002) keeps
+them that way. The two at 3.1.0 are the restructure reference runs.
+
+`.gitignore` carried an unanchored `reports/`, which matches a directory of that name **at any
+depth**. It was already swallowing `fixtures/reports/`, so tracking the corpus would have failed
+silently and rebuilt the defect one directory over. It is `/reports/` now, root-anchored, for the
+same reason the HEIC rules below it are.
+
+**Confirmed that the anchoring stopped ignoring nothing that was meant to stay ignored.** Every
+directory named `reports` in the tree was enumerated and checked against the new rules:
+`apps/web/dist/reports` is still ignored via `dist/`, `apps/web/public/reports` via its own explicit
+line, `reports/` via the anchored rule, and `fixtures/reports/` is the intended change. The ignore
+sets under the old and the new file were then diffed for everything on disk, and are identical.
+
+The residual difference is prospective, and it is the point: a *future* directory named `reports`
+nested somewhere else will no longer be ignored by accident. A rule that hides files nobody asked it
+to hide is how this started.
+
+### The cost, recorded
+
+The floor is declared in four files. `apps/web/test`, `apps/worker/test` and `apps/worker/bin` each
+compile under their own app's `rootDir: "."`, so sharing one integer between them would mean a new
+package. `reportFixtures.test.ts` asserts that the four declarations agree, that each is actually
+compared against rather than merely declared — a constant nothing reads is the D-131 shape — and
+that the committed corpus satisfies it.
+
+Every guard was made to fail before being trusted: directory absent, directory empty, and one
+fixture removed, in all four loaders.
+
+---
+
+## D-169 — The run id is the key; a domain naming two runs is refused, not resolved
+
+**2026-08-28 · business owner**
+
+`report-pdf` read `reports/<merchant-domain>.json`. That held while one storefront meant one file.
+`fixtures/reports/` holds two runs of sportstechnologylabs.com — `c268f8d7` at rule set 3.1.0 and
+`71bea35a` at 2.9.0 — and a domain key has to pick one of them.
+
+Picking is the failure, and it is a quiet one. What comes out is a valid report, correctly footered
+with a real merchant domain, indistinguishable from the document that was wanted unless somebody
+checks the run id. D-167 recorded this as a warning — that rendering without first copying a fixture
+over a domain name *"silently produces a PDF of the wrong run"* — and a warning in a decision record
+is not a guard.
+
+**So the run id is the key.** A domain is accepted as a convenience and must resolve to exactly one
+run; where it names more, `selectRun` refuses and lists the candidates with what separates them:
+id, rule-set version, domain, date. Refusing costs the operator eight retyped characters. Choosing
+costs a document about the wrong run.
+
+An id is matched before a domain, so a selector that looks like an id is never reread as one.
+Prefixes shorter than four characters are not matched at all — a one-character prefix is not a
+choice, it is array order wearing a selector's clothes.
+
+### Three CLIs, and the third was worse than domain keying
+
+- **`report-pdf`** keyed on domain. It takes a run id or an unambiguous domain now, plus
+  `--report-dir`, which is what lets the tracked corpus be rendered without copying anything
+  anywhere. D-167's recipe is rewritten accordingly and loses its two caveats.
+- **`compose-check`** *labelled* by domain, printing the two sportstechnologylabs runs as two
+  identical rows. A reader comparing a 62-finding row against a 97-finding row of the same name has
+  no way to tell which run either is — or that they are different runs at all. Labelled by run id
+  now. Its header row was also five columns out of true, and is built from the same widths as the
+  data row so the two cannot drift apart again.
+- **`print-check`** took `readdirSync('reports').find(...)` — the first `.json` in directory order —
+  and printed the merchant it happened to land on. Not domain keying, but worse: arbitrary, and it
+  read like a choice. It names a run now, or refuses when there is more than one and no selector.
+
+`resume-run` already keyed on run id and errors when none matches. It keeps reading `reports/`, and
+should: it resumes real local runs, not fixtures.
+
+### Two fields that were one
+
+`PdfOptions.domain` was doing two jobs — the report route's `?report=` parameter, and the merchant
+domain printed in the page footer. Identical while a stored report was named after its merchant, and
+not the same thing at all: one identifies a **file**, the other names a **merchant**. Rendering
+`run-c268f8d7.json` would have footered every page of that document *"run-c268f8d7"*. Split into
+`slug` and `domain`.
+
+### An argument parser, because the idiom was wrong
+
+`argv.find((arg) => !arg.startsWith('--'))` was how each of these read its positional. It is wrong
+whenever a flag takes a value: in `--report-dir fixtures/reports c268f8d7` the first non-flag token
+is the directory, so the corpus path gets read as the run selector and the run id is discarded.
+Latent while `--send` and `--out` were the only value-taking flags and were usually typed after the
+positional. `--report-dir` fired it on the first run.
+
+`positionals()` takes the list of flags that consume the token after them, because there is no way
+to infer it.
 
 ---

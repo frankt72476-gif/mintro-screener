@@ -18,6 +18,15 @@ export interface PdfOptions {
   readonly origin: string;
   /** Merchant domain — used for the filename and the page footer. */
   readonly domain: string;
+  /**
+   * The report route's `?report=` parameter, where it differs from the domain.
+   *
+   * These were one field while a stored report was named after its merchant. They are not the same
+   * thing: the route parameter identifies a **file**, the domain names the **merchant** printed in
+   * the footer. `fixtures/reports/run-c268f8d7.json` separated them, and passing the file name for
+   * both would footer every page of that document "run-c268f8d7" (D-169).
+   */
+  readonly slug?: string;
   readonly timeoutMs?: number;
   /**
    * The report and its pre-signed evidence URLs, handed to the page directly.
@@ -60,7 +69,7 @@ export interface PdfResult {
  */
 export async function renderReportPdf(browser: Browser, options: PdfOptions): Promise<PdfResult> {
   const timeout = options.timeoutMs ?? 60_000;
-  const url = `${options.origin}/?report=${encodeURIComponent(options.domain)}&print=1`;
+  const url = `${options.origin}/?report=${encodeURIComponent(options.slug ?? options.domain)}&print=1`;
 
   const context = await browser.newContext();
   const page = await context.newPage();

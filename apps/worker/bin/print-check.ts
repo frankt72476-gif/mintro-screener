@@ -1,7 +1,14 @@
 /**
  * What the printed report actually says about the merchant's side of it.
  *
- *     npm run print-check
+ *     npm run print-check                                    # where one run is stored
+ *     npm run print-check -- c268f8d7                        # by run id
+ *     npm run print-check -- c268f8d7 --report-dir fixtures/reports
+ *
+ * It used to render `readdirSync('reports').find(...)` — the first `.json` in directory order — and
+ * name the merchant it happened to land on. With more than one run stored that is a check on an
+ * arbitrary document, and the report line it printed gave no way to notice: it read like a choice.
+ * It now names a run or refuses to guess (D-169).
  *
  * ## Why this exists as a script and not as a unit test
  *
@@ -23,7 +30,9 @@
  */
 
 import { chromium } from 'playwright';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readStoredRuns, requireSingleRun, selectRun } from '../src/selectRun.js';
+import { flagValue, positionals } from '../src/cliArgs.js';
 import type { CommentInvitation, MerchantComment, ScreeningReport } from '@mintro/engine';
 import { startReportServer } from '../src/reportServer.js';
 import { renderReportPdf } from '../src/pdf.js';
@@ -107,18 +116,28 @@ function scenarios(ruleId: string): readonly Scenario[] {
   ];
 }
 
-async function main(): Promise<number> {
-  if (!existsSync('reports')) {
-    console.error('No reports/ directory. Run `npm run scan-full -- --report-dir ./reports <url>` first.');
-    return 1;
-  }
-  const file = readdirSync('reports').find((name) => name.endsWith('.json'));
-  if (file === undefined) {
-    console.error('No stored report to render.');
+async function main(argv: readonly string[]): Promise<number> {
+  const selector = positionals(argv, ['--report-dir'])[0];
+  const reportDir = flagValue(argv, '--report-dir', 'reports');
+
+  if (!existsSync(reportDir)) {
+    console.error(
+      `No ${reportDir}/ directory. Run \`npm run scan-full -- --report-dir ./reports <url>\` first,
+` +
+        `  or point this at the tracked corpus: --report-dir fixtures/reports`,
+    );
     return 1;
   }
 
-  const report = JSON.parse(readFileSync(`reports/${file}`, 'utf8')) as ScreeningReport;
+  let report: ScreeningReport;
+  try {
+    const runs = readStoredRuns(reportDir);
+    report = (selector === undefined ? requireSingleRun(runs) : selectRun(runs, selector)).report;
+  } catch (error) {
+    console.error(`${(error as Error).message}
+`);
+    return 1;
+  }
   const invited = report.categories
     .flatMap((category) => category.findings)
     .filter((finding) => finding.state === 'fail' || finding.state === 'review');
@@ -266,7 +285,7 @@ async function main(): Promise<number> {
   return failures === 0 ? 0 : 1;
 }
 
-main().then(
+main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (error) => {
     console.error(error);

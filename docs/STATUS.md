@@ -37,7 +37,7 @@ made to fail on purpose first.
 ### The tools a newcomer will want
 
     npm run loop-check -- <run-id>    did the sent document carry what the merchant did?
-    npm run print-check               do all five commentary states render, with attribution intact?
+    npm run print-check -- <run-id>   do all five commentary states render, with attribution intact?
     npm run compose-check             does the document compose well at any report size?
     npm run page-budget -- <run-id>   what does one document cost, by section?
 
@@ -79,7 +79,7 @@ Then run it:
     npm run validate                       # validate the rule set, exit 1 if malformed
     npm run scan-full -- --report-dir ./reports --evidence-dir ./evidence https://example.com
     npm run web                            # the report, reading those runs
-    npm run pdf -- example.com             # the PDF, printed from the same component
+    npm run pdf -- <run-id>                # the PDF, printed from the same component
 
 ---
 

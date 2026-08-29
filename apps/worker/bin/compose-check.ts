@@ -78,6 +78,17 @@ interface Shape {
 const REPORT_FIXTURES = 'fixtures/reports';
 
 /**
+ * Seven, and a **floor** rather than a total: a corpus that shrinks fails as loudly as one that
+ * vanishes. Delete four fixtures and every assertion below still runs, still passes, and covers
+ * three reports instead of seven — the same defect, quieter, and nothing else would catch it.
+ * Growth does not touch this number. `fixtures/reports/README.md` has the corpus.
+ */
+const REPORT_FIXTURE_FLOOR = 7;
+
+/** One shape per stored run, plus the short and long synthetics derived from the extremes. */
+const SHAPE_FLOOR = REPORT_FIXTURE_FLOOR + 2;
+
+/**
  * The pinned reports, or an error.
  *
  * This read the gitignored `reports/` behind `if (!existsSync('reports')) return []`, and on a
@@ -88,18 +99,31 @@ const REPORT_FIXTURES = 'fixtures/reports';
  */
 function stored(): ScreeningReport[] {
   const files = readdirSync(REPORT_FIXTURES).filter((file) => file.endsWith('.json'));
+  // Two diagnoses, not one. An empty directory is a checkout or a working-directory problem; a
+  // short one is a fixture somebody removed. Same remedy, different thing to go and look at.
   if (files.length === 0) throw new Error(`no report fixtures in ${REPORT_FIXTURES}/`);
+  if (files.length < REPORT_FIXTURE_FLOOR) {
+    throw new Error(
+      `${REPORT_FIXTURES}/ holds ${files.length} reports; at least ${REPORT_FIXTURE_FLOOR} are expected. ` +
+        `Restore the missing fixture, or lower the floor deliberately and record why.`,
+    );
+  }
   return files.map(
     (file) => JSON.parse(readFileSync(`${REPORT_FIXTURES}/${file}`, 'utf8')) as ScreeningReport,
   );
 }
 
 /**
- * The shapes to check.
+ * The shapes to check: every stored run, plus two synthetic sizes.
  *
- * Real storefronts where they exist, because a fixture would only exercise the composition a
- * fixture author imagined. Two synthetic ones for the sizes no real run currently reaches: a report
- * far shorter than any we hold, and one twice as long.
+ * Real storefronts because a fixture would only exercise the composition a fixture author imagined.
+ * Two synthetic ones for the sizes no real run reaches — a report far shorter than any we hold, and
+ * one twice as long.
+ *
+ * **Named by run id, not by domain.** Two of the fixtures are sportstechnologylabs.com at different
+ * rule-set versions, and labelling by domain printed them as two identical rows: a reader comparing
+ * a 62-finding row against a 97-finding row of the same name has no way to tell which run either
+ * is, and no reason to think they are different runs at all.
  */
 function shapes(reports: readonly ScreeningReport[]): Shape[] {
   const bySize = [...reports].sort(
@@ -110,7 +134,8 @@ function shapes(reports: readonly ScreeningReport[]): Shape[] {
   const chosen: Shape[] = [];
 
   for (const report of reports) {
-    chosen.push({ name: `${report.merchantDomain} (${countFindings(report)})`, report });
+    const name = `${report.runId.slice(0, 8)} ${report.merchantDomain} (${countFindings(report)})`;
+    chosen.push({ name, report });
   }
 
   if (smallest !== undefined) {
@@ -120,6 +145,21 @@ function shapes(reports: readonly ScreeningReport[]): Shape[] {
   if (largest !== undefined) {
     const huge = doubled(largest);
     chosen.push({ name: `synthetic long (${countFindings(huge)})`, report: huge });
+  }
+
+  /*
+    The same floor the loader asserts, one layer out.
+
+    `stored()` guarantees the corpus; this guarantees what was built from it. The two synthetic
+    shapes are conditional on a smallest and a largest existing, so a defect that emptied `reports`
+    would drop three shapes here while the loader still saw seven — and the check would run over
+    the survivors and report no problems, which is the shape this file's header objects to.
+  */
+  if (chosen.length < SHAPE_FLOOR) {
+    throw new Error(
+      `built ${chosen.length} shapes from ${reports.length} reports; at least ${SHAPE_FLOOR} are expected ` +
+        `(${REPORT_FIXTURE_FLOOR} stored + 2 synthetic).`,
+    );
   }
 
   return chosen;
@@ -189,8 +229,13 @@ async function main(): Promise<number> {
 
   try {
     console.log('compose-check · does the document compose well at any size?\n');
-    console.log('  report                          findings   content   pages   waste');
-    console.log('  ' + '-'.repeat(66));
+    // Same widths as the row below, written as the row is written, because a header aligned by
+    // hand drifts the moment a column changes — this one was five columns out already.
+    console.log(
+      `  ${' '.repeat(4)} ${'run      report'.padEnd(39)} ` +
+        `${'find'.padStart(4)}  ${'content'.padStart(8)}  ${'pages'.padStart(6)}  ${'waste'.padStart(5)}`,
+    );
+    console.log('  ' + '-'.repeat(75));
 
     for (const shape of shapes(reports)) {
       const { pages, contentPx } = await measure(browser, server.origin, shape.report);
@@ -202,7 +247,7 @@ async function main(): Promise<number> {
       if (!ok) failures += 1;
 
       console.log(
-        `  ${ok ? (informative ? 'ok  ' : '--  ') : 'FAIL'} ${shape.name.padEnd(30)} ` +
+        `  ${ok ? (informative ? 'ok  ' : '--  ') : 'FAIL'} ${shape.name.padEnd(39)} ` +
           `${String(findings).padStart(4)}  ` +
           `${(contentPx / PAGE_CONTENT_PX).toFixed(1).padStart(8)}  ` +
           `${String(pages).padStart(6)}  ` +
@@ -211,7 +256,7 @@ async function main(): Promise<number> {
       );
     }
 
-    console.log('  ' + '-'.repeat(66));
+    console.log('  ' + '-'.repeat(75));
     console.log(`  ceiling: ${(MAX_BREAK_WASTE * 100).toFixed(0)}% of the printed document\n`);
 
     if (failures > 0) {
