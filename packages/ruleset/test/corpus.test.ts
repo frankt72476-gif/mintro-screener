@@ -85,13 +85,25 @@ describe('the committed rule set and the committed corpus', () => {
    * The Mintro-authored section was removed with the only rule listed in it, and CATG-007 — also
    * `source: mintro` — had never been listed there. Nothing replaces it: a rule that quotes no
    * standard has no place in the text of the standards.
+   *
+   * The id list is a tripwire on a deliberate change, in D-139's shape. It read `['CATG-007']`
+   * while that was the only Mintro observation; D-177 added five more, and being asked whether you
+   * meant that is the point of pinning it. **What the test is actually for is the last line**: no
+   * `source: mintro` clause may appear in the corpus, whatever the set grows to.
    */
   it('holds no Mintro-authored section', () => {
     const text = readFileSync(CORPUS_PATH, 'utf8');
     expect(text).not.toContain('## Mintro-authored');
 
     const mintro = ruleset.rules.filter((rule) => rule.source === 'mintro');
-    expect(mintro.map((rule) => rule.id)).toEqual(['CATG-007']);
+    expect(mintro.map((rule) => rule.id).sort()).toEqual([
+      'CATG-007',
+      'DISC-004',
+      'PROD-011',
+      'PROD-012',
+      'PROD-013',
+      'PROD-014',
+    ]);
     for (const rule of mintro) expect(text).not.toContain(rule.clause);
   });
 });

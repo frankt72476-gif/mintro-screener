@@ -128,14 +128,14 @@ const SEPARATOR = '[\\s-]*';
  * whose premise was wrong. `bioavailabl` + `ity` is `bioavailablity`; English forms that noun by
  * replacing `-able` with `-ability`, which no suffix list reaches. A rule that wants the noun lists
  * the noun because **nothing here will ever reach it**, not because a widening was declined
- * (D-178).
+ * (D-177).
  */
 const INFLECTIONS = '(?:s|es|d|ed|ing|ly)?';
 
 const escapeRegex = (part: string): string => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * The suffixes a term ending in a silent `e` takes, with the `e` dropped before a vowel (D-178).
+ * The suffixes a term ending in a silent `e` takes, with the `e` dropped before a vowel (D-177).
  *
  * `cure` + `ing` is `cureing`, so appending alone never reached `curing` — and PROD-008 therefore
  * read *"this peptide is curing inflammation"* as clean. A false pass on a disease claim is the
@@ -184,7 +184,7 @@ function termPattern(term: string, wordBoundary: boolean): RegExp {
   const body = term.trim().split(/[\s-]+/).map(escapeRegex).join(SEPARATOR);
   if (!wordBoundary) return new RegExp(body, 'i');
 
-  // A silent final `e` is dropped before a vowel suffix; everything else appends (D-178).
+  // A silent final `e` is dropped before a vowel suffix; everything else appends (D-177).
   const inflected = body.endsWith('e') ? `${body.slice(0, -1)}${ELIDED}` : `${body}${INFLECTIONS}`;
   return new RegExp(`\\b${inflected}\\b`, 'i');
 }

@@ -10988,3 +10988,161 @@ evidence, at one capture per finding, not layout. Reaching twelve means one capt
 captures behind a link — changes to what the export contains, and neither is in this spec.
 
 ---
+
+## D-177 — The matcher sees the forms a page writes, and five Mintro observations of body copy
+
+**2026-08-29 · business owner · rule set 3.1.0 → 3.2.0**
+
+Four new rules were asked for and could not be written, because the matcher could not see their
+subject. So this is one ruling in two commits: the matcher first, then the rules that depend on it.
+
+### The matcher, and what it could not see
+
+`termPattern` matched a term as written, with a closed list of appended inflections. Measured
+against the terms these rules needed:
+
+    ok    weight loss   "steady weight loss over eight weeks"
+    MISS  weight loss   "steady weight-loss over eight weeks"
+    MISS  fat loss      "Supports fatloss and lean mass"
+    MISS  anti-aging    "Popular for anti aging protocols"
+
+**That is a false pass, not a cosmetic miss.** These rules are `expect: absent`, so a term the
+matcher cannot see reads as *"no prohibited claim found"* — hard constraint 2, reached by D-014's
+route: recognising the form you were handed rather than the subject you are looking for.
+
+Three changes, and they belong in the matcher rather than in each rule's term list. Variants written
+per rule are a tax every future rule pays and a list every author gets differently wrong; PAY-001
+already carried `Cash App` *and* `CashApp` for want of this.
+
+- **A separator in the term matches a separator, a hyphen, or nothing.** Both directions:
+  `anti-aging` reaches `anti aging`, `nasal spray` reaches `nasalspray`. `*` rather than `?` because
+  page text is not normalised before the matcher sees it, so a phrase can arrive broken across a
+  line.
+- **`-ly` joins the suffix list.** It earns its place on rules that already existed: PROD-007's
+  `subcutaneous` and `intramuscular` were missing the adverb of the same claim.
+- **A silent final `e` is dropped before a vowel suffix.** `cure` + `ing` was `cureing`, so
+  **PROD-008 read *"this peptide is curing inflammation"* as clean.** That one was shipped as its
+  own commit: a false pass on a disease claim is the worst shape this rule set can take, and it
+  deserved its own diff and its own revert.
+
+The anchoring is unchanged, and that is what keeps the widening honest: a term may be written as one
+word or two, but it still has to start where a word starts and end where one ends. The elision is
+bounded the same way — **the stem alone never matches**, so `cure` cannot reach a bare `cur`.
+
+### The `-ity` reasoning was wrong, and it was mine
+
+I recorded that `-ity` was held out of the suffix list for safety: that it *would* take
+`bioavailable` to `bioavailability`, and would also take an unknown number of other adjectives to
+nouns meaning something else.
+
+**The second half is a reasonable caution. The first half is false.** `bioavailabl` + `ity` is
+`bioavailablity`. English forms that noun by replacing `-able` with `-ability`, which is not a suffix
+rule at all, so no suffix list was ever going to reach it. The widening was not declined; it was
+never capable of the thing it was being declined for.
+
+The consequence is not academic. A test asserted the decision and **could not fail** — opening `-ity`
+left the suite green, because the word it was protecting was out of reach either way. A test that
+cannot fail is worse than a comment, because it looks like protection. It is replaced by one
+asserting what is true and what a real widening would break: the adjective does not reach the noun
+by any inflection this matcher applies, so **a rule that wants `bioavailability` lists it**.
+
+### What the regression showed
+
+Both matchers replayed over the stored DOM snapshots for `c268f8d7` (24) and `5b29036d` (30) —
+gunzipped from the evidence bucket, so the bytes those runs actually saw, with the same text through
+both matchers so the diff isolates the matcher.
+
+**Separator and `-ly`: one change on one page, and no finding moved.** A page reading *"we accept
+Credit Cards, e-checks, Zelle, and CashApp"* gained `Cash App` alongside the `CashApp` that already
+matched it — one occurrence, two spellings, same violation. That page is not in PAY-001's
+`footer_and_public_pages` surface, and the stored finding is `pass` either way.
+
+**The `e`-elision: nothing at all.** Three terms in the rule set end in `e` under `word_boundary` —
+PROD-007's `injectable`, PROD-008's `cure` and `disease` — and the strings they newly reach
+(`injectabling`, `curing`, `diseasing`) occur **zero** times across both runs. The fix closes a real
+false pass that this corpus never exercised, which is worth knowing: the reference runs cannot tell
+anyone the widening is safe in the field, only that it changed nothing here.
+
+### What it costs
+
+Keying the elision on the letter rather than on whether the letter is silent means `injectable` now
+matches `injectabling`, which is not a word. Asserted rather than hidden: it can only produce a
+false positive if a page literally contains the non-word, and narrowing it would take a dictionary,
+which is a different kind of thing to put in a matcher.
+
+### Five rules, `source: mintro`
+
+They come from a compliance plugin specification, not from the published standards. None of their
+clauses is a byte-exact substring of `rules/sources/ruo-standards-v1.1.md`, so `source: programme`
+would fail the validator — and would attribute an authority nobody stated, which is what that field
+exists to prevent. They render under D-138's *"Mintro observation, not a published standard"*
+heading, as CATG-007 does.
+
+| id | tier | what it reports |
+|---|---|---|
+| PROD-011 | `auto_fail` | Unambiguous benefit claims in body copy |
+| PROD-012 | `review_only` | Benefit vocabulary with ordinary non-claim uses |
+| PROD-013 | `auto_fail` | Body copy addressing a human user |
+| PROD-014 | `review_only` | Absorption and uptake claims |
+| DISC-004 | `review_only` | The FDA non-evaluation statement not observed |
+
+**The tiers are the point of two of them.** PROD-011 and PROD-013 are `auto_fail` because every term
+in them is a claim with no ordinary use on a research storefront. They are `auto_fail` *because*
+what would have weakened them was split out rather than left in:
+
+- PROD-012 exists so `recovery`, `performance` and `longevity` do not drag PROD-011 down. Each has a
+  routine non-claim use — assay performance, sample recovery — so a hit is a sentence somebody
+  reads. Splitting was free; weakening a whole rule for three words would not have been.
+- `subcutaneously` was dropped from PROD-013 for the same reason. It appears in cited method
+  sections, and route-of-administration wording already belongs to PROD-007.
+
+Constraint 4 is not overridden anywhere: no `review_only` rule was promoted, and the two `auto_fail`
+rules contain no ambiguous term.
+
+**Where each fails.** All five locate their subject by claim vocabulary in a merchant-authored
+sentence, never by the compliant form — there is no compliant phrasing of *"safe to inject"* to
+match against, so constraint 9 is satisfied by construction. The four `expect: absent` rules fail by
+**under-matching**: a claim worded outside the list is invisible, and on `absent` that reads as
+clean. *"No prescription is needed"* — one word inserted — is not reached by *"no prescription
+needed"*, and that is asserted in the tests rather than left to be discovered.
+
+### DISC-004 is a different code path, and a different failure
+
+It is the only `expect: present` rule of the five, and required presence fails toward **false
+decline**: a disclaimer worded differently reads as missing. `review_only` for that reason alone.
+
+Two things about that path were verified rather than assumed:
+
+- **It is satisfied by ANY term, not all** — `found.length === 0` is the violation. So several
+  phrasings are listed, and each one that matches is one fewer way a real disclaimer reads as absent.
+- **It is matched by `containsTerm`, not `termPattern`.** The present branch returns before the
+  claim-scoping code, and does its own `\b<term>\b` against normalised text with no separator
+  flexibility and no inflection. DISC-004 gets none of the widening above. Its terms are chosen for
+  that: punctuation-free, because a comma the page places differently would otherwise read as an
+  absent disclaimer.
+
+### Housekeeping
+
+Version `3.1.0` → `3.2.0`; the rule-count pin moves 54 → 59, in all three places that carry it, and
+the `source: mintro` id list moves from one entry to six. Both are tripwires in D-139's shape:
+adding a rule is something somebody meant to do, and being asked whether you meant this much of it
+is what a pin is for.
+
+`rules/ruleset.json` also carries the GATE-002 and GATE-003 blocking flags, still uncommitted and
+still unrecorded pending their authority. Those touch two existing rule objects; these five are new
+objects appended after the last one, so the hunks do not overlap and the two changes stage
+separately.
+
+### Not in this set
+
+**Prescription APIs.** A potential stopping condition whose authority is unresolved, held out
+deliberately.
+
+**A sixth rule.** The brief said six and `54 → 60`, and specified five. Five are written and the
+count is 59. Nothing was invented to make up the difference.
+
+**Cosmetic outcomes.** *"wrinkle reduction, skin tightening"* was in the original list of benefit
+claims and is in neither half of the split. Not silently folded into PROD-011, because which half it
+belongs in is a judgement about how ambiguous the wording is, and that is not mine to make.
+
+---

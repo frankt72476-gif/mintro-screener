@@ -85,9 +85,21 @@ describe('every rule states whose requirement it is', () => {
    * program, which is exactly what the field exists to prevent — so the schema requires it rather
    * than defaulting it, and this asserts the data has not drifted back.
    */
-  it('everything quoting the published standards says so, and only CATG-007 does not', () => {
+  it('everything quoting the published standards says so, and the Mintro observations are named', () => {
+    /*
+      The list grew from one to six with D-177. It is pinned rather than counted because *which*
+      rules claim no published authority is the fact worth being asked about — a rule drifting into
+      `mintro` to escape the clause corpus would otherwise pass unremarked.
+    */
     const mintro = ruleset.rules.filter((r) => r.source === 'mintro').map((r) => r.id);
-    expect([...mintro].sort()).toEqual(['CATG-007']);
+    expect([...mintro].sort()).toEqual([
+      'CATG-007',
+      'DISC-004',
+      'PROD-011',
+      'PROD-012',
+      'PROD-013',
+      'PROD-014',
+    ]);
     expect(ruleset.rules.filter((r) => r.source === 'programme')).toHaveLength(
       ruleset.rules.length - mintro.length,
     );

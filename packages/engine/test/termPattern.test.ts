@@ -71,7 +71,7 @@ describe('the suffix list, and where it stops', () => {
   });
 
   /**
-   * The defect this file found, now closed (D-178).
+   * The defect this file found, now closed (D-177).
    *
    * The suffix appends, so `cure` + `ing` was `cureing` and **PROD-008 read *"this peptide is
    * curing inflammation"* as clean**. A false pass on a disease claim is the worst shape this rule
