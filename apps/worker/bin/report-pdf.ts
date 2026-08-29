@@ -23,7 +23,7 @@ import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { readRunAttestations, resolveAttestations, type ScreeningReport } from '@mintro/engine';
 import { describeRun, readStoredRuns, selectRun } from '../src/selectRun.js';
-import { flagValue, positionals } from '../src/cliArgs.js';
+import { flagValue, positionals, requiredValue } from '../src/cliArgs.js';
 import { startReportServer } from '../src/reportServer.js';
 import { createWorkerSupabase, signEvidenceUrl } from '../src/store/supabase.js';
 import { renderReportPdf } from '../src/pdf.js';
@@ -49,7 +49,17 @@ async function main(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const recipient = argv.includes('--send') ? flagValue(argv, '--send', '') || null : null;
+  // `--send` with no address is an error, not a default — see `requiredValue` (D-170).
+  let recipient: string | null;
+  try {
+    recipient = requiredValue(argv, '--send');
+  } catch {
+    console.error(
+      '--send needs an address: npm run pdf -- <run-id> --send underwriting@iqwallet.com\n' +
+        '  Omit --send entirely to render without sending.',
+    );
+    return 2;
+  }
   const outDir = flagValue(argv, '--out', 'out');
   const reportDir = flagValue(argv, '--report-dir', 'reports');
 

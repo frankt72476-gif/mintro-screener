@@ -634,6 +634,26 @@ function participates(finding: ReportFinding): boolean {
 }
 
 /**
+ * How many distinct rules a run produced findings for — **not** how many findings it produced.
+ *
+ * Layer 2 evaluates product-surface rules once per sampled page, so one rule yields up to five
+ * findings. c268f8d7 has 62 findings across 54 rules. Every number in `ReportCoverage` counts
+ * findings, and every one of its field comments calls them rules — *"Rules this crawl could speak
+ * to"*, *"Rules still open"*, *"how much of the rule set could this crawl speak to"*. The coverage
+ * header then printed `{total} rules` over a finding count, telling a reader the rule set holds 62
+ * rules when it holds 54 (D-170).
+ *
+ * Derived rather than stored, and deliberately. Runs are immutable (D-002), so a stored field would
+ * be present on new runs and absent on every existing one, and the renderer would need a second
+ * derivation for those — two paths that can disagree, which is what `computeCoverage`'s own note
+ * about deriving in the engine warns against. `strip` carries one entry per finding with its rule
+ * id and is present on every run written, so one implementation answers for all of them.
+ */
+export function distinctRuleCount(report: Pick<ScreeningReport, 'strip'>): number {
+  return new Set((report.strip ?? []).map((tick) => tick.ruleId)).size;
+}
+
+/**
  * Coverage, computed from the findings themselves.
  *
  * Each `not_evaluable` finding is counted under the kind **it declared** when it was created. No
@@ -703,7 +723,11 @@ export function describeVerdict(
   const remainder = failures.length - named.length;
   const andMore = remainder > 0 ? `, and ${remainder} other failure(s)` : '';
 
-  return `${failures.length} rule(s) were observed to fail, including ${detail}${andMore}. ${counts.review} finding(s) are queued for review. ${counts.not_evaluable} could not be evaluated from the crawled surface.`;
+  // `failures` is a finding list, so this is a finding count — the next clause in this very
+  // sentence already says "finding(s)" for the same kind of number. It read "rule(s)", which
+  // is right only while no rule fails on two sampled pages: true of all seven stored runs and
+  // not a property of anything (D-170).
+  return `${failures.length} finding(s) were observed to fail, including ${detail}${andMore}. ${counts.review} finding(s) are queued for review. ${counts.not_evaluable} could not be evaluated from the crawled surface.`;
 }
 
 function buildCategories(

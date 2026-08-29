@@ -10250,3 +10250,97 @@ positional. `--report-dir` fired it on the first run.
 to infer it.
 
 ---
+
+## D-170 — Findings and rules are two numbers, and neither is printed under the other's name
+
+**2026-08-28 · business owner**
+
+Three counting defects were reported against `c268f8d7`. One is real, two do not reproduce, and
+saying which is which is the point of writing this down.
+
+### What was real: one word doing two jobs
+
+Layer 2 evaluates product-surface rules once per sampled page, so one rule yields up to five
+findings. `c268f8d7` has **62 findings across 54 rules**; `5b29036d` has 66 across 54. The two
+numbers differ on six of the seven stored runs.
+
+`computeCoverage(findings)` opens `const total = findings.length`. Every field it returns counts
+findings — and every one of its field comments calls them rules: *"Rules this crawl could speak
+to"*, *"Rules still open"*, *"The question the coverage line answers is how much of the rule set
+could this crawl speak to"*. The card header then rendered `{c.total} rules`, so a reader was told
+the rule set holds 62 rules. It holds 54.
+
+**The same conflation, a second time, in the same assembly.** `describeVerdict` composes
+`${failures.length} rule(s) were observed to fail` from a **finding** list — and the next clause of
+that very sentence says `${counts.review} finding(s) are queued for review` about the same kind of
+number. It is right on all seven stored runs only because no rule has yet failed on two sampled
+pages. That is a property of the corpus, not of the code.
+
+So `computeCoverage(enriched)` and `describeVerdict(enriched, counts)` take the **same argument**
+and both label finding counts as rules. The displayed numbers were the symptom.
+
+### The ruling
+
+**A count is printed with the noun it actually counts.** Coverage keeps counting findings, because
+that is what it does and what its buckets sum to, and the header now names both numbers:
+
+    42 resolved · 20 outstanding · 54 rules · 62 findings
+
+The section headings below already keep the pair apart in exactly this shape (D-166); coverage now
+does too. The restatement line gained the noun it never had — *"42 of 62 findings resolved"* — and
+the verdict says *"finding(s) were observed to fail"*.
+
+**Deliberately not done: recomputing coverage per rule.** The field comments describe a rule-level
+measure, and building one is defensible — for `c268f8d7` it would read 54 total and 32 evaluated
+rather than 62 and 40. But that changes every number an underwriter reads about how much was
+screened, which is a question about what the report claims, not about how it is spelled. Flagged,
+not decided.
+
+`distinctRuleCount` derives from `report.strip` rather than storing a field. Runs are immutable
+(D-002), so a stored count would be present on new runs and absent on every existing one, leaving
+the renderer a second derivation for those — two paths that can disagree, which is what
+`computeCoverage`'s own note about deriving in the engine warns against. `strip` carries one entry
+per finding with its rule id and every run written has it, so one implementation answers for all of
+them. Exported from `browser.ts` as well as `index.ts` for the same reason `RUN_DEADLINE_MS` is:
+the web app resolves the package to `browser.ts`, and the bundle test caught the omission.
+
+### What did not reproduce, and what was checked
+
+Two of the three reports describe numbers that no code path produces. Recorded because "we looked
+and it is not there" is a result.
+
+**The badge did not read 8.** `VerdictBanner` reads `report.counts.fail`; the legend reads
+`report.counts[state]`. **The same field of the same object** — they cannot disagree, and a test now
+pins that. Rendered for both reference runs, screen and print: `3 FAILED` beside `3 failed`. There
+is exactly one `N FAILED` in the application; the only other in the repository is `13 FAILED`,
+hardcoded in `demo/index.html`, the design spec.
+
+The suspicion behind the report was sound and the number exists: `blocking.declared` is **8** on
+`c268f8d7`. It renders in the stopping-conditions panel, correctly labelled — *"8 observed and not
+violated"*, *"None of the 8 rules marked as stopping conditions was observed failing on this run"* —
+and `blocking.failed` is empty. Nothing feeds it to the badge.
+
+**Both "evaluated" numbers read one field.** The card column and the restatement line both take
+`coverage.evaluable`, which is 40. No stored run has `evaluable: 48`; the rule-level figure for this
+run would be 32. `computeCoverage` is called exactly once, at assembly, so there is no second call
+site with different arguments to disagree.
+
+Checked before concluding: every fixture's counts, both runs rendered in screen and print, every
+`FAILED` and `v-badge` occurrence in the tree, `apps/web/public/reports/` (which holds no
+`c268f8d7` at all), and the build freshness of `apps/web/dist`. If those numbers were seen, they
+came from a surface outside this working tree — a deployed build, or a different run.
+
+### `--send` with no address
+
+`flagValue(argv, '--send', '') || null` turned a forgotten address into `null`, which is the value
+meaning *do not send*. So `npm run pdf -- 74eefa47 --send` rendered the PDF, wrote it, sent nothing
+and said nothing — the one command whose purpose is to transmit a document to an underwriter taking
+the silent path on a typo. A value beginning with `--` is the same mistake with the next flag eaten
+as the address.
+
+**A flag given without its value is an error, not a default.** `requiredValue` returns `null` only
+when the flag is absent, and throws when it is present without a usable value; the CLI exits 2 and
+names the correct form. This is D-168's placement rule applied to arguments: the guard belongs where
+the value is read, not at the point somebody remembers to check it.
+
+---

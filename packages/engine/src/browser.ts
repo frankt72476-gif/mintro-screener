@@ -59,6 +59,16 @@ export type {
   ScreeningReport,
 } from './report.js';
 
+/*
+  Counting rules rather than findings, shared with the report view (D-170).
+
+  A pure derivation over `report.strip` with no imports, so the browser bundle pays nothing for it.
+  It lives here for the same reason the deadline constants do: the coverage header and any other
+  reader must get this number from one implementation. Two would drift, and the drift would show as
+  a card headed "54 rules" beside a PDF headed "62".
+*/
+export { distinctRuleCount } from './report.js';
+
 export {
   invitesComment,
   commentaryFor,

@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ScreeningReport } from '@mintro/engine';
 import { describeRun, readStoredRuns, requireSingleRun, selectRun, type StoredRun } from '../src/selectRun.js';
-import { flagValue, positionals } from '../src/cliArgs.js';
+import { flagValue, positionals, requiredValue } from '../src/cliArgs.js';
 
 const run = (runId: string, merchantDomain: string, rulesetVersion = '3.1.0'): StoredRun => ({
   file: `${runId}.json`,
@@ -164,5 +164,28 @@ describe('argument parsing does not confuse a flag value for a positional', () =
   it('falls back when the flag ends the arguments', () => {
     expect(flagValue(['--out'], '--out', 'out')).toBe('out');
     expect(flagValue([], '--out', 'out')).toBe('out');
+  });
+});
+
+describe('a flag that means nothing without a value', () => {
+  it('returns null when the flag was not given at all', () => {
+    expect(requiredValue(['c268f8d7'], '--send')).toBeNull();
+  });
+
+  it('returns the value when one was given', () => {
+    expect(requiredValue(['--send', 'u@iqwallet.com'], '--send')).toBe('u@iqwallet.com');
+  });
+
+  /**
+   * The defect: `flagValue(argv, '--send', '') || null` turned a forgotten address into "do not
+   * send", so the command whose purpose is to transmit a report to an underwriter rendered the
+   * file and said nothing about not sending it.
+   */
+  it('refuses the flag with no value rather than reading it as "do not"', () => {
+    expect(() => requiredValue(['c268f8d7', '--send'], '--send')).toThrow(/needs a value/);
+  });
+
+  it('refuses to swallow the next flag as the value', () => {
+    expect(() => requiredValue(['--send', '--out', 'x'], '--send')).toThrow(/needs a value/);
   });
 });

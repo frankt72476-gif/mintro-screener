@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
 import {
   REQUIREMENT_HEADINGS,
+  distinctRuleCount,
   type FindingCommentary,
   type Participation,
   type ReportCategory,
@@ -664,6 +665,7 @@ function Coverage({ report }: { readonly report: ScreeningReport }): JSX.Element
  */
 function CoverageBreakdown({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
   const c = report.coverage;
+  const ruleCount = distinctRuleCount(report);
   if (typeof c.resolved !== 'number') return null;
 
   const columns: readonly {
@@ -687,8 +689,17 @@ function CoverageBreakdown({ report }: { readonly report: ScreeningReport }): JS
     <div className="cov-break">
       <div className="cov-head">
         <span className="eyebrow">Coverage</span>
+        {/*
+          Two nouns, because these are two numbers (D-170).
+
+          Every figure in this card counts **findings** — `computeCoverage` is handed the finding
+          list. This line read `{c.total} rules`, so a card whose columns say 40/2/1/11/6/2 was
+          headed "62 rules" while the rule set holds 54. The section headers below already keep the
+          two apart in exactly this shape (D-166); coverage now does too.
+        */}
         <span className="cov-split">
-          <b>{c.resolved}</b> resolved · <b>{c.outstanding}</b> outstanding · {c.total} rules
+          <b>{c.resolved}</b> resolved · <b>{c.outstanding}</b> outstanding · {ruleCount} rules ·{' '}
+          {c.total} findings
         </span>
       </div>
       <div className="cov-cols">
@@ -841,7 +852,7 @@ function CoverageLine({ report }: { readonly report: ScreeningReport }): JSX.Ele
       <b>
         {resolved} of {total}
       </b>{' '}
-      resolved ({resolvedParts})
+      findings resolved ({resolvedParts})
       {outstanding > 0 && (
         <>
           {' · '}

@@ -244,6 +244,7 @@ export {
 export {
   assembleReport,
   computeCoverage,
+  distinctRuleCount,
   pairSameObservation,
   describeVerdict,
   type AssembleInput,

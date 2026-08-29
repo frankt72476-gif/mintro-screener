@@ -36,3 +36,23 @@ export function positionals(argv: readonly string[], valueFlags: readonly string
   }
   return out;
 }
+
+/**
+ * The value of a flag that means nothing without one, or `null` when the flag was not given.
+ *
+ * `--send` read `flagValue(argv, '--send', '') || null`, so `--send` with the address forgotten
+ * fell back to the empty string, then to `null`, then to the *silent* path: render the PDF, write
+ * it, send nothing, say nothing. A flag given without its value is a mistake, and the one command
+ * whose purpose is to transmit a document to an underwriter is the worst place to guess at a
+ * default (D-170).
+ *
+ * A value beginning with `--` is the same mistake with the following flag eaten as the value.
+ */
+export function requiredValue(argv: readonly string[], name: string): string | null {
+  if (!argv.includes(name)) return null;
+  const value = flagValue(argv, name, '');
+  if (value === '' || value.startsWith('--')) {
+    throw new Error(`${name} needs a value.`);
+  }
+  return value;
+}
