@@ -71,17 +71,81 @@ describe('the suffix list, and where it stops', () => {
   });
 
   /**
-   * A gap this file found and does not close: the suffix is appended, so a term ending in `e` never
-   * reaches its `-ing` form. `cure` + `ing` is `cureing`.
+   * The defect this file found, now closed (D-178).
    *
-   * **`"this peptide is curing inflammation"` therefore reads as clean to PROD-008 today.** The
-   * comment on `termPattern` claimed otherwise before this test existed. Closing it means eliding a
-   * final `e` before a vowel suffix, which is a second widening and not the one that was green-lit
-   * — so it is asserted here as the current behaviour rather than left to be rediscovered, and
-   * reported for its own decision.
+   * The suffix appends, so `cure` + `ing` was `cureing` and **PROD-008 read *"this peptide is
+   * curing inflammation"* as clean**. A false pass on a disease claim is the worst shape this rule
+   * set can take. A silent final `e` is now dropped before a vowel suffix.
    */
-  it('does not reach the -ing form of a term ending in e (known gap)', () => {
-    expect(hits('cure', 'Curing takes weeks.')).toBe(false);
+  it('reaches the -ing form of a term ending in e', () => {
+    expect(hits('cure', 'Curing takes weeks.')).toBe(true);
+    expect(hits('cure', 'It cures inflammation.')).toBe(true);
+    expect(hits('cure', 'It cured the condition.')).toBe(true);
+  });
+
+  /**
+   * What bounds the elision: **the stem alone never matches.** Every branch appends something, so
+   * dropping the `e` cannot widen a term into its own prefix.
+   *
+   * This is the guard that makes the elision safe on a term whose `e` is not silent. Nothing here
+   * can know whether an `e` is silent, so instead the stem is never a match and the anchoring is
+   * unchanged — a non-silent `e` yields a stem-plus-suffix that is almost never a word, and where
+   * it is one the boundaries still require the whole of it.
+   */
+  it('never matches the stem on its own', () => {
+    expect(hits('cure', 'A cur ran past the shop.')).toBe(false);
+    expect(hits('disease', 'Diseas is a misspelling.')).toBe(false);
+  });
+
+  /** A term whose final `e` is not silent does not reach a longer unrelated word. */
+  it.each([
+    ['recipe', 'The recipient signed for it.'],
+    ['recipe', 'Reciprocal arrangements apply.'],
+    ['acne', 'Acknowledge receipt before shipping.'],
+  ])('%s does not reach "%s"', (term, sentence) => {
+    expect(hits(term, sentence)).toBe(false);
+  });
+
+  /**
+   * Every `e`-final term the rule set actually carries, checked rather than assumed.
+   *
+   * `cure` and `disease` are PROD-008's; `injectable` is PROD-007's. The elision gives PROD-008
+   * `curing` and `diseased` — both the same claim — and gives `injectable` nothing, because none of
+   * its elided forms is a word. PAY-001's terms are unaffected: it sets no `word_boundary`, so no
+   * inflection is applied to them at all.
+   */
+  it.each([
+    ['cure', 'It is curing the condition.', true],
+    ['disease', 'Treats diseased tissue.', true],
+    ['injectable', 'Supplied as an injectable.', true],
+  ])('%s on "%s"', (term, sentence, expected) => {
+    expect(hits(term, sentence)).toBe(expected);
+  });
+
+  /**
+   * The cost of keying the elision on the letter rather than on whether the letter is silent.
+   *
+   * `injectable` now matches `injectabling`, which is not a word. Asserted rather than hidden: it
+   * can only produce a false positive if a page literally contains the non-word, and the guard that
+   * matters — the stem alone never matching — still holds. Narrowing this would mean a dictionary,
+   * which is a different kind of thing to put in a matcher.
+   */
+  it('matches a non-word the elision creates, which is the price of not knowing which e is silent', () => {
+    expect(hits('injectable', 'Injectabling is not a word.')).toBe(true);
+    // The bound that still holds.
+    expect(hits('injectable', 'The injectabl prefix alone.')).toBe(false);
+  });
+
+  /**
+   * Without word boundaries a term is an unanchored substring, and always was.
+   *
+   * `Cash App` therefore reaches `Cash Apping` — not because of any inflection, which this path does
+   * not apply, but because nothing anchors either end. That is PAY-001's existing shape and the
+   * elision does not touch it; asserted so a reader does not mistake the reach for a new one.
+   */
+  it('applies no inflection without word boundaries, and stays an unanchored substring', () => {
+    expect(hits('Cash App', 'We are Cash Apping the payment.', false)).toBe(true);
+    expect(hits('Cash App', 'We accept CashApp.', false)).toBe(true);
   });
 
   /**
@@ -104,16 +168,19 @@ describe('the suffix list, and where it stops', () => {
   });
 
   /**
-   * `-ity` is deliberately absent (D-177). It would take `bioavailable` to `bioavailability`, which
-   * is wanted — and every other adjective to a noun that may mean something else, on every rule at
-   * once. A rule that needs the noun lists the noun.
+   * A rule that wants `bioavailability` lists it, and no suffix rule will ever save it the trouble.
    *
-   * **This documents the decision; it is not a tripwire against reversing it.** Verified by trying:
-   * adding `ity` to the suffix list changes nothing here, because `bioavailable` ends in `e` and
-   * `bioavailableity` is not a word. Reaching the noun would take the `e`-elision this file records
-   * as an open gap, so a future author opening `-ity` would find these tests still green.
+   * This replaced a test asserting that `-ity` was deliberately kept out of the suffix list. That
+   * test could not fail — opening `-ity` left it green, because `bioavailabl` + `ity` is
+   * `bioavailablity`. English forms the noun by replacing `-able` with `-ability`, which is not a
+   * suffix rule at all, so the premise behind the original decision was wrong: `-ity` was never
+   * going to reach the word it was being refused for.
+   *
+   * What is true, and is what the rule set needs to know, is asserted here instead: the adjective
+   * does not reach the noun by any inflection this matcher applies. A widening that made it reach
+   * turns this red, which is the whole of what a test in this position can honestly promise.
    */
-  it('does not reach -ity, so a rule that wants the noun must say so', () => {
+  it('does not reach a noun formed by replacing the suffix, so the rule lists it', () => {
     expect(hits('bioavailable', 'Excellent bioavailability in this formulation.')).toBe(false);
     expect(hits('bioavailability', 'Excellent bioavailability in this formulation.')).toBe(true);
   });

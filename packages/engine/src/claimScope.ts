@@ -123,15 +123,39 @@ const SEPARATOR = '[\\s-]*';
  * appends. PROD-008 does not see that adverb. Asserted in `termPattern.test.ts` rather than left as
  * an assumption, because the comment here claimed it did before a test asked.
  *
- * **`-ity` is deliberately not here.** It would take `bioavailable` to `bioavailability`, which is
- * wanted — and it would also take an unknown number of other adjectives to nouns that mean
- * something else, on every rule at once, for the sake of one term. A rule that needs the noun lists
- * the noun; that is one deliberate exception, visible in the rule, rather than a widening nobody
- * can enumerate the consequences of. See D-177.
+ * **`-ity` is not here, and would not help if it were.** It was left out to avoid taking every
+ * adjective in every rule to a noun that may mean something else — a good reason for a decision
+ * whose premise was wrong. `bioavailabl` + `ity` is `bioavailablity`; English forms that noun by
+ * replacing `-able` with `-ability`, which no suffix list reaches. A rule that wants the noun lists
+ * the noun because **nothing here will ever reach it**, not because a widening was declined
+ * (D-178).
  */
 const INFLECTIONS = '(?:s|es|d|ed|ing|ly)?';
 
 const escapeRegex = (part: string): string => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The suffixes a term ending in a silent `e` takes, with the `e` dropped before a vowel (D-178).
+ *
+ * `cure` + `ing` is `cureing`, so appending alone never reached `curing` — and PROD-008 therefore
+ * read *"this peptide is curing inflammation"* as clean. A false pass on a disease claim is the
+ * worst shape this rule set can take, which is why this is its own change rather than a line folded
+ * into the separator work.
+ *
+ * **The stem is never allowed on its own**: every branch appends something, so `cure` cannot match
+ * a bare `cur`. That is what keeps eliding the `e` from widening a term into its own prefix.
+ *
+ * Branches that duplicate the appending form — `cur` + `ed` is the same string as `cure` + `d` —
+ * are left in rather than pruned. They cost nothing, and the list then reads as the suffixes
+ * English takes rather than as the subset that happened not to overlap.
+ *
+ * The elision is keyed on the letter, not on whether the letter is silent, because nothing here can
+ * know that. What bounds it is that the stem alone never matches and the anchoring is unchanged:
+ * a term whose `e` is *not* silent yields a stem-plus-suffix that is almost never a word, and where
+ * it is one the trailing `\b` still requires the whole of it. Checked against every `e`-final term
+ * in the rule set in `termPattern.test.ts`.
+ */
+const ELIDED = '(?:e(?:s|d|ly)?|ing|ed|es)';
 
 /**
  * The regex for one term.
@@ -158,7 +182,11 @@ const escapeRegex = (part: string): string => part.replace(/[.*+?^${}()|[\]\\]/g
  */
 function termPattern(term: string, wordBoundary: boolean): RegExp {
   const body = term.trim().split(/[\s-]+/).map(escapeRegex).join(SEPARATOR);
-  return new RegExp(wordBoundary ? `\\b${body}${INFLECTIONS}\\b` : body, 'i');
+  if (!wordBoundary) return new RegExp(body, 'i');
+
+  // A silent final `e` is dropped before a vowel suffix; everything else appends (D-178).
+  const inflected = body.endsWith('e') ? `${body.slice(0, -1)}${ELIDED}` : `${body}${INFLECTIONS}`;
+  return new RegExp(`\\b${inflected}\\b`, 'i');
 }
 
 function isAttributed(sentence: string): boolean {
