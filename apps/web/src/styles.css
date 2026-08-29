@@ -1813,7 +1813,13 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   background: none !important;
   border-radius: 0;
   padding: 0;
-  flex: 0 0 82px;
+  /*
+    Widened from 82px for the new label set (D-175). "Needs a look" and "Not observed" are twelve
+    characters; at 10.5px monospace with 0.07em tracking that is ~84px, so both clipped. This is the
+    width the words need — the tone of the column (case, weight, colour) is a separate question and
+    is not decided here.
+  */
+  flex: 0 0 96px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;

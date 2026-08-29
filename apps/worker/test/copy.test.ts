@@ -29,6 +29,8 @@ import {
   quotedFromEvidence,
   type Finding,
   type ScreeningReport,
+  STATE_LABEL,
+  STATE_LABEL_LOWER,
 } from '@mintro/engine';
 import { bodyFor, subjectFor, attachmentName } from '../src/send.js';
 
@@ -544,7 +546,11 @@ describe('the covering email', () => {
     (_domain, report) => {
       expect(subjectFor(report)).toBe(`Screening report — ${report.merchantDomain}`);
       expect(subjectFor(report)).not.toMatch(/\d/);
-      expect(subjectFor(report)).not.toMatch(/fail|review|pass|evaluable/i);
+      // The current vocabulary, not the retired one. A guard listing words nothing renders is a
+      // guard that cannot fire (D-175).
+      for (const label of Object.values(STATE_LABEL)) {
+        expect(subjectFor(report), label).not.toMatch(new RegExp(`\b${label}\b`, 'i'));
+      }
     },
   );
 
@@ -554,7 +560,10 @@ describe('the covering email', () => {
       // Dropped from the subject, not from the message. Three failures out of ninety-seven
       // evaluable findings is a different fact from three out of five.
       const body = bodyFor(report, 'Captures attached.');
-      expect(body).toContain(`${report.counts.fail} failed`);
+      // Read from the shared set, so this cannot go on asserting a word the report stopped using
+      // — which is how the mail and the document it announces came to name states differently
+      // in the first place (D-175).
+      expect(body).toContain(`${report.counts.fail} ${STATE_LABEL_LOWER.fail}`);
       expect(body).toContain('findings were evaluable from this crawl');
     },
   );

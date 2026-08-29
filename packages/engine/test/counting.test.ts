@@ -91,7 +91,7 @@ describe('the verdict', () => {
   it('does not call three findings of one rule three rules', () => {
     const verdict = report(perPage('NAME-002', 'fail', 3)).verdict;
 
-    expect(verdict).toContain('3 finding(s) were observed to fail');
+    expect(verdict).toContain('3 finding(s) record a requirement not met');
     expect(verdict).not.toContain('3 rule(s)');
   });
 
@@ -101,12 +101,12 @@ describe('the verdict', () => {
       ...perPage('CATG-005', 'review', 2),
     ]).verdict;
 
-    expect(verdict).toContain('2 finding(s) are queued for review');
+    expect(verdict).toContain('2 finding(s) need a look');
   });
 
   it('says nothing of rules when nothing failed', () => {
     const verdict = report(perPage('PROD-006', 'pass', 3)).verdict;
-    expect(verdict).toContain('No rule was observed to fail');
+    expect(verdict).toContain('No requirement was observed unmet');
   });
 });
 

@@ -20,7 +20,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { parseRuleset } from '@mintro/ruleset';
-import { resolveAttestations, type StoredAttestation } from '@mintro/engine';
+import { resolveAttestations, STATE_LABEL, type StoredAttestation } from '@mintro/engine';
 import { AttestationSection, NotCheckedSection } from '../src/components/Attestations.js';
 
 const RULESET = parseRuleset(JSON.parse(readFileSync('rules/ruleset.json', 'utf8')));
@@ -87,9 +87,19 @@ describe('the section says whose words these are', () => {
    * would say a statement had been assessed.
    */
   it('uses none of the four finding states', () => {
-    const rendered = text(render([answered('ban-list', 'Yes.')])).toLowerCase();
-    for (const state of ['pass', 'fail', 'review', 'not evaluable']) {
-      expect(rendered).not.toContain(state);
+    /*
+      Read from the shared label set (D-175).
+
+      This listed `pass / fail / review / not evaluable` — the words the report used *then*. After
+      the relabelling it would have gone on guarding vocabulary nothing renders, passing because it
+      was looking for the wrong thing rather than because the boundary held.
+
+      Word boundaries, because "met" is a substring of ordinary English and a bare `toContain` would
+      fail on a question that happened to use it.
+    */
+    const rendered = text(render([answered('ban-list', 'Yes.')]));
+    for (const label of Object.values(STATE_LABEL)) {
+      expect(rendered, label).not.toMatch(new RegExp(`\b${label}\b`, 'i'));
     }
   });
 });

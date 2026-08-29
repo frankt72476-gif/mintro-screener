@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { auditAnalystNote, describeNoteWarning, type ScreeningReport } from '@mintro/engine';
+import { auditAnalystNote, describeNoteWarning, STATE_LABEL_LOWER, type ScreeningReport } from '@mintro/engine';
 import { describeSend, isSendPending, type SendQueue, type SendSummary } from '../lib/sendQueue.js';
 
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
 export function SendModal({ report, queue, onCancel, onSent }: Props): JSX.Element {
   const [to, setTo] = useState('underwriting@iqwallet.com');
   const [note, setNote] = useState(
-    `${report.counts.fail} failed, ${report.counts.review} for review, ${report.counts.not_evaluable} not evaluable. Captures attached.`,
+    `${report.counts.fail} ${STATE_LABEL_LOWER.fail}, ${report.counts.review} ${STATE_LABEL_LOWER.review}, ${report.counts.not_evaluable} ${STATE_LABEL_LOWER.not_evaluable}. Captures attached.`,
   );
 
   /**

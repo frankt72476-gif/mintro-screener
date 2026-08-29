@@ -509,7 +509,7 @@ function describeAccess(
       usedCredential: false,
       note:
         `${wall.reason}. No screening account was ${escalationAvailable ? 'stored for this merchant' : 'available to this run'}, ` +
-        'so product-surface rules could not be observed and are reported as not evaluable. ' +
+        'so product-surface rules could not be observed and are reported as not observed. ' +
         'Coverage of those rules would be wider with a merchant-supplied login.',
     };
   }

@@ -206,7 +206,7 @@ describe('the collapsed row says what it is hiding', () => {
 
     expect(group.state).toBe('review');
     expect(group.uniform).toBe(false);
-    expect(describeGroup(group)).toBe('Review on 2 of 5 sampled product pages; passed on 3.');
+    expect(describeGroup(group)).toBe('Needs a look on 2 of 5 sampled product pages; met on 3.');
   });
 
   it('shows the finding itself when there is only one', () => {

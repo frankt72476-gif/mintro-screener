@@ -93,6 +93,13 @@ export {
 } from './politeness.js';
 
 export {
+  STATE_LABEL,
+  STATE_LABEL_LOWER,
+  STATE_ORDER,
+  describeCounts,
+} from './stateLabel.js';
+
+export {
   SCAN_PHASES,
   INDETERMINATE_PHASES,
   PHASE_LABEL,

@@ -710,9 +710,15 @@ export function describeVerdict(
 
   if (failures.length === 0) {
     const observed = counts.pass;
+    /*
+      The verdict names states in prose, so it uses the vocabulary the report renders (D-175).
+
+      "Observed to fail" / "queued for review" / "passed" / "could not be evaluated" were four more
+      words for the four states, in a sentence sitting beside badges that used four others.
+    */
     return counts.review > 0
-      ? `No rule was observed to fail. ${counts.review} finding(s) are queued for review and ${observed} passed. ${counts.not_evaluable} could not be evaluated from the crawled surface.`
-      : `No rule was observed to fail. ${observed} passed and ${counts.not_evaluable} could not be evaluated from the crawled surface.`;
+      ? `No requirement was observed unmet. ${counts.review} finding(s) need a look and ${observed} were met. ${counts.not_evaluable} were not observed from the crawled surface.`
+      : `No requirement was observed unmet. ${observed} were met and ${counts.not_evaluable} were not observed from the crawled surface.`;
   }
 
   // Name the categories the failures fall in, then the most severe individual observations.
@@ -721,13 +727,13 @@ export function describeVerdict(
   const detail = named.map((finding) => finding.title.toLowerCase()).join('; ');
 
   const remainder = failures.length - named.length;
-  const andMore = remainder > 0 ? `, and ${remainder} other failure(s)` : '';
+  const andMore = remainder > 0 ? `, and ${remainder} other(s)` : '';
 
   // `failures` is a finding list, so this is a finding count — the next clause in this very
   // sentence already says "finding(s)" for the same kind of number. It read "rule(s)", which
   // is right only while no rule fails on two sampled pages: true of all seven stored runs and
   // not a property of anything (D-170).
-  return `${failures.length} finding(s) were observed to fail, including ${detail}${andMore}. ${counts.review} finding(s) are queued for review. ${counts.not_evaluable} could not be evaluated from the crawled surface.`;
+  return `${failures.length} finding(s) record a requirement not met, including ${detail}${andMore}. ${counts.review} finding(s) need a look. ${counts.not_evaluable} were not observed from the crawled surface.`;
 }
 
 function buildCategories(

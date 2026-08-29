@@ -10732,3 +10732,99 @@ control had to be re-made before it discriminated, and it keeps looking exactly 
 (D-172).
 
 ---
+
+## D-175 — One label set, held in one place
+
+**2026-08-29 · business owner · `docs/report-sections-spec.md` §2**
+
+The state identifiers are unchanged. `fail`, `review`, `pass` and `not_evaluable` stay exactly as
+they are in the data, in the database and in the rule set — D-060 already ruled that an identifier
+is not something an underwriter reads. What changed is every rendered string.
+
+| State | Was | Is |
+|---|---|---|
+| `fail` | `FAIL` / `FAILED` / `Failed` / `failed` | **Not met** |
+| `review` | `REVIEW` / `Needs review` / `For review` / `need review` | **Needs a look** |
+| `pass` | `PASS` / `Passed` / `passed` | **Met** |
+| `not_evaluable` | `N/A` / `Not evaluable` / `not evaluable from the site` | **Not observed** |
+
+*Not met* describes the standard, not the merchant, and instructs nothing (D-001). *Needs fixing*
+was rejected: warmer, and a step past observing — it tells the merchant what to do.
+
+### The vocabulary was in five places, which is why this was worth doing properly
+
+The relabelling was the occasion. The defect was that the four states were spelled out
+independently in **five** locations, each read by a different surface:
+
+- `apps/web/src/lib/format.ts` — `STATE_LABEL`, read by the row badge, the group badge and the tick
+  strip's tooltip
+- `ReportView.tsx` — the tick-strip **legend**, its own four words
+- `ReportView.tsx` — the filter **chips**, a third set
+- `apps/web/src/lib/grouping.ts` — `OUTCOME_WORD`, for the distribution sentence, a fourth
+- `apps/worker/src/send.ts` — the notification email, hand-interpolated, a fifth
+
+Changing any one of them left the other four saying "failed". A label set has to survive exactly
+that, so it is now a constant rather than a search: `packages/engine/src/stateLabel.ts`, exported
+from **both** `index.ts` and `browser.ts` (D-172), read by the worker's email and the browser's
+report alike. `STATE_LABEL_LOWER` is derived, not written out a second time — a second literal
+table is how the legend and the chips came to disagree in the first place.
+
+The report view and the PDF share this automatically. They are one component (D-167), so there was
+never a second surface to change.
+
+### The surfaces
+
+Badges, the verdict banner, the tick-strip legend, filter chips, section headings, the distribution
+sentence, the blocking panel's count line, the assembled verdict, the send modal's default note, the
+notification email, and two worker-side finding sentences that said *"reported as not evaluable"*.
+
+The attestation section and the comment page name no state at all and did not change — the
+attestation section is asserted to name none of them, which is the point of it.
+
+### The red badge is gone with the word
+
+`{failed} FAILED` was a red badge announcing a verdict Mintro does not reach. It now reads
+`{failed} not met`, in the vocabulary the rest of the report uses.
+
+One CSS change was required rather than chosen: `.state` widened from `82px` to `96px`, because
+"Needs a look" and "Not observed" are twelve characters and clipped at the old width. **The palette
+is untouched.** Three tone changes are proposed and not taken — dropping `text-transform: uppercase`,
+demoting `fail` from full-saturation rose to the weight `review` carries, and dropping the column
+from `font-weight: 700` to `600` so the state stops out-weighing the finding title beside it.
+
+### Immutability shows through, and it will look like a bug
+
+**A run written before this change keeps its old verdict sentence.** Runs are immutable (D-002) and
+`verdict` is composed at assembly and stored, so `assembleReport` writing new prose today does
+nothing for a report written yesterday.
+
+The visible result on every stored run:
+
+    badges, legend, chips, headings   Not met · Needs a look · Met · Not observed
+    verdict band, same page           "3 rule(s) were observed to fail … 11 finding(s) are
+                                       queued for review. 22 could not be evaluated …"
+
+All seven reference runs are in this state. It is not a rendering fault and must not be fixed by
+rewriting stored verdicts — a run records what was observed and how it was described at the time,
+and editing that to match today's vocabulary is precisely what D-002 forbids. It resolves for each
+merchant on their next scan, and the mixed state is worth expecting rather than debugging, which is
+why it is also noted in `docs/STATUS.md`.
+
+The same holds for the two worker-side finding sentences: stored findings keep *"reported as not
+evaluable"*, new ones say *"not observed"*.
+
+### Two guards were re-pointed, and neither had failed
+
+`attestationSection.test.ts` asserted the section uses none of `pass / fail / review / not
+evaluable`. After the relabelling it would have gone on guarding vocabulary nothing renders —
+passing because it was looking for the wrong thing. It reads `STATE_LABEL` now, with word
+boundaries, because "met" is a substring of ordinary English.
+
+`copy.test.ts` asserted the email subject matches no `/fail|review|pass|evaluable/i`. Same shape,
+same fix.
+
+Neither showed up as a failure. Fourteen tests did fail and were updated to read the constant rather
+than restate the words; these two are the ones that would have gone quiet instead, and they are the
+reason this section exists.
+
+---

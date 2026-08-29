@@ -20,6 +20,21 @@ and the received document verified against what the merchant actually did.
 | **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to production 2026-08-24, frontend deployed behind it, verified 13/13. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
 | **Retention** | **P0 through P7 built** (D-130, D-132). The clock starts, the gate refuses, the export is queued and built and reconciled against the database, verification checks every member, the purge is planned and refused before it is ever run, and a purged package's report says so in the masthead. Migrations `0035`–`0043`, all on production; the panel is live. The staged archive is discarded on a verified copy and swept from the bucket after a day, and the download link is nulled once it lapses. **Nobody holds `purge_approver`, so no purge can be approved**, and the executor has never run outside a dry run. |
 
+### Expect one thing to look wrong on any run screened before 2026-08-29
+
+The four states are rendered as **Not met · Needs a look · Met · Not observed** (D-175). The
+identifiers in the data are unchanged — `fail`, `review`, `pass`, `not_evaluable` — and only the
+strings a reader sees moved.
+
+**A run written before that change keeps its old verdict sentence**, because `verdict` is composed
+at assembly and stored, and runs are immutable (D-002). So an older report shows the new badges
+around a verdict band still reading *"3 rule(s) were observed to fail … 11 finding(s) are queued for
+review"*. All seven reference runs are in this state.
+
+That is correct, not a rendering fault, and it must not be fixed by rewriting stored verdicts — a
+run records what was observed and how it was described at the time. It resolves for each merchant on
+their next scan.
+
 ### What "verified" means here, because it is not the usual thing
 
 Not that the tests pass. The checks compare **two independent sources**: what the merchant did, read

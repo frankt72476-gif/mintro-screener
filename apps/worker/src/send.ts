@@ -12,7 +12,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { auditAnalystNote, type ScreeningReport } from '@mintro/engine';
+import { auditAnalystNote, describeCounts, type ScreeningReport } from '@mintro/engine';
 import { REPORT_CONTACT_LINE } from './contactLine.js';
 
 /** A row in the `sends` table (docs/ARCHITECTURE.md § Data model). */
@@ -298,7 +298,9 @@ export function bodyFor(report: ScreeningReport, note: string): string {
     `Rule set:  v${report.rulesetVersion}, effective ${report.rulesetEffective}`,
     `Completed: ${report.finishedAt}`,
     '',
-    `${counts.fail} failed · ${counts.review} for review · ${counts.pass} passed · ${counts.not_evaluable} not evaluable`,
+    // Built from the same constant the report renders, never spelled here (D-175). This line and
+    // the document it announces named the four states in different words for as long as both existed.
+    describeCounts(counts),
     `${coverage.evaluable} of ${coverage.total} findings were evaluable from this crawl.`,
     coverage.notReachable > 0
       ? `${coverage.notReachable} require a surface no crawl reaches and are reported as not evaluable.`

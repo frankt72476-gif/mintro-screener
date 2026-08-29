@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
-import { distinctRuleCount, type ScreeningReport } from '@mintro/engine';
+import { distinctRuleCount, STATE_LABEL_LOWER, type ScreeningReport } from '@mintro/engine';
 import { ReportView } from '../src/components/ReportView.js';
 
 const access = { description: 'none needed for markup', urlFor: async () => null };
@@ -81,10 +81,15 @@ describe('the badge and the legend cannot disagree', () => {
    */
   it.each(RUNS)('%s: one number, rendered twice', (_label, report) => {
     const rendered = text(report);
-    expect(rendered).toContain(`${report.counts.fail} FAILED`);
-    expect(rendered).toContain(`${report.counts.fail} failed`);
+    /*
+      Badge and legend both render `<count> not met`, so the assertion is that it appears **twice**
+      rather than that two different strings each appear once — which is what it checked while the
+      badge shouted `3 FAILED` and the legend said `3 failed` (D-175).
+    */
+    const phrase = `${report.counts.fail} ${STATE_LABEL_LOWER.fail}`;
+    expect(rendered.split(phrase).length - 1).toBeGreaterThanOrEqual(2);
     if (report.blocking !== undefined && report.blocking.declared !== report.counts.fail) {
-      expect(rendered).not.toContain(`${report.blocking.declared} FAILED`);
+      expect(rendered).not.toContain(`${report.blocking.declared} ${STATE_LABEL_LOWER.fail}`);
     }
   });
 });

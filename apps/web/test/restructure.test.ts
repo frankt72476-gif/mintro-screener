@@ -174,7 +174,7 @@ describe('the distribution is never flattened to the worst state', () => {
     // The badge sorts and scans on the worst state.
     expect(g.state).toBe('review');
     // The sentence carries what actually happened.
-    expect(describeGroup(g)).toBe('Review on 3 of 5 sampled product pages; passed on 2.');
+    expect(describeGroup(g)).toBe('Needs a look on 3 of 5 sampled product pages; met on 2.');
   });
 
   it('5b29036d: a rule split between review and not-observed keeps both', () => {

@@ -85,6 +85,6 @@ export async function requestAssistedSignIn(request: AssistedRequest): Promise<A
     session: NO_SESSION,
     unavailable:
       `assisted sign-in is designed but not built (${request.reason}). ` +
-      'The run continued unauthenticated; findings that depend on a session are not evaluable.',
+      'The run continued unauthenticated; findings that depend on a session are not observed.',
   };
 }

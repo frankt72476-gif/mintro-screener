@@ -34,7 +34,7 @@ import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { ParticipationRecord } from './Participation.js';
-import { formatReportDate, rowSentence, stateClass, STATE_LABEL } from '../lib/format.js';
+import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
 
 export type Filter = State | 'all';
 
@@ -532,8 +532,12 @@ function VerdictBanner({ report }: { readonly report: ScreeningReport }): JSX.El
   const failed = report.counts.fail;
   return (
     <div className={`verdict ${failed > 0 ? 'fail' : ''}`}>
+      {/*
+        The word, not an alarm (D-175). It read `{failed} FAILED` — a red badge shouting a verdict
+        Mintro does not reach. It states the count and the label the rest of the report uses.
+      */}
       <span className="v-badge" style={failed === 0 ? { background: 'var(--jade)' } : undefined}>
-        {failed} FAILED
+        {failed} {STATE_LABEL_LOWER.fail}
       </span>
       <span className="v-text" style={failed === 0 ? { color: 'var(--ink-mid)' } : undefined}>
         {report.verdict}
@@ -545,10 +549,12 @@ function VerdictBanner({ report }: { readonly report: ScreeningReport }): JSX.El
 /** The tick strip — one mark per finding, in rule-set order. */
 function TickStrip({ report }: { readonly report: ScreeningReport }): JSX.Element {
   const legend: readonly { readonly state: State; readonly label: string; readonly swatch: string }[] = [
-    { state: 'fail', label: 'failed', swatch: 'var(--rose)' },
-    { state: 'review', label: 'need review', swatch: 'var(--amber)' },
-    { state: 'pass', label: 'passed', swatch: '#B7E7D2' },
-    { state: 'not_evaluable', label: 'not evaluable from the site', swatch: '#DCD8E8' },
+    // Labels read from the shared set, never spelled again here (D-175). Lower case because they
+    // sit mid-sentence after a count: "3 not met".
+    { state: 'fail', label: STATE_LABEL_LOWER.fail, swatch: 'var(--rose)' },
+    { state: 'review', label: STATE_LABEL_LOWER.review, swatch: 'var(--amber)' },
+    { state: 'pass', label: STATE_LABEL_LOWER.pass, swatch: '#B7E7D2' },
+    { state: 'not_evaluable', label: STATE_LABEL_LOWER.not_evaluable, swatch: '#DCD8E8' },
   ];
 
   return (
@@ -595,10 +601,10 @@ function Filters({
 }): JSX.Element {
   const chips: readonly { readonly value: Filter; readonly label: string }[] = [
     { value: 'all', label: 'Everything' },
-    { value: 'fail', label: 'Failed' },
-    { value: 'review', label: 'Needs review' },
-    { value: 'pass', label: 'Passed' },
-    { value: 'not_evaluable', label: 'Not evaluable' },
+    { value: 'fail', label: STATE_LABEL.fail },
+    { value: 'review', label: STATE_LABEL.review },
+    { value: 'pass', label: STATE_LABEL.pass },
+    { value: 'not_evaluable', label: STATE_LABEL.not_evaluable },
   ];
 
   return (

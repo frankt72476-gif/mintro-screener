@@ -12,12 +12,14 @@ export function stateClass(state: State): 'fail' | 'review' | 'pass' | 'na' {
   return state === 'not_evaluable' ? 'na' : state;
 }
 
-export const STATE_LABEL: Record<State, string> = {
-  fail: 'FAIL',
-  review: 'REVIEW',
-  pass: 'PASS',
-  not_evaluable: 'N/A',
-};
+/*
+  The labels live in `@mintro/engine` and are re-exported here (D-175).
+
+  They were `FAIL / REVIEW / PASS / N/A` in this file, and four other places held their own copy of
+  the same vocabulary in different words. The worker's notification email reads the same constant
+  now, so the report and the mail about it cannot name a state differently.
+*/
+export { STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER } from '@mintro/engine';
 
 /** `20 Aug 2026, 10:42 ET`, matching the demo's report header. */
 export function formatReportDate(iso: string): string {

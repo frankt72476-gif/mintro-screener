@@ -24,7 +24,7 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import { invitesComment, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
+import { invitesComment, STATE_LABEL, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
  * The bucket a `not_evaluable` finding belongs to for reading (D-044).
@@ -117,17 +117,17 @@ const COLLAPSIBLE: ReadonlySet<State> = new Set<State>(['pass', 'not_evaluable',
 const ORDER: readonly { state: State; heading: string; lede: string }[] = [
   {
     state: 'fail',
-    heading: 'Failed',
+    heading: STATE_LABEL.fail,
     lede: 'Each observation is listed separately with its own capture, including repeats of the same rule on different pages.',
   },
   {
     state: 'review',
-    heading: 'For review',
+    heading: STATE_LABEL.review,
     lede: 'Observations a person examines. Repeats of one rule are grouped; the count is how many pages are involved.',
   },
   {
     state: 'pass',
-    heading: 'Passed',
+    heading: STATE_LABEL.pass,
     lede: 'Rules the run observed and found satisfied. Grouped by rule.',
   },
 ];
@@ -397,12 +397,13 @@ export function nestCascades(groups: readonly FindingGroup[]): FindingGroup[] {
  * States the count and the pages. It does not summarise the findings — a summary of five
  * observations is a sixth statement nobody observed.
  */
-const OUTCOME_WORD: Record<State, string> = {
-  fail: 'Failed',
-  review: 'Review',
-  not_evaluable: 'Not observed',
-  pass: 'Passed',
-};
+/*
+  The distribution sentence names states in prose, so it reads the shared set (D-175).
+
+  It held its own four words — `Failed / Review / Not observed / Passed` — which is how a surface
+  ends up saying "passed" after every badge has stopped saying it.
+*/
+const OUTCOME_WORD = STATE_LABEL;
 
 export function describeGroup(group: FindingGroup): string {
   // One finding: its own note, unchanged. There is nothing to summarise, and paraphrasing would
