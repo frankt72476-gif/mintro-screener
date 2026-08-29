@@ -11573,3 +11573,156 @@ states it at the point the failure happens, or the distinction does not exist an
 to give the producer somewhere to say so.
 
 ---
+
+## D-182 — A Layer 3 surface that was not reached says what was tried, and a status check comes first
+
+**2026-08-29 · engineering · four items, one change: evidence, kind, visibility, cost**
+
+Four things, and the order is the argument. The cheap probe is the cost item and the least
+important; it is here because the fact it produces — *did the origin answer* — is what the other
+three were missing.
+
+### 1. Seventeen findings asserted an absence with nothing behind it
+
+Across the seven reference runs, seventeen `not_exposed` findings — `GATE-004`, `GATE-005`,
+`GATE-007`, `FULF-001`, `COMM-001` — reported that a merchant did not publish a page and carried
+**zero attempts**. The report said *"no page was found at the shipping paths tried"* and attached no
+record of which paths, or what any of them returned.
+
+The attempts existed. `findDocument` pushed them into a run-wide list feeding `describeObstruction`,
+a run-level summary; they never reached the finding. So a reader auditing one row had the sentence
+and nothing to check it against, which is precisely what hard constraint 3 forbids: a
+`not_evaluable` finding must evidence *why*, with the requests attempted and what they returned.
+
+`Layer3Discovery` and `Layer3Input` now carry `Located<PageContext>` rather than
+`PageContext | undefined`. **`Located<T>` rather than a new record**, because it already holds the
+attempts and, since D-181, the `obstructed` flag — and two shapes for one relation are two things
+free to disagree.
+
+What that looks like on a real run, comopeptides `FULF-001`:
+
+    before   not_exposed · "no shipping policy was reached: no page was found at the shipping
+             paths tried, and no link on the homepage pointed to one"
+             evidence: none
+
+    after    not_exposed · "no shipping policy was reached: 1 of the 7 path(s) tried was served
+             but could not be read as one"
+             200  /aboutcomopeptides/#how-quickly   redirected away from what was asked for
+             404  /pages/shipping-policy
+             404  /pages/shipping
+             404  /shipping-policy
+             404  /shipping
+             404  /shipping-returns
+             404  /delivery
+
+The finding claims no capture it does not have: `evidenceKey` and `sourceSha256` stay empty, because
+nothing was rendered. The requests are the evidence (D-012).
+
+### 2. The kind, and the third of D-181's three sites closed
+
+`layer3.ts:249` was an unconditional `not_exposed` — one of the three sites D-181's sweep listed as
+structurally unable to decide, because the producer handed back a bare `undefined` with no field
+saying which party failed. The probe supplies the missing fact, and the mapping is:
+
+| the probe said | the render | kind | why |
+|---|---|---|---|
+| non-2xx on every candidate | not attempted | `not_exposed` | the origin's own answer about those paths |
+| 2xx, then the render failed | failed | `not_retrieved` | ours — the merchant served a page we could not read |
+| never completed on any candidate | attempted anyway | `not_exposed` | nothing was learned either way; no flag is raised on ignorance |
+| 2xx, read, and it is not the document | succeeded | `not_exposed` | read and judged on content, which is an observation |
+
+Row two is the one that mattered. **A probe holding a 200 for a URL, in a report stating the
+merchant did not carry that page, is holding evidence against what it prints.**
+
+Row three is deliberately not `not_retrieved`. An undecided probe followed by a failed render tells
+us nothing about whose failure it was, and D-181's rule is that a kind is *read* from a signal, not
+inferred — including not inferred from the absence of one.
+
+### 3. An undecided probe is recorded where it can be read
+
+`undecided` renders. That is the safe behaviour and also the invisible one: a probe layer failing on
+every request produces exactly the run it produced before the probe existed — same findings, same
+cost — and nothing would say so.
+
+**The first cut wrote the count with `say()`, the progress callback.** The scan CLI does not print
+it and it reaches no report, so the record went nowhere. Caught by looking for it in a run log and
+not finding it. It now goes into the run's `truncations`, which the report renders, and the test
+asserts the destination rather than the wording.
+
+Silent when every candidate was decided. A permanent "0 undecided" is noise on every run where
+nothing went wrong.
+
+### 4. What "looks like a document" means, in code
+
+**The final status is in `[200, 300)`, after redirects. That is the whole predicate.**
+
+Deliberately the weakest useful test, because the cost of being wrong is asymmetric: a candidate
+wrongly rejected is a surface the merchant published that the report says they did not — the false
+`not_exposed` hard constraint 2 calls the worst bug in this system — while a candidate wrongly
+accepted costs one render, which is what happened before. So it never decides a surface is *absent*;
+it decides only that the origin answered with an error status, and `establishDocument` still runs
+every guard on everything that gets through. **The probe removes renders. It removes no checks.**
+
+`GET`, not `HEAD`: a meaningful minority of storefronts answer `HEAD` with 404 or 405 on paths they
+serve, and a rejection is only sound if it is the origin's real answer about that path.
+
+A themed 404 answering `200` passes and is rendered. That is intended, not a gap — it is caught
+downstream on content, where the question can be answered.
+
+#### The fingerprint, declined — recorded because the next person will want it
+
+Content-length against a known-404 fingerprint **works**: D-180 used exactly this signal to date
+deployed code, and on comopeptides every rejected candidate returned a byte-identical ~28,950-byte
+themed 404. One request to a deliberately-absent path would fingerprint the site and let every later
+candidate be rejected on size alone, including the themed-404 case the status check misses.
+
+Declined because **it decides absence from a heuristic**, and this predicate must not:
+
+- A real page whose length falls near the 404's is rejected. A themed 404 is the site's chrome plus
+  a short message — which also describes a thin but genuine shipping policy. The collision is the
+  expected case for exactly the short documents most likely to be missed.
+- It fails silently and in the worst direction: a wrongly rejected surface produces a confident
+  `not_exposed` carrying a clean 200, a report asserting an absence against its own evidence.
+- Any tolerance is a guess. A cart count, a CSRF token or a timestamp moves the length by a few
+  bytes, so exact matching is too strict and a window is a number nobody can justify.
+- It spends a request per origin to build the fingerprint, and only pays off on sites already quick
+  to answer.
+
+The status predicate has none of these: the origin's status is the origin's own statement about
+whether a path exists, not an inference from one. **If a later change wants the fingerprint, it
+belongs after the render as a corroborating signal inside `establishDocument`, never as a gate in
+front of one.**
+
+### Measured, on comopeptides only
+
+Sportstechnologylabs varies 3.4× on identical code and cannot measure our own changes (D-180).
+Local timings, which run roughly 4× the Fly figures — proportions transfer, totals do not:
+
+| | before | after |
+|---|---|---|
+| elapsed | 113s, 111s, 110s | 75s, 75s, 74s |
+| DOM snapshots | 30 | 10 |
+| artifacts stored | 42 (3.6MB) | 22 (3.1MB) |
+| findings | 3 fail · 13 review · 25 pass · 19 not evaluable | identical |
+
+**33% off the run, twenty renders removed.** Screenshots are unchanged at 8 — `keepCapture` (D-155)
+had already stopped capturing rejected candidates, so what is saved here is the navigation and idle
+wait, which is the part that was still being paid.
+
+### Acquisition is unchanged, and that is the claim that needed proving
+
+Comparing what every finding *says* and what it *cites*: **71 findings before, 71 after, 2 rows
+differ** — `FULF-001` and `COMM-001`, the two unreached surfaces, which gained the attempts they
+were missing. Everything else is identical.
+
+The two accepted surfaces resolve identically: the sign-up form at `/my-account/` (`GATE-004`,
+`GATE-005`) and the terms document at `/termsandconditions/` (`GATE-007`) — same state, same note,
+same source URL, same artifact.
+
+**Run-to-run controls were taken first, and they earn the comparison.** before-vs-before and
+after-vs-after both differ in 0 rows, so the 2 are the change and not noise. One thing the controls
+caught: `sourceSha256` differs on *every* pair, old-vs-old included — the homepage hash moves
+between fetches on unchanged code, because the storefront serves something per-request. Without the
+control that would have read as evidence drift caused by this change.
+
+---

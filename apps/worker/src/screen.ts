@@ -306,20 +306,22 @@ export async function screenStorefront(
   */
   progress.surfaceRead('the homepage');
   if (discovered.signup.found) progress.surfaceRead('the sign-up form');
-  if (discovered.terms !== undefined) progress.surfaceRead('the terms document');
-  if (discovered.shipping !== undefined) progress.surfaceRead('the shipping policy');
-  if (discovered.faq !== undefined) progress.surfaceRead('the FAQ');
-  if (discovered.payment !== undefined) progress.surfaceRead('the payment or refund policy');
+  if (discovered.terms.located) progress.surfaceRead('the terms document');
+  if (discovered.shipping.located) progress.surfaceRead('the shipping policy');
+  if (discovered.faq.located) progress.surfaceRead('the FAQ');
+  if (discovered.payment.located) progress.surfaceRead('the payment or refund policy');
   artifacts.push(...discovered.artifacts);
 
   const layer3 = runLayer3(
     {
       signup: discovered.signup,
       homepage: rendered.page,
-      ...(discovered.terms === undefined ? {} : { terms: discovered.terms }),
-      ...(discovered.shipping === undefined ? {} : { shipping: discovered.shipping }),
-      ...(discovered.faq === undefined ? {} : { faq: discovered.faq }),
-      ...(discovered.payment === undefined ? {} : { payment: discovered.payment }),
+      // Passed whole, located or not: an unreached surface carries the requests its finding needs
+      // to evidence why it was not reached (D-182).
+      terms: discovered.terms,
+      shipping: discovered.shipping,
+      faq: discovered.faq,
+      payment: discovered.payment,
     },
     ruleset,
   );
@@ -390,7 +392,11 @@ export async function screenStorefront(
       startedAt,
       finishedAt: new Date().toISOString(),
       findings,
-      truncations: [...layer0.truncations, ...(collapse === null ? [] : [collapse])],
+      truncations: [
+        ...layer0.truncations,
+        ...(collapse === null ? [] : [collapse]),
+        ...probeUndecided(discovered.probe),
+      ],
       politeness: describeCrawlDelay(delay),
       /*
         What the run asked for and did not get (D-136).
@@ -520,4 +526,24 @@ function describeAccess(
     usedCredential: false,
     note: wall.reason.charAt(0).toUpperCase() + wall.reason.slice(1) + '.',
   };
+}
+
+/**
+ * A note on the run when the cheap Layer 3 probe could not decide (D-182).
+ *
+ * `undecided` renders, which is the safe behaviour and also the invisible one: a probe layer
+ * failing on every request produces exactly the run it produced before the probe existed — same
+ * findings, same cost — and nothing would say so. It goes in `truncations` because that is the
+ * run-level record of what limited a scan, and it reaches the report; a progress line would not.
+ *
+ * Silent when the probe decided every candidate, which is the normal case. A permanent "0 probes
+ * were undecided" is noise on every run that matters (the reasoning at `report.ts:251`).
+ */
+export function probeUndecided(probe: { readonly undecided: number; readonly total: number }): string[] {
+  if (probe.undecided === 0) return [];
+  return [
+    `the cheap path check could not reach a verdict on ${probe.undecided} of ${probe.total} ` +
+      `Layer 3 candidate(s); each was rendered in full rather than skipped, so no surface was ` +
+      `missed, but the check was not doing its work on this run`,
+  ];
 }

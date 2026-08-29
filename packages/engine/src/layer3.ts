@@ -28,6 +28,7 @@ import { checkPaymentTerms, type PublicSurface } from './checks/payment.js';
 import { checkDomAssert } from './checks/domAssert.js';
 import { checkTextCooccurrence } from './checks/textCooccurrence.js';
 import { checkTextMatch } from './checks/textMatch.js';
+import type { Located } from './surface.js';
 import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
 import { RENDERED } from './checks/pageEvidence.js';
 import type { PageContext, SignupForm } from './page.js';
@@ -52,8 +53,15 @@ const BUILT_SURFACES = new Set([
 export interface Layer3Input {
   /** The sign-up form, located structurally by the worker. */
   readonly signup: SignupForm;
-  /** The terms document as a rendered page, or undefined when none was reached. */
-  readonly terms?: PageContext;
+  /**
+   * The terms document, or the record of what was tried looking for it (D-182).
+   *
+   * `Located<PageContext>` rather than `PageContext | undefined`, because a finding about a surface
+   * that was not reached has to carry the requests attempted — hard constraint 3 — and `undefined`
+   * carries nothing. Seventeen `not_exposed` findings across the reference corpus asserted an
+   * absence with zero attempts behind them, which is this type in its previous form.
+   */
+  readonly terms: Located<PageContext>;
   /**
    * The rendered homepage.
    *
@@ -62,10 +70,10 @@ export interface Layer3Input {
    * but respecting it does not require loading the page twice.
    */
   readonly homepage?: PageContext;
-  readonly shipping?: PageContext;
-  readonly faq?: PageContext;
-  /** A payment-methods or refund policy page, when the merchant publishes one. */
-  readonly payment?: PageContext;
+  readonly shipping: Located<PageContext>;
+  readonly faq: Located<PageContext>;
+  /** A payment-methods or refund policy page, or what was tried looking for one. */
+  readonly payment: Located<PageContext>;
 }
 
 export interface Layer3Run {
@@ -123,10 +131,8 @@ export function runLayer3(input: Layer3Input, ruleset: Ruleset): Layer3Run {
     }
 
     if (surface === 'faq' && rule.type === 'text_cooccurrence') {
-      if (input.faq === undefined) {
-        return notEvaluable(rule, FAQ_REASON, RENDERED, 'not_exposed');
-      }
-      return checkTextCooccurrence(rule, input.faq);
+      if (!input.faq.located) return unreachedSurface(rule, input.faq);
+      return checkTextCooccurrence(rule, input.faq.value);
     }
 
     // PAY-001: the footer plus every public policy page that was reached (D-049).
@@ -198,21 +204,23 @@ function publicSurfaces(input: Layer3Input): readonly PublicSurface[] {
     });
   }
 
-  if (input.terms !== undefined) {
+  if (input.terms.located) {
     surfaces.push({
-      label: `the terms document (${input.terms.finalUrl})`,
-      text: input.terms.text,
-      url: input.terms.finalUrl,
+      label: `the terms document (${input.terms.value.finalUrl})`,
+      text: input.terms.value.text,
+      url: input.terms.value.finalUrl,
       required: 'terms',
     });
   }
 
-  for (const [label, page] of [
+  for (const [label, surface] of [
     ['the shipping policy', input.shipping],
     ['the FAQ', input.faq],
     ['the payment or refund policy', input.payment],
   ] as const) {
-    if (page !== undefined) surfaces.push({ label: `${label} (${page.finalUrl})`, text: page.text, url: page.finalUrl });
+    if (!surface.located) continue;
+    const page = surface.value;
+    surfaces.push({ label: `${label} (${page.finalUrl})`, text: page.text, url: page.finalUrl });
   }
 
   return surfaces;
@@ -235,17 +243,52 @@ const FAQ_REASON =
  *
  * Reuses `checkTextMatch` unchanged. These are rendered pages like any other, and a second text
  * matcher per surface would be a second place for the same question to be answered differently.
- *
- * A document that could not be reached is `not_exposed` — the check ran and the site did not
- * present the document, which is a fact about the merchant rather than about Mintro (D-044). It
- * is never a `pass`: absence of a document is not absence of what the document should have said.
  */
 function documentFinding(
   rule: RuleOfType<'text_match'>,
-  page: PageContext | undefined,
+  surface: Located<PageContext>,
   _label: string,
-  reason: string,
+  _reason: string,
 ): Finding {
-  if (page === undefined) return notEvaluable(rule, reason, RENDERED, 'not_exposed');
-  return checkTextMatch(rule, page);
+  if (!surface.located) return unreachedSurface(rule, surface);
+  return checkTextMatch(rule, surface.value);
+}
+
+/**
+ * A surface the worker looked for and did not establish (D-182).
+ *
+ * **Never a `pass`**: the absence of a document is not the absence of what the document should
+ * have said. What changed is the other two things this finding owes a reader.
+ *
+ * **The kind is read, not assumed.** This was an unconditional `not_exposed` — one of the three
+ * sites D-181's sweep listed as structurally unable to decide, because the producer handed back a
+ * bare `undefined` with no field saying which party failed. `Located.obstructed` is that field:
+ * the worker sets it where a candidate answered and the render then failed, which is our
+ * acquisition failing on a page the merchant demonstrably served (D-156). A report that says the
+ * merchant did not carry a page, while holding a 200 for it, is contradicting its own evidence.
+ *
+ * **The attempts are attached.** Every `not_evaluable` finding must evidence *why*, with the
+ * requests made and what they returned (hard constraint 3). Seventeen findings across the
+ * reference corpus stated an absence and carried nothing at all — the attempts existed, but they
+ * went into the run-level obstruction summary and never onto the finding. A reader auditing one
+ * `not_exposed` row had no way to see which paths were tried.
+ */
+function unreachedSurface(rule: Rule, surface: Located<PageContext> & { located: false }): Finding {
+  return notEvaluable(
+    rule,
+    surface.reason,
+    RENDERED,
+    surface.obstructed === true ? 'not_retrieved' : 'not_exposed',
+    [
+      {
+        kind: RENDERED,
+        // Nothing was captured, and nothing is claimed to have been. The requests are the evidence.
+        sourceUrl: surface.attempts[0]?.url ?? '',
+        sourceSha256: '',
+        evidenceKey: '',
+        capturedAt: new Date().toISOString(),
+        attempts: surface.attempts,
+      },
+    ],
+  );
 }

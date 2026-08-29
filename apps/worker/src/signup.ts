@@ -29,12 +29,14 @@ import type { Browser } from 'playwright';
 import type {
   EvidenceArtifact,
   FetchAttempt,
+  Located,
   Pacer,
   PageContext,
   SignupForm,
   SurfaceSpec,
 } from '@mintro/engine';
-import { NO_SIGNUP_FORM } from '@mintro/engine';
+import { located, NO_SIGNUP_FORM, unreachable } from '@mintro/engine';
+import { probeSurface } from './surfaceProbe.js';
 import { establishDocument } from './locate.js';
 import { PROBE_IDLE_MS, renderPage } from './render.js';
 
@@ -127,13 +129,33 @@ export const MAX_LINKED_CANDIDATES = 4;
 
 export interface Layer3Discovery {
   readonly signup: SignupForm;
-  readonly terms?: PageContext;
-  readonly shipping?: PageContext;
-  readonly faq?: PageContext;
-  readonly payment?: PageContext;
-  /** Every navigation made looking for either, and what it returned. */
+  /*
+    `Located<PageContext>` rather than `PageContext | undefined` (D-182).
+
+    A surface that was not established has to carry *what was tried and what each candidate
+    returned*, or the finding it produces asserts an absence with nothing behind it — which is what
+    seventeen `not_exposed` findings across the reference corpus did, every one of them with zero
+    attempts on its evidence. Hard constraint 3 requires the requests attempted.
+
+    Reusing `Located<T>` rather than inventing a parallel record is deliberate: it already carries
+    the attempts and, since D-181, the `obstructed` flag that says which party failed. Two shapes
+    for one relation are two things free to disagree.
+  */
+  readonly terms: Located<PageContext>;
+  readonly shipping: Located<PageContext>;
+  readonly faq: Located<PageContext>;
+  readonly payment: Located<PageContext>;
+  /** Every navigation made looking for any of them, and what it returned. */
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
+  /**
+   * Candidates the cheap probe could not decide on, and how many it saw in total (D-182).
+   *
+   * Carried out rather than swallowed. `undecided` renders, so a probe layer failing on every
+   * request behaves exactly like one where every path answered — same findings, same cost — and
+   * would be invisible without a count.
+   */
+  readonly probe: { readonly undecided: number; readonly total: number };
 }
 
 export interface DiscoverOptions {
@@ -196,27 +218,28 @@ export async function discoverLayer3(
   const signup = await findSignupForm(browser, origin, options, attempts, artifacts, say);
   done += 1;
 
-  const found = new Map<string, PageContext | undefined>();
+  const probe = { undecided: 0, total: 0 };
+  const found = new Map<string, Located<PageContext>>();
   for (const what of documents) {
     step(what.label);
-    found.set(what.label, await findDocument(browser, origin, options, attempts, artifacts, say, what));
+    found.set(what.label, await findDocument(browser, origin, options, attempts, artifacts, say, what, probe));
     done += 1;
   }
   say('policy pages read', { done, total });
 
-  const terms = found.get('terms document');
-  const shipping = found.get('shipping policy');
-  const faq = found.get('FAQ');
-  const payment = found.get('payment or refund policy');
+
+  const surface = (label: string): Located<PageContext> =>
+    found.get(label) ?? unreachable(`the ${label} was not looked for`, []);
 
   return {
     signup,
-    ...(terms === undefined ? {} : { terms }),
-    ...(shipping === undefined ? {} : { shipping }),
-    ...(faq === undefined ? {} : { faq }),
-    ...(payment === undefined ? {} : { payment }),
+    terms: surface('terms document'),
+    shipping: surface('shipping policy'),
+    faq: surface('FAQ'),
+    payment: surface('payment or refund policy'),
     attempts,
     artifacts,
+    probe,
   };
 }
 
@@ -335,7 +358,24 @@ async function findDocument(
   artifacts: EvidenceArtifact[],
   say: (line: string) => void,
   what: { readonly label: string; readonly paths: readonly string[]; readonly linkHints: readonly string[] },
-): Promise<PageContext | undefined> {
+  probeTally: { undecided: number; total: number },
+): Promise<Located<PageContext>> {
+  /*
+    This surface's own attempts, kept separately from the run-wide list (D-182).
+
+    The shared `attempts` array feeds `describeObstruction`, which is a run-level summary. A
+    *finding* needs the requests made for *its* surface — six URLs, each with its status — and
+    filtering the run-wide list by surface afterwards would be a second derivation of a fact this
+    loop already knows.
+  */
+  const mine: FetchAttempt[] = [];
+  const record = (attempt: FetchAttempt): void => {
+    mine.push(attempt);
+    attempts.push(attempt);
+  };
+
+  /** Set when a candidate answered but could not be turned into a page we could read (D-156). */
+  let obstructed = false;
   /*
     Every guard now lives in `establishDocument` (D-054).
 
@@ -369,6 +409,30 @@ async function findDocument(
     if (!url.startsWith(origin)) continue;
 
     /*
+      Ask the origin before spending a render (D-182).
+
+      Most candidates here are guesses at conventional paths and most are wrong; on comopeptides 22
+      of 24 renders were discarded. A status-only request answers "does this path exist" for a
+      fraction of the cost, and `probeSurface` is deliberately unable to conclude anything else.
+
+      `undecided` renders. The probe observing nothing is not the origin saying a path is absent,
+      and a cheap check must never turn a reachable surface into a miss.
+    */
+    probeTally.total += 1;
+    const probe = await probeSurface(url, { pacer: options.pacer });
+
+    if (probe.verdict === 'rejected') {
+      // The origin's own answer about this path, recorded as the status it actually returned.
+      record({ url, status: probe.status, error: `the origin answered HTTP ${probe.status}` });
+      continue;
+    }
+
+    if (probe.verdict === 'undecided') {
+      probeTally.undecided += 1;
+      say(`  the probe could not decide on ${url} (${probe.error ?? 'no reason given'}); rendering it`);
+    }
+
+    /*
       Rendered as a probe, not as evidence (D-155).
 
       The short idle wait and the deferred capture both follow from what this loop is: a guess at a
@@ -388,19 +452,48 @@ async function findDocument(
 
     const outcome = establishDocument(url, rendered.page, spec, []);
     if (!outcome.located) {
-      attempts.push({
+      const renderFailed = rendered.page.renderError !== undefined;
+
+      /*
+        The probe knew this path answered, and the render then failed (D-156, D-182).
+
+        Holding a 200 for a URL while reporting that the merchant did not carry the page is holding
+        evidence against what the report prints. The surface is `not_retrieved` — ours — and this
+        is the producer-set signal `layer3.ts` was missing when D-181 listed it among the three
+        sites that structurally could not decide.
+
+        Only when the probe actually answered. A candidate the probe could not decide on tells us
+        nothing about whose failure this is, so it does not raise the flag.
+      */
+      if (renderFailed && probe.verdict === 'answered') obstructed = true;
+
+      record({
         url,
-        status: rendered.page.renderError === undefined ? rendered.page.httpStatus : 0,
-        error: outcome.reason,
+        // The probe's status is a real one and survives a failed render, which used to zero it.
+        status: renderFailed ? probe.status : rendered.page.httpStatus,
+        error: renderFailed ? (rendered.page.renderError as string) : outcome.reason,
       });
       continue;
     }
 
-    attempts.push({ url, status: rendered.page.httpStatus });
+    record({ url, status: rendered.page.httpStatus });
     say(`  ${what.label} located at ${outcome.how}`);
-    return outcome.value;
+    return located(outcome.value, outcome.url, outcome.how);
   }
 
   say(`  no ${what.label} reached`);
-  return undefined;
+  return unreachable(
+    `no ${what.label} was reached: ${describeCandidates(mine)}`,
+    mine,
+    obstructed,
+  );
+}
+
+/** What the loop tried, in one clause, for a reason a reader can check against the attempts. */
+function describeCandidates(attempts: readonly FetchAttempt[]): string {
+  if (attempts.length === 0) return 'no candidate paths were available to try';
+  const answered = attempts.filter((a) => a.status >= 200 && a.status < 300).length;
+  return answered === 0
+    ? `none of the ${attempts.length} path(s) tried was served`
+    : `${answered} of the ${attempts.length} path(s) tried was served but could not be read as one`;
 }
