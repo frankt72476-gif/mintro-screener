@@ -14072,3 +14072,60 @@ The question they were already answered for shows the answer, who recorded it, a
 
 Shown rather than hidden: they are entitled to see what was recorded in their name and to disagree
 with it.
+
+---
+
+## D-213 — A read that fails must never render as the absence of what it failed to read
+
+*2026-08-30.*
+
+Past reports rendered empty after bc34363 while thirty-seven complete runs sat in the database.
+Four faults, of which two were sufficient on their own.
+
+**1 · The embed became ambiguous.** The list query gained `merchant_comments ( count )` for the
+responded flag. Migration 0051 had already given `merchant_comments` a *second* foreign key to
+`runs` — `inherited_from_run`, the inheritance provenance — so PostgREST could not tell which
+relationship was meant and refused the whole request with `PGRST201`. Not an RLS problem and not a
+role problem: the ambiguous form fails for `service_role` and `anon` alike, 100% of the time. Fixed
+by naming it: `merchant_comments!merchant_comments_run_id_fkey ( count )`. Against the live
+database the named form returns 37 rows for `service_role` and 0 for `anon`, which is RLS working.
+
+**2 · The failure was swallowed.** `list()` returned `[]` on error, and the pane rendered *"Nothing
+screened yet"*. That sentence tells an operator their work is gone. It is also the third instance of
+one class — D-036 for a merchant's commentary, D-200 for the eye test — so the rule is recorded here
+in general form:
+
+> **A read that fails must never render as the absence of what it failed to read.**
+
+The fix is the return type, not the copy. `RunList` and `RequestList` are now
+`{ ok: true, … } | { ok: false, error }`; a shape that cannot express failure leaves every caller to
+invent one, and one of them will. Both surfaces render the failure with the database's own message
+attached, because the `PGRST201` hint named the two candidate relationships — the fix was in the
+error the old code discarded.
+
+The same edit fixes `list()`'s `flatMap` silently dropping a run whose `report` is null. It fires on
+nothing today; a list that is quietly short is a list nobody can check, so the count is stated.
+
+**3 · Nothing held the query against the schema.** 2691 tests passed over a query that failed every
+time it was issued: the schema tests talk to Postgres and never see relationship resolution, the web
+tests render components and never issue a query. `apps/worker/test/schema/embeds.test.ts` reads the
+embeds out of the app's own source and asks `pg_constraint` how many relationships each one has. It
+catches the *next* foreign key added to an embedded table, which is the only version worth having —
+the bug was not that someone wrote a bad query, it was that a good query stopped being good.
+
+**4 · The pane was hidden.** The same commit wrapped `PastReports` in `<div className="pane">`,
+nested inside the `<section className="pane on">` the app already renders. `.pane{display:none}`
+applied to the inner one, which no `.on` ever reaches, so the list, the empty state *and* the
+failure sentence were invisible whatever the query returned. `.pane-head`, invented in the same
+edit, has no CSS at all.
+
+This one is worth its own note. It was found by screenshotting the fixed component and getting a
+blank page — not by the diagnosis, which went to the query and stopped there, and not by any test,
+because every test asserts on markup that a stylesheet later hides. **A fix verified only against
+the data is not verified.** The guard added with it compares the root element's classes and checks
+that every class the component emits exists in the stylesheet.
+
+Its own first version asserted `.not.toMatch(/\bpane\b/)` and passed over the exact markup it exists
+to reject: the word boundaries reached the file as literal control characters, so the pattern
+matched nothing. Replaced with a plain string comparison. A guard that can be mistyped into silence
+is worth less than a plainer one that cannot.

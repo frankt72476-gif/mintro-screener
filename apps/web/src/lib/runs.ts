@@ -41,13 +41,39 @@ export interface RunSummary {
   readonly responded: boolean;
 }
 
+/**
+ * The result of listing runs, with the failure kept rather than flattened (D-213).
+ *
+ * `list()` returned `readonly RunSummary[]` and answered a failed query with `[]`. The list then
+ * rendered *"Nothing screened yet"* — indistinguishable from an empty database, and what every
+ * operator saw for the whole time `merchant_comments ( count )` was ambiguous.
+ *
+ * **A read that fails must never render as the absence of what it failed to read.** Third instance
+ * of the same class: D-036 for a merchant's commentary, D-200 for the eye test, this for the run
+ * list. The return type is where it gets settled, because a shape that cannot express the failure
+ * leaves every caller free to invent one.
+ */
+export type RunList =
+  | {
+      readonly ok: true;
+      readonly runs: readonly RunSummary[];
+      /**
+       * Rows that came back and could not be turned into a summary.
+       *
+       * A run with no stored report has nothing to show, and dropping it silently is the same defect
+       * one row down: the list would be short and say nothing about why. Counted so a surface can.
+       */
+      readonly unreadable: number;
+    }
+  | { readonly ok: false; readonly error: string };
+
 export interface LoadedRun {
   readonly report: ScreeningReport;
   readonly quarantine: string | null;
 }
 
 export interface RunSource {
-  list(): Promise<readonly RunSummary[]>;
+  list(): Promise<RunList>;
   load(runId: string): Promise<LoadedRun | null>;
   readonly description: string;
 }
@@ -62,17 +88,40 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
         .from('runs')
         .select(
           'id, finished_at, report, merchants ( domain ), run_quarantine ( reason ), ' +
-            'merchant_comments ( count )',
+            /*
+              Named relationship, not a bare table name (D-213).
+
+              `merchant_comments` has two foreign keys to `runs` since 0051 gave it
+              `inherited_from_run`, so `merchant_comments ( count )` is ambiguous and PostgREST
+              refuses the whole request with PGRST201 — for every role, on every call. The one this
+              wants is the run the comment was written on, not the run it was carried forward from.
+            */
+            'merchant_comments!merchant_comments_run_id_fkey ( count )',
         )
         .eq('status', 'complete')
         .order('started_at', { ascending: false })
         .limit(100);
 
-      if (error !== null || data === null) return [];
+      /*
+        The failure travels out (D-213).
 
-      return (data as unknown as RunRow[]).flatMap((row) => {
+        PostgREST answered PGRST201 with the fix in its own hint, and this line used to throw it away
+        and return `[]`. The message is carried so a surface can print it: a reader who is told *"the
+        run list could not be read"* looks for a cause, and one who is told *"nothing screened yet"*
+        concludes their work is gone.
+      */
+      if (error !== null) return { ok: false, error: error.message };
+      if (data === null) return { ok: false, error: 'the run list came back empty-handed' };
+
+      let unreadable = 0;
+      const runs = (data as unknown as RunRow[]).flatMap((row) => {
         const report = row.report;
-        if (report === null) return [];
+        if (report === null) {
+          // Counted, not dropped. A short list that says nothing about why is the same defect one
+          // row down from the one above.
+          unreadable += 1;
+          return [];
+        }
         return [
           {
             runId: row.id,
@@ -84,6 +133,8 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
           },
         ];
       });
+
+      return { ok: true, runs, unreadable };
     },
 
     async load(runId) {
@@ -140,7 +191,9 @@ export function createLocalRunSource(): RunSource {
         .then((response) => (response.ok ? (response.json() as Promise<unknown>) : []))
         .catch(() => []);
 
-      if (!Array.isArray(names)) return [];
+      if (!Array.isArray(names)) {
+        return { ok: false, error: 'the local report index could not be read' };
+      }
 
       const reports = await Promise.all(
         names
@@ -152,10 +205,13 @@ export function createLocalRunSource(): RunSource {
           ),
       );
 
-      return reports.flatMap((report) =>
-        report === null
-          ? []
-          : [
+      let unreadable = 0;
+      const runs = reports.flatMap((report) => {
+        if (report === null) {
+          unreadable += 1;
+          return [];
+        }
+        return [
               {
                 runId: report.runId,
                 domain: report.merchantDomain,
@@ -166,13 +222,16 @@ export function createLocalRunSource(): RunSource {
                 quarantine: null,
                 responded: false,
               },
-            ],
-      );
+        ];
+      });
+
+      return { ok: true, runs, unreadable };
     },
 
     async load(runId) {
-      const summaries = await this.list();
-      const match = summaries.find((summary) => summary.runId === runId);
+      const listed = await this.list();
+      if (!listed.ok) return null;
+      const match = listed.runs.find((summary) => summary.runId === runId);
       if (match === undefined) return null;
 
       const report = await fetch(`/reports/${match.domain}.json`)

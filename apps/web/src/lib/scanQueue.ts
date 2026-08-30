@@ -68,6 +68,16 @@ export interface ScanRequestSummary {
   readonly phaseTotal: number | null;
 }
 
+/**
+ * The result of listing scan requests, with the failure kept (D-213).
+ *
+ * A read that fails must never render as the absence of what it failed to read — the rule D-036 and
+ * D-200 each settled for one surface, and this file is the third place it had not been applied.
+ */
+export type RequestList =
+  | { readonly ok: true; readonly requests: readonly ScanRequestSummary[] }
+  | { readonly ok: false; readonly error: string };
+
 export interface ScanQueue {
   /**
    * Queues a scan.
@@ -80,7 +90,7 @@ export interface ScanQueue {
     url: string,
   ): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
-  list(limit?: number): Promise<readonly ScanRequestSummary[]>;
+  list(limit?: number): Promise<RequestList>;
   /**
    * One request, by id.
    *
@@ -170,9 +180,17 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error !== null || data === null) return [];
+      /*
+        The failure travels out (D-213).
 
-      return (data as RequestRow[]).map(toSummary);
+        This returned `[]` on an error, which the scan form rendered as *"Nothing running"* — a
+        merchant's scan queue that could not be read, shown as a queue with nothing in it. Same
+        class as the run list, and it would have hidden the same kind of defect.
+      */
+      if (error !== null) return { ok: false, error: error.message };
+      if (data === null) return { ok: false, error: 'the request list came back empty-handed' };
+
+      return { ok: true, requests: (data as RequestRow[]).map(toSummary) };
     },
 
     async get(id) {

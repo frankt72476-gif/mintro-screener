@@ -686,6 +686,25 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .stalled-note { color: var(--amber); }
 
+/*
+  A queue that could not be read, in the hint that would otherwise say "Nothing running" (D-213).
+
+  The `.err` text colour, not a new hue: this is the same statement the run library makes in a full
+  box, made in one line because the form's subject is the field above it.
+*/
+.queue-unreadable{color:#7A1F31;font-weight:600}
+
+/*
+  Why a read failed, under the sentence saying it did (D-213).
+
+  Quieter than the failure itself and in the mono face, because it is the database's own words: the
+  PGRST201 that caused this had the fix in its hint, and the old code threw it away.
+*/
+.list-unreadable-why{
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--slate);
+  margin:10px 0 0;line-height:1.6;word-break:break-word;
+}
+
 /* The progress card, when the run behind it has no worker. */
 .card.prog.stalled { border-color: var(--amber); }
 

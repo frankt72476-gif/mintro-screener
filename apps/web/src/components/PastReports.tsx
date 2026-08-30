@@ -15,13 +15,14 @@
  */
 
 import type { JSX } from 'react';
-import type { RunSummary } from '../lib/runs.js';
+import type { RunList } from '../lib/runs.js';
 import type { InFlightRun } from '../lib/domainGroups.js';
 import { groupByDomain } from '../lib/domainGroups.js';
 import { DomainGroups } from './DomainGroups.js';
 
 interface Props {
-  readonly runs: readonly RunSummary[];
+  /** The read's own result, so a failure can be shown as one (D-213). */
+  readonly listing: RunList;
   readonly source: string;
   readonly onOpen: (runId: string) => void;
   /** Scans in progress, so a run appears in its own group while it runs (D-211). */
@@ -33,20 +34,59 @@ interface Props {
 }
 
 export function PastReports({
-  runs,
+  listing,
   source,
   onOpen,
   inFlight = [],
   responded = new Set<string>(),
   onRescan,
 }: Props): JSX.Element {
-  const groups = groupByDomain(runs, inFlight, responded);
+  /*
+    A failed read is shown as one, never as an empty list (D-213).
+
+    *"Nothing screened yet"* over a query that errored tells an operator their work is gone. This is
+    the third instance of the class — D-036 for a merchant's commentary, D-200 for the eye test —
+    and the rule it settles is general: **a read that fails must never render as the absence of what
+    it failed to read.**
+  */
+  if (!listing.ok) {
+    return (
+      <div>
+        {/*
+      The pane's own heading, not a second `.pane` (D-213).
+
+      This wrapper was `<div className="pane">` — nested inside the `<section className="pane on">`
+      the app already renders, where the global `.pane{display:none}` applied to it and hid
+      everything below. The list, the empty state and the failure sentence were all invisible
+      whatever the query returned, which is the other half of "Past reports renders empty" and the
+      half no test could have caught from the data side.
+
+      `.pane-head` was invented in the same edit and has no CSS at all. The heading shape here is
+      the one every other pane uses.
+    */}
+        <div className="eyebrow">Library</div>
+        <h1>Past reports</h1>
+        <div className="card">
+          <p className="err">
+            The run list could not be read from {source}. This is a failure to read it, not an
+            absence of runs — nothing has been lost, and reloading may be enough.
+          </p>
+          <p className="list-unreadable-why">{listing.error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const groups = groupByDomain(listing.runs, inFlight, responded);
 
   return (
-    <div className="pane">
-      <div className="pane-head">
-        <h1>Past reports</h1>
-      </div>
+    <div>
+      <div className="eyebrow">Library</div>
+      <h1>Past reports</h1>
+      <p className="sub">
+        Every merchant this account can read, most recently active first. Re-scanning adds a run; it
+        never replaces one, so a merchant's runs stack up under its name.
+      </p>
       <div className="card">
         <DomainGroups
           groups={groups}
@@ -54,6 +94,16 @@ export function PastReports({
           source={source}
           {...(onRescan === undefined ? {} : { onRescan })}
         />
+        {/*
+          Rows that came back and could not be turned into a summary. Stated rather than dropped:
+          a short list that says nothing about why is the same defect one row down.
+        */}
+        {listing.unreadable > 0 && (
+          <p className="list-unreadable-why">
+            {listing.unreadable} run{listing.unreadable === 1 ? '' : 's'} could not be read and
+            {listing.unreadable === 1 ? ' is' : ' are'} not listed above.
+          </p>
+        )}
       </div>
     </div>
   );

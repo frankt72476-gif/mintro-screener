@@ -66,6 +66,8 @@ import { PastReports } from './components/PastReports.js';
 import { AttestationForm } from './components/Attestations.js';
 import { recordAnswer, recordComment } from './lib/operatorAnswers.js';
 import type { InFlightRun } from './lib/domainGroups.js';
+import type { RunList } from './lib/runs.js';
+import type { RequestList } from './lib/scanQueue.js';
 import { groupByDomain } from './lib/domainGroups.js';
 import { DomainGroups } from './components/DomainGroups.js';
 
@@ -368,7 +370,15 @@ function Screener({
   // Kept beside the report rather than inside it: the report is an immutable document that said
   // what it said, and the quarantine notice is a later statement about it (0012).
   const [quarantine, setQuarantine] = useState<string | null>(null);
-  const [queued, setQueued] = useState<readonly ScanRequestSummary[]>([]);
+  /*
+    The queue, or the reason there is none (D-213).
+
+    Held as the result for the reason the run list is: *"Nothing running"* over a queue that could
+    not be read is a false statement about the worker, and the surface has to be able to tell the
+    two apart.
+  */
+  const [queueList, setQueueList] = useState<RequestList>({ ok: true, requests: [] });
+  const queued = queueList.ok ? queueList.requests : [];
   /**
    * The request this browser asked for and is following, by id (D-045).
    *
@@ -389,7 +399,15 @@ function Screener({
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   /** Whether the last poll saw work outstanding — see the polling effect. */
   const wasPending = useRef(false);
-  const [available, setAvailable] = useState<readonly RunSummary[]>([]);
+  /*
+    The run list, or the reason there is none (D-213).
+
+    Held as the result rather than as an array, because an array cannot say *I could not read them*
+    — and for the whole time the `merchant_comments` embed was ambiguous, every operator was shown
+    an empty list and told nothing.
+  */
+  const [listing, setListing] = useState<RunList>({ ok: true, runs: [], unreadable: 0 });
+  const available = listing.ok ? listing.runs : [];
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -475,8 +493,11 @@ function Screener({
   useEffect(() => {
     void runs
       .list()
-      .then(setAvailable)
-      .catch(() => setAvailable([]));
+      .then(setListing)
+      // A throw is a failed read like any other, and says so rather than emptying the list.
+      .catch((cause: unknown) =>
+        setListing({ ok: false, error: cause instanceof Error ? cause.message : String(cause) }),
+      );
   }, [runs]);
 
   /*
@@ -489,8 +510,10 @@ function Screener({
   useEffect(() => {
     if (openDomain === null) return;
 
-    void runs.list().then((summaries) => {
-      const match = summaries.find((summary) => summary.domain === openDomain);
+    void runs.list().then((listed) => {
+      const match = listed.ok
+        ? listed.runs.find((summary) => summary.domain === openDomain)
+        : undefined;
       if (match === undefined) {
         // Named rather than silently ignored. A link that opens the empty scan pane looks like the
         // notification was wrong; this says the run could not be read, which is the actual fact.
@@ -510,8 +533,10 @@ function Screener({
 
     // The print route takes a domain; runs are addressed by id. Resolve to the most recent run
     // for that domain, which is what `list()` returns first.
-    void runs.list().then((summaries) => {
-      const match = summaries.find((summary) => summary.domain === printDomain);
+    void runs.list().then((listed) => {
+      const match = listed.ok
+        ? listed.runs.find((summary) => summary.domain === printDomain)
+        : undefined;
       if (match === undefined) {
         setError(`no run readable for ${printDomain}`);
         return;
@@ -761,14 +786,14 @@ function Screener({
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const tick = async (): Promise<void> => {
-      const requests = await queue.list();
+      const listed = await queue.list();
       if (!live) return;
 
-      setQueued(requests);
+      setQueueList(listed);
 
-      const stillPending = requests.some((request) => isPending(request.status));
+      const stillPending = listed.ok && listed.requests.some((request) => isPending(request.status));
       if (wasPending.current && !stillPending) {
-        void runs.list().then(setAvailable).catch(() => undefined);
+        void runs.list().then(setListing).catch(() => undefined);
       }
       wasPending.current = stillPending;
 
@@ -835,7 +860,7 @@ function Screener({
       }
 
       setWatching(null);
-      void runs.list().then(setAvailable).catch(() => undefined);
+      void runs.list().then(setListing).catch(() => undefined);
 
       if (request.status === 'failed') {
         setError(`The scan of ${request.url} failed: ${request.error ?? 'no reason was recorded'}`);
@@ -954,7 +979,7 @@ function Screener({
         <section className={`pane ${pane === 'reports' ? 'on' : ''}`}>
           {pane === 'reports' && (
             <PastReports
-              runs={available}
+              listing={listing}
               source={runs.description}
               inFlight={inFlight}
               responded={responded}
@@ -975,6 +1000,7 @@ function Screener({
               onRun={load}
               source={runs.description}
               queued={queued}
+              queueUnreadable={queueList.ok ? null : queueList.error}
               credentialsAvailable={credentials.available}
               onCredential={(domain) => setCredentialFor(domain)}
               client={client}
@@ -990,7 +1016,7 @@ function Screener({
                   setWatchedState(null);
                   setWatching({ requestId: result.id, url });
                   setStage('watching');
-                  setQueued(await queue.list());
+                  setQueueList(await queue.list());
                 }
                 return result;
               }}
@@ -1215,8 +1241,16 @@ function Screener({
  * disabled rather than removed, because the report header states which mode produced a run and
  * the reader needs to know the other modes exist.
  */
-function ScanInput({
+/**
+ * The scan form.
+ *
+ * Exported for the failure-state test only (D-213): the sentence this form shows over a queue it
+ * could not read is the one thing on the page an operator would act on wrongly, and a rendered
+ * assertion is the only way to hold it.
+ */
+export function ScanInput({
   available,
+  queueUnreadable,
   error,
   onRun,
   source,
@@ -1233,6 +1267,13 @@ function ScanInput({
   readonly onRun: (runId: string) => void;
   readonly source: string;
   readonly queued: readonly ScanRequestSummary[];
+  /**
+   * The reason the queue could not be read, or null (D-213).
+   *
+   * "Nothing running" over a failed read is a false statement about the worker, and the one an
+   * operator would act on — they would queue the scan again.
+   */
+  readonly queueUnreadable: string | null;
   readonly credentialsAvailable: boolean;
   readonly onCredential: (domain: string) => void;
   readonly client: SupabaseClient;
@@ -1429,13 +1470,32 @@ function ScanInput({
           action; a second way to start a scan, two inches from the first, is a choice an agent has
           to make before she can do the obvious thing.
         */}
-        {recentGroups.length > 0 && (
+        {/*
+          Shown for a failed queue read even with nothing recent (D-213).
+
+          Gated on `recentGroups.length` alone, a queue that could not be read on a fresh account
+          rendered as an absent block — the failure sentence below hidden by the very emptiness it
+          exists to deny. The same silence one level up from the bug this ruling is about.
+        */}
+        {(recentGroups.length > 0 || queueUnreadable !== null) && (
           <div className="field">
             <span className="flabel">Recent</span>
             <p className="fhint">
-              {working.length > 0
-                ? `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
-                : 'Nothing running.'}
+              {/*
+                A queue that could not be read is not an empty queue (D-213).
+
+                "Nothing running" over a failed read is a false statement about the worker, and the
+                one an operator would act on — they would queue the scan again.
+              */}
+              {queueUnreadable !== null ? (
+                <strong className="queue-unreadable">
+                  The request queue could not be read, so what is running is not known.
+                </strong>
+              ) : (
+                working.length > 0
+                  ? `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
+                  : 'Nothing running.'
+              )}
               {stalled.length > 0 && (
                 <>
                   {' '}
@@ -1446,7 +1506,9 @@ function ScanInput({
                 </>
               )}
             </p>
-            <DomainGroups groups={recentGroups} onOpen={onRun} startOpen={false} />
+            {recentGroups.length > 0 && (
+              <DomainGroups groups={recentGroups} onOpen={onRun} startOpen={false} />
+            )}
           </div>
         )}
 
