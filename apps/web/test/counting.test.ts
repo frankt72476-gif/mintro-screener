@@ -93,13 +93,17 @@ describe('the top band is gone, and the count it carried is stated once', () => 
    * worth pinning is that nothing reintroduces a second one — which is how the four restatements
    * accumulated in the first place.
    */
-  it.each(RUNS)('%s: the failure count is stated once, in the header lines', (_label, report) => {
+  it.each(RUNS)('%s: the review count is stated once, in the header lines', (_label, report) => {
     const rendered = text(report);
     const parts = reportParts(report, 'agent');
-    const observed = parts.find((p) => p.id === 'observed');
+    const review = parts.find((p) => p.id === 'review');
 
-    // The header line, in numerals: "3  standards not met".
-    expect(rendered).toContain(`${observed?.tally.byState.fail} standards not met`);
+    /*
+      Three sections became one, so the header lines carry one destination for all of it rather
+      than separate lines for not met and unclear (D-189). The count is the section's own tally —
+      the same one the heading and the bands read.
+    */
+    expect(rendered).toContain(`${review?.tally.rules} for your review`);
 
     // And none of what it replaced.
     expect(rendered).not.toContain('FAILED');

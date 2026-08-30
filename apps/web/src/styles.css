@@ -2062,6 +2062,70 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   display: inline-block;
 }
 
+/* ---------- the three review bands (D-189, spec §3) ----------
+   Sub-headings with a rule above their rows. Heavier than a block heading and lighter than a
+   section name, because that is exactly where they sit: one section, three bands, blocks inside
+   the third. Hierarchy from type and space; no fills, no new colour (D-167). */
+
+.band { margin-top: 30px; }
+.band:first-of-type { margin-top: 18px; }
+
+.band-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The state word at reading size here, not badge size: it is the heading, not a marker on a row. */
+.band-name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+.band-name.fail { color: #B0203A; }
+.band-name.review { color: #A5620E; }
+.band-name.na { color: var(--ink-mid); }
+
+.band-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* Coverage sits under the third band's heading, where a reader meets it while reading about
+   what could not be seen rather than before they know there is anything to explain. */
+.band-lede { margin: 0 0 12px; font-size: 12px; line-height: 1.55; color: var(--slate); max-width: 80ch; }
+
+.band-gloss {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--slate);
+  flex: 1 1 100%;
+  max-width: 80ch;
+}
+
+/* Inside a band the bucket blocks are a level down again, so they lose the rule the band carries. */
+.band .block-head { border-top: 0; padding-top: 0; font-size: 12.5px; }
+.band .sect-block { margin-top: 20px; }
+.band .sect-block:first-of-type { margin-top: 0; }
+
+@media print {
+  /* A band heading stays with the first row it introduces, and names itself again at the top of
+     every page it continues onto — the requirement the spec sets for a band that spans a break. */
+  .band-head { break-after: avoid; break-inside: avoid; }
+  .band-name { string-set: band content(); }
+  @page { @top-right { content: string(band); font-size: 9px; color: #6B6880; } }
+}
+
 /* ---------- the stopping-conditions checklist (D-186) ----------
    Every declared condition, named. The state word is the left column and is what a reader scans;
    the title carries the meaning; the rule id is last and quietest. No fills and no badges — the

@@ -55,22 +55,21 @@ describe.each(RUNS)('%s', (_label, report) => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(SURFACES)('renders all four sections on %s, even the empty ones', (surface) => {
+  it.each(SURFACES)('renders all three sections on %s, even the empty ones', (surface) => {
+    // Four became three (D-189): not met, unclear and not observed are bands inside one section.
     expect(reportParts(report, surface).map((p) => p.id).sort()).toEqual([
-      'not-observed',
-      'observed',
       'questions',
+      'review',
       'stopping',
     ]);
   });
 
-  it('orders 1,2,3,4 for the merchant and the agent', () => {
+  it('orders 1,2,3 for the merchant and the agent', () => {
     for (const surface of ['merchant', 'agent'] as const) {
       expect(reportParts(report, surface).map((p) => p.id)).toEqual([
         'stopping',
         'questions',
-        'observed',
-        'not-observed',
+        'review',
       ]);
     }
   });
@@ -87,8 +86,7 @@ describe.each(RUNS)('%s', (_label, report) => {
     expect(reportParts(report, 'iqwallet').map((p) => p.id)).toEqual([
       'stopping',
       'questions',
-      'observed',
-      'not-observed',
+      'review',
     ]);
   });
 
@@ -101,24 +99,25 @@ describe.each(RUNS)('%s', (_label, report) => {
    *
    * The surface parameter controls section order and nothing else now.
    */
-  it.each(SURFACES)('splits section 3 into two labelled subsections on %s', (surface) => {
-    const observed = reportParts(report, surface).find((p) => p.id === 'observed');
-    expect(observed?.blocks.map((b) => b.heading)).toEqual(['Not met', 'Unclear']);
-    // Not met first: the list that is work, before the list that is a conversation.
-    expect(observed?.blocks[0]?.state).toBe('fail');
-    expect(observed?.blocks[1]?.state).toBe('review');
+  it.each(SURFACES)('bands the review section on %s', (surface) => {
+    const review = reportParts(report, surface).find((p) => p.id === 'review');
+    expect(review?.bands?.map((b) => b.heading)).toEqual(['Not met', 'Unclear', 'Not observed']);
+    // Not met first: what a reader acts on first, first. Same order as `STATE_ORDER` minus `pass`.
+    expect(review?.bands?.map((b) => b.state)).toEqual(['fail', 'review', 'not_evaluable']);
   });
 
-  it('carries the same rows in section 3 whoever is reading', () => {
-    const forAgent = reportParts(report, 'agent').find((p) => p.id === 'observed');
-    const forIqwallet = reportParts(report, 'iqwallet').find((p) => p.id === 'observed');
+  it('carries the same rows in the review section whoever is reading', () => {
+    const forAgent = reportParts(report, 'agent').find((p) => p.id === 'review');
+    const forIqwallet = reportParts(report, 'iqwallet').find((p) => p.id === 'review');
     expect(forIqwallet?.tally).toEqual(forAgent?.tally);
     expect(forIqwallet?.blocks.map((b) => b.tally)).toEqual(forAgent?.blocks.map((b) => b.tally));
   });
 
   it('holds the passes as furniture rather than a section', () => {
-    const notObserved = reportParts(report, 'agent').find((p) => p.id === 'not-observed');
-    expect(notObserved?.passes?.groups.length).toBeGreaterThan(0);
+    // The passes moved with the section that held them: they sit at the end of "For your review",
+    // which is the end of the document (D-189, spec §5).
+    const review = reportParts(report, 'agent').find((p) => p.id === 'review');
+    expect(review?.passes?.groups.length).toBeGreaterThan(0);
     // Never a section of their own: twenty-six passes above the fold is what makes it read as a list.
     expect(reportParts(report, 'agent').map((p) => p.heading)).not.toContain('Met');
   });
@@ -189,7 +188,7 @@ describe('print carries both headers, which it did not', () => {
     expect(rows).toBe(ungrouped(report).length);
   });
 
-  it.each(RUNS)('%s: all four section headings appear, in the one order (D-186)', (_label, report) => {
+  it.each(RUNS)('%s: all three section headings appear, in the one order (D-186, D-189)', (_label, report) => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report, access, surface: 'iqwallet', print: true }),
     );
@@ -198,8 +197,7 @@ describe('print carries both headers, which it did not', () => {
     expect(headings).toEqual([
       'Stopping conditions',
       'Operational questions',
-      'What we observed',
-      'Not observed from the site',
+      'For your review',
     ]);
   });
 

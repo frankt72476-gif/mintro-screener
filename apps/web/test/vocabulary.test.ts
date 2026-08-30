@@ -79,10 +79,18 @@ describe('no surface carries a retired word', () => {
   });
 
   it.each(RUNS)('%s: the header lines', (name) => {
-    // The one that was missed. It is a paraphrase, so it escaped a search for the label itself.
+    /*
+      The line that was missed by D-188's first pass: it paraphrased the label, so it escaped a
+      search for the label itself.
+
+      Since D-189 the header lines name sections rather than states — three destinations, one per
+      section — so there is no state label here to assert on. What must still hold is that no
+      retired word survives anywhere in them.
+    */
     const labels = headerLines(reportParts(load(name), 'agent')).map((l) => l.label);
+
     for (const retired of RETIRED) expect(labels.join(' ')).not.toContain(retired);
-    expect(labels).toContain(STATE_LABEL_LOWER.review);
+    expect(labels).toEqual(['stopping conditions failed', 'operational questions', 'for your review']);
   });
 
   it.each(RUNS)('%s: the stored verdict sentence', (name) => {
@@ -104,8 +112,13 @@ describe('no surface carries a retired word', () => {
   });
 
   it.each(RUNS)('%s: the band headings', (name) => {
-    const observed = reportParts(load(name), 'agent').find((p) => p.id === 'observed');
-    expect(observed?.blocks.map((b) => b.heading)).toEqual([STATE_LABEL.fail, STATE_LABEL.review]);
+    const review = reportParts(load(name), 'agent').find((p) => p.id === 'review');
+    // Three bands now, one section (D-189). Every heading is a label, never a paraphrase of one.
+    expect(review?.bands?.map((b) => b.heading)).toEqual([
+      STATE_LABEL.fail,
+      STATE_LABEL.review,
+      STATE_LABEL.not_evaluable,
+    ]);
   });
 
   const cases = RUNS.flatMap((r) => SURFACES.flatMap((s) => [[r, s, false], [r, s, true]] as const));

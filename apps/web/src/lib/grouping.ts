@@ -616,7 +616,7 @@ export function invitedFindings(report: ScreeningReport): readonly InvitedRef[] 
    ═════════════════════════════════════════════════════════════════════════════════════════════ */
 
 /** The four. Every item in the report belongs to exactly one. */
-export type SectionId = 'stopping' | 'questions' | 'observed' | 'not-observed';
+export type SectionId = 'stopping' | 'questions' | 'review';
 
 /**
  * Who is reading.
@@ -666,6 +666,31 @@ export function reportTally(report: ScreeningReport): SectionTally {
  * PDF, which is the whole of what "grouping is a parameter" means: a merchant fixing a storefront
  * works a single list, an underwriter reads *not met* and *needs a look* as different categories.
  */
+/**
+ * A band inside "For your review" (D-189, spec §3).
+ *
+ * Three of them — not met, unclear, not observed — each a sub-heading with a count, a one-line
+ * gloss of what the state means, and its rows beneath. They were three separate sections; all
+ * three describe what Mintro saw, and the reader's job is identical for all three, so three
+ * headings implied three different jobs.
+ *
+ * A band holds `blocks` rather than groups directly, because the *not observed* band keeps D-044's
+ * five-way split inside it. That split is not decoration: it separates a check Mintro has not
+ * written from a page the merchant does not carry, and collapsing it would report our own unbuilt
+ * work in the words used for a merchant's omission.
+ */
+export interface ReviewBand {
+  readonly key: string;
+  readonly heading: string;
+  /** What the state means, in one line beside the count. Short: it sits in the heading. */
+  readonly gloss: string;
+  /** A paragraph under the heading, where the band needs one. Only the third does. */
+  readonly lede?: string;
+  readonly state: State;
+  readonly blocks: readonly SectionBlock[];
+  readonly tally: SectionTally;
+}
+
 export interface SectionBlock {
   readonly key: string;
   /** `null` where the section's own heading is the only one — no sub-heading is rendered. */
@@ -774,13 +799,14 @@ export interface ReportPart {
    * substitute for them, and print opens the disclosure (D-042 as revised by D-166).
    */
   readonly passes?: { readonly groups: readonly FindingGroup[]; readonly tally: SectionTally };
+  /** "For your review" only: the three bands (D-189). */
+  readonly bands?: readonly ReviewBand[];
 }
 
 const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
   stopping: 'Stopping conditions',
   questions: 'Operational questions',
-  observed: 'What we observed',
-  'not-observed': 'Not observed from the site',
+  review: 'For your review',
 };
 
 /**
@@ -801,9 +827,9 @@ const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
  * merchant's comment boxes, the agent's controls — and that is real. Ordering was not.
  */
 const SECTION_ORDER: Readonly<Record<Surface, readonly SectionId[]>> = {
-  merchant: ['stopping', 'questions', 'observed', 'not-observed'],
-  agent: ['stopping', 'questions', 'observed', 'not-observed'],
-  iqwallet: ['stopping', 'questions', 'observed', 'not-observed'],
+  merchant: ['stopping', 'questions', 'review'],
+  agent: ['stopping', 'questions', 'review'],
+  iqwallet: ['stopping', 'questions', 'review'],
 };
 
 /**
@@ -846,13 +872,10 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
       groups.filter((group) => isStopping(group) && group.state === 'fail'),
     ),
     questions: questionsPart(report),
-    observed: observedPart(
-      groups.filter(
-        (group) => !isStopping(group) && (group.state === 'fail' || group.state === 'review'),
-      ),
-    ),
-    'not-observed': notObservedPart(
+    review: reviewPart(
       report,
+      groups.filter((group) => !isStopping(group) && group.state === 'fail'),
+      groups.filter((group) => !isStopping(group) && group.state === 'review'),
       groups.filter((group) => !isStopping(group) && group.state === 'not_evaluable'),
       groups.filter((group) => !isStopping(group) && group.state === 'pass'),
     ),
@@ -982,59 +1005,51 @@ function questionsPart(report: ScreeningReport): ReportPart {
 }
 
 /**
- * Section 3 — two labelled subsections, on every surface.
+ * "For your review" — the one section a reader works (D-189, spec §3).
  *
- * *Not met* and *needs a look* are different questions. One is an observation against a stated
- * condition; the other is a judgement somebody still has to make. A merchant fixing a storefront
- * needs that separation as much as an underwriter does — arguably more, since the first list is the
- * work and the second is the conversation.
+ * Three sections became one. Not met, unclear and not observed all describe what Mintro saw, and
+ * the reader's job is the same for all three: read it, and say where we have it wrong. Three
+ * headings implied three different jobs, and the middle one's old label — *needs a look* — claimed
+ * for one band what was true of all of them (D-188).
  *
- * It was split only on the IQwallet PDF, which left the app surfaces showing one list in rule-set
- * order with the two states **interleaved** and nothing but the badge in the margin telling them
- * apart. A reader scanning for what failed had to read every row to find three of them.
+ * ## The bands
  *
- * The surface parameter no longer touches this. It controls **section order and nothing else**.
+ * Sub-headings with a count and a gloss, not gutter labels. The order is `STATE_ORDER` minus
+ * `pass`: what a reader acts on first, first.
+ *
+ * ## Why *not observed* keeps five blocks inside it
+ *
+ * D-044 split `not_evaluable` into buckets because one pile told a merchant that Mintro's unbuilt
+ * check and their own missing page were the same kind of fact. **That split survives inside the
+ * band**, unchanged — the band is a heading above it, not a replacement for it.
+ *
+ * It is also why the band's gloss is not the spec's *"nothing on the site to measure"*. That is
+ * true of `not_exposed` and false of the other four: `no_check_built` is Mintro's gap and
+ * `not_reachable` is nobody's. A gloss that named the site would state a fact about the merchant
+ * for rows that carry none.
+ *
+ * ## Where the passes and the coverage sentence went
+ *
+ * Both lived in the old section 4, which no longer exists. The passes stay furniture at the end of
+ * this section, which is the end of the document (spec §5). The coverage sentence goes with the
+ * *not observed* band, which is what it explains.
  */
-function observedPart(groups: readonly FindingGroup[]): ReportPart {
-  const blocks: SectionBlock[] = (['fail', 'review'] as const)
-    .map((state) => {
-      const ofState = groups.filter((group) => group.state === state);
-      return {
-        key: `observed:${state}`,
-        heading: STATE_LABEL[state],
-        lede: '',
-        state,
-        groups: ofState,
-        tally: tally(ofState),
-      };
-    })
-    .filter((block) => block.groups.length > 0);
-
-  return {
-    id: 'observed',
-    heading: SECTION_HEADING.observed,
-    lede: 'What the crawl saw on the pages named, with the capture behind each. Stopping conditions are in section 1 and are not repeated here.',
-    blocks,
-    tally: tally(groups),
-  };
-}
-
-/**
- * Section 4 — what could not be seen, and the passes as furniture.
- *
- * The `not_evaluable` rows keep their four-way split (D-044): whose limitation each gap is is the
- * whole point of the section, and one undifferentiated pile would tell a merchant that Mintro's
- * unbuilt check and their own missing page are the same kind of fact.
- */
-function notObservedPart(
+function reviewPart(
   report: ScreeningReport,
+  failed: readonly FindingGroup[],
+  unclear: readonly FindingGroup[],
   unevaluated: readonly FindingGroup[],
   passes: readonly FindingGroup[],
 ): ReportPart {
-  const blocks: SectionBlock[] = NOT_EVALUABLE_ORDER.map(({ bucket, heading, lede }) => {
+  /** One block, unsplit, for the two bands whose rows need no further separation. */
+  const plain = (state: State, groups: readonly FindingGroup[]): SectionBlock[] => [
+    { key: `review:${state}`, heading: null, lede: '', state, groups, tally: tally(groups) },
+  ];
+
+  const notObservedBlocks: SectionBlock[] = NOT_EVALUABLE_ORDER.map(({ bucket, heading, lede }) => {
     const ofBucket = unevaluated.filter((group) => bucketOfGroup(group) === bucket);
     return {
-      key: `not-observed:${bucket}`,
+      key: `review:not_evaluable:${bucket}`,
       heading,
       lede,
       state: 'not_evaluable' as const,
@@ -1044,22 +1059,78 @@ function notObservedPart(
     };
   }).filter((block) => block.groups.length > 0);
 
-  return {
-    id: 'not-observed',
-    heading: SECTION_HEADING['not-observed'],
-    /*
-      Coverage lives here now, as one sentence (spec §4).
+  const bands: ReviewBand[] = ([
+    {
+      key: 'band:fail',
+      heading: STATE_LABEL.fail,
+      gloss: 'observed, and short of the standard',
+      state: 'fail',
+      blocks: plain('fail', failed),
+      tally: tally(failed),
+    },
+    {
+      key: 'band:review',
+      heading: STATE_LABEL.review,
+      gloss: 'observed, but the check cannot decide',
+      state: 'review',
+      blocks: plain('review', unclear),
+      tally: tally(unclear),
+    },
+    {
+      key: 'band:not_evaluable',
+      heading: STATE_LABEL.not_evaluable,
+      // Not "nothing on the site to measure": see the note above. Five reasons, and only one of
+      // them is about the site, so the gloss names none of them and the blocks below do.
+      gloss: 'nothing was measured, and the reasons differ',
+      lede: coverageSentence(report),
+      state: 'not_evaluable',
+      blocks: notObservedBlocks,
+      tally: tally(unevaluated),
+    },
+  ] as ReviewBand[]).filter((band) => band.tally.rules > 0);
 
-      It was six labelled boxes above the fold stating the same six numbers in the same order, plus
-      a prose restatement of all six under the filter chips. The sentence sits inside the section it
-      explains, where a reader meets it while reading about what could not be seen rather than
-      before they know there is anything to explain.
-    */
-    lede: `What this run could not establish, and whose limitation each one is. ${coverageSentence(report)}`,
-    blocks,
-    tally: tally(unevaluated),
+  const all = [...failed, ...unclear, ...unevaluated];
+
+  return {
+    id: 'review',
+    heading: SECTION_HEADING.review,
+    lede: reviewLede(all.length),
+    // `blocks` stays populated and flattened so every existing reader — the print branch, the
+    // comment count, the group renderer — keeps working off one shape (D-189).
+    blocks: bands.flatMap((band) => band.blocks),
+    bands,
+    tally: tally(all),
     passes: { groups: passes, tally: tally(passes) },
   };
+}
+
+/**
+ * The section's own line, which states the size of the job and asks for the one thing wanted back.
+ *
+ * *"Read each one and tell us where we have it wrong"* is a request for correction, not an
+ * instruction about the storefront — the distinction D-001 turns on. It asks about **this
+ * document**, which Mintro authored, rather than about the merchant's site.
+ */
+function reviewLede(count: number): string {
+  const many = count === 1 ? 'One observation' : `${spellOut(count)} observations`;
+  return `${many}. Read each one and tell us where we have it wrong.`;
+}
+
+/** Small numbers read as words in a sentence; large ones as numerals. */
+function spellOut(n: number): string {
+  const words = [
+    'Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen',
+    'Nineteen', 'Twenty',
+  ];
+  if (n <= 20) return words[n] as string;
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  if (n < 100) {
+    const t = tens[Math.floor(n / 10)] as string;
+    const u = n % 10;
+    return u === 0 ? t : `${t}-${(words[u] as string).toLowerCase()}`;
+  }
+  return String(n);
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -1121,10 +1192,9 @@ export interface HeaderLine {
  * participle means the conditions were looked at, and it would not want to change if that label did.
  */
 const HEADER_LABEL: Readonly<Record<string, string>> = {
-  stopping: 'stopping conditions observed',
+  stopping: 'stopping conditions failed',
   questions: 'operational questions',
-  fail: `standards ${STATE_LABEL_LOWER.fail}`,
-  review: STATE_LABEL_LOWER.review,
+  'review-section': 'for your review',
 };
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
@@ -1139,25 +1209,38 @@ export const sectionAnchor = (id: SectionId): string => `section-${id}`;
 export const findingAnchor = (ruleId: string): string => `rule-${ruleId}`;
 
 /**
- * The four lines, in the order the sections are read.
+ * One line per section — three of them now, not four (D-189).
  *
- * Section 3 contributes two lines — *not met* and *unclear* — because those are the two
- * numbers a reader is looking for, and both point at the same section. Sections 4's own count is
- * deliberately absent: what could not be seen is explained in a sentence inside the section, not
- * announced as a headline number, because a large "19 not observed" above the fold reads as a
- * verdict on the crawl.
+ * Section 3 used to contribute two lines, *not met* and *unclear*, both pointing at the same
+ * section. With the three review sections merged there is one destination for all of it, and a
+ * navigation offering two links to one place is a navigation that has stopped describing the
+ * document.
+ *
+ * **The counts come from each section's own tally**, which is the same derivation the section
+ * heading and the bands read. A second count of the same rows is how a summary comes to disagree
+ * with the thing it summarises.
+ *
+ * A zero section still renders its line, with `0` and no link. An absent line reads as an absent
+ * section, which is an absent value shown as an answer (D-044).
  */
 export function headerLines(parts: readonly ReportPart[]): readonly HeaderLine[] {
   const lines: HeaderLine[] = [];
 
   for (const part of parts) {
     if (part.id === 'stopping') {
+      /*
+        The count is failures, so the label says failures (D-189).
+
+        It read *"0 stopping conditions observed"* on a run where seven were observed and met —
+        the number is `stoppingPart`'s tally, which covers only the failed rows. A reader met a
+        zero beside the word "observed" and could reasonably conclude nothing had been checked,
+        which is the opposite of what the run found.
+      */
       lines.push(line('stopping', part.tally.rules, part.id));
     } else if (part.id === 'questions') {
       lines.push(line('questions', part.tally.rules, part.id));
-    } else if (part.id === 'observed') {
-      lines.push(line('fail', part.tally.byState.fail, part.id));
-      lines.push(line('review', part.tally.byState.review, part.id));
+    } else if (part.id === 'review') {
+      lines.push(line('review-section', part.tally.rules, part.id));
     }
   }
 

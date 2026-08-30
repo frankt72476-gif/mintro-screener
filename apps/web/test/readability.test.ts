@@ -77,13 +77,9 @@ describe('1 — stopping conditions list every rule', () => {
 });
 
 describe('2 — one order on every surface', () => {
-  it.each(['merchant', 'agent', 'iqwallet'] as const)('%s reads 1,2,3,4', (surface) => {
-    expect(reportParts(c268, surface).map((p) => p.id)).toEqual([
-      'stopping',
-      'questions',
-      'observed',
-      'not-observed',
-    ]);
+  it.each(['merchant', 'agent', 'iqwallet'] as const)('%s reads 1,2,3', (surface) => {
+    // Four sections became three when the review bands merged (D-189). One order still.
+    expect(reportParts(c268, surface).map((p) => p.id)).toEqual(['stopping', 'questions', 'review']);
   });
 });
 
@@ -153,8 +149,8 @@ describe('6 — persistent navigation on screen only', () => {
     const markup = render(c268, 'agent');
     const lines = markup.match(/class="headline-n">(\d+)</g) ?? [];
 
-    // Four header lines, each appearing twice: once in the block, once in the bar.
-    expect(lines).toHaveLength(8);
-    expect(lines.slice(0, 4)).toEqual(lines.slice(4));
+    // Three header lines now (D-189), each appearing twice: once in the block, once in the bar.
+    expect(lines).toHaveLength(6);
+    expect(lines.slice(0, 3)).toEqual(lines.slice(3));
   });
 });

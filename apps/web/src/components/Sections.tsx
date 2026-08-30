@@ -194,7 +194,14 @@ export function ReportSectionView({
   /** Section 2's body, which is not findings at all. */
   readonly questions?: JSX.Element | null;
 }): JSX.Element {
-  const anchored = part.id === 'not-observed';
+  /*
+    The old section-4 anchor now lives on the review section (D-189).
+
+    `NOTHING_OBSERVED_ID` is in merchant emails already sent (D-069). Section 4 no longer exists, and
+    the not-observed rows are inside "For your review", so the link lands on the section that now
+    holds what it pointed at rather than on nothing.
+  */
+  const anchored = part.id === 'review';
   return (
     <section
       id={sectionAnchor(part.id)}
@@ -220,11 +227,39 @@ export function ReportSectionView({
 
       {questions}
 
-      {part.blocks.map((block) => (
-        <Block key={block.key} block={block} {...(commentaryOf === undefined ? {} : { commentaryOf })}>
-          {children}
-        </Block>
-      ))}
+      {part.bands === undefined
+        ? part.blocks.map((block) => (
+            <Block key={block.key} block={block} {...(commentaryOf === undefined ? {} : { commentaryOf })}>
+              {children}
+            </Block>
+          ))
+        : part.bands.map((band) => (
+            <div key={band.key} className="band" data-state={band.state}>
+              {/*
+                A sub-heading with a rule above its rows, not a gutter label (spec §3).
+
+                `band-name` carries a print running header, so a band running over a page break is
+                still named at the top of the page it continues onto.
+              */}
+              <h3 className="band-head">
+                <span className={`band-name state ${band.state === 'not_evaluable' ? 'na' : band.state}`}>
+                  {band.heading}
+                </span>
+                <span className="band-count">{band.tally.rules}</span>
+                <span className="band-gloss">{band.gloss}</span>
+                <CommentCount
+                  groups={band.blocks.flatMap((b) => b.groups)}
+                  {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                />
+              </h3>
+              {band.lede !== undefined && <p className="band-lede">{band.lede}</p>}
+              {band.blocks.map((block) => (
+                <Block key={block.key} block={block} {...(commentaryOf === undefined ? {} : { commentaryOf })}>
+                  {children}
+                </Block>
+              ))}
+            </div>
+          ))}
 
       {passes}
     </section>

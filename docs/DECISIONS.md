@@ -12325,3 +12325,93 @@ It also asserts that no label contains an instruction verb, which is the propert
 the one that would be quietly lost by a future rename.
 
 ---
+
+## D-189 — Three sections become one: "For your review"
+
+**2026-08-29 · business owner · `docs/report-redesign-spec.md` §3; part 2 of 3**
+
+Not met, unclear and not observed were three sections. They are one, with three bands.
+
+> **For your review**
+> Thirty-five observations. Read each one and tell us where we have it wrong.
+>
+>     Not met        3 · observed, and short of the standard
+>     Unclear       10 · observed, but the check cannot decide
+>     Not observed  22 · nothing was measured, and the reasons differ
+
+**All three describe what Mintro saw, and the reader's job is identical for all three** — read it,
+and say where we have it wrong. Three headings implied three different jobs, which is the same
+mistake the old *needs a look* label made one level down (D-188).
+
+The lede asks about **this document**, which Mintro wrote — not about the storefront. *"Tell us
+where we have it wrong"* is a request for correction; *"fix these"* would be a determination, and
+D-001 does not relax for a summary line. A test pins that no instruction verb appears in it.
+
+### Bands are sub-headings, and the third one keeps D-044 inside it
+
+Each band is a heading with a count and a one-line gloss, with a rule above its rows — not a gutter
+label. Rows are unchanged: title, observation sentence, source path, everything else on click, and a
+commented row keeps its dot.
+
+**The spec's third gloss was "nothing on the site to measure", and that is not what was built.** It
+is true of `not_exposed` and false of the other four buckets: `no_check_built` is Mintro's own gap
+and `not_reachable` is nobody's. A gloss naming the site would state a fact about the merchant for
+rows that carry none — the exact conflation D-044 exists to prevent, reintroduced one level up.
+
+So the band reads *"nothing was measured, and the reasons differ"*, and **D-044's five-way split
+survives unchanged as blocks inside it**, each with its own heading and lede. The band is a heading
+above that split, not a replacement for it.
+
+The coverage sentence sits under that band's heading rather than in the gloss: a gloss is one line
+beside a count, and the first attempt concatenated a two-clause sentence into it.
+
+### What print does
+
+Every row expands, exactly as before — D-042 as revised by D-166 is untouched, and the test asserts
+open rows equal total rows on both reference runs.
+
+Band headings **repeat across a page break**: `break-after: avoid` keeps a heading with the first row
+it introduces, and `string-set: band` puts the band name in `@page { @top-right }`, so a band running
+onto the next page is named at the top of it. The section name already runs in `@top-left` (D-186);
+a reader mid-document now has both.
+
+### Navigation, and a header line that said the opposite of the truth
+
+Three destinations, not four. The header lines used to carry two — *not met* and *unclear* — both
+pointing at the same section, which is a navigation that has stopped describing the document. Counts
+come from each section's own tally, the same derivation the heading and the bands read.
+
+**"0 stopping conditions observed" said the opposite of what the run found.** The number is
+`stoppingPart`'s tally, which counts only failed rows — so on a run where seven conditions were
+observed and met, a reader met a zero beside the word *observed* and could reasonably conclude
+nothing had been checked. It now reads **"0 stopping conditions failed"**.
+
+### Where the furniture went
+
+The old section 4 no longer exists. The passes stay as a count with a disclosure at the end of "For
+your review", which is the end of the document (spec §5). `NOTHING_OBSERVED_ID` — the anchor in
+merchant emails already sent (D-069) — moves to the review section, which now holds what it pointed
+at.
+
+### Order, and a deviation from the spec's numbering worth stating
+
+The spec numbers its sections brief, stopping, review, questions, met — which would move the
+operational questions *after* the review section. **Not done, because this instruction scoped part 2
+to §3**, and because leaving the questions where they are is what puts the passes at the end of the
+document rather than stranded after a section that no longer follows them. Flagged for part 3 rather
+than decided here.
+
+### Page counts
+
+| run | HEAD | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 22 | 22 |
+| `5b29036d` comopeptides | 23 | 23 |
+| `f66f7299` comopeptides, live | 24 | 24 |
+
+Unchanged, and **checked rather than assumed** (D-187): the PDFs differ in bytes and digest on every
+run, so this is a real null rather than a stale bundle. Two section headings and two ledes were
+traded for one heading, one lede and three band headings — close to a wash, which is what a
+reorganisation that removes no content should cost.
+
+---
