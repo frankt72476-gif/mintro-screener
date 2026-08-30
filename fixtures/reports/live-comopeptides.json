@@ -1,0 +1,3178 @@
+{
+  "runId": "f66f7299-c728-4a9d-bc5d-cc7799d2922d",
+  "merchantDomain": "www.comopeptides.com",
+  "merchantName": "ComoPeptides.com – Lab-tested research peptides. Columbia, MO.",
+  "platform": "woocommerce",
+  "mode": "public",
+  "rulesetVersion": "3.3.0",
+  "rulesetEffective": "2026-08-26",
+  "startedAt": "2026-08-29T23:30:36.283Z",
+  "finishedAt": "2026-08-29T23:31:49.786Z",
+  "counts": {
+    "fail": 3,
+    "review": 13,
+    "pass": 25,
+    "not_evaluable": 30
+  },
+  "coverage": {
+    "evaluable": 41,
+    "total": 71,
+    "noCheckBuilt": 3,
+    "notReachable": 11,
+    "notExposed": 14,
+    "notApplicable": 2,
+    "notRetrieved": 0,
+    "kindNotRecorded": 0,
+    "resolved": 43,
+    "outstanding": 28
+  },
+  "sameObservation": [
+    {
+      "ruleIds": [
+        "GATE-002",
+        "GATE-004"
+      ],
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://www.comopeptides.com/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/collections/all",
+              "sourceSha256": "6c5c578b85448528023688d0060d1b0fbba334ca2fd385c66c8702017de23e3e",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.738Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://www.comopeptides.com/shop",
+              "matchedUrls": [
+                "https://www.comopeptides.com/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "review",
+          "note": "The sign-up form at https://www.comopeptides.com/my-account/ was read in full and carried no checkbox. 2 field(s) were observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/my-account/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z"
+            }
+          ],
+          "title": "Terms acknowledged at sign-up",
+          "clause": "The user must actively check “I Agree” against the complete Terms and Conditions. Until they do, account creation cannot proceed.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "ruleIds": [
+        "GATE-002",
+        "GATE-005"
+      ],
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://www.comopeptides.com/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/collections/all",
+              "sourceSha256": "6c5c578b85448528023688d0060d1b0fbba334ca2fd385c66c8702017de23e3e",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.738Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://www.comopeptides.com/shop",
+              "matchedUrls": [
+                "https://www.comopeptides.com/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "review",
+          "note": "The sign-up form at https://www.comopeptides.com/my-account/ carried only fields used to create an account. All 2 field(s) observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required). No field beyond that set was present to identify research status.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/my-account/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z",
+              "matchedValue": "\"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required)"
+            }
+          ],
+          "title": "Research field required at sign-up",
+          "clause": "When the account is established, the buyer must identify their research status. This is a required field — never optional.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        }
+      ]
+    }
+  ],
+  "blocking": {
+    "declared": 9,
+    "failed": [],
+    "notEvaluable": [
+      "GATE-003",
+      "NAME-001"
+    ],
+    "passed": [
+      "PROD-006",
+      "PROD-007",
+      "CATG-001",
+      "CATG-002",
+      "CATG-003",
+      "CATG-004",
+      "PAY-001"
+    ]
+  },
+  "sample": {
+    "productsInScope": 37,
+    "productsSampled": 5,
+    "surfacesRead": [
+      "the homepage",
+      "the sign-up form",
+      "the terms document"
+    ]
+  },
+  "verdict": "3 finding(s) record a requirement not met, including no marketing terms in product names; disclaimer on every sampled page, and 1 other(s). 13 finding(s) need a look. 30 were not observed from the crawled surface.",
+  "categories": [
+    {
+      "id": "gate",
+      "name": "Access and identity gating",
+      "n": 1,
+      "findings": [
+        {
+          "ruleId": "GATE-002",
+          "state": "fail",
+          "note": "1 of 3 path(s) served content directly with a status this rule treats as a violation: https://www.comopeptides.com/shop returned 200. Each was requested with no session — what an anonymous visitor sees.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/collections/all",
+              "sourceSha256": "6c5c578b85448528023688d0060d1b0fbba334ca2fd385c66c8702017de23e3e",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.738Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/collections/all",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/products",
+                  "status": 404
+                },
+                {
+                  "url": "https://www.comopeptides.com/shop",
+                  "status": 200
+                }
+              ],
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              },
+              "matchedValue": "200 https://www.comopeptides.com/shop",
+              "matchedUrls": [
+                "https://www.comopeptides.com/shop"
+              ]
+            }
+          ],
+          "title": "Products hidden until an account exists",
+          "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "http_probe",
+          "layer": 0
+        },
+        {
+          "ruleId": "GATE-004",
+          "state": "review",
+          "note": "The sign-up form at https://www.comopeptides.com/my-account/ was read in full and carried no checkbox. 2 field(s) were observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/my-account/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z"
+            }
+          ],
+          "title": "Terms acknowledged at sign-up",
+          "clause": "The user must actively check “I Agree” against the complete Terms and Conditions. Until they do, account creation cannot proceed.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-005",
+          "state": "review",
+          "note": "The sign-up form at https://www.comopeptides.com/my-account/ carried only fields used to create an account. All 2 field(s) observed: \"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required). No field beyond that set was present to identify research status.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/my-account/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z",
+              "matchedValue": "\"Email address *Required\" [email] (email, required); \"Password *Required\" [password] (password, required)"
+            }
+          ],
+          "title": "Research field required at sign-up",
+          "clause": "When the account is established, the buyer must identify their research status. This is a required field — never optional.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-007",
+          "state": "review",
+          "note": "3 of 5 required phrases were not observed: 'research use only', 'indemnif', 'qualified'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/termsandconditions/",
+              "sourceSha256": "7b3fc42abe61f25ecb95b8c96adf671f3d52d3dc1a0acc609db208f72394b419",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/bfab3c31b7c8a019e8feb3a7fec5427e0408c14ab2f4cefd9926723f4124a8f8.png",
+              "capturedAt": "2026-08-29T23:31:02.297Z"
+            }
+          ],
+          "title": "Terms cover all required clauses",
+          "clause": "Five points, at minimum: use is restricted to research; human consumption is forbidden; the products play no part in diagnosing, treating or preventing any disease; the buyer indemnifies the seller; and the buyer confirms they are a qualified professional.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: the add-to-cart control was clicked but the cart remained empty, so the flow never began. Steps: opened /shop/bpc-157-tb500-blend/ → clicked add to cart → the cart was still empty after adding.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "b80e7d39625281f835359e8679112b860e8a5154a72ee964914e39663d225729",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:27.252Z",
+              "session": {
+                "mode": "unauthenticated",
+                "origin": "none"
+              }
+            }
+          ],
+          "notEvaluableReason": "the add-to-cart control was clicked but the cart remained empty, so the flow never began. Steps: opened /shop/bpc-157-tb500-blend/ → clicked add to cart → the cart was still empty after adding.",
+          "notEvaluableKind": "not_exposed",
+          "title": "Guest checkout disabled",
+          "clause": "There is no anonymous path to purchase. Guest checkout must be turned off entirely.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "flow_probe",
+          "layer": 3
+        },
+        {
+          "ruleId": "GATE-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Order records are server-side. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Order records are server-side. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Research field stored with each order",
+          "clause": "The selected research field must be stored with every order in your database, not just captured at signup.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "GATE-001",
+          "state": "pass",
+          "note": "An entry interstitial was observed (modal or overlay container) containing '21 years'. It covers the viewport or locks page scrolling.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z",
+              "matchedValue": "21 years"
+            }
+          ],
+          "title": "Age affirmation before entry",
+          "clause": "Every visitor must be stopped at the door and affirm they are 21 or older. This happens before products can be viewed — not at checkout.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        }
+      ]
+    },
+    {
+      "id": "disclose",
+      "name": "Site-wide disclosure",
+      "n": 2,
+      "findings": [
+        {
+          "ruleId": "DISC-003",
+          "state": "fail",
+          "note": "No text resembling the required disclaimer was observed in this page's footer. Observed on 5 of 5 sampled product page(s), including /shop/bpc-157-tb500-blend/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "Disclaimer on every sampled page",
+          "clause": "This sentence belongs in the footer of every single page, set in a legible size.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "DISC-001",
+          "state": "review",
+          "note": "The footer does not contain the required wording, and no comparable text was observed. Required: \"For research and laboratory use only. Not for human or animal consumption.\"",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z"
+            }
+          ],
+          "title": "Footer disclaimer wording",
+          "clause": "For research and laboratory use only. Not for human or animal consumption.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: the footer was rendered but no disclaimer element could be located within it, so nothing was measured",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z"
+            }
+          ],
+          "notEvaluableReason": "the footer was rendered but no disclaimer element could be located within it, so nothing was measured",
+          "notEvaluableKind": "not_exposed",
+          "title": "Footer disclaimer is legible",
+          "clause": "It may not be hidden, shrunk past readability, or tucked inside a collapsed element.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "computed_style",
+          "layer": 1
+        },
+        {
+          "ruleId": "DISC-004",
+          "state": "pass",
+          "note": "Observed: 'not intended to diagnose', 'prevent any disease'. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "FDA non-evaluation statement not observed",
+          "clause": "No statement was observed that the products are not evaluated by the FDA and are not intended to diagnose, treat, cure or prevent disease.",
+          "source": "mintro",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "name": "Product page content",
+      "n": 3,
+      "findings": [
+        {
+          "ruleId": "PROD-008",
+          "state": "review",
+          "note": "Observed: 'recovery', 'injury'. Not counted: 'treat', 'cure', 'prevent', 'disease' appeared only in negated or quoted sentences. Observed on 1 of 5 sampled product page(s), including /shop/semax/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z",
+              "matchedValue": "recovery, injury"
+            }
+          ],
+          "title": "No disease or benefit claims",
+          "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/shop/bpc-157-tb500-blend/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "The compound’s exact CAS registry number.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/shop/cjc-1295-no-dac-ipamorelin-blend/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "The compound’s exact CAS registry number.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "review",
+          "note": "/shop/bacteriostatic-water/ — The expected value was not observed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "The compound’s exact CAS registry number.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-012",
+          "state": "review",
+          "note": "Observed: 'recovery'. Observed on 1 of 5 sampled product page(s), including /shop/semax/.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z",
+              "matchedValue": "recovery"
+            }
+          ],
+          "title": "Benefit vocabulary with ordinary non-claim uses",
+          "clause": "Body copy uses words that name a buyer outcome in one sentence and something unremarkable in the next. Reported for a person to read rather than decided here.",
+          "source": "mintro",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no region labelled 'molecular formula' was observed, so there was nothing to examine Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular formula' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular formula listed",
+          "clause": "For example, C62H98N16O22 for BPC-157.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/shop/bpc-157-tb500-blend/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/shop/cjc-1295-no-dac-ipamorelin-blend/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "not_evaluable",
+          "note": "/shop/bacteriostatic-water/ — Not evaluable from the crawled surface: no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'molecular weight', 'g/mol' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no region labelled 'storage', 'store at' was observed, so there was nothing to examine Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "notEvaluableReason": "no region labelled 'storage', 'store at' was observed, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "Storage conditions listed",
+          "clause": "For example, “Store at -20°C, desiccated.”",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-005",
+          "state": "pass",
+          "note": "In the rendered text of the product surface, no quantity term (mg, mcg, iu, ml) was observed within 12 tokens of a schedule or route term. Co-occurrences further apart than that window were not examined. Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No dosing information",
+          "clause": "Never publish dosing information of any kind: milligram amounts, frequency, route of administration, or injection schedules.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-006",
+          "state": "pass",
+          "note": "None of 8 prohibited term(s) was claimed in the rendered text of this sampled page: 'Ozempic', 'Wegovy', 'Mounjaro', 'Zepbound', 'Rybelsus'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No pharmaceutical brand names",
+          "clause": "Ozempic, Wegovy, Mounjaro, Zepbound and Rybelsus are off limits, as is every other brand name.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-007",
+          "state": "pass",
+          "note": "None of 5 prohibited term(s) was claimed in the rendered text of this sampled page: 'injectable', 'nasal spray', 'for injection', 'subcutaneous', 'intramuscular'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No route-of-administration labels",
+          "clause": "Products cannot be labeled “injectable” or “nasal spray.” These describe how a person would take the product, which makes them administration route claims.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-011",
+          "state": "pass",
+          "note": "None of 7 prohibited term(s) was claimed in the rendered text of this sampled page: 'weight loss', 'fat loss', 'appetite suppression', 'muscle building', 'recomp'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "Benefit claims in product body copy",
+          "clause": "Body copy on a product page describes an outcome a buyer would experience. NAME-001 and NAME-002 report the same claim types in product names and category names; this reports them in the prose.",
+          "source": "mintro",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-013",
+          "state": "pass",
+          "note": "None of 5 prohibited term(s) was claimed in the rendered text of this sampled page: 'safe to inject', 'safe for human use', 'personal use', 'no prescription needed', 'no prescription required'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "Body copy addressing a human user",
+          "clause": "Body copy addresses the reader as the person who will take the product. Distinct from dosing information (PROD-005) and disease claims (PROD-008), neither of which reaches this wording.",
+          "source": "mintro",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "pass",
+          "note": "/shop/cagrilintide/ — Observed: '1415456-99-3'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z",
+              "matchedValue": "1415456-99-3"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "The compound’s exact CAS registry number.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-001",
+          "state": "pass",
+          "note": "/shop/semax/ — Observed: '80714-61-0'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z",
+              "matchedValue": "80714-61-0"
+            }
+          ],
+          "title": "CAS number listed",
+          "clause": "The compound’s exact CAS registry number.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-009",
+          "state": "pass",
+          "note": "The rendered page was examined for any of 'pubmed', 'ncbi.nlm.nih.gov', 'doi.org', 'clinicaltrials.gov'; none was observed. Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No links to study databases",
+          "clause": "Research papers may not be cited or linked, and neither may off-site material of any kind, where doing so would suggest a benefit to a person or point toward human use.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-010",
+          "state": "pass",
+          "note": "None of 4 prohibited term(s) was claimed in the rendered text of this sampled page: 'Sema', 'Tirz', 'Reta', 'Cagri'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No community abbreviations",
+          "clause": "Refer to GLP-1 products by chemical name or internal code only — “Semaglutide,” “Tirzepatide.” Never “Sema,” “Tirz,” or similar shorthand.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/shop/cagrilintide/ — Observed: '4409 g/mol'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z",
+              "matchedValue": "4409 g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-003",
+          "state": "pass",
+          "note": "/shop/semax/ — Observed: '813.9 g/mol'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z",
+              "matchedValue": "813.9 g/mol"
+            }
+          ],
+          "title": "Molecular weight listed",
+          "clause": "Expressed in g/mol.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "PROD-014",
+          "state": "pass",
+          "note": "None of 5 prohibited term(s) was claimed in the rendered text of this sampled page: 'absorbs into your system', 'bioavailable', 'bioavailability', 'maximum uptake', 'rapid absorption'. Text not rendered on the page was not examined. Observed across all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "Absorption and uptake claims",
+          "clause": "Body copy describes how the product enters or is taken up by the body, which addresses a reader as the subject of that uptake.",
+          "source": "mintro",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "naming",
+      "name": "Naming and taxonomy",
+      "n": 4,
+      "findings": [
+        {
+          "ruleId": "NAME-002",
+          "state": "fail",
+          "note": "2 of 37 URLs in scope 'products' matched a prohibited pattern: https://www.comopeptides.com/shop/bpc-157-tb500-blend/ (matched 'blend'); https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/ (matched 'blend').",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z",
+              "matchedValue": "blend",
+              "matchedUrls": [
+                "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+                "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/"
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No marketing terms in product names",
+          "clause": "Names such as “Lean Stack,” “Mass,” “PCT,” “CagriLean,” “Wolverine Peptide” or “Healing Stack” are not permitted.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/shop/bpc-157-tb500-blend/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "review",
+          "note": "/shop/cjc-1295-no-dac-ipamorelin-blend/ — Observed 'BPC-157' without 'Body Protection Compound 157'; 'TB-500' without 'Thymosin Beta-4 Fragment'.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z",
+              "matchedValue": "BPC-157, TB-500"
+            }
+          ],
+          "title": "Proper chemical names used",
+          "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no URLs in scope 'collections' were listed in the sitemap, so there was nothing to examine",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/robots.txt",
+              "sourceSha256": "1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344",
+              "capturedAt": "2026-08-29T23:30:36.283Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/sitemap_index.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/sitemap_index.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/sitemap_index.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/robots.txt",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/sitemap_index.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/page-sitemap.xml",
+                  "status": 200
+                },
+                {
+                  "url": "https://www.comopeptides.com/product-sitemap.xml",
+                  "status": 200
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no URLs in scope 'collections' were listed in the sitemap, so there was nothing to examine",
+          "notEvaluableKind": "not_exposed",
+          "title": "No therapeutic categories",
+          "clause": "Products cannot be filed under categories such as “Weight Loss,” “Obesity,” “Longevity,” “Cognitive Enhancement,” “Joint Healing” or “Anti-Aging.”",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/shop/bacteriostatic-water/ — Not evaluable from the crawled surface: this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            }
+          ],
+          "notEvaluableReason": "this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "notEvaluableKind": "no_check_built",
+          "title": "Proper chemical names used",
+          "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/shop/cagrilintide/ — Not evaluable from the crawled surface: this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            }
+          ],
+          "notEvaluableReason": "this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "notEvaluableKind": "no_check_built",
+          "title": "Proper chemical names used",
+          "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "NAME-003",
+          "state": "not_evaluable",
+          "note": "/shop/semax/ — Not evaluable from the crawled surface: this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "notEvaluableReason": "this page carries none of the 2 compound(s) this rule has entries for ('BPC-157', 'TB-500'), so nothing on it was compared. A compound with no entry is not examined, whether or not the page carries one",
+          "notEvaluableKind": "no_check_built",
+          "title": "Proper chemical names used",
+          "clause": "Name each product with the compound’s precise chemical name or its formula — nothing else.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "name": "Catalog composition",
+      "n": 5,
+      "findings": [
+        {
+          "ruleId": "CATG-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'bacteriostatic' or 'sterile water'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Reconstitution solution labelling",
+          "clause": "Bacteriostatic water is permitted when it carries the label “Reconstitution Solution for Laboratory Use.” Keep injection language off the listing, and attach no pharmaceutical brand names such as Pfizer or Hospira.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-006",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: this rule applies only to products described as 'capsule'; this page is not one Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "notEvaluableReason": "this rule applies only to products described as 'capsule'; this page is not one",
+          "notEvaluableKind": "not_applicable",
+          "title": "Capsule labelling",
+          "clause": "Capsules may be sold only where they are exclusively for research use and properly labeled, listed with chemical names and CAS numbers only. Anything short of that is prohibited.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 2
+        },
+        {
+          "ruleId": "CATG-001",
+          "state": "pass",
+          "note": "37 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No needles or syringes",
+          "clause": "Offering injection supplies next to peptides is itself evidence of intended injection.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-002",
+          "state": "pass",
+          "note": "37 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No alcohol wipes",
+          "clause": "Their obvious purpose is preparing an injection site, which places the sale in a human-injection context.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-003",
+          "state": "pass",
+          "note": "37 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No HCG or HGH",
+          "clause": "Human Chorionic Gonadotropin and Human Growth Hormone both require prescriptions.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-004",
+          "state": "pass",
+          "note": "37 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No tablets or pills",
+          "clause": "Oral dosage forms are not permitted.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "CATG-007",
+          "state": "pass",
+          "note": "37 URLs in scope 'products' were examined; none matched the patterns for this rule.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "Non-peptide research compounds in the catalogue",
+          "clause": "The catalogue offered under a research peptide programme may contain compounds that are not peptides. This rule reports which of them are present and names them.",
+          "source": "mintro",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "url_pattern",
+          "layer": 0
+        }
+      ]
+    },
+    {
+      "id": "coa",
+      "name": "Quality documentation",
+      "n": 6,
+      "findings": [
+        {
+          "ruleId": "COA-006",
+          "state": "review",
+          "note": "A certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate, so nothing it would state can be read. 5 link(s) were requested, each listed with what it returned.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:30:56.305Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/how-to-read-a-coa/",
+                  "status": 200,
+                  "error": "served 133447 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cjc-1295-no-dac-ipamorelin-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bacteriostatic-water",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cagrilintide",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "title": "Certificate links serve a readable certificate",
+          "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:30:56.305Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/how-to-read-a-coa/",
+                  "status": 200,
+                  "error": "served 133447 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cjc-1295-no-dac-ipamorelin-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bacteriostatic-water",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cagrilintide",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "Certificate reports a test date within 60 days",
+          "clause": "Refresh COAs at least every 60 days. When a new batch arrives, update immediately rather than waiting for the cycle.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:30:56.305Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/how-to-read-a-coa/",
+                  "status": 200,
+                  "error": "served 133447 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cjc-1295-no-dac-ipamorelin-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bacteriostatic-water",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cagrilintide",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "Certificate states purity at or above 98%",
+          "clause": "A minimum of 98% purity for all products, and every purity figure must be backed by a Certificate of Analysis.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Accreditation and authenticity cannot be verified from a PDF. Forged COAs are a known failure mode. Independent assay is the only real control.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Lab is accredited and independent",
+          "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COA-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:30:56.305Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bpc-157-tb500-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/how-to-read-a-coa/",
+                  "status": 200,
+                  "error": "served 133447 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cjc-1295-no-dac-ipamorelin-blend",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#bacteriostatic-water",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                },
+                {
+                  "url": "https://www.comopeptides.com/certificates-of-analysis/#cagrilintide",
+                  "status": 200,
+                  "error": "served 1079498 byte(s) as 'text/html; charset=UTF-8' that do not begin with %PDF, so no certificate was retrieved"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "a certificate link on the sampled product pages returned something that is not a PDF. The link resolves and looks live to a customer; what it serves is not a certificate. 5 link(s) were requested, each listed with what it returned",
+          "notEvaluableKind": "not_exposed",
+          "title": "COA contains all required fields",
+          "clause": "The COA must identify the batch or lot number, the testing date, the compound identity, the purity percentage, and the method used (HPLC preferred).",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "doc_parse",
+          "layer": 2
+        },
+        {
+          "ruleId": "COA-001",
+          "state": "pass",
+          "note": "Observed on the rendered page: 'coa'. Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "COA linked on each sampled product page",
+          "clause": "Each product page must link to the COA for the current batch, issued by an accredited independent third-party testing laboratory.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        }
+      ]
+    },
+    {
+      "id": "fulfil",
+      "name": "Fulfillment and screening",
+      "n": 7,
+      "findings": [
+        {
+          "ruleId": "FULF-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal record. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal record. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Ban list maintained",
+          "clause": "Keep a live ban list. A customer who so much as hints at human consumption is removed for good, with no appeal, and the reason is written down.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no shipping policy was reached: 1 of the 7 path(s) tried was served but could not be read as one",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/aboutcomopeptides/#how-quickly",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/aboutcomopeptides/#how-quickly",
+                  "status": 200,
+                  "error": "shipping policy: https://www.comopeptides.com/aboutcomopeptides/#how-quickly redirected to https://www.comopeptides.com/#how-quickly, which is not the document that was requested"
+                },
+                {
+                  "url": "https://www.comopeptides.com/pages/shipping-policy",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/pages/shipping",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/shipping-policy",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/shipping",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/shipping-returns",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/delivery",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no shipping policy was reached: 1 of the 7 path(s) tried was served but could not be read as one",
+          "notEvaluableKind": "not_exposed",
+          "title": "Shipping policy states USA only",
+          "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "text_match",
+          "layer": 3
+        },
+        {
+          "ruleId": "FULF-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Establishing this requires entering a PO box address at checkout and seeing whether the merchant accepts it, which means submitting data to a live store. The crawl submits nothing. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "No PO boxes",
+          "clause": "Domestic addresses only. No PO boxes, and nothing crossing the border.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Carrier configuration. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Carrier configuration. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Adult signature on first orders",
+          "clause": "Every first-time customer order must require an adult signature on delivery, with 21+ confirmed.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "FULF-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Physical document. Requires a test order or merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Physical document. Requires a test order or merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Packing slip disclaimers",
+          "clause": "Include the research-use-only disclaimer and the research-professional acknowledgement in the shipment itself.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    },
+    {
+      "id": "offsite",
+      "name": "Off-site presence",
+      "n": 8,
+      "findings": [
+        {
+          "ruleId": "OFFS-004",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Post-level review needs platform API access or a commercial listening tool. Not covered.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Social post content",
+          "clause": "Whatever the channel, a post lives under the product-page rules — naming, claims, categories and disclaimers all carry over.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-005",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal process. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal process. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Monthly social audits",
+          "clause": "Sweep every channel at least once a month, and act on any post found carrying human-use language.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "OFFS-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no social media links were observed on the rendered homepage, and accounts a storefront does not link to are not discoverable from it",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z"
+            }
+          ],
+          "notEvaluableReason": "no social media links were observed on the rendered homepage, and accounts a storefront does not link to are not discoverable from it",
+          "notEvaluableKind": "not_exposed",
+          "title": "Social accounts linked from the storefront",
+          "clause": "From social profiles and posts, link to the site’s home page and nowhere deeper.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "OFFS-001",
+          "state": "pass",
+          "note": "19 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "No affiliate or referral program URLs",
+          "clause": "Do not operate an affiliate or referral program.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "url_pattern",
+          "layer": 0
+        },
+        {
+          "ruleId": "OFFS-002",
+          "state": "pass",
+          "note": "No elements matching '[itemtype*=\"schema.org/Review\"], [itemtype*=\"schema.org/AggregateRating\"], [itemprop=\"review\"], [itemprop=\"aggregateRating\"], [data-product-reviews]' were observed. Content of this kind presented in other markup was not examined. Observed on all 5 sampled product page(s).",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/",
+              "sourceSha256": "3b1fe9a346d2b9ad3968648c36d7166480914e24f7270ac3d5a77bbab884068a",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/1c1bc2dac3ed69e4415241c15574e4bb56ffcab07504cdff0e11cd5162e548f2.png",
+              "capturedAt": "2026-08-29T23:30:40.932Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/",
+              "sourceSha256": "53d80fc4a9c9183e9a3c4056a70ba6a0a24d920c4ba7609e684deb4b82278cc1",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/5883de41d82034cbcf77fc9c6c36657f6e3a85531d510a9bbfc8b5487a4b0b3e.png",
+              "capturedAt": "2026-08-29T23:30:43.977Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/bacteriostatic-water/",
+              "sourceSha256": "b5d0c16a74e03beb5a912c84e532d6fb61be0e74a66cf22a3465d97868f2878b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b0000f8e047508dccb5738f39c47b3da901d36ddc3388fbced92e300bae1197c.png",
+              "capturedAt": "2026-08-29T23:30:46.953Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/cagrilintide/",
+              "sourceSha256": "82e3eab26187d43af2fabecb6a1bd94e772e993a9d58645615d947feadb79762",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/d3fcef9f571fbfd52204a6a368c75d99a52300c4cf2d8606f5122abac4c1961d.png",
+              "capturedAt": "2026-08-29T23:30:49.937Z"
+            },
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/shop/semax/",
+              "sourceSha256": "c7dc49bc088d90b138e2b307cb7ff64cf0fa171210555fd18d0217ecec87163b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/b90a36abf5eb2efc66dfae5587346acd4b6ebb4c1379248238c73311ae65e601.png",
+              "capturedAt": "2026-08-29T23:30:52.945Z"
+            }
+          ],
+          "title": "No testimonials or outcome stories",
+          "clause": "Do not post testimonials, before-and-after photos, recovery stories, or user reviews that describe health outcomes.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 2
+        },
+        {
+          "ruleId": "OFFS-007",
+          "state": "pass",
+          "note": "62 link(s) with visible text in the rendered homepage were examined for 'affiliate', 'ambassador', 'referral program', 'partner program'; none matched. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z"
+            }
+          ],
+          "title": "Affiliate program linked from the homepage",
+          "clause": "Do not operate an affiliate or referral program.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 1
+        },
+        {
+          "ruleId": "OFFS-006",
+          "state": "pass",
+          "note": "19 content URLs were examined; none had a slug matching this rule's patterns. Page content itself was not read, and URLs not identified as content — or absent from the sitemap — were not examined.",
+          "evidenceKind": "document",
+          "evidence": [
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/sitemap_index.xml",
+              "sourceSha256": "ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/ecc35d5c731e2f028b97f7e8c5f88047acd35108d9c0b95f11b5b3b8412afd9c",
+              "capturedAt": "2026-08-29T23:30:37.042Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/page-sitemap.xml",
+              "sourceSha256": "10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/10e18fedd58450835b7820d58353f1d76166d105e2c5e8182ced53a93643333b",
+              "capturedAt": "2026-08-29T23:30:37.582Z"
+            },
+            {
+              "kind": "document",
+              "sourceUrl": "https://www.comopeptides.com/product-sitemap.xml",
+              "sourceSha256": "cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer0/cda1c12c009b6ff16a2776713385f28b6fd19227a32529e9770e9c17136ff26b",
+              "capturedAt": "2026-08-29T23:30:38.088Z"
+            }
+          ],
+          "title": "Editorial content on therapeutic topics",
+          "clause": "Nothing on the site may state or imply that a compound treats, cures, prevents or diagnoses a disease or condition of any kind.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "url_pattern",
+          "layer": 0
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "Payments",
+      "n": 9,
+      "findings": [
+        {
+          "ruleId": "PAY-003",
+          "state": "review",
+          "note": "No link with visible text matching 'refund', 'return', 'chargeback' was observed among 28 link(s) in the rendered homepage footer. The visible text of these links was examined; their destinations were not followed.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "97b2d5788a6f2a21d32a2bf30036a10deb3b2dea1f55d1d398d616fe113c68c5",
+              "evidenceKey": "f66f7299-c728-4a9d-bc5d-cc7799d2922d/layer1/07c834cdea196e5a01de6e9635ce3dd6aaa1e3cb957e7520a68a791b0dabc9b9.png",
+              "capturedAt": "2026-08-29T23:30:38.582Z"
+            }
+          ],
+          "title": "Refund and chargeback policy published",
+          "clause": "Publish a refund and chargeback policy, clearly written and easy to find.",
+          "source": "programme",
+          "severity": "minor",
+          "tier": "review_only",
+          "checkType": "dom_assert",
+          "layer": 3
+        },
+        {
+          "ruleId": "PAY-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Card processing through a merchant account",
+          "clause": "Card payments must run through a legitimate merchant processor that performs proper KYC. How a seller collects money is read as evidence of how the business is run.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "PAY-001",
+          "state": "pass",
+          "note": "None of 'Zelle', 'Cash App', 'CashApp', 'Venmo', 'Friends & Family', 'friends and family' was observed in the rendered text of 2 public surface(s): the homepage footer, the terms document (https://www.comopeptides.com/termsandconditions/). A checkout page behind a sign-in was not among the surfaces examined, and text not rendered on these pages was not examined.",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z"
+            }
+          ],
+          "title": "No peer-to-peer payment methods named on public pages",
+          "clause": "To an investigator, a seller collecting through Venmo, Cash App, Zelle or PayPal Friends & Family looks like one sidestepping the fraud controls that come with a standard merchant account.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "auto_fail",
+          "checkType": "text_match",
+          "layer": 3
+        }
+      ]
+    },
+    {
+      "id": "comms",
+      "name": "Customer communications",
+      "n": 10,
+      "findings": [
+        {
+          "ruleId": "COMM-001",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: no FAQ was reached: none of the 6 path(s) tried was served",
+          "evidenceKind": "rendered_page",
+          "evidence": [
+            {
+              "kind": "rendered_page",
+              "sourceUrl": "https://www.comopeptides.com/pages/faq",
+              "sourceSha256": "",
+              "evidenceKey": "",
+              "capturedAt": "2026-08-29T23:31:23.735Z",
+              "attempts": [
+                {
+                  "url": "https://www.comopeptides.com/pages/faq",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/pages/faqs",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/faq",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/faqs",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/frequently-asked-questions",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                },
+                {
+                  "url": "https://www.comopeptides.com/help",
+                  "status": 404,
+                  "error": "the origin answered HTTP 404"
+                }
+              ]
+            }
+          ],
+          "notEvaluableReason": "no FAQ was reached: none of the 6 path(s) tried was served",
+          "notEvaluableKind": "not_exposed",
+          "title": "FAQ free of dosing or administration advice",
+          "clause": "No dosing advice, no administration guidance, and nothing a reader could take as instruction for using a drug — in any channel, by any staff member.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "text_cooccurrence",
+          "layer": 3
+        },
+        {
+          "ruleId": "COMM-002",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Not reachable by crawl. Sampled transcript review or mystery shopping only.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Support channels free of human-use language",
+          "clause": "This standard covers every channel — your FAQ and site copy, email, live chat, phone, and social media direct messages.",
+          "source": "programme",
+          "severity": "critical",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        },
+        {
+          "ruleId": "COMM-003",
+          "state": "not_evaluable",
+          "note": "Not evaluable from the crawled surface: Internal training. Requires merchant attestation.",
+          "evidenceKind": "document",
+          "evidence": [],
+          "notEvaluableReason": "Internal training. Requires merchant attestation.",
+          "notEvaluableKind": "not_reachable",
+          "title": "Staff do not help with protocols",
+          "clause": "Staff must never offer to help a customer “figure out” a protocol.",
+          "source": "programme",
+          "severity": "major",
+          "tier": "review_only",
+          "checkType": "manual",
+          "layer": null
+        }
+      ]
+    }
+  ],
+  "strip": [
+    {
+      "ruleId": "GATE-002",
+      "title": "Products hidden until an account exists",
+      "state": "fail"
+    },
+    {
+      "ruleId": "GATE-004",
+      "title": "Terms acknowledged at sign-up",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-005",
+      "title": "Research field required at sign-up",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-007",
+      "title": "Terms cover all required clauses",
+      "state": "review"
+    },
+    {
+      "ruleId": "GATE-003",
+      "title": "Guest checkout disabled",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-006",
+      "title": "Research field stored with each order",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "GATE-001",
+      "title": "Age affirmation before entry",
+      "state": "pass"
+    },
+    {
+      "ruleId": "DISC-003",
+      "title": "Disclaimer on every sampled page",
+      "state": "fail"
+    },
+    {
+      "ruleId": "DISC-001",
+      "title": "Footer disclaimer wording",
+      "state": "review"
+    },
+    {
+      "ruleId": "DISC-002",
+      "title": "Footer disclaimer is legible",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "DISC-004",
+      "title": "FDA non-evaluation statement not observed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-008",
+      "title": "No disease or benefit claims",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-012",
+      "title": "Benefit vocabulary with ordinary non-claim uses",
+      "state": "review"
+    },
+    {
+      "ruleId": "PROD-002",
+      "title": "Molecular formula listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-004",
+      "title": "Storage conditions listed",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PROD-005",
+      "title": "No dosing information",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-006",
+      "title": "No pharmaceutical brand names",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-007",
+      "title": "No route-of-administration labels",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-011",
+      "title": "Benefit claims in product body copy",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-013",
+      "title": "Body copy addressing a human user",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-001",
+      "title": "CAS number listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-009",
+      "title": "No links to study databases",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-010",
+      "title": "No community abbreviations",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-003",
+      "title": "Molecular weight listed",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PROD-014",
+      "title": "Absorption and uptake claims",
+      "state": "pass"
+    },
+    {
+      "ruleId": "NAME-002",
+      "title": "No marketing terms in product names",
+      "state": "fail"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "review"
+    },
+    {
+      "ruleId": "NAME-001",
+      "title": "No therapeutic categories",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "NAME-003",
+      "title": "Proper chemical names used",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-005",
+      "title": "Reconstitution solution labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-006",
+      "title": "Capsule labelling",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "CATG-001",
+      "title": "No needles or syringes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-002",
+      "title": "No alcohol wipes",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-003",
+      "title": "No HCG or HGH",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-004",
+      "title": "No tablets or pills",
+      "state": "pass"
+    },
+    {
+      "ruleId": "CATG-007",
+      "title": "Non-peptide research compounds in the catalogue",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COA-006",
+      "title": "Certificate links serve a readable certificate",
+      "state": "review"
+    },
+    {
+      "ruleId": "COA-002",
+      "title": "Certificate reports a test date within 60 days",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-003",
+      "title": "Certificate states purity at or above 98%",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-005",
+      "title": "Lab is accredited and independent",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-004",
+      "title": "COA contains all required fields",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COA-001",
+      "title": "COA linked on each sampled product page",
+      "state": "pass"
+    },
+    {
+      "ruleId": "FULF-005",
+      "title": "Ban list maintained",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-001",
+      "title": "Shipping policy states USA only",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-002",
+      "title": "No PO boxes",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-003",
+      "title": "Adult signature on first orders",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "FULF-004",
+      "title": "Packing slip disclaimers",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-004",
+      "title": "Social post content",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-005",
+      "title": "Monthly social audits",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-003",
+      "title": "Social accounts linked from the storefront",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "OFFS-001",
+      "title": "No affiliate or referral program URLs",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "title": "No testimonials or outcome stories",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-007",
+      "title": "Affiliate program linked from the homepage",
+      "state": "pass"
+    },
+    {
+      "ruleId": "OFFS-006",
+      "title": "Editorial content on therapeutic topics",
+      "state": "pass"
+    },
+    {
+      "ruleId": "PAY-003",
+      "title": "Refund and chargeback policy published",
+      "state": "review"
+    },
+    {
+      "ruleId": "PAY-002",
+      "title": "Card processing through a merchant account",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "PAY-001",
+      "title": "No peer-to-peer payment methods named on public pages",
+      "state": "pass"
+    },
+    {
+      "ruleId": "COMM-001",
+      "title": "FAQ free of dosing or administration advice",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-002",
+      "title": "Support channels free of human-use language",
+      "state": "not_evaluable"
+    },
+    {
+      "ruleId": "COMM-003",
+      "title": "Staff do not help with protocols",
+      "state": "not_evaluable"
+    }
+  ],
+  "truncations": [],
+  "politeness": "robots.txt declared no Crawl-delay; requests were not additionally spaced.",
+  "notChecked": [
+    {
+      "subject": "Social media accounts",
+      "why": "Mintro crawls the storefront. It does not follow or read the social media accounts a storefront links to. FDA actively monitors social channels for claims that contradict a seller's own disclaimers, and the standards name off-site marketing as the highest-risk area, so nothing in this report speaks to what those accounts contain."
+    }
+  ],
+  "attestationQuestions": [
+    {
+      "id": "shipping-destinations",
+      "question": "Do you ship only within the USA, excluding PO boxes and international addresses?",
+      "authority": "programme",
+      "sev": "critical"
+    },
+    {
+      "id": "shipping-to-clinics",
+      "question": "Do you ship to gyms, med-spas, wellness clinics or weight-loss clinics?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "adult-signature",
+      "question": "Do first-time orders require an adult signature at 21+?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "packing-slip-disclaimer",
+      "question": "Does the packing slip carry the RUO disclaimer and research acknowledgement?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "ban-list",
+      "question": "Do you maintain a permanent ban list for customers who indicate human use?",
+      "authority": "programme",
+      "sev": "critical"
+    },
+    {
+      "id": "ban-list-permanence",
+      "question": "Are bans documented and permanent, with no appeal?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "support-dosing-guidance",
+      "question": "Do support staff ever provide dosing, administration or protocol guidance — by email, chat, phone or DM?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "support-dosing-response",
+      "question": "What is your standard support response to a dosing question?",
+      "authority": "law",
+      "sev": "major"
+    },
+    {
+      "id": "staff-protocol-help",
+      "question": "Do staff offer to help customers \"figure out\" protocols?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "social-account-content",
+      "question": "Do any social accounts contain human-use claims, testimonials or outcome stories?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "influencer-payment",
+      "question": "Do you pay or barter with influencers?",
+      "authority": "law",
+      "sev": "critical"
+    },
+    {
+      "id": "social-audit-cadence",
+      "question": "How often are social channels audited, and by whom?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "brand-mention-monitoring",
+      "question": "Do you monitor third-party brand mentions and issue cease-and-desist notices?",
+      "authority": "programme",
+      "sev": "minor"
+    },
+    {
+      "id": "coa-lab-accreditation",
+      "question": "Is your COA lab independent and accredited? Which accreditation?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "coa-batch-cadence",
+      "question": "How often do you receive new batches, and how quickly are COAs updated?",
+      "authority": "programme",
+      "sev": "minor"
+    },
+    {
+      "id": "payment-channels",
+      "question": "Do you accept payment through any channel other than card processing?",
+      "authority": "network",
+      "sev": "critical"
+    },
+    {
+      "id": "related-storefronts",
+      "question": "Do you operate any other storefronts, brands or domains selling the same products?",
+      "authority": "network",
+      "sev": "critical"
+    },
+    {
+      "id": "research-field-storage",
+      "question": "Do you store the declared research field with every order?",
+      "authority": "programme",
+      "sev": "major"
+    },
+    {
+      "id": "prior-termination",
+      "question": "Has any acquirer, processor or platform terminated you?",
+      "authority": "network",
+      "sev": "critical"
+    }
+  ],
+  "access": {
+    "mode": "public",
+    "wall": false,
+    "usedCredential": false,
+    "note": "Every sampled product page was served to an anonymous request."
+  }
+}

@@ -2062,6 +2062,54 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
   display: inline-block;
 }
 
+/* ---------- the brief (D-190, spec §1) ----------
+   Page one, and the first screen. Hierarchy from type and space; the only mark is a rule down the
+   left of each item, which is what a quoted observation looks like. No new colour. */
+
+.brief { margin: 0 0 34px; }
+
+.brief-head {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 25px; font-weight: 600; letter-spacing: -0.015em;
+  margin: 0 0 18px; max-width: 26ch; line-height: 1.25;
+}
+
+.brief-items { list-style: none; margin: 0 0 20px; padding: 0; }
+
+.brief-item {
+  border-left: 2px solid var(--line);
+  padding: 2px 0 2px 14px;
+  margin-bottom: 12px;
+}
+
+/* A failed stopping condition is not the same kind of news as a standard not met: it means the
+   package does not proceed. One accent, used once (D-167). */
+.brief-item[data-stopping] { border-left-color: var(--rose); }
+
+.brief-title { display: block; font-size: 14.5px; font-weight: 500; color: var(--ink); text-decoration: none; }
+.brief-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.brief-line { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-mid); line-height: 1.5; }
+
+.brief-more { margin: -6px 0 18px 16px; font-size: 12px; color: var(--slate); }
+
+.brief-counts {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 26px;
+  margin: 0 0 14px; padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-mid);
+}
+.brief-counts a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+.brief-counts a:hover { border-bottom-color: var(--ink); }
+.brief-n { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.brief-coverage { margin: 0; font-size: 12px; line-height: 1.6; color: var(--slate); max-width: 76ch; }
+
+@media print {
+  /* Page one, and nothing else on it. A reader who stops here has the whole summary. */
+  .brief { break-after: page; }
+  .brief-head { font-size: 22px; }
+}
+
 /* ---------- the three review bands (D-189, spec §3) ----------
    Sub-headings with a rule above their rows. Heavier than a block heading and lighter than a
    section name, because that is exactly where they sit: one section, three bands, blocks inside

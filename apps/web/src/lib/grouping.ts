@@ -24,6 +24,7 @@
  */
 
 import type { State } from '@mintro/ruleset';
+import { briefLine } from './format.js';
 import { invitesComment, STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
@@ -622,8 +623,13 @@ export type SectionId = 'stopping' | 'questions' | 'review';
  * Who is reading.
  *
  * Surfaces differ in what they may **act on** — the merchant's comment boxes, the agent's
- * controls — and never in how the document is ordered. All three read the same four sections in
- * the same order (D-186).
+ * controls — and never in how the document is ordered. All three read the same sections in the
+ * same order (D-186).
+ *
+ * Settled at brief, stopping conditions, for your review, operational questions, met (D-190). The
+ * questions moved after the review section once the merge existed: the spec's original numbering
+ * predates it, and this is the order that leaves the passes at the genuine end of the document
+ * rather than stranded in the middle of it.
  */
 export type Surface = 'merchant' | 'agent' | 'iqwallet';
 
@@ -827,9 +833,9 @@ const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
  * merchant's comment boxes, the agent's controls — and that is real. Ordering was not.
  */
 const SECTION_ORDER: Readonly<Record<Surface, readonly SectionId[]>> = {
-  merchant: ['stopping', 'questions', 'review'],
-  agent: ['stopping', 'questions', 'review'],
-  iqwallet: ['stopping', 'questions', 'review'],
+  merchant: ['stopping', 'review', 'questions'],
+  agent: ['stopping', 'review', 'questions'],
+  iqwallet: ['stopping', 'review', 'questions'],
 };
 
 /**
@@ -1199,6 +1205,125 @@ const HEADER_LABEL: Readonly<Record<string, string>> = {
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
 export const sectionAnchor = (id: SectionId): string => `section-${id}`;
+
+/**
+ * The brief — page one, and the first screen (D-190, spec §1).
+ *
+ * Self-contained: a reader may stop here. What it holds is a headline, up to three named items with
+ * one line each, three counts and a coverage sentence.
+ *
+ * ## Priority-ordered, not fixed content
+ *
+ * A failed stopping condition leads wherever one exists, because a failed one means the package
+ * does not proceed — and it is marked `stopping` so the surface can render it distinctly. Standards
+ * not met fill that space otherwise. Where neither exists there are no items and the headline says
+ * so, with the counts carrying the page.
+ *
+ * ## Nothing here instructs
+ *
+ * *"Three observations did not meet a standard"*, never *"three things to change"*. A summary is
+ * where a determination is most likely to creep in, because brevity invites the shorter, stronger
+ * verb — and D-001 is not relaxed by brevity (hard constraint 7).
+ *
+ * ## Three, and the rest counted
+ *
+ * The brief is a summary or it is a second list. Beyond three the remainder is stated as a number
+ * and the section below carries them.
+ */
+export interface BriefItem {
+  readonly ruleId: string;
+  readonly title: string;
+  /** The one-line summary, or `null` where none could be selected without rewriting one. */
+  readonly line: string | null;
+  /** True for a failed stopping condition, which the surface marks out. */
+  readonly stopping: boolean;
+}
+
+export interface BriefCount {
+  readonly label: string;
+  readonly count: number;
+  readonly href: string | null;
+}
+
+export interface Brief {
+  readonly headline: string;
+  readonly items: readonly BriefItem[];
+  /** How many more of the same kind are below, when more than `MAX_BRIEF_ITEMS` exist. */
+  readonly more: number;
+  readonly counts: readonly BriefCount[];
+  readonly coverage: string;
+}
+
+const MAX_BRIEF_ITEMS = 3;
+
+export function brief(report: ScreeningReport, parts: readonly ReportPart[]): Brief {
+  const groups = nestCascades(groupByRule(ungrouped(report)));
+  const stoppingIds = stoppingRuleIds(report);
+
+  const failedStopping = groups.filter((g) => stoppingIds.has(g.ruleId) && g.state === 'fail');
+  const failed = groups.filter((g) => !stoppingIds.has(g.ruleId) && g.state === 'fail');
+
+  // Stopping conditions first, always. Everything else is what fills the space they leave.
+  const leading = failedStopping.length > 0 ? failedStopping : failed;
+  const shown = leading.slice(0, MAX_BRIEF_ITEMS);
+
+  const items: BriefItem[] = shown.map((group) => ({
+    ruleId: group.ruleId,
+    title: group.title,
+    line: briefLine(group.findings[0]?.note ?? '', group.title),
+    stopping: failedStopping.length > 0,
+  }));
+
+  const part = (id: SectionId): ReportPart | undefined => parts.find((p) => p.id === id);
+  const review = part('review');
+  const anchor = (id: SectionId, n: number): string | null => (n === 0 ? null : `#${sectionAnchor(id)}`);
+
+  const questions = part('questions')?.tally.rules ?? 0;
+  const unclear = review?.tally.byState.review ?? 0;
+  const stoppingFailed = part('stopping')?.tally.rules ?? 0;
+
+  return {
+    headline: briefHeadline(failedStopping.length, failed.length),
+    items,
+    more: Math.max(0, leading.length - shown.length),
+    counts: [
+      { label: `question${questions === 1 ? '' : 's'} for you`, count: questions, href: anchor('questions', questions) },
+      { label: STATE_LABEL_LOWER.review, count: unclear, href: anchor('review', unclear) },
+      {
+        label: `stopping condition${stoppingFailed === 1 ? '' : 's'} failed`,
+        count: stoppingFailed,
+        href: anchor('stopping', stoppingFailed),
+      },
+    ],
+    coverage: `${sampleSentence(report)}${coverageSentence(report)}`,
+  };
+}
+
+/**
+ * The headline, which states what was observed and stops.
+ *
+ * Each of these is a count and a fact. None of them tells anyone what to do about it, and none
+ * characterises the merchant — *"observations did not meet a standard"* is about observations
+ * against a standard, not about a storefront's intent.
+ */
+function briefHeadline(stopping: number, failed: number): string {
+  if (stopping > 0) {
+    return stopping === 1
+      ? 'One stopping condition was not met'
+      : `${spellOut(stopping)} stopping conditions were not met`;
+  }
+  if (failed === 0) return 'No observation fell short of a standard';
+  return failed === 1
+    ? 'One observation did not meet a standard'
+    : `${spellOut(failed)} observations did not meet a standard`;
+}
+
+/** How much of the catalogue was looked at, where the run recorded it (D-162). */
+function sampleSentence(report: ScreeningReport): string {
+  const sample = report.sample;
+  if (sample === undefined) return '';
+  return `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages. `;
+}
 
 /**
  * Where a rule's row lives, so the stopping checklist can point at its own detail (D-186).

@@ -21,6 +21,7 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import {
+  brief,
   findingAnchor,
   describeGroup,
   inheritsEvidence,
@@ -29,6 +30,7 @@ import {
   reportParts,
   sectionAnchor,
   ordinalsFor,
+  type Brief as BriefModel,
   type FindingGroup,
   type ReportPart,
   type Surface,
@@ -255,6 +257,7 @@ export function ReportView({
         it points at cannot disagree. **Nothing was moved into the space this vacated**: the point is
         fewer things and more air.
       */}
+      <Brief brief={brief(report, parts)} />
       <HeaderLines parts={parts} />
       {/*
         The sentinel the sticky bar watches. When this scrolls out, the bar appears — done in CSS
@@ -304,25 +307,11 @@ export function ReportView({
               <AttestationSection attestations={attestations} print={print} />
             ) : null;
 
-          const passes =
-            part.passes !== undefined && part.passes.groups.length > 0 ? (
-              <PassDisclosure
-                groups={part.passes.groups}
-                tally={part.passes.tally}
-                access={access}
-                ordinals={ordinals}
-                print={print}
-                {...(commentaryOf === undefined ? {} : { commentaryOf })}
-                {...(commentBox === undefined ? {} : { commentBox })}
-              />
-            ) : null;
-
           return (
             <ReportSectionView
               key={part.id}
               part={part}
               questions={questions}
-              passes={passes}
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
@@ -341,6 +330,31 @@ export function ReportView({
             </ReportSectionView>
           );
         })}
+
+        {/*
+          Met, at the end of the document (D-190, spec §5).
+
+          It was furniture inside the section that held the not-observed rows. That section is now
+          "For your review" and the questions read after it, so leaving the passes where they were
+          would strand twenty-one satisfied rules in the middle of the document. A count and a
+          disclosure, never a heading of its own — twenty-six passes above the fold is what made the
+          report read as a list.
+        */}
+        {(() => {
+          const review = parts.find((part) => part.passes !== undefined && part.passes.groups.length > 0);
+          if (review?.passes === undefined) return null;
+          return (
+            <PassDisclosure
+              groups={review.passes.groups}
+              tally={review.passes.tally}
+              access={access}
+              ordinals={ordinals}
+              print={print}
+              {...(commentaryOf === undefined ? {} : { commentaryOf })}
+              {...(commentBox === undefined ? {} : { commentBox })}
+            />
+          );
+        })()}
       </div>
 
       {/*
@@ -430,6 +444,61 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
  * No new colour and no shadow — a hairline, the page's own background, and the numerals doing the
  * work, which is the treatment the lines already have (D-167).
  */
+/**
+ * The brief — the first screen, and page one of the PDF (D-190, spec §1).
+ *
+ * Self-contained: a reader may stop here. Up to three named items with one line each, three counts,
+ * and what the run covered.
+ *
+ * A failed stopping condition carries `data-stopping`, because a failed one means the package does
+ * not proceed and that is not the same kind of news as a standard not met. Every item links to its
+ * row.
+ *
+ * Nothing in it instructs (D-001, hard constraint 7). The headline states what was observed and
+ * stops; the summary lines are sentences the findings already carry, selected rather than written.
+ */
+function Brief({ brief: content }: { readonly brief: BriefModel }): JSX.Element {
+  return (
+    <section className="brief" aria-label="Summary">
+      <h2 className="brief-head">{content.headline}</h2>
+
+      {content.items.length > 0 && (
+        <ul className="brief-items">
+          {content.items.map((item) => (
+            <li key={item.ruleId} className="brief-item" data-stopping={item.stopping ? '' : undefined}>
+              <a className="brief-title" href={`#${findingAnchor(item.ruleId)}`}>
+                {item.title}
+              </a>
+              {/*
+                Omitted rather than truncated where no whole sentence fits (D-190). A clipped
+                observation can invert its own meaning, and the row is one click away.
+              */}
+              {item.line !== null && <span className="brief-line">{item.line}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {content.more > 0 && (
+        <p className="brief-more">
+          {content.more} more of the same below.
+        </p>
+      )}
+
+      <ul className="brief-counts">
+        {content.counts.map((count) => (
+          <li key={count.label}>
+            <span className="brief-n">{count.count}</span>{' '}
+            {count.href === null ? count.label : <a href={count.href}>{count.label}</a>}
+          </li>
+        ))}
+      </ul>
+
+      <p className="brief-coverage">{content.coverage}</p>
+    </section>
+  );
+}
+
 function StickyLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
   return (
     <div className="headbar" aria-hidden="true">

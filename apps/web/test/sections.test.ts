@@ -68,8 +68,8 @@ describe.each(RUNS)('%s', (_label, report) => {
     for (const surface of ['merchant', 'agent'] as const) {
       expect(reportParts(report, surface).map((p) => p.id)).toEqual([
         'stopping',
-        'questions',
         'review',
+        'questions',
       ]);
     }
   });
@@ -85,8 +85,8 @@ describe.each(RUNS)('%s', (_label, report) => {
     */
     expect(reportParts(report, 'iqwallet').map((p) => p.id)).toEqual([
       'stopping',
-      'questions',
       'review',
+      'questions',
     ]);
   });
 
@@ -196,8 +196,8 @@ describe('print carries both headers, which it did not', () => {
 
     expect(headings).toEqual([
       'Stopping conditions',
-      'Operational questions',
       'For your review',
+      'Operational questions',
     ]);
   });
 

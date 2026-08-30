@@ -43,3 +43,19 @@ The two at 3.1.0 are the restructure reference runs, carrying every current fiel
 **These are outputs, not inputs.** Nothing regenerates them and nothing should: they are what those
 runs produced. A test that needs a report of a shape not here should build one with
 `assembleReport`, as most of the suite does.
+
+## The two added for the redesign (D-190)
+
+`live-comopeptides.json` is a **real run** at rule set 3.3.0, produced by the Layer 3 probe work
+(D-182). It is the only fixture carrying the sample basis, the stopping-condition checklist and the
+current vocabulary together, and it is what the brief was built against.
+
+`constructed-stopfail.json` is **synthetic and says so** — its `runId` is
+`constructed-stopping-failed` rather than a uuid. It is `live-comopeptides` with `CATG-003` flipped
+from met to not met, because no stored run has ever failed a stopping condition and the brief's most
+consequential branch cannot otherwise be exercised: a failed one displaces everything else and is
+rendered distinctly, so that path would ship unrendered and untested.
+
+**It is not evidence of anything and must never be read as a run.** The tests name it explicitly and
+nothing counts it toward what the corpus observed. If a real run ever fails a stopping condition,
+that run replaces this and this goes.

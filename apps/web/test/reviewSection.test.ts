@@ -142,7 +142,7 @@ describe('the header lines', () => {
     const lines = headerLines(reportParts(load(name), 'agent'));
 
     expect(lines).toHaveLength(3);
-    expect(lines.map((l) => l.id)).toEqual(['stopping', 'questions', 'review']);
+    expect(lines.map((l) => l.id)).toEqual(['stopping', 'review', 'questions']);
   });
 
   it.each(RUNS)('%s: counts come from the sections own tallies', (name) => {

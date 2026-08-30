@@ -90,7 +90,7 @@ describe('no surface carries a retired word', () => {
     const labels = headerLines(reportParts(load(name), 'agent')).map((l) => l.label);
 
     for (const retired of RETIRED) expect(labels.join(' ')).not.toContain(retired);
-    expect(labels).toEqual(['stopping conditions failed', 'operational questions', 'for your review']);
+    expect(labels).toEqual(['stopping conditions failed', 'for your review', 'operational questions']);
   });
 
   it.each(RUNS)('%s: the stored verdict sentence', (name) => {

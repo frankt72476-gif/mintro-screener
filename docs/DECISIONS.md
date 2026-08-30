@@ -12415,3 +12415,121 @@ traded for one heading, one lede and three band headings — close to a wash, wh
 reorganisation that removes no content should cost.
 
 ---
+
+## D-190 — The brief, and the settled section order
+
+**2026-08-29 · business owner · `docs/report-redesign-spec.md` §1; part 3 of 3**
+
+Page one, and the first screen. Self-contained: a reader may stop there.
+
+    www.comopeptides.com                              29 August 2026
+
+      Three observations did not meet a standard
+
+      │ Products hidden until an account exists
+      │ 1 of 3 path(s) served content directly with a status this rule treats as a violation
+      │ Disclaimer on every sampled page
+      │ Observed on 5 of 5 sampled product page(s).
+      │ No marketing terms in product names
+      │ 2 of 37 URLs in scope 'products' matched a prohibited pattern
+
+      19 questions for you    10 unclear    0 stopping conditions failed
+
+      Screened 5 of 37 product pages. Of 71 findings, 43 were resolved from the
+      crawled surface. 28 were not: 11 needed a surface no crawl reaches, …
+
+### The summary line: it selects a sentence, it never writes one
+
+The hard part, and the ruling is a constraint rather than a technique. **Every line is a whole
+sentence the finding already carries.** Nothing is paraphrased, compressed by rewording or
+generated — because a rewrite, however careful, is Mintro characterising an observation rather than
+quoting it, and the rule was that it must never add a fact the finding does not carry.
+
+Two candidates, in order: **the sentence carrying an `n of m`**, then the first sentence. The
+quantifier is preferred because the first sentence is sometimes useless alone — PROD-008's opens
+with the single word *"Observed."*, which is true and says nothing. Measured across all 45 fail and
+review findings on the three runs: a quantifier is present on 17, and a first sentence exists on all
+45, so neither rule alone is enough and the pair covers every case.
+
+Two cuts before choosing: the colon-introduced list, as `rowSentence` already does, and a trailing
+*", including /some/path"* — an example the row lists in full.
+
+**How it fails is the design, not the residue:**
+
+- **Too long — it omits.** Never truncates. A clipped observation can invert its own meaning:
+  *"no prohibited term was observed"* cut mid-clause becomes the opposite claim, and an ellipsis
+  does not un-read it. Budget 96 characters; over it, the item shows its title alone.
+- **Structural — it omits.** OFFS-002 and its kin describe selector sets and match windows. The
+  surviving sentence is a specification rather than an observation, and it exceeds the budget for
+  exactly that reason. A brief that summarised a structural check would flatten the thing that makes
+  it trustworthy.
+- **A restatement of the title — it omits.** GATE-001's note is its title said again. Both would be
+  one fact twice, in a place with room for neither.
+
+Across all 45, 29 produce a line and 16 are omitted. Every failing finding on all three runs
+produces one.
+
+**What this cannot do, stated plainly.** The spec's example lines read *"Products are visible without
+an account"* and *"/shop returned 200 to an anonymous visitor"* — the first inverting the rule title
+into what was observed, the second composing a fact from parts of the note. **Neither is derivable
+by selection; both are new prose.** So the item's first line is the rule title as written
+(*"Products hidden until an account exists"*), and the second is the closest whole sentence. Two of
+the spec's three lines are matched in substance; GATE-002's is not, and its selected sentence is
+wordier than the example. Inverting titles would need a written phrase per rule in the rule set —
+data, and a decision per rule — which is a larger change than this one and is not assumed here.
+
+### Priority ordering, and nothing that instructs
+
+A failed stopping condition leads wherever one exists, marked `data-stopping` and ruled in the
+accent, because a failed one means the package does not proceed and that is not the same kind of
+news. Standards not met fill the space otherwise. Where neither exists the headline says *"No
+observation fell short of a standard"* and the counts carry the page. Beyond three items the
+remainder is a number, because a brief that lists everything is a second list.
+
+*"Three observations did not meet a standard"*, never *"three things to change"*. A test asserts no
+imperative reaches any part of the brief on any of the four runs — D-001 is not relaxed by brevity,
+and brevity is exactly where the shorter, stronger verb is tempting.
+
+### The section order, settled
+
+**Brief, stopping conditions, for your review, operational questions, met.**
+
+The questions moved after the review section. The spec numbered them the other way and that numbering
+predates the merge; with three sections rather than four, this is the order that leaves the passes at
+the genuine end of the document rather than stranded in its middle. The passes moved out of the review
+section to sit after the last one, which is what "met, at the end" (spec §5) requires once the section
+holding them is no longer last.
+
+### A synthetic fixture, and why one was needed
+
+`constructed-stopfail.json` is `live-comopeptides` with CATG-003 flipped to not met. **No stored run
+has ever failed a stopping condition**, and the brief's most consequential branch — the one where a
+failed condition displaces everything else — would otherwise have shipped unrendered and untested.
+
+Its `runId` is `constructed-stopping-failed` rather than a uuid, the README says what it is, and
+nothing counts it toward what the corpus observed. If a real run ever fails one, that run replaces it.
+
+### Page counts
+
+| run | before | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 22 | **23** |
+| `5b29036d` comopeptides | 23 | **24** |
+| `f66f7299` comopeptides, live | 24 | **25** |
+
+One page on each, and it is the brief: `break-after: page` gives it page one alone, which is the
+point of a summary a reader may stop at. Measured on a fresh `vite build` (D-187).
+
+### A defect worth recording, because the tooling hid it
+
+`briefLine` silently ignored its own quantifier rule for an afternoon. The regex intended as
+`\b\d+ of \d+\b` had been written into the file with **literal backspace bytes (0x08)** where the
+`\b` escapes belonged — a heredoc escaping fault. `sed` rendered that byte as `\b`, so the file
+*looked* correct in every reading of it; only `od -c` showed otherwise.
+
+The symptom was a wrong answer rather than an error: DISC-003 fell through to its first sentence and
+lost the count. Several rounds of reasoning about the code failed to find it, because the code being
+reasoned about was not the code on disk. **When an isolated reimplementation of a function disagrees
+with the function, stop reading the source and read the bytes.**
+
+---

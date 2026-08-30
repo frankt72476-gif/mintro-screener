@@ -79,7 +79,7 @@ describe('1 — stopping conditions list every rule', () => {
 describe('2 — one order on every surface', () => {
   it.each(['merchant', 'agent', 'iqwallet'] as const)('%s reads 1,2,3', (surface) => {
     // Four sections became three when the review bands merged (D-189). One order still.
-    expect(reportParts(c268, surface).map((p) => p.id)).toEqual(['stopping', 'questions', 'review']);
+    expect(reportParts(c268, surface).map((p) => p.id)).toEqual(['stopping', 'review', 'questions']);
   });
 });
 
