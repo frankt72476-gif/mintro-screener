@@ -162,7 +162,15 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 }
 
-main(process.argv.slice(2)).then((code) => process.exit(code));
+main(process.argv.slice(2)).then(
+  (code) => process.exit(code),
+  (error: unknown) => {
+    // A refusal is a message to read, not a stack to decode (D-187). The stale-bundle guard is the
+    // case this exists for: the remedy is one command and the trace hides it.
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  },
+);
 
 /**
  * Signed URLs for every capture a report cites.

@@ -75,13 +75,20 @@ describe.each(RUNS)('%s', (_label, report) => {
     }
   });
 
-  it('orders 1,3,4,2 for the IQwallet PDF', () => {
-    // An unanswered question is a gap in the record there rather than a task, so it reads last.
+  it('orders the IQwallet PDF exactly as the app surfaces (D-186)', () => {
+    /*
+      The reversal. The PDF used to read 1,3,4,2 on the reasoning that an unanswered question is a
+      gap in the record there rather than a task — which is true, and did not earn a second order.
+
+      The header lines are the navigation, so ordering stopped being load-bearing; and two orders
+      meant "the third section" named different content depending on which document someone was
+      holding.
+    */
     expect(reportParts(report, 'iqwallet').map((p) => p.id)).toEqual([
       'stopping',
+      'questions',
       'observed',
       'not-observed',
-      'questions',
     ]);
   });
 
@@ -182,7 +189,7 @@ describe('print carries both headers, which it did not', () => {
     expect(rows).toBe(ungrouped(report).length);
   });
 
-  it.each(RUNS)('%s: all four section headings appear, in the print order', (_label, report) => {
+  it.each(RUNS)('%s: all four section headings appear, in the one order (D-186)', (_label, report) => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report, access, surface: 'iqwallet', print: true }),
     );
@@ -190,9 +197,9 @@ describe('print carries both headers, which it did not', () => {
 
     expect(headings).toEqual([
       'Stopping conditions',
+      'Operational questions',
       'What we observed',
       'Not observed from the site',
-      'Operational questions',
     ]);
   });
 

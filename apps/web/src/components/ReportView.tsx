@@ -21,6 +21,7 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import {
+  findingAnchor,
   describeGroup,
   inheritsEvidence,
   coverageSentence,
@@ -145,7 +146,7 @@ export function ReportView({
   // would be two derivations, which is the thing part 1 built the tally to prevent (spec §3).
   const parts = useMemo(() => reportParts(report, surface), [report, surface]);
   return (
-    <div>
+    <div id="top">
       <div className="rhead">
         <div className="grow">
           <div className="eyebrow">Report · {formatReportDate(report.finishedAt)}</div>
@@ -255,6 +256,12 @@ export function ReportView({
         fewer things and more air.
       */}
       <HeaderLines parts={parts} />
+      {/*
+        The sentinel the sticky bar watches. When this scrolls out, the bar appears — done in CSS
+        with no scroll listener, so it costs nothing on a twenty-page document.
+      */}
+      {print !== true && <div className="headbar-sentinel" />}
+      {print !== true && <StickyLines parts={parts} />}
 
       {/*
         Two renderings of the same findings (D-042).
@@ -316,6 +323,7 @@ export function ReportView({
               part={part}
               questions={questions}
               passes={passes}
+              {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
                 block.groups.map((group) => (
@@ -401,6 +409,52 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
  * Right-aligned numerals in a monospace column, because the point of numerals over prose is that
  * four of them can be read at a glance without being parsed.
  */
+/**
+ * The same four lines again, as a bar that stays put while the document scrolls (D-186).
+ *
+ * ## Why this rather than a back-to-top button
+ *
+ * The report runs past twenty pages and a reader who has scrolled into section 4 has no way back
+ * except scrolling. A back-to-top control solves half of that — it returns you to the top, where
+ * the navigation is — and this solves both halves at once: it *is* the navigation, so a reader
+ * moves between sections directly, and the counts travel with them so position is never lost.
+ *
+ * It is the header lines and not a new component. Two navigations with two vocabularies is how a
+ * document comes to disagree with itself; this renders `headerLines` from the same derivation, so
+ * a count that changes changes in both places or in neither.
+ *
+ * **Screen only.** Paper does not scroll, and the running header already carries the section name
+ * on every page (D-166). It appears once the header lines themselves have left the viewport, so a
+ * reader never sees the same four counts twice.
+ *
+ * No new colour and no shadow — a hairline, the page's own background, and the numerals doing the
+ * work, which is the treatment the lines already have (D-167).
+ */
+function StickyLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
+  return (
+    <div className="headbar" aria-hidden="true">
+      <ul className="headbar-lines">
+        {headerLines(parts).map((entry) => (
+          <li key={`bar-${entry.id}-${entry.label}`} className={entry.count === 0 ? 'zero' : undefined}>
+            {entry.href === null ? (
+              <span>
+                <span className="headline-n">{entry.count}</span> {entry.label}
+              </span>
+            ) : (
+              <a href={entry.href}>
+                <span className="headline-n">{entry.count}</span> {entry.label}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+      <a className="headbar-top" href="#top">
+        Top
+      </a>
+    </div>
+  );
+}
+
 function HeaderLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
   return (
     <ul className="headlines">
@@ -589,6 +643,29 @@ function FindingRow({
           )}
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
         </span>
+        {/*
+          A filled dot on any row the merchant answered (D-186).
+
+          A reader working a long section could not tell which rows carried a response without
+          opening each one. The dot marks it; the count in the section heading says how many there
+          are to look for. Nothing is said about *what* they answered here — that is the row's own
+          content, one click away.
+        */}
+        {commentary?.state === 'commented' && (
+          <span className="find-answered" title="The merchant responded to this finding">
+            <span className="dot" aria-hidden="true" />
+            <span className="sr-only">merchant responded</span>
+          </span>
+        )}
+        {/*
+          The disclosure affordance (D-186).
+
+          The whole head is the target and always was — it is a `button` spanning the row — but
+          nothing said so, so rows did not read as openable. The caret is the smallest mark that
+          says it. Hidden in print, where everything is already open and a chevron pointing at an
+          expanded row is a control nobody can press.
+        */}
+        {!print && <span className="find-caret" aria-hidden="true" />}
       </button>
       <div className="ev">
         <Requirement finding={finding} />
@@ -780,7 +857,7 @@ function GroupCard({
 
   if (print === true || !group.collapsible) {
     return (
-      <div className="card cat open">
+      <div className="card cat open" id={findingAnchor(group.ruleId)}>
         {/*
           The group header, which the export did not have (spec §1).
 
@@ -832,7 +909,7 @@ function GroupCard({
   }
 
   return (
-    <div className={`card cat group ${open ? 'open' : ''}`}>
+    <div className={`card cat group ${open ? 'open' : ''}`} id={findingAnchor(group.ruleId)}>
       <button className="cat-head" onClick={() => setOpen(!open)}>
         <span className={`state ${stateClass(group.state)}`}>{STATE_LABEL[group.state]}</span>
         <span className="cat-name">

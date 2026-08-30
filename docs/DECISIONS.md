@@ -11357,10 +11357,15 @@ heads more than one row, so a group of one is its own row rather than being titl
 
 | run | before | after |
 |---|---|---|
-| `c268f8d7` sportstechnologylabs | 25 | **23** |
-| `5b29036d` comopeptides | 25 | **24** |
+| `c268f8d7` sportstechnologylabs | ~~25~~ **23** | ~~23~~ **22** |
+| `5b29036d` comopeptides | ~~25~~ **23** | ~~24~~ **22** |
 
-Two pages and one page, against a longer row sentence pulling the other way. "Requests attempted"
+**Corrected 2026-08-29 by D-187.** All four original figures were taken against a stale
+`apps/web/dist` and every one was wrong. Re-measured from worktrees at `3a9afae` and `725b395`,
+each with its own `vite build`: one page on each run, not two and one. The direction and the reason
+were right; the numbers were not.
+
+One page and one page, against a longer row sentence pulling the other way. "Requests attempted"
 blocks fell from 6 to 3 and from 7 to 4 — in each case the cascade's four became one.
 
 ---
@@ -12036,5 +12041,190 @@ its own record.
 `verify-supabase.ts`'s table list; nothing reads or writes it, and it was superseded by
 `vault_entries` in 0013. Noted here so the next person does not spend an afternoon working out what
 it is for. A migration against production for zero benefit is not worth it today.
+
+---
+
+## D-186 — The readability pass, and one reading order
+
+**2026-08-29 · business owner · six changes to how the report is read, none to what it says**
+
+Every finding was correct and the document was hard to read. Six changes, and not one of them alters
+an observation, a state or a capture.
+
+### 1. Stopping conditions list every rule
+
+The most important section rendered **one sentence** in a document where every other section lists
+every item. On a clean run it said "none was failing" and showed nothing at all, so a reader could
+not see which conditions had been checked, only how many.
+
+It now carries a checklist: every declared condition, named, with its state — beneath the summary
+line, which stays because the count and the list answer different questions. A condition that failed
+links to its full row further down rather than repeating the observation.
+
+**Titles come from the run's own findings, never from today's rule set.** A run is immutable and
+carries the rule set it was screened against (D-002); reading a title from current data would
+relabel an old run's condition with wording it never had. Every declared rule has a finding —
+`assembleReport` guarantees it (D-183) — so there is always one to read from.
+
+Runs predating the flag render no checklist rather than an empty one. An empty list reads as "no
+conditions apply", which is a claim about the merchant drawn from the age of the file (D-161).
+
+### 2. One reading order, on every surface
+
+The IQwallet package read 1,3,4,2 — the operational questions last, on the reasoning that an
+unanswered question is a gap in the record there rather than a task. **That was specified
+deliberately and it was wrong. The reversal is recorded rather than quietly applied.**
+
+Two reasons it did not earn its cost. **The header lines are the navigation**: four labelled counts,
+each an anchor — a reader reaches a section by clicking rather than by scrolling past the ones
+before it, so ordering stopped being load-bearing. And **two orders means the app and the export
+cannot be discussed in the same terms**: "the third section" named different content depending on
+which document someone was holding, a cost paid in every conversation about a report.
+
+The type stays keyed by surface. What differs between surfaces is what may be *acted on* — the
+merchant's comment boxes, the agent's controls — and that is real. Ordering was not.
+
+### 3. Collapsed on screen, expanded in print
+
+Rows were already collapsible; nothing said so. The head has always been a `button` spanning the
+full row, so the target was right and invisible. It now has a caret that rotates, a hover the eye
+can actually see — the old `#FBFAFD` was two per cent off white — and a focus ring.
+
+**Print is unchanged and pinned by test.** Every finding renders fully expanded; D-042 as revised by
+D-166 holds. The caret does not print: a chevron pointing at already-expanded content is a control
+nobody can press.
+
+### 4. Section headings are headings
+
+`.part-name` was 17px with 4px beneath and nothing above, so a reader scrolling twenty pages could
+pass a section start without registering it. Now 23px, with space above and a hairline separating
+sections.
+
+`"NOT MET · 3 rules"` was a `div` set at 10px in the gutter — **the same treatment a single row's
+state badge gets** — so the boundary between the two halves of section 3 was invisible. It is an
+`h3` at heading weight with a rule above it.
+
+Hierarchy from type and space, one hairline, no new colour, no fills, no bands (D-167).
+
+### 5. A dot where the merchant answered
+
+A filled violet dot on any row carrying a response, and a count in the block heading. A reader
+working a long section could not tell which rows had been answered without opening each one.
+
+Silent at zero: a permanent "0 answered" on every report never sent for comment is noise, the same
+reasoning `report.ts` gives for the obstruction block.
+
+### 6. Persistent navigation — the header lines, not a back-to-top button
+
+**Proposed and built as a sticky bar**, because a back-to-top control solves half the problem —
+it returns you to where the navigation is — and this solves both halves at once. It *is* the
+navigation, so a reader moves between sections directly, and the counts travel with them so position
+is never lost.
+
+It renders `headerLines` from the same derivation as the block at the top, so a count that changes
+changes in both or in neither. Two navigations with two vocabularies is how a document comes to
+disagree with itself.
+
+Sticky via CSS with no scroll listener, so it costs nothing on a long document. **Screen only** —
+paper does not scroll, and the running header already carries the section name on every page.
+
+### Page counts
+
+| run | before | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 22 | 22 |
+| `5b29036d` comopeptides, pre-flag | 22 | **23** |
+| `f66f7299` comopeptides, live | 24 | 24 |
+
+**One page across three documents**, against a checklist of 8 and 9 rows, larger headings and more
+space between sections. The two runs that gained nothing are the ones where the added rows happened
+to fall inside existing whitespace; `5b29036d` renders no checklist at all — it predates the flag —
+so its extra page is the heading weight alone.
+
+### A measurement that was wrong first
+
+The first set of page counts was identical across all three runs, before and after. That was not a
+result — `report-pdf` serves `apps/web/dist`, the **Vite** build, and `tsc -b` does not produce it.
+Both renders had used the same stale bundle.
+
+Caught because three identical numbers is not what a checklist of nine rows produces. Re-run with
+`vite build` before each side. **A before/after where nothing changed is a claim that needs checking
+harder than one where something did.**
+
+---
+
+## D-187 — A report is never rendered from a stale bundle, and D-179's page counts were wrong
+
+**2026-08-29 · engineering · a refusal, and a correction to a recorded measurement**
+
+`apps/web/dist` is produced by **`vite build`**. `tsc --build` does not produce it, and every `npm
+run` script that renders a report runs `tsc --build` first — so the obvious way to prepare a
+measurement leaves the bundle exactly as it was.
+
+**The failure mode is not a crash.** It is a PDF that renders correctly from older code, and a page
+count taken from it that looks like a result. A before/after is the worst case: both sides render
+the same stale bundle, both numbers agree, and the agreement reads as evidence that a change had no
+effect.
+
+### Refuse, rather than build
+
+Two ways to close it. `startReportServer` now **refuses** when `dist/index.html` is older than the
+newest file under `apps/web/src`, and prints what to run.
+
+Not "build it itself", for three reasons:
+
+- **A renderer that builds is a renderer whose output cannot be traced to a build.** These PDFs are
+  the deliverable of a defensibility tool. *"Which bundle produced this?"* must have an answer, and a
+  command that silently rebuilds underneath the render makes the answer "whichever one it made".
+- **The deployed worker has no build toolchain.** `pdfJob` renders on Fly from an image where `vite`
+  and the source tree are absent. A renderer that builds would work locally and fail in production.
+- **The remedy is one command; the diagnosis was the whole cost.** Nobody seeing the message is
+  confused about what to do. The entire loss was not knowing there was a problem.
+
+In `startReportServer`, not in `report-pdf`. **Four callers serve this bundle** — `report-pdf`,
+`page-budget`, `compose-check`, `loop-check` — and `page-budget` exists to produce page counts.
+Fixing the one that was noticed and leaving three is how a defect of this shape survives (D-181).
+
+**No source tree, no check.** On Fly the bundle is built into the image and `apps/web/src` is not
+present. Absence of the source is not evidence of staleness, and a guard that only ever fires in
+production is worse than none.
+
+### Which numbers were wrong
+
+Re-measured from worktrees at `3a9afae` and `725b395`, each with its own `vite build`:
+
+| D-179 | recorded | actual |
+|---|---|---|
+| `c268f8d7` before → after | 25 → 23 | **23 → 22** |
+| `5b29036d` before → after | 25 → 24 | **23 → 22** |
+
+**All four figures were wrong.** The change saved one page on each run, not two and one. Direction
+and reasoning were right; the arithmetic was measured against a bundle that predated the change.
+The table is corrected in place rather than rewritten, so the error stays visible.
+
+**D-186's figures are sound**, and there is a cross-check that says so rather than an assurance:
+D-179's true *after* is 22 and 22, and D-186's independently measured *before* is 22 and 22. Two
+measurements taken hours apart by different routes agree exactly. The recorded D-179 *after* — 23
+and 24 — agrees with neither, which is what exposed it.
+
+**D-167's table (36 → 24, 38 → 25) is not verified.** It predates this session and the code either
+side is several commits back; it is left as recorded rather than corrected on a guess. The same
+doubt applies to D-176's "26 and 26" waypoints. Anyone relying on those numbers should re-measure
+now that it is impossible to do so wrongly.
+
+### Two process notes, because both cost real time
+
+**Three identical numbers is not a result.** The first D-186 measurement returned the same page count
+on all three runs, before and after, across a change that added a nine-row checklist and raised every
+heading by six points. That is what prompted the check. **A before/after where nothing moved deserves
+more scrutiny than one where something did**, because the null result is what a broken measurement
+looks like.
+
+**`git worktree remove --force` followed a `node_modules` symlink and deleted 166 tracked files.**
+The worktrees shared the main checkout's `node_modules` by symlink to avoid reinstalling; that
+directory contains workspace links back into `packages/`, and the recursive delete followed them.
+Everything was committed and `git checkout -- packages` restored it in full, verified by a forced
+rebuild and the whole suite. **Do not symlink `node_modules` into a git worktree**; copy it, or
+accept the install.
 
 ---

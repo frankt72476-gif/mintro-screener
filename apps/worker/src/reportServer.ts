@@ -14,6 +14,7 @@
 import { createServer, type Server } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
+import { bundleFreshness } from './bundleFreshness.js';
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8',
@@ -33,6 +34,14 @@ export interface ReportServerOptions {
   /** Directories mounted at a URL prefix — reports and evidence. */
   readonly mounts: Readonly<Record<string, string>>;
   readonly port?: number;
+  /**
+   * Skips the staleness refusal (D-187).
+   *
+   * For a caller deliberately rendering an old bundle — comparing two builds, say. Never for
+   * convenience: the refusal exists because a stale render produces a correct-looking document
+   * from code that is no longer in the tree, and a measurement taken from it looks like a result.
+   */
+  readonly allowStaleBundle?: boolean;
 }
 
 export interface RunningReportServer {
@@ -41,6 +50,24 @@ export interface RunningReportServer {
 }
 
 export async function startReportServer(options: ReportServerOptions): Promise<RunningReportServer> {
+  /*
+    Refuse before serving a byte (D-187).
+
+    `apps/web/dist` comes from `vite build`; `tsc --build` does not produce it, and every script
+    that renders a report runs `tsc --build` first. So the obvious way to prepare a measurement
+    leaves the bundle untouched, and the result is not a crash — it is a correct-looking PDF of
+    month-old code.
+
+    Here rather than in one CLI because four callers serve this bundle, and one of them,
+    `page-budget`, exists to produce page counts.
+  */
+  if (options.allowStaleBundle !== true) {
+    const freshness = bundleFreshness(options.webRoot);
+    if (freshness.stale) {
+      throw new Error(`refusing to render: ${freshness.reason}`);
+    }
+  }
+
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     const path = decodeURIComponent(url.pathname);

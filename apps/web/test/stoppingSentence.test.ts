@@ -19,6 +19,7 @@ const account = (over: Partial<StoppingAccount> = {}): StoppingAccount => ({
   failed: [],
   notEvaluable: [],
   passed: ['PROD-006', 'PROD-007', 'CATG-001', 'CATG-002', 'CATG-003', 'CATG-004', 'PAY-001'],
+  checklist: [],
   ...over,
 });
 

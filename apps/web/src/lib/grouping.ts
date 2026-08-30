@@ -24,7 +24,7 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import { invitesComment, STATE_LABEL, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
+import { invitesComment, STATE_LABEL, STATE_ORDER, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
  * The bucket a `not_evaluable` finding belongs to for reading (D-044).
@@ -621,8 +621,9 @@ export type SectionId = 'stopping' | 'questions' | 'observed' | 'not-observed';
 /**
  * Who is reading.
  *
- * `agent` and `merchant` differ in what they may act on, not in how the document is ordered, so
- * they order alike. `iqwallet` is the only surface that reorders — see `SECTION_ORDER`.
+ * Surfaces differ in what they may **act on** — the merchant's comment boxes, the agent's
+ * controls — and never in how the document is ordered. All three read the same four sections in
+ * the same order (D-186).
  */
 export type Surface = 'merchant' | 'agent' | 'iqwallet';
 
@@ -676,6 +677,23 @@ export interface SectionBlock {
   readonly tally: SectionTally;
 }
 
+/**
+ * One declared stopping condition, as a line in section 1's checklist (D-186).
+ *
+ * Every rule the underwriter declines on, named, with what this run observed against it. The
+ * section used to render a sentence and the failed rows — so on a clean run it said "none was
+ * failing" and listed nothing, in a document where every other section lists every item. The most
+ * important section was the least legible.
+ */
+export interface StoppingCondition {
+  readonly ruleId: string;
+  readonly title: string;
+  /** The rule's worst observed state, which is what the checklist reports. */
+  readonly state: State;
+  /** Set when this condition failed and has a full row further down the section. */
+  readonly anchored: boolean;
+}
+
 /** What the stopping-conditions section states, whether or not anything was observed failing. */
 export interface StoppingAccount {
   /** How many rules the rule set declares as stopping conditions, or null on a run predating them. */
@@ -684,6 +702,13 @@ export interface StoppingAccount {
   /** Declared rules this run could not observe either way. Named, never counted as cleared. */
   readonly notEvaluable: readonly string[];
   readonly passed: readonly string[];
+  /**
+   * Every declared condition, in the rule set's own order, with its state.
+   *
+   * Empty on a run predating the flag — there is no list to draw, and inventing one from today's
+   * rule set would report a boundary the run never had (D-161).
+   */
+  readonly checklist: readonly StoppingCondition[];
 }
 
 /**
@@ -759,17 +784,26 @@ const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
 };
 
 /**
- * Reading order by surface (spec §1).
+ * Reading order. **One, on every surface (D-186).**
  *
- * One parameter, not two component trees. Merchant and agent read 1,2,3,4 — the questions are the
- * merchant's own work and the only rows they can act on, so they come before anything observed.
- * IQwallet reads 1,3,4,2: an unanswered question there is a gap in the record rather than a task,
- * and it belongs after what was seen.
+ * The IQwallet package used to read 1,3,4,2 — stopping conditions, then the observations, then the
+ * operational questions last. That was specified deliberately and it was wrong, and the reversal is
+ * recorded rather than quietly applied.
+ *
+ * Two reasons it does not earn its cost. **The header lines are the navigation**: four labelled
+ * counts, each an anchor, at the top of every surface — so a reader reaches a section by clicking
+ * rather than by scrolling past the ones before it, and the order stops being load-bearing. And
+ * **two orders means the app and the export cannot be discussed in the same terms**: "the third
+ * section" names different content depending on who is holding which document, which is a cost paid
+ * in every conversation about a report.
+ *
+ * The type stays keyed by surface. What differs between surfaces is what may be *acted on* — the
+ * merchant's comment boxes, the agent's controls — and that is real. Ordering was not.
  */
 const SECTION_ORDER: Readonly<Record<Surface, readonly SectionId[]>> = {
   merchant: ['stopping', 'questions', 'observed', 'not-observed'],
   agent: ['stopping', 'questions', 'observed', 'not-observed'],
-  iqwallet: ['stopping', 'observed', 'not-observed', 'questions'],
+  iqwallet: ['stopping', 'questions', 'observed', 'not-observed'],
 };
 
 /**
@@ -851,6 +885,53 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
  * failed condition makes the decline notice the document rather than the full report (D-163). That
  * is a presentation choice about the same package going to the same place.
  */
+/**
+ * The checklist, built from the stored summary and the report's own findings (D-186).
+ *
+ * **Titles come from the findings, not from a rule set.** A run is immutable and carries the rule
+ * set it was screened against (D-002); reading a title from today's data would relabel an old run's
+ * condition with a wording it never had. Every declared rule has a finding — `assembleReport`
+ * guarantees it (D-183) — so there is always one to read from.
+ *
+ * Order follows `report.blocking`: failed first, then unevaluated, then met. A reader scanning this
+ * meets the conditions that stopped something before the ones that did not.
+ */
+function stoppingChecklist(
+  report: ScreeningReport,
+  failed: readonly FindingGroup[],
+): readonly StoppingCondition[] {
+  const blocking = report.blocking;
+  if (blocking === undefined) return [];
+
+  const byRule = new Map<string, ReportFinding>();
+  for (const category of report.categories) {
+    for (const finding of category.findings) {
+      const held = byRule.get(finding.ruleId);
+      // Worst state wins, matching how the summary counts a rule observed on several pages.
+      if (held === undefined || STATE_ORDER.indexOf(finding.state) < STATE_ORDER.indexOf(held.state)) {
+        byRule.set(finding.ruleId, finding);
+      }
+    }
+  }
+
+  const anchored = new Set(failed.map((group) => group.ruleId));
+  const entry = (ruleId: string, fallback: State): StoppingCondition => {
+    const finding = byRule.get(ruleId);
+    return {
+      ruleId,
+      title: finding?.title ?? ruleId,
+      state: finding?.state ?? fallback,
+      anchored: anchored.has(ruleId),
+    };
+  };
+
+  return [
+    ...blocking.failed.map((f) => entry(f.ruleId, f.state)),
+    ...blocking.notEvaluable.map((id) => entry(id, 'not_evaluable')),
+    ...blocking.passed.map((id) => entry(id, 'pass')),
+  ];
+}
+
 function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]): ReportPart {
   const blocking = report.blocking;
   return {
@@ -867,6 +948,7 @@ function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]):
       failed,
       notEvaluable: blocking?.notEvaluable ?? [],
       passed: blocking?.passed ?? [],
+      checklist: stoppingChecklist(report, failed),
     },
   };
 }
@@ -1028,6 +1110,14 @@ const HEADER_LABEL: Readonly<Record<string, string>> = {
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
 export const sectionAnchor = (id: SectionId): string => `section-${id}`;
+
+/**
+ * Where a rule's row lives, so the stopping checklist can point at its own detail (D-186).
+ *
+ * A rule is one row wherever it appears (D-166), so one anchor per rule is unambiguous. Ids are
+ * stable and never reused, which is what makes them safe to put in a fragment.
+ */
+export const findingAnchor = (ruleId: string): string => `rule-${ruleId}`;
 
 /**
  * The four lines, in the order the sections are read.

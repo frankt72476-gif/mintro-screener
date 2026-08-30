@@ -18,8 +18,42 @@
  */
 
 import type { JSX } from 'react';
-import type { ReportPart, SectionBlock } from '../lib/grouping.js';
-import { NOTHING_OBSERVED_ID, sectionAnchor, stoppingSentence } from '../lib/grouping.js';
+import { STATE_LABEL, type FindingCommentary, type ReportFinding } from '@mintro/engine';
+import type { FindingGroup, ReportPart, SectionBlock } from '../lib/grouping.js';
+import { findingAnchor, NOTHING_OBSERVED_ID, sectionAnchor, stoppingSentence } from '../lib/grouping.js';
+import { stateClass } from '../lib/format.js';
+
+/**
+ * How many rows in this block carry a merchant response (D-186).
+ *
+ * A reader working through a long section has no way to tell which rows the merchant answered
+ * without opening each one. The count says how many there are; the dot on the row says which.
+ *
+ * Silent at zero. A permanent "0 responses" on every section of every report that was never sent
+ * for comment is noise, and the reasoning is the same one `report.ts` gives for the obstruction
+ * block.
+ */
+function CommentCount({
+  groups,
+  commentaryOf,
+}: {
+  readonly groups: readonly FindingGroup[];
+  readonly commentaryOf?: (finding: ReportFinding) => FindingCommentary;
+}): JSX.Element | null {
+  if (commentaryOf === undefined) return null;
+
+  const answered = groups.filter((group) =>
+    group.findings.some((finding) => commentaryOf(finding).state === 'commented'),
+  ).length;
+
+  if (answered === 0) return null;
+  return (
+    <span className="sect-responses">
+      <span className="dot" aria-hidden="true" />
+      {answered} answered
+    </span>
+  );
+}
 
 /** `4 rules · 7 findings` — from the part's own tally, never recounted here (spec §1). */
 function TallyLine({ rules, findings }: { readonly rules: number; readonly findings: number }): JSX.Element | null {
@@ -68,6 +102,34 @@ function StoppingAccountLine({ part }: { readonly part: ReportPart }): JSX.Eleme
           </span>
         ))}
       </p>
+
+      {/*
+        Every declared condition, named, with what was observed against it (D-186).
+
+        The summary line above says how many; this says which. Section 1 used to render the sentence
+        and nothing else on a clean run — one sentence in a document where every other section lists
+        every item, in the section a reader is most likely to be looking for.
+
+        A condition that failed has a full row further down this section, so its line here links to
+        it rather than repeating the observation.
+      */}
+      {account.checklist.length > 0 && (
+        <ul className="stopcheck">
+          {account.checklist.map((condition) => (
+            <li key={condition.ruleId} className={`stopcheck-row ${stateClass(condition.state)}`}>
+              <span className={`state ${stateClass(condition.state)}`}>{STATE_LABEL[condition.state]}</span>
+              <span className="stopcheck-title">
+                {condition.anchored ? (
+                  <a href={`#${findingAnchor(condition.ruleId)}`}>{condition.title}</a>
+                ) : (
+                  condition.title
+                )}
+              </span>
+              <span className="stopcheck-id mono">{condition.ruleId}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
@@ -81,17 +143,28 @@ function StoppingAccountLine({ part }: { readonly part: ReportPart }): JSX.Eleme
 function Block({
   block,
   children,
+  commentaryOf,
 }: {
   readonly block: SectionBlock;
   readonly children: (block: SectionBlock) => JSX.Element[];
+  readonly commentaryOf?: (finding: ReportFinding) => FindingCommentary;
 }): JSX.Element {
   return (
     <div className="sect-block" data-bucket={block.bucket ?? undefined}>
       {block.heading !== null && (
-        <div className="block-head">
+        /*
+          A heading, not a gutter label (D-186).
+
+          "NOT MET · 3 rules" was set at state-badge size in the margin — the same treatment a
+          single row's state gets — so the boundary between the two halves of section 3 was invisible
+          to anyone scrolling. It is `h3` now, at heading weight, with the rule above it doing the
+          separating.
+        */
+        <h3 className="block-head">
           <span className={`state ${block.state === undefined ? '' : block.state}`}>{block.heading}</span>
           <TallyLine rules={block.tally.rules} findings={block.tally.findings} />
-        </div>
+          <CommentCount groups={block.groups} {...(commentaryOf === undefined ? {} : { commentaryOf })} />
+        </h3>
       )}
       {block.lede !== '' && <p className="block-lede">{block.lede}</p>}
       {children(block)}
@@ -110,9 +183,12 @@ export function ReportSectionView({
   children,
   passes,
   questions,
+  commentaryOf,
 }: {
   readonly part: ReportPart;
   readonly children: (block: SectionBlock) => JSX.Element[];
+  /** Supplied only where commentary is in use, so a report never sent for comment shows nothing. */
+  readonly commentaryOf?: (finding: ReportFinding) => FindingCommentary;
   /** Section 4's furniture: the pass count and its disclosure. */
   readonly passes?: JSX.Element | null;
   /** Section 2's body, which is not findings at all. */
@@ -145,7 +221,7 @@ export function ReportSectionView({
       {questions}
 
       {part.blocks.map((block) => (
-        <Block key={block.key} block={block}>
+        <Block key={block.key} block={block} {...(commentaryOf === undefined ? {} : { commentaryOf })}>
           {children}
         </Block>
       ))}
