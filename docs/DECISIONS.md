@@ -14129,3 +14129,60 @@ Its own first version asserted `.not.toMatch(/\bpane\b/)` and passed over the ex
 to reject: the word boundaries reached the file as literal control characters, so the pattern
 matched nothing. Replaced with a plain string comparison. A guard that can be mistyped into silence
 is worth less than a plainer one that cannot.
+
+---
+
+## D-214 — The v3.1.0 → v3.3.0 matcher regression does not exist
+
+*2026-08-30. Investigation; no code or rule-set change.*
+
+A correctness pass opened on the premise that pattern matching regressed between rule set v3.1.0
+and v3.3.0: that `CATG-003` had matched `/shop/hcg/` and `NAME-002` had matched `/shop/glow/` on
+CoMo Peptides, and that both went quiet under v3.3.0 against a catalogue that had grown. Written up
+here because it did not reproduce, and the reason it did not is worth more than the fix would have
+been.
+
+**The matcher did not change.** `slug.ts`, `layer0.ts`, `layer1.ts`, `layer2.ts` and `suspicion.ts`
+are byte-identical between `78e86d5` (v3.1.0) and `40f32bb` (v3.3.0). The one edit to
+`checks/urlPattern.ts` in that range is D-184's: an unusable surface reports `not_retrieved` rather
+than `not_exposed`. It touches which party a shortfall belongs to, not what matches.
+
+**The rule set only widened.** Across the same range: five rules added (`DISC-004`, `PROD-011`
+through `PROD-014`), every rule gained a `subject` clause (D-194), `GATE-003` became blocking
+(D-178), and `CATG-003`'s patterns gained `semaglutide` and `tirzepatide` (D-177's bump). No pattern
+was removed from any rule. `hcg` and `glow` are both still listed. Both bumps do have decision
+records — D-177 for v3.2.0, D-178 for v3.3.0.
+
+**Neither run says what the premise says.** Run `5b29036d` (v3.1.0) and run `356ce753` (v3.3.0),
+same merchant, report *identical* states for all fifty-four rules present in both — nine
+`url_pattern` rules included. Both examined 37 URLs in scope `products`. Both failed `NAME-002` on
+the same two `blend` URLs. Both passed `CATG-003`. The catalogue did not grow from 36 to 37; it was
+37 in each.
+
+**The URLs are not the merchant's URLs.** `356ce753`'s stored `product-sitemap.xml` lists 38 `<loc>`
+entries. There is no `/shop/hcg/` — it is not in the catalogue. There is no `/shop/glow/` either;
+what is there is **`/shop/klow/`**, one letter away. `/shop/tz/` and `/shop/rt/` are there. A
+matcher cannot miss a URL that was never published, and `klow` is not `glow`.
+
+**What is real is a vocabulary gap, and it is the rule set's.** `tz` and `rt` are how this merchant
+spells two GLP-1 agonists. `CATG-003` gained `semaglutide` and `tirzepatide` as words; neither
+reaches an initialism. `klow` is a blend sold under a coined name `NAME-002` does not carry. All
+three are matched by nothing.
+
+**It explains the sampler too, and is not a second defect.** `suspicion.ts` reads its scoring
+vocabulary out of the rule set, so a slug no rule names scores zero. `/shop/tz/`, `/shop/rt/` and
+`/shop/klow/` each score **0** and the sample goes to the five that score above it — reproduced
+exactly: `bpc-157-tb500-blend` (12), `cjc-1295-no-dac-ipamorelin-blend` (12),
+`bacteriostatic-water` (5), `cagrilintide` (4), `semax` (4), which is the live run's sample. They
+were not passed over by the sampler; they were invisible to the vocabulary the sampler reads.
+
+**Blast radius: none.** No finding on any stored run changed state across the version range, and no
+other stored merchant publishes a product slug of three letters or fewer (`biotechpeptides` 287
+URLs, `sportstechnologylabs` 97, `swisschems` 182, none; `peptidesciences` served no sitemap at
+all). Nothing was suppressed, so nothing needs re-running — which D-002 would forbid anyway.
+
+**Not fixed here.** Teaching `CATG-003` to read `tz` and `rt`, or `NAME-002` to read `klow`, is a
+rule-set change and carries its own decision under D-025 — and two-letter tokens on an `auto_fail`
+rule need the false-positive argument made before they are added, not after. `packages/engine/test/codedProductSlugs.test.ts`
+pins both halves: the matcher does match `hcg` and `glow` when a merchant publishes them, and it
+matches nothing on `tz`, `rt` or `klow` today.
