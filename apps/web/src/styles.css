@@ -2641,7 +2641,15 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .stop-panel.is-failed { border-color: #8A8598; border-left-width: 3px; }
   .stop-icon { background: none; border: 0.5px solid #8A8598; }
 
-  .stop-panel { break-inside: avoid; }
+  /*
+    The panel may break across pages (D-208).
+
+    `break-inside: avoid` on a card that is taller than a page cannot be honoured, so the renderer
+    pushed the whole panel to page two and left page one holding a header and a part label. The rows
+    inside it already avoid breaking individually — `.find`, `.slip`, `.mr` — which is the guarantee
+    that was wanted: no single finding split down the middle. The container never needed it.
+  */
+  .stop-panel { break-inside: auto; }
   .stop-head { break-after: avoid; }
 }
 
@@ -2998,4 +3006,32 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .band-bar[data-band='eye']       { background: #E3E0EE; }
   .band-bar[data-band='questions'] { background: #EDEBF4; }
   .band-bar[data-band='review']    { background: #F5F3F9; }
+}
+
+/*
+  A block heading is not a row's state mark (D-208).
+
+  `.state` carries `flex: 0 0 96px` — a gutter sized for the four state words a finding row shows.
+  A block heading reuses the class for a bucket label, and *"Cannot be answered from a website"* is
+  not four characters: in a 96px column it set as four stacked lines, 78px tall, in a heading 688px
+  wide.
+
+  The gutter is right for rows and wrong for headings. Headings size to their words.
+*/
+.block-head .state,
+.band .block-head .state {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/*
+  An unreachable capture prints nothing rather than an empty frame (D-208).
+
+  A thumbnail's worth of space saying *capture not reachable* is a box with no content in it. On
+  screen it is worth keeping — it tells a reader the image is missing rather than slow — but on
+  paper nothing can be retried, and the evidence slip beside it already carries the source, the
+  method and the SHA-256.
+*/
+@media print {
+  .shot:has(.shot-missing) { display: none; }
 }

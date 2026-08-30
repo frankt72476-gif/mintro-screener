@@ -35,6 +35,7 @@ import {
   ordinalsFor,
   type FindingGroup,
   type ReportPart,
+  type SectionBlock,
   type Surface,
 } from '../lib/grouping.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
@@ -133,6 +134,15 @@ interface Props {
    */
   readonly eyeResponses?: readonly MerchantComment[];
   /**
+   * The merchant's answer form, rendered where the questions section sits (D-209).
+   *
+   * The comment page used to append it after everything, so the merchant met the questions in a
+   * different place from the one the report and the PDF put them in. This is the only mechanism by
+   * which that page differs from the report, and it is additive: the section, its band and its
+   * statistics are the report's.
+   */
+  readonly questionsForm?: JSX.Element;
+  /**
    * What the merchant stated about requirements no crawl can observe (D-134).
    *
    * Rendered after the findings and never among them: these are statements, not observations, and
@@ -172,6 +182,7 @@ export function ReportView({
   commentBox,
   eyeCommentBox,
   eyeResponses,
+  questionsForm,
   attestations,
   eyeTest = null,
 }: Props): JSX.Element {
@@ -400,13 +411,16 @@ export function ReportView({
           if (part.tally.rules === 0 && part.id === 'notmet') return eyePanel;
 
           const questions =
-            part.id === 'questions' && attestations !== undefined ? (
-              <AttestationSection
-                attestations={attestations}
-                {...(participation === undefined ? {} : { invited: participation.invited })}
-                print={print}
-              />
-            ) : null;
+            part.id !== 'questions'
+              ? null
+              : // The merchant answers; everyone else reads what was answered.
+                (questionsForm ?? (attestations === undefined ? null : (
+                  <AttestationSection
+                    attestations={attestations}
+                    {...(participation === undefined ? {} : { invited: participation.invited })}
+                    print={print}
+                  />
+                )));
 
           return (
             <Fragment key={part.id}>
@@ -419,17 +433,28 @@ export function ReportView({
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
-                block.groups.map((group) => (
+                [
+                  ...(blockHasNoEvidence(block)
+                    ? [
+                        <p className="block-nocapture" key="nocapture">
+                          Nothing was retrieved for any of these, so there is nothing to cite against
+                          them individually.
+                        </p>,
+                      ]
+                    : []),
+                  ...block.groups.map((group) => (
                     <GroupCard
                       key={`${group.ruleId}-${group.state}`}
                       group={group}
                       access={access}
                       ordinals={ordinals}
+                      {...(blockHasNoEvidence(block) ? { hideEmptyEvidence: true } : {})}
                       {...(print === true ? { print: true } : {})}
                       {...(commentaryOf === undefined ? {} : { commentaryOf })}
                       {...(commentBox === undefined ? {} : { commentBox })}
                     />
-                  ))
+                  )),
+                ]
               }
             </ReportSectionView>
             {eyePanel}
@@ -449,13 +474,16 @@ export function ReportView({
       <p className="part-label">Part two · the record</p>
         {parts.filter((part) => !PART_ONE.has(part.id)).map((part) => {
           const questions =
-            part.id === 'questions' && attestations !== undefined ? (
-              <AttestationSection
-                attestations={attestations}
-                {...(participation === undefined ? {} : { invited: participation.invited })}
-                print={print}
-              />
-            ) : null;
+            part.id !== 'questions'
+              ? null
+              : // The merchant answers; everyone else reads what was answered.
+                (questionsForm ?? (attestations === undefined ? null : (
+                  <AttestationSection
+                    attestations={attestations}
+                    {...(participation === undefined ? {} : { invited: participation.invited })}
+                    print={print}
+                  />
+                )));
 
           return (
             <ReportSectionView
@@ -468,17 +496,28 @@ export function ReportView({
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
-                block.groups.map((group) => (
-                  <GroupCard
-                    key={`${group.ruleId}-${group.state}`}
-                    group={group}
-                    access={access}
-                    ordinals={ordinals}
-                    {...(print === true ? { print: true } : {})}
-                    {...(commentaryOf === undefined ? {} : { commentaryOf })}
-                    {...(commentBox === undefined ? {} : { commentBox })}
-                  />
-                ))
+                [
+                  ...(blockHasNoEvidence(block)
+                    ? [
+                        <p className="block-nocapture" key="nocapture">
+                          Nothing was retrieved for any of these, so there is nothing to cite against
+                          them individually.
+                        </p>,
+                      ]
+                    : []),
+                  ...block.groups.map((group) => (
+                    <GroupCard
+                      key={`${group.ruleId}-${group.state}`}
+                      group={group}
+                      access={access}
+                      ordinals={ordinals}
+                      {...(blockHasNoEvidence(block) ? { hideEmptyEvidence: true } : {})}
+                      {...(print === true ? { print: true } : {})}
+                      {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                      {...(commentBox === undefined ? {} : { commentBox })}
+                    />
+                  )),
+                ]
               }
             </ReportSectionView>
           );
@@ -625,6 +664,22 @@ const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Elemen
  * evidence and take a comment. **The clear ones do not** — they are a list, not findings, and giving
  * a satisfied rule a comment box invites noise for no gain (D-063).
  */
+
+/**
+ * Whether a whole block carries no evidence at all (D-208).
+ *
+ * Eleven attestation rules in one block each printed the same slip — *"No capture. Nothing was
+ * retrieved for this rule, so there is nothing to cite."* — eleven times. It is true of every one of
+ * them and it is true for the same reason, which is what the block itself is: rules no crawl can
+ * reach.
+ *
+ * Said once, above them. **Not dropped:** hard constraint 3 is about a finding evidencing why, and
+ * the block's own sentence is where that lives when the reason is the block's rather than the row's.
+ */
+function blockHasNoEvidence(block: SectionBlock): boolean {
+  const findings = block.groups.flatMap((group) => group.findings);
+  return findings.length > 1 && findings.every((finding) => finding.evidence.length === 0);
+}
 
 function StoppingPanel({
   report,
@@ -1208,6 +1263,8 @@ function listOf(parts: readonly string[]): string {
  */
 function FindingRow({
   finding,
+  showRequirement = true,
+  hideEmptyEvidence = false,
   access,
   commentary,
   commentBox,
@@ -1215,6 +1272,15 @@ function FindingRow({
   evidenceFrom,
 }: {
   readonly finding: ReportFinding;
+  /**
+   * False where the group prints its published standard once above the instances (D-208).
+   *
+   * The standard belongs to the rule and not to the instance, so five sampled pages under one rule
+   * printed the same quotation five times.
+   */
+  readonly showRequirement?: boolean;
+  /** Suppresses the empty-evidence slip where the block states it once (D-208). */
+  readonly hideEmptyEvidence?: boolean;
   readonly access: EvidenceAccess;
   /** What the merchant said, or why the space is blank. Absent when commentary is not in use. */
   readonly commentary?: FindingCommentary;
@@ -1310,9 +1376,13 @@ function FindingRow({
         {!print && <span className="find-caret" aria-hidden="true" />}
       </button>
       <div className="ev">
-        <Requirement finding={finding} />
+        {/* False where the group states it once above (D-208). */}
+        {showRequirement && <Requirement finding={finding} />}
         {evidenceFrom === undefined ? (
-          <EvidenceSlip finding={finding} access={access} />
+          // Nothing where the block above already said it, for all of them, once.
+          hideEmptyEvidence && finding.evidence.length === 0 ? null : (
+            <EvidenceSlip finding={finding} access={access} />
+          )
         ) : (
           /*
             The capture is the one immediately above, under the rule named here (D-179).
@@ -1469,6 +1539,7 @@ function PassDisclosure({
  * about a merchant, and the collapsed row would present them identically.
  */
 function GroupCard({
+  hideEmptyEvidence = false,
   group,
   access,
   ordinals,
@@ -1478,6 +1549,8 @@ function GroupCard({
 }: {
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
   readonly group: FindingGroup;
+  /** True where the block above states, once, that none of these carries a capture (D-208). */
+  readonly hideEmptyEvidence?: boolean;
   readonly access: EvidenceAccess;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   /**
@@ -1534,13 +1607,28 @@ function GroupCard({
         )}
         <div className="cat-body">
           {group.findings.length > 1 && <p className="group-lede">{describeGroup(group)}</p>}
+          {/*
+            The published standard, once for the group (D-208).
+
+            It is a property of the **rule**, so five instances of PROD-003 printed *"Expressed in
+            g/mol"* five times — the same quotation, five times, on paper. A reader learns a standard
+            once; repeating it is how a five-page group becomes a nine-page one.
+
+            Hoisted above the instances rather than left on the first, so it reads as the group's
+            and not as that instance's.
+          */}
+          {group.findings.length > 1 && group.findings[0] !== undefined && (
+            <Requirement finding={group.findings[0]} />
+          )}
           {group.findings.map((finding, i) => (
             <FindingRow
               key={`${finding.ruleId}-${i}`}
               finding={finding}
+              {...(group.findings.length > 1 ? { showRequirement: false } : {})}
               access={access}
               {...(print === true ? { print: true } : {})}
               {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
+              {...(hideEmptyEvidence ? { hideEmptyEvidence: true } : {})}
               {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
             />
           ))}

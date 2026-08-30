@@ -53,8 +53,16 @@ import {
   NOTHING_OBSERVED_ID,
   invitedFindings,
   nothingObservedCount,
-  nothingObservedSection,
 } from '../lib/grouping.js';
+/**
+ * The key the eye-test reply travels under inside this component (D-209).
+ *
+ * Not a rule id — it cannot be, since `merchant_comments.rule_id` takes only `^[A-Z]+-[0-9]{3}$`
+ * (D-203) — and deliberately not shaped like one, so a value that leaked into a rule field would be
+ * refused by the database rather than filed against an imaginary rule.
+ */
+const EYE_TEST_SUBJECT = 'subject:eye-test';
+
 import { AttestationForm } from './Attestations.js';
 import { ReportView } from './ReportView.js';
 import { formatClock, formatStamp } from '../lib/format.js';
@@ -234,39 +242,6 @@ function OpenReport({
     null,
   );
 
-  /**
-   * How many findings are ones the pages did not show either way (D-067).
-   *
-   * The same `invitesComment` predicate, narrowed to `not_evaluable` — so this is exactly the set
-   * that carries a box, never the wider set of things nobody observed. `no_check_built` and
-   * `not_retrieved` are gaps in what Mintro looked at, they carry no box, and the report labels
-   * them as ours (D-046). Counting them here would promise a response this page does not offer.
-   *
-   * Derived from the report rather than passed in, so the callout and the section it points at
-   * cannot come to mean different sets.
-   */
-  const nothingObserved = useMemo(() => nothingObservedCount(opened.report), [opened.report]);
-
-  /*
-    Whether the link has anywhere to land (D-069).
-
-    The callout used to count with one rule and the anchor was chosen with another, so a report
-    could produce a non-zero count and no anchored section — which is what Frank clicked. Both now
-    come from `grouping.ts`, and the link renders only when the section it points at exists.
-  */
-  const jumpTarget = useMemo(() => nothingObservedSection(opened.report), [opened.report]);
-
-  /*
-    The filter is gone, and the dance it required with it.
-
-    A section hidden by the filter could not be scrolled to, so jumping had to clear the filter
-    first and scroll on the next frame. With the chips deleted every section is always in the
-    document, so this is a scroll and nothing else.
-  */
-  const jump = (event: { preventDefault: () => void }): void => {
-    event.preventDefault();
-    document.getElementById(NOTHING_OBSERVED_ID)?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   /*
     Restore, and note what it deliberately does not do (D-071).
@@ -483,6 +458,14 @@ function OpenReport({
    */
   const storedBody = (ruleId: string, ordinal: number | undefined): string => {
     if (identity === null) return '';
+    if (ruleId === EYE_TEST_SUBJECT) {
+      const mine = comments.filter(
+        (comment) =>
+          comment.subject === 'eye-test' &&
+          comment.identifiedAs.trim().toLowerCase() === identity.email.trim().toLowerCase(),
+      );
+      return mine[mine.length - 1]?.body ?? '';
+    }
     const mine = comments.filter(
       (comment) =>
         comment.ruleId === ruleId &&
@@ -509,12 +492,22 @@ function OpenReport({
   ): Promise<string | null> => {
     if (identity === null) return 'Please give an email address above before writing a response.';
 
+    /*
+      The eye-test reply is stored against a subject, not a rule (D-203).
+
+      One sentinel through the same field, so the draft map, the autosave and the Save button need
+      no second path — and the database refuses a row that names both, so a mistake here is a
+      refusal rather than a mis-filed comment.
+    */
+    const subject = ruleId === EYE_TEST_SUBJECT;
+
     const { data, error } = await client.rpc('submit_merchant_comment', {
       p_token: token,
-      p_rule_id: ruleId,
-      p_ordinal: ordinal ?? null,
+      p_rule_id: subject ? null : ruleId,
+      p_ordinal: subject ? null : ordinal ?? null,
       p_body: body,
       p_visit_id: identity.visitId,
+      ...(subject ? { p_subject: 'eye-test' } : {}),
     });
 
     const payload = data as { ok?: boolean; reason?: string; savedAt?: string; wrote?: boolean } | null;
@@ -807,8 +800,6 @@ function OpenReport({
           does not edit it, shorten it, or reply to it.
         </p>
 
-        <NothingObservedCallout report={opened.report} onJump={jump} />
-
         <p className="sub">
           This link works until {opened.expiresAt.slice(0, 10)}. It can be forwarded — whoever
           responds says who they are, and each response is shown against the address given when it
@@ -847,10 +838,43 @@ function OpenReport({
           Their own words are not lost: `CommentBox` shows what they have already written, above
           the box they would add to.
         */}
+        {/*
+          The report, in the report's own order (D-209).
+
+          Same sequence, same bands, same statistics, same headings as the analyst's copy and the
+          PDF. Everything this page adds is additive — the responder's email above, a box on
+          anything that takes one — and nothing is reordered, summarised or promoted because the
+          reader is the merchant. A page that rearranged the document for them would make their copy
+          a different document from the one an underwriter reads.
+        */}
         <ReportView
           surface="merchant"
           report={opened.report}
           access={access}
+          {...(opened.report.attestationQuestions === undefined
+            ? {}
+            : {
+                questionsForm: (
+                  <AttestationForm
+                    questions={opened.report.attestationQuestions}
+                    answers={answers}
+                    identified={identity !== null}
+                    onAnswer={answer}
+                  />
+                ),
+              })}
+          eyeCommentBox={() => (
+            <CommentBox
+              body={bodyOf(EYE_TEST_SUBJECT, undefined)}
+              onChange={(next) =>
+                setDrafts((existing) => new Map(existing).set(keyOf(EYE_TEST_SUBJECT, undefined), next))
+              }
+              onBlur={() => autosave(EYE_TEST_SUBJECT, undefined)}
+              savedAt={savedAt.get(keyOf(EYE_TEST_SUBJECT, undefined))}
+              existing={comments.filter((comment) => comment.subject === 'eye-test')}
+              identified={identity !== null}
+            />
+          )}
           commentBox={(finding, ordinal) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
@@ -874,15 +898,6 @@ function OpenReport({
           Rendered from the run's own snapshot of the questions rather than from the current rule
           set: they must be asked exactly what the report will show them as having been asked.
         */}
-        {opened.report.attestationQuestions !== undefined && (
-          <AttestationForm
-            questions={opened.report.attestationQuestions}
-            answers={answers}
-            identified={identity !== null}
-            onAnswer={answer}
-          />
-        )}
-
         <ResponseFooter
           identified={identity !== null}
           submitControl={submitControl}
@@ -1055,62 +1070,6 @@ function ResponseFooter({
           Anything you write is still saved.
         </p>
       )}
-    </div>
-  );
-}
-
-/**
- * The findings where a response is worth most (D-067).
- *
- * Exported and separate from `CommentPane` for a reason that is not tidiness: **the anchor check
- * has to render this and the report together.** The link lives here and the id it targets lives in
- * `ReportView`, and the only way to know they meet is to render both and look. Buried inside a
- * component that needs a Supabase client and a live token, it could not be rendered at all — and a
- * link that resolves to nothing is what happened.
- *
- * It renders **only when the section it points at exists** (D-069), which is what makes the pairing
- * a property of the code rather than of the data it happens to be given.
- */
-export function NothingObservedCallout({
-  report,
-  onJump,
-}: {
-  readonly report: ScreeningReport;
-  readonly onJump?: (event: { preventDefault: () => void }) => void;
-}): JSX.Element | null {
-  const count = nothingObservedCount(report);
-  if (count === 0 || nothingObservedSection(report) === null) return null;
-
-  return (
-    <div className="card unseen">
-      <h2 className="unseen-head">
-        {count} where your pages did not show one way or the other
-        <a
-          className="unseen-jump"
-          href={`#${NOTHING_OBSERVED_ID}`}
-          {...(onJump === undefined ? {} : { onClick: onJump })}
-        >
-          Jump to these
-        </a>
-      </h2>
-      {/*
-        "did not show one way or the other" — not "nothing could be observed" (D-067).
-
-        The narrower phrasing resolves a real overlap. Findings Mintro has not built a check for are
-        also ones where nothing was observed, but they are gaps in what *we* looked at rather than
-        in what the pages showed; they carry no box, and the report's four-column breakdown labels
-        them as ours. A callout that swept them in would contradict it.
-
-        The same applies to a finding whose kind was never recorded, which is why the count comes
-        from `grouping.ts` and includes only positively recorded merchant-surface kinds (D-069).
-      */}
-      <p>
-        For these, your public pages did not show either way — an order-handling practice, a page
-        behind a login, a document not published.{' '}
-        <strong>A response here adds more than anywhere else on this report</strong>, because there
-        is nothing on the site for the team reviewing your account to read instead. You can describe
-        how your site handles it now, or how you intend to.
-      </p>
     </div>
   );
 }

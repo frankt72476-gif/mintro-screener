@@ -402,7 +402,13 @@ export function AttestationForm({
   return (
     <section className="att att-form" aria-labelledby="att-form-head">
       <div className="att-top">
-        <h2 id="att-form-head">Questions the screening cannot answer</h2>
+        {/*
+          No heading of its own (D-209).
+
+          The form renders inside the questions section, under the band that already names it. Two
+          headings for one section is the duplication the bands removed everywhere else, and the
+          merchant's copy below still says what these questions are and why they are being asked.
+        */}
         <p className="att-lede">
           Some of these standards are about what happens away from your website — where you
           ship, what your support team says, who tests your batches. Mintro has no way to observe

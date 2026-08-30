@@ -13825,3 +13825,76 @@ reader took reassurance from the first clause and had it withdrawn by the next. 
 of a sentence carrying both. A sentence that only asks has no order to get wrong, and the reassurance
 now sits in a band that states its own gap in the same breath: *7 of 9 checked and clear · 2
 unverifiable*.
+## D-208 — The PDF was mostly repetition
+
+**2026-08-30 · technical · `apps/web/src/styles.css`, `apps/web/src/components/ReportView.tsx`**
+
+Five kinds of dead space, in order of size. **21 pages where there were 25** on comopeptides,
+21 from 25 on `5b29036d`, 20 from 22 on `c268f8d7`.
+
+**Page one held a header and a part label.** `.stop-panel { break-inside: avoid }` on a card taller
+than a page cannot be honoured, so the renderer moved the whole panel to page two rather than
+splitting it. The rows inside already avoid breaking individually — `.find`, `.slip`, `.mr` — which
+is the guarantee that was actually wanted: no single finding split down the middle. The container
+never needed it.
+
+**A block heading was set in a row's state gutter.** `.state` carries `flex: 0 0 96px`, sized for the
+four state words a finding row shows. A block heading reuses the class, and *"Cannot be answered from
+a website"* is not four characters: it set as four stacked lines, 96px wide and 78px tall, inside a
+heading 688px wide. Measured before and after — **244 x 20 now**. Headings size to their words; the
+gutter stays right for rows.
+
+**Eleven attestation rules each printed the same slip.** *"No capture. Nothing was retrieved for this
+rule, so there is nothing to cite."* — eleven times, true of every one of them and true for the same
+reason, which is what the block is. Said once above them now. **Not dropped:** hard constraint 3 is
+about a finding evidencing why, and the block's sentence is where that lives when the reason is the
+block's rather than the row's. Twelve occurrences became one.
+
+**Unreachable captures printed an empty frame.** A thumbnail's worth of space saying *capture not
+reachable* is a box with no content. On screen it earns its place — it distinguishes missing from
+slow — but nothing can be retried on paper, and the slip beside it already carries the source, the
+method and the SHA-256.
+
+**A group repeated its published standard per instance.** It is a property of the rule, so five
+sampled pages under PROD-003 printed *"Expressed in g/mol"* five times. Hoisted above the instances
+rather than left on the first, so it reads as the group's. Three occurrences became one.
+
+## D-209 — The comment page is the report, plus a place to answer
+
+**2026-08-30 · business owner · `apps/web/src/components/CommentPane.tsx`, `ReportView.tsx`**
+
+**The nothing-observed callout is deleted.** It picked one band out of the document — *"16 where your
+pages did not show one way or the other"* — with a jump link to it, and in doing so undersold
+everything else that wanted an answer: three standards not met, nineteen questions, and Mintro's own
+read of the storefront.
+
+**The questions form renders in the questions section's own place.** It used to be appended after
+everything, so the merchant met the questions somewhere the report and the PDF do not put them.
+`ReportView` takes a `questionsForm` slot; the section, its band and its statistics are the report's.
+The form's own `h2` went with it — the band names the section, and two headings for one section is
+the duplication D-206 removed everywhere else.
+
+**The eye test takes a response.** The box D-202 built and D-203 gave a storage key is wired here,
+through the same draft map and autosave every other field uses. One sentinel, `subject:eye-test`,
+deliberately not shaped like a rule id — `merchant_comments.rule_id` takes only `^[A-Z]+-[0-9]{3}$`,
+so a value that leaked into that field is refused by the database rather than filed against an
+imaginary rule.
+
+The only differences from the report are additive: the responder's email at the top, and a response
+field on anything that takes one. Nothing is reordered, summarised or promoted because the reader is
+the merchant — a page that rearranged the document for them would make their copy a different
+document from the one an underwriter reads.
+
+### What the deletion took with it
+
+`nothingObservedSection` is gone: nothing used it once the jump did not. And `anchors.test.ts` lost
+its subject entirely — **the report now emits no in-page links at all**, the nav cards and sticky bar
+having gone with D-206 and the callout here. Its own comment warned about exactly this:
+
+> A check that never saw a single anchor reported that every anchor resolved.
+
+Rewritten around what still has consequences: **merchant emails already sent carry
+`#nothing-observed`** (D-069) and runs are immutable (D-002), so a link posted in August must land in
+a report rendered today. That id is now asserted on both surfaces. The link check remains, asserting
+zero — so the day one is added it starts checking, and the day the count stops being zero it is
+visible in the diff.

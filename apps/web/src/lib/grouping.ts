@@ -534,18 +534,6 @@ export const MERCHANT_SURFACE_BUCKETS = ['not_reachable', 'not_exposed', 'not_ap
 const isMerchantSurface = (bucket: Bucket | undefined): boolean =>
   bucket !== undefined && (MERCHANT_SURFACE_BUCKETS as readonly string[]).includes(bucket);
 
-/**
- * The section the merchant page's callout points at, or null when there is none.
- *
- * **One computation for the count, the link and the anchor.** They were three: the callout counted
- * with `invitesComment`, the anchor was chosen from a bucket list in `ReportView`, and neither knew
- * about the other. A report could have a non-zero count and no anchored section — which is exactly
- * what Frank clicked on.
- */
-export function nothingObservedSection(report: ScreeningReport): ReportSection | null {
-  return groupReport(report).find((section) => isMerchantSurface(section.bucket)) ?? null;
-}
-
 /** How many findings the callout is about. Zero means it must not render at all. */
 export function nothingObservedCount(report: ScreeningReport): number {
   return groupReport(report)
