@@ -76,6 +76,18 @@ export function createAnthropicVisionClient(options: AnthropicOptions = {}): Vis
     const body = {
       model,
       max_tokens: maxTokens,
+      /*
+        Live only because `model` is still Sonnet 4.5 (D-197).
+
+        `claude-sonnet-5` rejects this field — `temperature is deprecated for this model`, HTTP 400,
+        every call. The eye test hit it because its rubric pins Sonnet 5; this path has not, because
+        the default above has not moved.
+
+        It is not waiting on a code change. `ANTHROPIC_VISION_MODEL` reaches `model` two lines up,
+        so setting it to a Sonnet 5 build breaks every extraction on this deployment with no commit
+        involved. Left in place rather than removed because dropping it silently gives up
+        determinism on the path that still has it; whoever moves the model takes this line with it.
+      */
       temperature: 0,
       system: request.system,
       messages: [

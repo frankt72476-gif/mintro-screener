@@ -52,6 +52,24 @@ const API_VERSION = '2023-06-01';
  */
 export const EYE_TEST_TIMEOUT_MS = 20_000;
 
+/**
+ * How long an answer may be.
+ *
+ * **Measured, not guessed.** At 2000 one call in three stopped on `max_tokens` mid-JSON, which
+ * reaches the reader as "the model answered in a shape the rubric does not allow" — a parse failure
+ * standing in for a length failure, and an absence recorded for a run the model actually completed.
+ *
+ * Four real calls against the same six captures returned 1491, 1762, 1843 and one truncated at
+ * 2000: roughly 25% spread on identical input. The largest untruncated answer carried four
+ * `concern` verdicts; the worst structural case is nine, each with its own `saw` line, which is
+ * about double that explanatory text. 4000 clears the worst case with room for the spread.
+ *
+ * Bounded rather than removed. The answer is JSON with a fixed number of items, so a response that
+ * keeps going is a malfunction — and an unbounded ceiling would bill for it. Headroom is free:
+ * output is charged on what is produced, not on what is permitted.
+ */
+const MAX_ANSWER_TOKENS = 4000;
+
 /** A capture the eye test wants, named by the surface the rubric asks about. */
 export interface CaptureRequest {
   readonly surface: string;
@@ -162,9 +180,21 @@ export async function runEyeTest(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2000,
-        // Deterministic: the same captures should not produce a different reading run to run.
-        temperature: 0,
+        max_tokens: MAX_ANSWER_TOKENS,
+        /*
+          No `temperature`.
+
+          It was set to 0 for determinism, and `claude-sonnet-5` — the model the rubric pins —
+          rejects the field outright: `temperature is deprecated for this model`, HTTP 400. Every
+          production run would have recorded an absence, and the local timing runs did exactly that
+          until the field came out.
+
+          So determinism is not on offer here, and the layer does not pretend otherwise. Four calls
+          against identical captures produced four differently-worded reads that agreed on all nine
+          verdicts. That is the property that matters — the verdicts are what a reader acts on, and
+          `rubricVersion` plus `model` is what makes a read attributable. Wording that varies is a
+          reason to store the read, which this does, not a reason to claim it was reproducible.
+        */
         messages: [{ role: 'user', content: content(rubric, images) }],
       }),
     });
@@ -179,7 +209,25 @@ export async function runEyeTest(
       );
     }
 
-    const parsed = parseAnswer(await response.json(), rubric);
+    const answer = (await response.json()) as { readonly stop_reason?: unknown };
+
+    /*
+      A cut-off answer is its own cause.
+
+      Without this it falls through to the parse failure below, and the run records that the model
+      answered in a disallowed shape — which is true of the bytes and false about what happened. A
+      reader cannot tell a model that broke the rubric from one that ran out of room, and only one
+      of those is fixed by `MAX_ANSWER_TOKENS`.
+    */
+    if (answer.stop_reason === 'max_tokens') {
+      return absent(
+        rubric.version,
+        `the model's answer was cut off at the ${MAX_ANSWER_TOKENS}-token ceiling`,
+        captures,
+      );
+    }
+
+    const parsed = parseAnswer(answer, rubric);
     if (parsed === null) {
       return absent(rubric.version, 'the model answered in a shape the rubric does not allow', captures);
     }

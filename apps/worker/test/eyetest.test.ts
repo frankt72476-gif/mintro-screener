@@ -222,6 +222,28 @@ describe('what it sends', () => {
     expect(image.source).not.toHaveProperty('url');
   });
 
+  it('sends no temperature, because the model the rubric pins rejects the field', async () => {
+    /*
+      Not a style preference. `claude-sonnet-5` answers `temperature is deprecated for this model`
+      with HTTP 400, so this field present is every production run recording an absence — which is
+      what it did until it came out (D-197).
+    */
+    const spy = answered([]);
+    await runEyeTest([want()], [artifact('run-1/layer1/home.png')], { ...KEY, fetchImpl: spy });
+
+    const body = JSON.parse(String((spy.mock.calls[0]?.[1] as { body: string }).body));
+    expect(body).not.toHaveProperty('temperature');
+  });
+
+  it('leaves room for nine concern verdicts, not four', async () => {
+    // At 2000 one call in three stopped mid-JSON. The largest untruncated answer measured 1843.
+    const spy = answered([]);
+    await runEyeTest([want()], [artifact('run-1/layer1/home.png')], { ...KEY, fetchImpl: spy });
+
+    const body = JSON.parse(String((spy.mock.calls[0]?.[1] as { body: string }).body));
+    expect(body.max_tokens).toBeGreaterThanOrEqual(4000);
+  });
+
   it('puts the page text after the image, and labels it as context', async () => {
     // A model given text first answers from it, which is the text checks run again. The ordering
     // is the instruction.
@@ -293,6 +315,29 @@ describe('what it accepts back', () => {
     });
 
     expect(outcome.kind).toBe('absent');
+  });
+
+  it('says an answer was cut off, rather than calling it a disallowed shape', async () => {
+    /*
+      Both produce an absence, and they are not the same event. A truncated answer is a ceiling that
+      is too low; a disallowed shape is a model that broke the rubric. Reporting the first as the
+      second sends a reader to fix the wrong thing.
+    */
+    const outcome = await runEyeTest([want()], [artifact('run-1/layer1/home.png')], {
+      ...KEY,
+      fetchImpl: vi.fn<typeof fetch>(async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"read":"A' }] }),
+        }) as unknown as Response,
+      ),
+    });
+
+    expect(outcome.kind).toBe('absent');
+    if (outcome.kind !== 'absent') return;
+    expect(outcome.absence.reason).toMatch(/cut off/);
+    expect(outcome.absence.reason).not.toMatch(/shape/);
   });
 
   it('records the model it actually sent, not a second computation of it', async () => {

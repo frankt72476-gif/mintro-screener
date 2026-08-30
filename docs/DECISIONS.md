@@ -12944,3 +12944,163 @@ runs.** The fixtures are outputs, immutable, and they will always render the voc
 produced under.
 
 ---
+## D-196 — The eye test: a judgment layer that can never reach a finding
+
+**2026-08-30 · business owner · `rules/eyetest.json`, `packages/engine/src/eyetest.ts`, `apps/worker/src/eyetest.ts`, `docs/eye-test-spec.md`**
+
+Written after the fact. This shipped in `f3dcc56` and `adabd63`, both labelled **(D-195)**, which is
+the stopping-panel rewording and has nothing to do with it. Eight citations of `D-196` in shipped
+code pointed at an entry that did not exist. The citations are correct and stay; this is the record
+they point at.
+
+The 59 rules describe what was observed. **The eye test describes how the storefront reads** — the
+things a person notices in a second and no pattern matches: that the homepage is a shop, that the
+photography is of bodies, that the research framing is surrounded by a fire sale.
+
+### It produces observations and can never produce a finding
+
+Nothing it returns moves a state, a count, a coverage number, a stopping condition or a verdict. The
+report is complete without it, and `eyeVerdictToState()` exists as a function returning `null` so
+that a future caller reaching for the mapping finds the answer in code rather than inventing one.
+
+That is not caution to be relaxed once the rubric is trusted. **A model's reading of a photograph is
+not evidence of the kind hard constraint 3 requires.** Letting it reach a finding would put an
+unbacked claim into a document that goes to an underwriter, under Mintro's name — the same
+distinction the whole product turns on, one layer up.
+
+Its verdicts are deliberately **not** the four finding states. `clear` / `concern` / `cannot_tell`,
+so that nothing about the vocabulary invites a reader to add them to a count of failures.
+
+### It reads the captures, and the text travels behind them
+
+Full-page screenshots the crawl already takes — homepage, sampled product pages, the sign-up form.
+No new requests, no new crawling.
+
+Page text is sent **after** each image and labelled as context. A model given text first answers
+from the text, which is the rules run again, more expensively and less reliably. The ordering is the
+instruction, and there is a test that asserts it.
+
+### Nine questions, not eleven
+
+Padding to a round number would mean inventing questions the captures cannot answer. Nothing in the
+rubric re-answers a rule — certificate depth, disclaimer legibility, testimonials, sign-up fields
+and product naming are all excluded by name in the file, because a report that says the same thing
+twice in different words is worse than saying it once, and the second saying carries less authority.
+
+Question 7 — *does anything undercut the research framing?* — is the one that earns the layer. It
+asks about the **composition**, which nothing can match on: a site states research-use-only in the
+footer and surrounds it with a discount code, a bundle named for an outcome, subscribe-and-save and
+a chat widget. Each element is individually defensible; together the site is selling to people.
+
+**No score, ever.** A number invites arithmetic and nine numbers invite an average, which is a
+determination (D-001). The compliance vendors publish 0-100 scales; Mintro does not.
+
+### The rubric is data, and the model is part of it
+
+`rules/eyetest.json` carries the questions, and revising it is never a code change — hard constraint
+1, for hard constraint 1's reason.
+
+`version` stores with every result beside `rulesetVersion`. **So does `model`** (the `adabd63`
+amendment): which model answers is a calibration decision, not a code change, and a rubric version
+that identified the questions but not the model would leave a calibration log unable to compare two
+reads. `ANTHROPIC_VISION_MODEL` is deliberately not consulted — an environment variable that moved
+the model without moving the version defeats the whole arrangement. The model string sent is the
+model string stored, captured rather than recomputed.
+
+### An absence says what it wanted and what happened
+
+The call is fail-open with a 20s ceiling: a crawl that produced 71 findings is not wasted because a
+judgment layer timed out. `runEyeTest` never throws.
+
+But **"the eye test did not run" is the shape hard constraint 3 exists to forbid.** It states an
+outcome and withholds the reason, and a reader cannot tell a vendor outage from a run that had no
+captures to send. So an absence carries every capture it wanted, whether or not it got one, each
+with what became of it — the same standard a `not_evaluable` finding is held to, one level up from a
+finding.
+
+An unparsed verdict becomes `cannot_tell`, never `clear`. Coercing a parse failure into reassurance
+is the one direction that matters.
+
+### It goes to all three audiences
+
+Merchant, agent and IQwallet see the same read. **A judgment Mintro would not show the merchant is
+one it should not be making.** It renders between the stopping-conditions panel and the brief,
+dashed-bordered and labelled MINTRO'S IMPRESSION, NOT AN OBSERVATION — nothing else in the document
+is dashed, so a reader learns the signal once.
+
+It runs on every package including blocked ones. On a blocked package nobody reads it; it is
+calibration data, and throwing it away would mean the rubric never sees the storefronts that most
+need judging.
+
+## D-197 — The eye test could not have run in production, and the duplicate key was mine
+
+**2026-08-30 · technical · `apps/worker/src/eyetest.ts`, `packages/extraction/src/anthropic.ts`, `.env`**
+
+Four fixes found by timing the eye test against real captures rather than a stub. Three were real
+defects in shipped code; the fourth is a correction to something I reported.
+
+### `temperature: 0` made every production run an absence
+
+`claude-sonnet-5` answers `temperature is deprecated for this model` with HTTP 400. The rubric pins
+that model (D-196), so the field was not a preference that would have degraded the read — it was a
+request the vendor refused, on every call, before looking at a single capture. The layer would have
+recorded an absence for every run and the absence would have said *"the model refused the request
+(HTTP 400)"*, which is true and gives no one the actual cause.
+
+It was there for determinism. **That is not on offer and the code no longer implies it is.** Four
+calls against identical captures produced four differently-worded reads that agreed on all nine
+verdicts. The verdicts are what a reader acts on; wording that varies run to run is a reason to
+store the read — which `EyeTest.read` does — not a reason to claim it was reproducible.
+
+`packages/extraction/src/anthropic.ts` sends the same field and is live only because its model
+default is still `claude-sonnet-4-5`, which accepts it. Both verified against the API. The model is
+left alone, but the condition is now written at the line rather than held in someone's head, and it
+is worse than "a defect when the default moves": `ANTHROPIC_VISION_MODEL` reaches that same `model`
+binding, so a deployment can break every extraction by setting an environment variable, with no
+commit involved.
+
+### The answer ceiling was measured at the wrong number
+
+`max_tokens: 2000` truncated one call in three mid-JSON. Four real calls returned **1491, 1762,
+1843, and one cut off at 2000** — about 25% spread on identical input, and the largest untruncated
+answer carried only four `concern` verdicts. The worst structural case is nine, each with its own
+`saw` line.
+
+Raised to 4000: clear of the worst case with room for the spread, and still bounded. The answer is
+JSON with a fixed item count, so a response that keeps going is a malfunction rather than a long
+read, and headroom costs nothing — output is billed on what is produced.
+
+**A cut-off answer now says so.** It previously fell through to the malformed-shape branch and the
+run recorded *"the model answered in a shape the rubric does not allow"* — true of the bytes,
+false about the event, and it sends a reader to fix the rubric when the ceiling is what moved. The
+two are distinct absences because only one of them is fixed by raising the number.
+
+### The duplicate key: I reported the cause wrong
+
+`.env` carried two `ANTHROPIC_API_KEY` lines. The first was an identity-linked key that returns
+HTTP 400 demanding an `anthropic-workspace-id`; the second authenticates bare. It also carried
+`ANTHROPIC_WORKSPACE_ID=default`, a placeholder the API rejects outright — *"must be a valid
+workspace ID"*. Both are gone; the surviving key is the working one.
+
+**The stated cause was wrong twice over.** I reported that dotenv takes the first occurrence and
+that this made the broken key win. This repo does not use dotenv — it uses Node's native
+`--env-file`, which takes the **last** occurrence. Tested: two `DUP_TEST` lines resolve to the
+second. So the working key would have won in every product path, the duplicate never affected the
+worker, and on Fly the value comes from `fly secrets` where no duplicate exists.
+
+What actually picked the broken key was **my own timing harness**, whose regex used a non-global
+`exec` and therefore matched the first line. A scratch-file bug, reported as a production one.
+
+The lines are still removed. A dead credential sitting in a config file is a thing that gets copied
+into the next file, and a placeholder that the vendor rejects is worse than an absent variable —
+nothing reads `ANTHROPIC_WORKSPACE_ID` today, so it was inert, but it is exactly the value the next
+person to add that header would trust.
+
+### Proved rather than assumed
+
+Each fix was reverted individually and the test that exists to catch it failed, with the message it
+exists to produce — the truncation test failing as *"expected 'the model answered in a shape the
+rub…' to match /cut off/"* is the confusion the branch removes, stated by the suite. Then one call
+through the production `runEyeTest` against the six real comopeptides captures: `ran` in 24.6s,
+nine verdicts, and the sign-up surface recorded `sent=false — no capture was taken for this
+surface`, which is hard constraint 3 holding at the layer above a finding.
