@@ -18,6 +18,7 @@ import {
   type ReportCategory,
   type ReportFinding,
   type EyeTestRecord,
+  type MerchantComment,
   type RunAttestations,
   type ScreeningReport,
 } from '@mintro/engine';
@@ -43,6 +44,7 @@ import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { notObservedSentence } from '@mintro/engine';
+import { formatStamp } from '../lib/format.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
 
@@ -123,6 +125,14 @@ interface Props {
    */
   readonly eyeCommentBox?: () => JSX.Element | null;
   /**
+   * What the merchant wrote back about the eye test (D-203).
+   *
+   * **It travels to IQwallet like any other response.** Suppressing a reply while keeping the
+   * judgment it answers would be one-sided — the document would carry Mintro's impression of a
+   * storefront and not the merchant's account of it, which is the shape D-063 exists to prevent.
+   */
+  readonly eyeResponses?: readonly MerchantComment[];
+  /**
    * What the merchant stated about requirements no crawl can observe (D-134).
    *
    * Rendered after the findings and never among them: these are statements, not observations, and
@@ -161,6 +171,7 @@ export function ReportView({
   surface: surfaceProp,
   commentBox,
   eyeCommentBox,
+  eyeResponses,
   attestations,
   eyeTest = null,
 }: Props): JSX.Element {
@@ -371,6 +382,7 @@ export function ReportView({
               <EyeTestPanel
                 record={eyeTest}
                 {...(eyeCommentBox === undefined ? {} : { commentBox: eyeCommentBox })}
+                {...(eyeResponses === undefined ? {} : { responses: eyeResponses })}
               />
             ) : null;
 
@@ -790,10 +802,13 @@ function StoppingPanel({
 function EyeTestPanel({
   record,
   commentBox,
+  responses,
 }: {
   readonly record: EyeTestRecord | null;
   /** One box, under the read, because the read is what it answers (D-202, §3). */
   readonly commentBox?: () => JSX.Element | null;
+  /** What the merchant wrote back. Rendered on every surface, including the PDF (D-203). */
+  readonly responses?: readonly MerchantComment[];
 }): JSX.Element | null {
   /*
     Nothing at all in two cases, and they are not the same case.
@@ -937,6 +952,26 @@ function EyeTestPanel({
         thing the eye test may never become (D-196).
       */}
       {commentBox?.()}
+
+      {/*
+        The merchant's answer to the read (D-203).
+
+        Their words, verbatim, in the serif face every merchant response carries — never Mintro's
+        voice, and never folded into the read it answers. Attribution is per comment and says
+        "identified themselves as", because the address is self-declared (D-063).
+
+        Above the verdicts for the same reason the box is: it answers the paragraph, not the rubric.
+      */}
+      {(responses ?? []).map((response) => (
+        <div className="mr" key={`${response.submittedAt}-${response.identifiedAs}`}>
+          <span className="mr-head">Merchant response</span>
+          <p className="mr-body">{response.body}</p>
+          <p className="mr-attrib">
+            Written by someone who identified themselves as {response.identifiedAs} ·{' '}
+            {formatStamp(response.submittedAt)}
+          </p>
+        </div>
+      ))}
 
       {/*
         No count of concerns anywhere on this panel (§3).

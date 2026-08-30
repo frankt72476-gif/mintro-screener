@@ -160,6 +160,58 @@ describe('submitting a comment', () => {
     visitId = row!.result.visitId;
   });
 
+  /*
+    A reply to the eye test, stored against a subject rather than a rule (D-203).
+
+    `rule_id` could never have held `'eye-test'` — its check is `^[A-Z]+-[0-9]{3}$` — and a value
+    that *did* pass would be worse, because a value in that column is a rule id to every reader
+    above it. These assertions are what stop the two kinds of comment merging back together.
+  */
+  it('stores a reply to the eye test against a subject, with no rule id', async () => {
+    const [row] = await schema.query<{ result: { ok: boolean } }>(
+      `select public.submit_merchant_comment($1, null, null, 'The Fire Sale ran for two days and is gone.', $2, 'eye-test') as result`,
+      [TOKEN, visitId],
+    );
+    expect(row!.result.ok).toBe(true);
+
+    const [stored] = await schema.query<{ rule_id: string | null; subject: string; body: string }>(
+      `select rule_id, subject, body from public.merchant_comments where subject = 'eye-test'`,
+    );
+    expect(stored!.rule_id).toBeNull();
+    expect(stored!.subject).toBe('eye-test');
+    expect(stored!.body).toBe('The Fire Sale ran for two days and is gone.');
+  });
+
+  it('refuses a comment about both a finding and a subject', async () => {
+    const [row] = await schema.query<{ result: { ok: boolean; reason: string } }>(
+      `select public.submit_merchant_comment($1, 'FULF-001', null, 'Both.', $2, 'eye-test') as result`,
+      [TOKEN, visitId],
+    );
+    expect(row!.result.ok).toBe(false);
+    expect(row!.result.reason).toMatch(/not both/);
+  });
+
+  it('refuses a comment about neither', async () => {
+    // A merchant's words with nothing to attach them to. Worse than losing them: the document would
+    // carry a quotation it could not place.
+    const [row] = await schema.query<{ result: { ok: boolean; reason: string } }>(
+      `select public.submit_merchant_comment($1, null, null, 'Floating.', $2, null) as result`,
+      [TOKEN, visitId],
+    );
+    expect(row!.result.ok).toBe(false);
+  });
+
+  it('refuses a subject nobody defined', async () => {
+    // The vocabulary is closed at the database. A caller cannot invent a subject the report has no
+    // place to render.
+    await expect(
+      schema.query(
+        `select public.submit_merchant_comment($1, null, null, 'Invented.', $2, 'made-up') as result`,
+        [TOKEN, visitId],
+      ),
+    ).rejects.toThrow();
+  });
+
   it('stores the words verbatim', async () => {
     const body = '  We ship USA only.\n\nOur carrier confirms 21+ signature — see attached.  ';
 

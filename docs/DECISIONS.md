@@ -13510,3 +13510,56 @@ two to three pages per run, so the earlier measurement was of a broken styleshee
 
 Copy, ordering within a section, the four states, the evidence contract and every sentence a finding
 renders are untouched.
+## D-203 — The merchant's reply to the eye test, and why it is not a rule id
+
+**2026-08-30 · business owner · migration `0050_eye_test_comment.sql`, `packages/engine/src/commentary.ts`, `apps/web/src/components/ReportView.tsx`**
+
+D-202 built the box and left the storage open, because where a merchant's answer to Mintro's
+impression lives is a business question. It is answered here.
+
+### A column, not a reserved rule id
+
+The obvious move is to write `'eye-test'` into `merchant_comments.rule_id`. **The column will not
+take it:**
+
+    rule_id text not null check (rule_id ~ '^[A-Z]+-[0-9]{3}$')
+
+And the shapes that *would* pass are worse than the failure. A value in that column **is** a rule id
+to everything above it — `merchant_comments_run_idx` is `(run_id, rule_id)`, the report groups
+comments by rule, `commentaryFor` looks a finding up by its id — so a reserved `EYE-000` would be
+picked up as a finding comment by every reader that did not know the magic string.
+
+So `subject text` nullable, with `check ((rule_id is null) <> (subject is null))`: a row says which
+kind of thing it is about by which column is filled, and the constraint makes that exclusive rather
+than conventional. A row with both is a comment the document could render twice saying different
+things; a row with neither is a merchant's words with nothing to attach them to, which is worse than
+losing them because the document would carry a quotation it could not place.
+
+**The vocabulary is closed at the database** — a check constraint, not free text. Adding a second
+subject should be a migration somebody reviews, not a string a caller invents.
+
+### One write path
+
+`submit_merchant_comment` gained `p_subject text default null` rather than gaining a sibling. Every
+guard it makes — token, expiry, visit, empty body, and D-147's "unchanged is not a write" — has to
+hold identically, and two functions is two copies free to drift. The default keeps every existing
+five-argument call resolving unchanged.
+
+**The first draft of this migration got that wrong in a way worth recording.** It rebuilt the
+function from 0016's body and silently dropped the autosave dedupe D-147 added in 0045 — a
+`create or replace` reconstructed from an old copy discards every amendment made since. Four schema
+tests caught it. The safe move is to start from what is deployed, and the migration says so at the
+line.
+
+### It renders as a response and travels to IQwallet
+
+Never as a finding comment: it carries no rule id, so `commentaryFor` cannot see it and no finding
+row can render it. It sits inside the eye-test panel, under the read it answers and above the
+verdicts, in the serif face every merchant response carries, attributed per comment and marked
+self-declared (D-063).
+
+**It goes to all three surfaces including the PDF.** Suppressing a reply while keeping the judgment
+it answers would be one-sided: the package would carry Mintro's read of a storefront and not the
+merchant's account of it. Supplied from `commentaryProps`, the same helper the finding comments come
+from, so a reply cannot appear on screen and be missing from the export — the failure that has
+already happened once on this component.

@@ -44,6 +44,7 @@ import {
   type FindingCommentary,
   type ReportFinding,
   type EyeTestRecord,
+  type MerchantComment,
   type RunAttestations,
   type RunCommentary,
 } from '@mintro/engine';
@@ -1501,6 +1502,7 @@ function commentaryProps(
   commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   commentaryNote?: string;
   participation?: Participation;
+  eyeResponses?: readonly MerchantComment[];
 } {
   if (commentary === undefined) return {};
 
@@ -1521,6 +1523,17 @@ function commentaryProps(
   }
 
   const props = {
+    /*
+      The merchant's reply to the eye test, on every surface (D-203).
+
+      Supplied from the same read the finding comments come from, so a reply cannot appear on the
+      screen and be missing from the PDF — which is the defect this helper exists to prevent, and
+      which has happened once on this call site already.
+
+      `commentaryFor` matches on `ruleId` and these carry none, so they are invisible to the finding
+      rows without anything having to exclude them.
+    */
+    eyeResponses: commentary.comments.filter((comment) => comment.subject === 'eye-test'),
     commentaryOf: (finding: ReportFinding, ordinal?: number): FindingCommentary =>
       /*
         `sentAt` is what separates a response from a superseded draft (D-147).

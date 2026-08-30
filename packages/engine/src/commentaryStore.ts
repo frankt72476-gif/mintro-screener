@@ -162,7 +162,7 @@ export async function readRunCommentary(
   const comments = await rows<CommentRow>(
     db,
     'merchant_comments',
-    'rule_id, ordinal, body, identified_as, submitted_at',
+    'rule_id, ordinal, body, identified_as, submitted_at, subject',
     runId,
     'submitted_at',
   );
@@ -222,10 +222,20 @@ export async function readRunCommentary(
         }),
       ),
     },
+    /*
+      Finding comments and subject comments, in one list (D-203).
+
+      Not split into two fields here. A subject comment is still the merchant's words on this run,
+      written through the same link with the same attribution, and every rule about it — verbatim,
+      append-only, attributed per comment — is the same. What differs is where it renders, and that
+      is the renderer's question: `commentaryFor` matches on `ruleId`, so a subject row is invisible
+      to it without anything having to exclude it.
+    */
     comments: comments.map(
       (row): MerchantComment => ({
-        ruleId: row.rule_id,
+        ruleId: row.rule_id ?? '',
         ...(row.ordinal === null ? {} : { ordinal: row.ordinal }),
+        ...(row.subject === 'eye-test' ? { subject: 'eye-test' as const } : {}),
         body: row.body,
         identifiedAs: row.identified_as,
         submittedAt: row.submitted_at,
@@ -259,7 +269,8 @@ interface SendRow {
   outcome: string;
 }
 interface CommentRow {
-  rule_id: string;
+  rule_id: string | null;
+  subject: string | null;
   ordinal: number | null;
   body: string;
   identified_as: string;

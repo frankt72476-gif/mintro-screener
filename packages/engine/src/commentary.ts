@@ -20,10 +20,27 @@ import type { State } from '@mintro/ruleset';
 import type { NotEvaluableKind } from './findings.js';
 
 /** What someone wrote about one finding, verbatim and timestamped. */
+/**
+ * What a comment is about when it is not about a finding (D-203).
+ *
+ * A closed vocabulary, matching the database's own check constraint. `merchant_comments.rule_id`
+ * takes only `^[A-Z]+-[0-9]{3}$`, so a reserved rule id was never available — and a value that
+ * looked like one would be picked up as a finding by every reader above it.
+ */
+export type CommentSubject = 'eye-test';
+
 export interface MerchantComment {
+  /** Empty where the comment is about a `subject` instead. Exactly one of the two is set. */
   readonly ruleId: string;
   /** Which finding of that rule, for rules that produce one per sampled page. */
   readonly ordinal?: number;
+  /**
+   * What this comment answers, where it answers something that is not a finding (D-203).
+   *
+   * Present only on subject comments. A reader that groups by `ruleId` never sees these, which is
+   * the point of the separation rather than a side effect of it.
+   */
+  readonly subject?: CommentSubject;
   /** Their words, exactly as written. Never trimmed, normalised or summarised. */
   readonly body: string;
   /**
