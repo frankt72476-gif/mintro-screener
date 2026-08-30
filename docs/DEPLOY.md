@@ -321,6 +321,12 @@ Skip this if you are not using merchant-supplied logins yet. Everything else wor
 It prints three blocks: a value for Netlify, a ready-to-paste `fly secrets set` command, and lines
 for `apps/web/.env`. Copy them out now — **the pair is printed once and stored nowhere.**
 
+The worker's boot line says which of three states it is in:
+
+    ok    credentials    ready — key pair verified, public half derived from the private key
+    --    credentials    not configured — merchant-supplied logins are unavailable, public crawls unaffected
+    XX    credentials    REFUSED — public key set, private key missing
+
 Losing the private half makes every stored credential permanently unreadable. That is deliberate
 (D-038): a recovery path would be a second route to plaintext, which is exactly what the two-key
 design is paying to avoid. Re-asking a merchant costs an email.
@@ -340,10 +346,20 @@ key already in it, so paste that rather than retyping:
 
     fly secrets set CREDENTIAL_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..." --app mintro-screener-worker
 
-The worker starts fine without it and screens public storefronts normally. A request that *asks*
-for a screening account then fails loudly rather than quietly running as a public crawl — a
+**Only the private half goes to Fly.** The worker derives the public half from it at boot (D-191):
+an RSA private key already contains its own modulus and exponent, so a second secret would be a
+second thing to keep in step with nothing checking that it was. `CREDENTIAL_PUBLIC_KEY` is accepted
+here if set, and checked against the derived one — a mismatch refuses the boot rather than being
+discovered when a merchant's login cannot be opened.
+
+The worker starts fine without any of it and screens public storefronts normally. A request that
+*asks* for a screening account then fails loudly rather than quietly running as a public crawl — a
 signed-in scan that silently became anonymous would report gated pages as unobservable and
 attribute that to the merchant's configuration.
+
+**What it will not do is start half-configured.** A public key with no private half is refused at
+boot: the browser would seal deposits that nothing can ever open, and they would accumulate in
+`credential_deposits` looking like ordinary queue depth. There is no recovery for those (D-038).
 
 To check what is set — this shows names and digests, never values:
 
@@ -549,6 +565,7 @@ repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as writ
 | `SUPABASE_URL` | — | ✅ | **never** | ✅ |
 | `SUPABASE_SERVICE_KEY` | **never** | ✅ | **never** | ✅ |
 | `CREDENTIAL_PRIVATE_KEY` | **never** | ✅ | **never** | ✅ |
+| `CREDENTIAL_PUBLIC_KEY` | — | not needed | — | not needed |
 | `SUPABASE_EVIDENCE_BUCKET` | — | optional | — | optional |
 | `RESEND_API_KEY` | — | ✅ | **never** | optional |
 | `WEB_ORIGIN` | — | ✅ | — | for local invites |

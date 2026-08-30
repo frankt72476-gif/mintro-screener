@@ -314,6 +314,14 @@ function Screener({
   const [credentialFor, setCredentialFor] = useState<string | null>(null);
   /** Bumped after a deposit, so the card re-reads rather than showing the pre-deposit state. */
   const [credentialEpoch, setCredentialEpoch] = useState(0);
+  /**
+   * Domains deposited for in this session, and when (D-191).
+   *
+   * A deposit becomes a `credential_state` row only once the worker has opened it. Holding the
+   * moment here lets the card say "queued, not yet collected" rather than "no login stored" — which
+   * is what it said before, indistinguishable from never having tried.
+   */
+  const [depositedAt, setDepositedAt] = useState<Readonly<Record<string, string>>>({});
   const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
   const [pdfBusy, setPdfBusy] = useState(false);
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
@@ -754,6 +762,7 @@ function Screener({
               onCredential={(domain) => setCredentialFor(domain)}
               client={client}
               credentialEpoch={credentialEpoch}
+              depositedAt={depositedAt}
               onRequest={async (url) => {
                 const result = await queue.request(url);
                 if (result.ok) {
@@ -879,7 +888,8 @@ function Screener({
             // The card is reading `credential_state`, which the worker writes when it collects the
             // deposit. Bumping the epoch makes it re-read rather than showing the pre-deposit state.
             setCredentialEpoch((n) => n + 1);
-            setToast(`Credential stored for ${domain} — it cannot be read back`);
+            setDepositedAt((held) => ({ ...held, [domain]: new Date().toISOString() }));
+            setToast(`Credential sealed for ${domain} — it cannot be read back`);
           }}
         />
       )}
@@ -907,6 +917,7 @@ function ScanInput({
   onCredential,
   client,
   credentialEpoch,
+  depositedAt,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
@@ -918,6 +929,8 @@ function ScanInput({
   readonly client: SupabaseClient;
   /** Changes when a deposit lands, so the card re-reads (D-185). */
   readonly credentialEpoch: number;
+  /** When a deposit was made for each domain in this session (D-191). */
+  readonly depositedAt: Readonly<Record<string, string>>;
   readonly onRequest: (
     url: string,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
@@ -1144,6 +1157,11 @@ function ScanInput({
           domain={url}
           available={credentialsAvailable}
           onStore={() => onCredential(url.trim())}
+          {...(() => {
+            const folded = normaliseDomain(url);
+            const at = folded === null ? undefined : depositedAt[folded];
+            return at === undefined ? {} : { depositedAt: at };
+          })()}
         />
 
         {error !== null && (

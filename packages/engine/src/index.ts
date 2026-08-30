@@ -328,6 +328,7 @@ export {
   unseal,
   isSealedEnvelope,
   generateKeyPair,
+  publicKeyFromPrivate,
   type SealedEnvelope,
 } from './sealed.js';
 

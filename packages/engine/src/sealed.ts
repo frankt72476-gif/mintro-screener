@@ -207,3 +207,44 @@ function fromBase64(value: string): ArrayBuffer {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
 }
+
+
+/**
+ * The public half of an RSA key pair, recovered from the private half (D-191).
+ *
+ * **An RSA private key already contains its public key.** PKCS#8 carries the modulus and the public
+ * exponent alongside the private factors, so `n` and `e` come straight out of a JWK export and
+ * re-import as a public key. Verified byte-identical against the generated public key: the derived
+ * SPKI matches exactly.
+ *
+ * This exists so the worker does not need a second secret. It previously required
+ * `CREDENTIAL_PUBLIC_KEY` in its own environment as well as the private half — **two values that
+ * must agree, set in two places, with nothing checking they do.** A mismatched pair seals fine,
+ * writes fine, and fails only when the worker tries to open a real merchant's credential.
+ *
+ * One secret cannot disagree with itself.
+ */
+export async function publicKeyFromPrivate(privateKeyPem: string): Promise<string> {
+  const priv = await crypto.subtle.importKey(
+    'pkcs8',
+    fromPem(privateKeyPem, 'PRIVATE KEY'),
+    RSA_ALGORITHM,
+    true,
+    ['decrypt'],
+  );
+
+  const jwk = await crypto.subtle.exportKey('jwk', priv);
+  if (typeof jwk.n !== 'string' || typeof jwk.e !== 'string') {
+    throw new Error('the private key did not export a modulus and exponent, so no public key could be derived');
+  }
+
+  const pub = await crypto.subtle.importKey(
+    'jwk',
+    { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RSA-OAEP-256', ext: true, key_ops: ['encrypt'] },
+    RSA_ALGORITHM,
+    true,
+    ['encrypt'],
+  );
+
+  return toPem(await crypto.subtle.exportKey('spki', pub), 'PUBLIC KEY');
+}

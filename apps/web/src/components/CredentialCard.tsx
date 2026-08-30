@@ -34,6 +34,18 @@ interface Props {
   readonly domain: string;
   readonly available: boolean;
   readonly onStore: () => void;
+  /**
+   * When a credential was deposited for this domain in this session (D-191).
+   *
+   * A deposit is not stored until the worker collects it: it seals in the browser, lands in
+   * `credential_deposits`, and only becomes a `credential_state` row once the worker has opened it
+   * and written the vault. **If the worker cannot open it, no row ever appears** — so a deposit
+   * that stays pending is the signal that it went into a void.
+   *
+   * That is the whole mechanism, and it needs no handshake: the absence the analyst is watching for
+   * is the same absence the failure produces.
+   */
+  readonly depositedAt?: string;
 }
 
 /** `2026-08-12T…` → `12 Aug`. Short, because these sit inline in a status line. */
@@ -79,8 +91,25 @@ export function credentialLine(
       };
 }
 
-export function CredentialCard({ state, loading, domain, available, onStore }: Props): JSX.Element {
+export function CredentialCard({
+  state,
+  loading,
+  domain,
+  available,
+  onStore,
+  depositedAt,
+}: Props): JSX.Element {
   const line = credentialLine(state, loading);
+
+  /*
+    Deposited here, and not yet collected (D-191).
+
+    The worker drains deposits at the top of every cycle, so this clears within a minute on a
+    healthy deployment. It persisting is the honest signal that the worker holds no private key, or
+    holds one from a different pair — the case where the analyst was previously shown a working
+    button and a stored-nothing card, with no way to tell the difference from never having tried.
+  */
+  const pending = depositedAt !== undefined && state === null && !loading;
 
   /*
     The button label is a claim about what pressing it will do, so it follows what is known.
@@ -112,6 +141,15 @@ export function CredentialCard({ state, loading, domain, available, onStore }: P
           {available ? label : 'Needs VITE_CREDENTIAL_PUBLIC_KEY'}
         </button>
       </div>
+
+      {pending && (
+        <p className="fhint cred-pending">
+          Sealed and queued at {new Date(depositedAt as string).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
+          It is stored once the worker collects it, which is usually within a minute. If this line
+          stays, the worker has no private key for it — nothing here can open what was sealed, and
+          the merchant would need to supply the login again.
+        </p>
+      )}
 
       {line.tone === 'failed' && (
         /*

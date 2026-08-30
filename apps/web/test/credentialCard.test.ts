@@ -144,3 +144,66 @@ describe('the action', () => {
     expect(markup.toLowerCase()).not.toContain('password');
   });
 });
+
+/**
+ * A deposit is not stored until the worker collects it (D-191).
+ *
+ * The card previously showed "No login stored" between a deposit and its collection — the same
+ * words it shows when nobody has ever tried. So an analyst depositing into a worker with no private
+ * key saw a working button, a success toast, and a card that looked exactly as it had before.
+ *
+ * The signal needs no handshake: **the absence the analyst watches for is the absence the failure
+ * produces.** A row appears when the worker opens the deposit and writes the vault; if it cannot,
+ * none ever does.
+ */
+describe('a deposit that has not been collected', () => {
+  const render = (state: CredentialState | null | undefined, depositedAt?: string) =>
+    renderToStaticMarkup(
+      createElement(CredentialCard, {
+        state,
+        loading: false,
+        domain: 'shop.example',
+        available: true,
+        onStore: () => undefined,
+        ...(depositedAt === undefined ? {} : { depositedAt }),
+      }),
+    );
+
+  it('says it is queued rather than that nothing is stored', () => {
+    const markup = render(null, '2026-08-29T10:15:00.000Z');
+
+    expect(markup).toContain('Sealed and queued');
+    expect(markup).toContain('cred-pending');
+  });
+
+  it('says what it means if the line stays', () => {
+    // The whole value of the signal. Without this sentence a persisting line is a mystery rather
+    // than a diagnosis.
+    const markup = render(null, '2026-08-29T10:15:00.000Z');
+
+    expect(markup).toContain('the worker has no private key for it');
+    expect(markup).toContain('supply the login again');
+  });
+
+  it('stops saying it once the worker has collected the deposit', () => {
+    const collected: CredentialState = {
+      merchantDomain: 'shop.example',
+      updatedAt: '2026-08-29T10:16:00.000Z',
+      lastLoginOk: null,
+      lastLoginAt: null,
+    };
+
+    expect(render(collected, '2026-08-29T10:15:00.000Z')).not.toContain('Sealed and queued');
+  });
+
+  it('says nothing where no deposit was made in this session', () => {
+    // "No login stored" is the right answer when nobody has tried, and must stay unqualified.
+    expect(render(null)).not.toContain('cred-pending');
+    expect(render(null)).toContain('No login stored');
+  });
+
+  it('does not claim a deposit is queued when the lookup merely failed', () => {
+    // `undefined` is "could not check", which is not "waiting for the worker".
+    expect(render(undefined, '2026-08-29T10:15:00.000Z')).not.toContain('Sealed and queued');
+  });
+});

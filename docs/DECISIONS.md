@@ -12533,3 +12533,102 @@ reasoned about was not the code on disk. **When an isolated reimplementation of 
 with the function, stop reading the source and read the bytes.**
 
 ---
+
+## D-191 — The credential key pair is proved at boot, and derived rather than configured twice
+
+**2026-08-29 · engineering · closing the gap the credential survey found**
+
+The credential path had a documented procedure and had never been run. No pair exists, no `.env`
+carries one, and all nine runs in the corpus are `mode: public` with `usedCredential: false`. So the
+first real use would also have been the first test of the deployment wiring — and its failure mode is
+quiet: an analyst types a merchant's password, the browser seals it, the row is written, the toast
+says stored, and only `collectDeposits` fails.
+
+### One secret, not two
+
+`readVaultKeys` required **`CREDENTIAL_PUBLIC_KEY` in the worker's own environment** alongside the
+private half, and threw if either was missing. `DEPLOY.md` never told anyone to set it on Fly — so a
+worker following the documented procedure could not have built a vault at all. That is a deployment
+gap that had gone unnoticed precisely because nobody had reached this path.
+
+**The public half is derived from the private one instead.** An RSA private key already contains its
+modulus and exponent; PKCS#8 carries them, a JWK export exposes them, and re-importing `{n, e}` as a
+public key produces SPKI **byte-identical to the generated public key** — verified, not assumed, and
+then round-tripped through `seal`/`unseal` because byte equality is convincing and a round trip is
+proof.
+
+Two values that must agree, set in two places, with nothing checking that they did, are now one
+value. **One secret cannot drift from itself.**
+
+`CREDENTIAL_PUBLIC_KEY` is still read if present and checked against the derived half — a deployment
+that sets it is saying something, and if what it says disagrees, one of the two places it is written
+is stale. The frontend holds that same value, so a mismatch means the browser is sealing to a key
+this worker cannot open.
+
+### Three outcomes at boot
+
+    ok    credentials    ready — key pair verified, public half derived from the private key
+    --    credentials    not configured — merchant-supplied logins are unavailable, public crawls unaffected
+    XX    credentials    REFUSED — public key set, private key missing
+
+**Neither key configured is not a failure.** The credential path is optional and every run in the
+corpus is a public crawl; a deployment that has not set it up screens normally, with the capability
+absent rather than the process dead. An empty variable counts as unset — a blank in a `.env` is
+somebody not having filled it in, not a key.
+
+**A public key with no private half is refused**, and it is the case worth refusing over. Everything
+downstream of the browser succeeds: the envelope is well-formed, the check constraint accepts it, the
+analyst is told it was stored. Only the opening fails, and the deposits accumulate looking like
+ordinary queue depth. There is no recovery for them (D-038) — the merchant is asked again.
+
+The message names both ways out, not only the one that turns the feature on: set the private half,
+or unset the public one and run without merchant logins. Same shape as the stale-bundle refusal
+(D-187): a message to act on, not a stack to decode.
+
+### What the round trip proves, and what it does not
+
+The preflight seals a fixed marker and unseals it. **This is weaker than it looks and is kept
+knowingly.**
+
+Once the public half is derived, a key that parses is a key that works — so the round trip cannot
+catch a mismatched pair, and **removing it leaves the whole suite green**, which was verified by
+doing exactly that. What it catches is `crypto.subtle` being unavailable or refusing RSA-OAEP /
+AES-GCM in this runtime, which is a real failure on a platform or Node change and costs a
+millisecond to rule out.
+
+The derivation and the explicit mismatch check are what prove the pair, and both go red when broken.
+The round trip is a crypto-availability smoke test. That is said in the code and in the test rather
+than left as a check that appears to cover something it does not — the lesson D-177's `-ity` test
+paid for.
+
+### The signal in the app, without a handshake
+
+The survey's second consequence: the button works whenever the frontend has a public key, and says
+nothing about whether the worker holds the matching private half.
+
+**No endpoint, because the absence the analyst watches for is the absence the failure produces.** A
+deposit becomes a `credential_state` row only when the worker has opened it and written the vault. If
+it cannot open it, no row ever appears. The card previously rendered that as *"No login stored"* —
+the same words it shows when nobody has ever tried — so an analyst depositing into a worker with no
+private key saw a success toast and a card that looked exactly as before.
+
+It now distinguishes the two:
+
+> **Sealed and queued at 10:15.** It is stored once the worker collects it, which is usually within a
+> minute. If this line stays, the worker has no private key for it — nothing here can open what was
+> sealed, and the merchant would need to supply the login again.
+
+The sentence about what a persisting line *means* is the part that matters. Without it the line is a
+mystery rather than a diagnosis. The toast changed from "stored" to "sealed" for the same reason:
+sealing is what the browser did, storing is what the worker does later.
+
+State is per session and per domain. `undefined` — the lookup failed — is deliberately not treated as
+pending: "could not check" is not "waiting for the worker".
+
+### Not changed
+
+`readVaultKeys` still exists and still requires both halves. Nothing in the boot path calls it now,
+and it is left rather than deleted because removing an exported function is a wider change than this
+one; it should go when something else touches that file.
+
+---

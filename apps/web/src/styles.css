@@ -836,6 +836,10 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .cred-stale { margin-top: 6px; }
 
+/* Sealed here, not yet collected by the worker (D-191). Amber, like a stale login: something to
+   notice, not an error — it clears on its own within a cycle on a healthy deployment. */
+.cred-pending { margin-top: 6px; border-left: 3px solid var(--amber); padding-left: 10px; }
+
 /* The replace warning sits above the button that would do it, because the value it overwrites
    cannot be recovered or compared afterwards by anyone in this application. */
 .cred-replacing {

@@ -39,7 +39,8 @@ import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun } from '../src/store/completeness.js';
-import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
+import { createSealedVault, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
+import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { recordSignIn } from '../src/auth/credentialState.js';
 import { establishSession } from '../src/auth/login.js';
@@ -141,19 +142,31 @@ async function main(argv: readonly string[]): Promise<number> {
     return 1;
   }
 
-  // Optional at startup, and deliberately so: a demo that has not set up credentials should still
-  // screen public storefronts. A request that *asks* for a screening account when no key is
-  // configured fails loudly rather than quietly running as a public crawl.
-  let keys: SealedVaultKeys | undefined;
-  try {
-    keys = readVaultKeys();
-    console.log('  ok    credential deposit key                          loaded');
-  } catch (error) {
-    console.log(`  --    credential deposit key                          not configured`);
-    const [firstLine] = error instanceof Error ? error.message.split(/\r?\n/) : [''];
-    console.log(`        ${firstLine ?? ''}`);
-    console.log('        Public crawls are unaffected; screening_account requests will fail.');
+  /*
+    The credential key pair, proved rather than loaded (D-191).
+
+    Optional, and deliberately so: a deployment that has not set up credentials screens public
+    storefronts normally, which is every run in the corpus. What is **not** optional is that a
+    configured pair works — the first real use would otherwise be the first test of the wiring, and
+    its failure mode is a merchant's password sealed into a deposit nobody can open.
+
+    `readVaultKeys` is gone from this path. It required a second secret, `CREDENTIAL_PUBLIC_KEY`,
+    that `DEPLOY.md` never told anyone to set here — so a worker following the documented procedure
+    could not have built a vault at all. The public half is derived from the private one now.
+  */
+  const credentials = await credentialPreflight();
+  const mark = credentials.error !== undefined ? 'XX' : credentials.keys === undefined ? '--' : 'ok';
+  console.log(`  ${mark}    ${credentials.line}`);
+
+  if (credentials.error !== undefined) {
+    console.error('');
+    console.error(credentials.error);
+    console.error('');
+    console.error('The worker will not start with a credential key it cannot use.');
+    return 1;
   }
+
+  const keys: SealedVaultKeys | undefined = credentials.keys;
 
   let browser = await launchBrowser();
 
