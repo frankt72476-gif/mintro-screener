@@ -59,6 +59,14 @@ export interface ReportActions {
   readonly onInvite?: () => void;
   /** True while the worker is rendering. The button says so rather than appearing inert. */
   readonly downloading?: boolean;
+  /**
+   * Queues a fresh screening of this merchant (D-211).
+   *
+   * Here because this is where the decision is made — an agent decides to run it again while
+   * reading the report that made her decide. Nothing is destroyed: a re-run is a new run with its
+   * own findings and its own comment round (D-002).
+   */
+  readonly onRescan?: () => void;
 }
 
 interface Props {
@@ -226,6 +234,18 @@ export function ReportView({
         </div>
         {!print && actions !== undefined && (
           <div className="acts">
+            {/*
+              Re-screen, where the decision is made (D-211).
+
+              An agent decides to run it again while reading the report that made her decide.
+              Ghost rather than primary: Send to IQwallet is what this page is for, and a re-screen
+              is the thing she does instead of sending, not the thing she came to do.
+            */}
+            {actions.onRescan !== undefined && (
+              <button className="btn btn-ghost" onClick={actions.onRescan}>
+                Re-screen
+              </button>
+            )}
             <button
               className="btn btn-ghost"
               onClick={actions.onDownload}

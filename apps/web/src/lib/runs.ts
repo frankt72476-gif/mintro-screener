@@ -31,6 +31,14 @@ export interface RunSummary {
    * the verification script cannot disagree about which runs they are.
    */
   readonly quarantine: string | null;
+  /**
+   * Whether this run carries any merchant response (D-211).
+   *
+   * A count, embedded in the list query rather than fetched per run — the group header states it so
+   * an agent knows answers will carry forward before she re-screens (D-204). False where the read
+   * did not supply it, which the header renders as nothing rather than as "no responses".
+   */
+  readonly responded: boolean;
 }
 
 export interface LoadedRun {
@@ -52,14 +60,17 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
     async list() {
       const { data, error } = await client
         .from('runs')
-        .select('id, finished_at, report, merchants ( domain ), run_quarantine ( reason )')
+        .select(
+          'id, finished_at, report, merchants ( domain ), run_quarantine ( reason ), ' +
+            'merchant_comments ( count )',
+        )
         .eq('status', 'complete')
         .order('started_at', { ascending: false })
         .limit(100);
 
       if (error !== null || data === null) return [];
 
-      return (data as RunRow[]).flatMap((row) => {
+      return (data as unknown as RunRow[]).flatMap((row) => {
         const report = row.report;
         if (report === null) return [];
         return [
@@ -69,6 +80,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             finishedAt: row.finished_at,
             counts: { fail: report.counts.fail, review: report.counts.review },
             quarantine: quarantineReason(row.run_quarantine),
+            responded: commentCount(row.merchant_comments) > 0,
           },
         ];
       });
@@ -106,6 +118,7 @@ function quarantineReason(embed: QuarantineEmbed): string | null {
 }
 
 interface RunRow {
+  readonly merchant_comments?: unknown;
   id: string;
   finished_at: string | null;
   report: ScreeningReport | null;
@@ -148,9 +161,10 @@ export function createLocalRunSource(): RunSource {
                 domain: report.merchantDomain,
                 finishedAt: report.finishedAt,
                 counts: { fail: report.counts.fail, review: report.counts.review },
-                // Local files carry no quarantine record. Development only, and the source line
-                // in the UI says which source is in use.
+                // Local files carry no quarantine record and no commentary. Development only, and
+                // the source line in the UI says which source is in use.
                 quarantine: null,
+                responded: false,
               },
             ],
       );
@@ -168,4 +182,21 @@ export function createLocalRunSource(): RunSource {
       return report === null ? null : { report, quarantine: null };
     },
   };
+}
+
+/**
+ * How many merchant comments a run carries, from PostgREST's embedded count.
+ *
+ * The shape depends on the join: an array of one `{ count }` for a to-many embed, an object for a
+ * to-one. Read defensively and treated as zero when it is neither — a group header that said
+ * "merchant has responded" on a misread would tell an agent answers were carrying forward when
+ * none were.
+ */
+function commentCount(embed: unknown): number {
+  if (Array.isArray(embed)) {
+    const first = embed[0] as { count?: unknown } | undefined;
+    return typeof first?.count === 'number' ? first.count : 0;
+  }
+  const one = embed as { count?: unknown } | null;
+  return typeof one?.count === 'number' ? one.count : 0;
 }

@@ -63,6 +63,9 @@ import { Rail } from './components/Rail.js';
 import { CommentPane, commentToken } from './components/CommentPane.js';
 import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
+import type { InFlightRun } from './lib/domainGroups.js';
+import { groupByDomain } from './lib/domainGroups.js';
+import { DomainGroups } from './components/DomainGroups.js';
 
 import type { Pane } from './components/Rail.js';
 import { DocumentsReportView, type DocumentsReportViewProps } from './components/DocumentsReportView';
@@ -524,6 +527,46 @@ function Screener({
     void tick();
   }
 
+  /*
+    Scans still running, shaped for the group list (D-211).
+
+    Both lists take the same rows: a run in flight belongs in its merchant's group, not in a queue
+    somewhere else on the page. The agent presses Re-screen and watches it appear where she is
+    already looking.
+  */
+  const inFlight: InFlightRun[] = queued
+    .filter((request) => isPending(request.status))
+    .map((request) => ({
+      requestId: request.id,
+      url: request.url,
+      status: request.status,
+      progress: request.progress,
+      createdAt: request.createdAt,
+      stalled: isStalled(request),
+    }));
+
+  /**
+   * Re-screening a domain, from wherever the agent decided to.
+   *
+   * The same path a typed URL takes — one queue, one request row, one worker — because a second way
+   * to start a scan is a second thing to get wrong (D-035). Nothing is destroyed: a re-run is a new
+   * run with its own findings and its own comment round, and what carries across is the merchant's
+   * answers and comments (D-204).
+   */
+  /** Runs whose group header should say the merchant has already responded (D-204). */
+  const responded = new Set(available.filter((run) => run.responded).map((run) => run.runId));
+
+  const rescan = (domain: string): void => {
+    void queue.request(`https://${domain}/`).then((result) => {
+      if (result.ok) {
+        setError(null);
+        setToast('Scan queued — the worker will pick it up');
+      } else {
+        setError(result.error);
+      }
+    });
+  };
+
   async function load(runId: string): Promise<void> {
     setStage('running');
     setError(null);
@@ -834,6 +877,9 @@ function Screener({
             <PastReports
               runs={available}
               source={runs.description}
+              inFlight={inFlight}
+              responded={responded}
+              onRescan={rescan}
               onOpen={(runId) => {
                 setPane('scan');
                 void load(runId);
@@ -899,6 +945,17 @@ function Screener({
                   onSend: () => setSending(true),
                   onDownload: () => void downloadPdf(report),
                   onInvite: () => setInviting(true),
+                  /*
+                    Re-screen, where the decision is made (D-211).
+
+                    An agent decides to run it again while reading the report that made her decide.
+                    Sending her to another pane to find the button is asking her to hold the reason
+                    in her head on the way.
+                  */
+                  onRescan: () => {
+                    setPane('reports');
+                    rescan(report.merchantDomain);
+                  },
                   downloading: pdfBusy,
                 }}
                 {...commentaryProps(commentary, report)}
@@ -1105,7 +1162,32 @@ function ScanInput({
     This is a "what did I just do" strip, and a scan form that grows a scrolling history stops
     being a form.
   */
-  const recent = queued.slice(0, 5);
+  /*
+    Five domains, not five runs (D-211, §3).
+
+    Grouped from the same rows the reports pane groups, then cut to five — cutting first would drop
+    a merchant whose runs happen to sit below the fold of a flat list, which is the defect.
+  */
+  const recentGroups = groupByDomain(
+    available,
+    queued.filter((request) => isPending(request.status)).map((request) => ({
+      requestId: request.id,
+      url: request.url,
+      status: request.status,
+      progress: request.progress,
+      createdAt: request.createdAt,
+      stalled: isStalled(request),
+    })),
+  ).slice(0, 5);
+
+  /*
+    Scans still running, shaped for the group list (D-211).
+
+    Both lists take the same rows: a run in flight belongs in its merchant's group, not in a queue
+    somewhere else on the page. The agent presses Re-screen and watches it appear where she is
+    already looking.
+  */
+
 
   return (
     <div>
@@ -1175,9 +1257,23 @@ function ScanInput({
           })()}
         />
 
-        {queued.length > 0 && (
+        {/*
+          The last five **domains**, not the last five requests (D-211, §3).
+
+          An agent working four merchants who has re-screened one of them three times saw that
+          merchant three times and one of the others not at all. The same grouping the reports pane
+          uses, and the same component — two implementations of one idea is how they came to answer
+          the question differently.
+
+          Collapsed here, open there: on this page the list is secondary to the field above it.
+
+          **No Re-screen button.** The URL field is directly above and is this page's primary
+          action; a second way to start a scan, two inches from the first, is a choice an agent has
+          to make before she can do the obvious thing.
+        */}
+        {recentGroups.length > 0 && (
           <div className="field">
-            <span className="flabel">Recent requests</span>
+            <span className="flabel">Recent</span>
             <p className="fhint">
               {working.length > 0
                 ? `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
@@ -1192,59 +1288,7 @@ function ScanInput({
                 </>
               )}
             </p>
-            <ul className="queue-list">
-              {recent.map((request) => (
-                <li
-                  key={request.id}
-                  className={`queue-item ${request.status}${isStalled(request) ? ' stalled' : ''}`}
-                >
-                  {/*
-                    A request claimed longer ago than the worker's own watchdog deadline is not
-                    "running" in any sense an analyst can use (D-152). Saying so is the whole fix:
-                    the comopeptides row sat labelled `running` for twenty-nine minutes with a
-                    progress line that had stopped changing, and nothing on screen distinguished
-                    that from work in progress.
-
-                    The label says what is known — no worker is touching it — and not what is not:
-                    it does not say failed, because a released claim is retried, not abandoned.
-                  */}
-                  <span className={`queue-state ${isStalled(request) ? 'stalled' : request.status}`}>
-                    {isStalled(request) ? 'no worker' : request.status}
-                  </span>
-                  <span className="queue-url">
-                    {request.url}
-                    {request.mode === 'screening_account' && (
-                      <span
-                        className="mode-tag"
-                        title="Product pages were behind a login; the merchant's stored account was used for them"
-                      >
-                        used merchant login
-                      </span>
-                    )}
-                    <span className="queue-when">{formatReportDate(request.createdAt)}</span>
-                  </span>
-                  <span className="queue-note">
-                    {request.status === 'failed' ? (
-                      (request.error ?? 'failed')
-                    ) : request.status === 'done' && request.runId !== null ? (
-                      /*
-                        A quick link to the run this request produced (D-047).
-
-                        By run id, never "the newest report for this merchant" — that substitution
-                        is exactly D-045, and a shortcut is the easiest place to reintroduce it.
-                      */
-                      <button className="queue-open" onClick={() => onRun(request.runId as string)}>
-                        Open report
-                      </button>
-                    ) : isStalled(request) ? (
-                      `No worker has touched this since ${formatReportDate(request.claimedAt as string)}. It is past the ${Math.round(RUN_DEADLINE_MS / 60000)}-minute limit a run is given, so the claim will be released and the scan retried. Last progress: ${request.progress ?? 'none recorded'}`
-                    ) : (
-                      (request.progress ?? 'waiting for the worker')
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <DomainGroups groups={recentGroups} onOpen={onRun} startOpen={false} />
           </div>
         )}
 

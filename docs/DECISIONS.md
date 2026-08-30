@@ -13898,3 +13898,82 @@ Rewritten around what still has consequences: **merchant emails already sent car
 a report rendered today. That id is now asserted on both surfaces. The link check remains, asserting
 zero — so the day one is added it starts checking, and the day the count stops being zero it is
 visible in the diff.
+## D-210 — The responder is remembered across visits, and clearing means clearing
+
+**2026-08-30 · business owner · `apps/web/src/lib/visitStore.ts`, `CommentPane.tsx`**
+
+A comment link is valid for thirty days. Someone who answered a few questions, closed the tab and
+came back on Thursday was asked to introduce themselves again — which is the friction D-071 set out
+to remove, reappearing one session later.
+
+**This narrows D-071's storage choice and keeps what it was protecting.** That decision chose
+`sessionStorage` because `localStorage` would let *"one person's address attach to another person's
+words"* on a shared machine: the link is forwardable, a merchant and their agent may use the same
+desk, and every response is attributed to the address held when it was written.
+
+That risk has not gone away, and three things hold it down — none of which is the storage:
+
+1. The page states it. *"Responding as sue@agency.example"*, in a card, with the control beside it.
+   **A stated identity is safer than the silently pre-filled box D-071 shipped**: a merchant handed
+   the laptop sees whose name is on it before they type.
+2. `clearVisit` removes it, from both stores. The control reads *"Not you? Enter your email"* and the
+   likeliest reason to press it is exactly that hand-over.
+3. The key is the **link**, not the run and not the domain. One person may hold links for several
+   merchants under different addresses, and a run key could not tell those apart.
+
+**The key is derived, not the token.** The token is the credential; writing it into a `localStorage`
+key would leave the thing that opens the report sitting there indefinitely. FNV-1a — not offered as a
+secret-strength derivation, but the stored key cannot open anything, which is the property that
+matters.
+
+Unchanged: this is convenience and never authentication. The address is a self-declaration,
+`submit_merchant_comment` reads `identified_as` from the visit row server-side, and a remembered
+address is never submitted on its own — it fills the field and the person still writes and sends
+(D-063).
+
+## D-211 — Both lists group by storefront, and share one component
+
+**2026-08-30 · business owner · `apps/web/src/lib/domainGroups.ts`, `components/DomainGroups.tsx`**
+
+Two lists showed the same thing and showed it differently. *Past reports* listed runs flat, sortable
+by merchant, date or outcome. The scan form listed the last five **requests**. An agent working four
+merchants who had re-screened one of them three times **saw that merchant three times and one of the
+others not at all**.
+
+`runs.merchant_id` joins `merchants.domain` and `upsertMerchant` keys on domain, so every run for a
+storefront already hung off one row. This is the grouping that was always available and never made.
+
+One component, in both places. What differs is passed in and is small: whether groups start open, and
+whether the header offers Re-screen.
+
+**Ungrouped is not a state.** A domain screened once is a group of one and renders identically to a
+group of five — a list that changes shape at two rows is one an agent has to learn twice, and the
+shape it changes into is the one they see least often.
+
+**A run in flight sits in its own group.** The agent presses Re-screen and watches the row appear
+where she is already looking, rather than in a queue elsewhere on the page.
+
+**The header says whether the merchant has responded**, from a count embedded in the list query, so
+an agent knows answers will carry forward (D-204) before she runs it rather than afterwards.
+
+**Re-screen is also on the report**, because that is where the decision is made — an agent decides to
+run it again while reading the report that made her decide. Ghost rather than primary: sending is
+what that page is for.
+
+### The scan form takes five domains, not five runs
+
+Grouped first and cut to five second. Cutting first would drop a merchant whose runs happen to sit
+below the fold of a flat list, which is the defect. Collapsed there and open on the reports pane,
+because on the scan form the list is secondary to the field above it.
+
+**No Re-screen button there, and it reads better without one.** The URL field is directly above and
+is the page's primary action; a second way to start a scan two inches from the first is a choice an
+agent has to make before she can do the obvious thing.
+
+### What the sort controls took with them
+
+`sortRuns` is gone: a group list has one order that means anything — most recent activity first — and
+three sort keys over groups would be three ways of asking the same question. Its tests moved rather
+than went, and one of them **caught a real defect on the way**: `groupByDomain` was not a total
+order, so two runs finished at the same timestamp reshuffled between renders. Two runs of one
+merchant on one day is the ordinary case (D-045); the tie-break came across with the tests.

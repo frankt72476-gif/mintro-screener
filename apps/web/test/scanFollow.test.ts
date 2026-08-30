@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createScanQueue, isPending, normaliseUrl } from '../src/lib/scanQueue.js';
-import { sortRuns } from '../src/components/PastReports.js';
+import { groupByDomain, domainOf } from '../src/lib/domainGroups.js';
 import type { RunSummary } from '../src/lib/runs.js';
 
 function run(runId: string, domain: string, finishedAt: string): RunSummary {
@@ -28,6 +28,7 @@ function run(runId: string, domain: string, finishedAt: string): RunSummary {
     finishedAt,
     counts: { fail: 5, review: 18 },
     quarantine: null,
+    responded: false,
   };
 }
 
@@ -55,35 +56,36 @@ describe('run labels', () => {
   });
 });
 
-describe('sortRuns', () => {
+describe('grouping by domain', () => {
+  /*
+    These properties moved rather than went (D-211).
+
+    `sortRuns` sorted a flat list by merchant, date or outcome. The list groups by domain now, so
+    "sorting by merchant" is the shape rather than an option — but the guarantees underneath it are
+    the same ones, and each of them was worth a test before.
+  */
   const other = run('aaaa1111', 'biotechpeptides.com', '2026-08-20T09:00:00.000Z');
 
-  it('puts the newest run first by default', () => {
-    const sorted = sortRuns([OLDER, other, NEWER], 'date', 'desc');
-    expect(sorted.map((r) => r.runId)).toEqual(['c0ffee00', '895056af', 'aaaa1111']);
+  it('puts a merchant’s runs together, newest first inside the group', () => {
+    const groups = groupByDomain([OLDER, other, NEWER]);
+    const swiss = groups.find((g) => g.domain === 'swisschems.is');
+
+    expect(swiss?.runs.map((r) => r.runId)).toEqual(['c0ffee00', '895056af']);
+    expect(swiss?.runs).toHaveLength(2);
   });
 
-  it('groups a merchant together when sorting by merchant', () => {
-    const sorted = sortRuns([NEWER, other, OLDER], 'merchant', 'asc');
-    expect(sorted.map((r) => r.domain)).toEqual([
-      'biotechpeptides.com',
-      'swisschems.is',
-      'swisschems.is',
-    ]);
+  it('orders groups by their most recent activity', () => {
+    const groups = groupByDomain([OLDER, other, NEWER]);
+    expect(groups.map((g) => g.domain)).toEqual(['swisschems.is', 'biotechpeptides.com']);
   });
 
-  it('sorts by failures, then by reviews', () => {
-    const worse: RunSummary = { ...other, runId: 'bbbb2222', counts: { fail: 9, review: 1 } };
-    const sorted = sortRuns([OLDER, worse], 'outcome', 'desc');
-    expect(sorted[0]?.runId).toBe('bbbb2222');
-  });
+  it('puts a run that never finished last inside its group, not first', () => {
+    // Treating "no date" as the newest would bury the real runs beneath a run that produced nothing.
+    const unfinished: RunSummary = { ...NEWER, runId: 'cccc3333', finishedAt: null };
+    const groups = groupByDomain([unfinished, NEWER, OLDER]);
+    const swiss = groups.find((g) => g.domain === 'swisschems.is');
 
-  it('sorts a run that never finished last under newest-first, not first', () => {
-    const unfinished: RunSummary = { ...other, runId: 'cccc3333', finishedAt: null };
-    const sorted = sortRuns([unfinished, NEWER, OLDER], 'date', 'desc');
-    // Treating "no date" as the oldest would be right; treating it as the newest would bury the
-    // real runs beneath a run that produced nothing.
-    expect(sorted[sorted.length - 1]?.runId).toBe('cccc3333');
+    expect(swiss?.runs[swiss.runs.length - 1]?.runId).toBe('cccc3333');
   });
 
   it('is a total order, so rows do not reshuffle between renders', () => {
@@ -91,15 +93,63 @@ describe('sortRuns', () => {
       { ...OLDER, runId: 'bbbb', finishedAt: '2026-08-22T00:00:00.000Z' },
       { ...OLDER, runId: 'aaaa', finishedAt: '2026-08-22T00:00:00.000Z' },
     ];
-    expect(sortRuns(twins, 'date', 'desc').map((r) => r.runId)).toEqual(
-      sortRuns([...twins].reverse(), 'date', 'desc').map((r) => r.runId),
-    );
+    const once = groupByDomain(twins)[0]?.runs.map((r) => r.runId);
+    const again = groupByDomain([...twins].reverse())[0]?.runs.map((r) => r.runId);
+
+    expect(once).toEqual(again);
   });
 
   it('does not mutate what it is given', () => {
     const input = [OLDER, NEWER];
-    sortRuns(input, 'merchant', 'asc');
-    expect(input.map((r) => r.runId)).toEqual(['895056af', 'c0ffee00']);
+    const before = input.map((r) => r.runId);
+    groupByDomain(input);
+    expect(input.map((r) => r.runId)).toEqual(before);
+  });
+
+  it('renders a domain screened once as a group of one, not as something else', () => {
+    /*
+      Ungrouped is not a state (D-211). A list that changes shape at two rows is one an agent has to
+      learn twice — and the shape it changes into is the one they see least often.
+    */
+    const groups = groupByDomain([other]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.runs).toHaveLength(1);
+    expect(groups[0]?.domain).toBe('biotechpeptides.com');
+  });
+
+  it('files a scan in flight in its own group, and orders that group by it', () => {
+    // The agent presses Re-screen and watches the row appear where she is already looking.
+    const groups = groupByDomain(
+      [OLDER, other],
+      [
+        {
+          requestId: 'req-1',
+          url: 'https://biotechpeptides.com/',
+          status: 'running',
+          progress: 'sampling product pages',
+          createdAt: '2026-08-30T12:00:00.000Z',
+          stalled: false,
+        },
+      ],
+    );
+
+    expect(groups[0]?.domain).toBe('biotechpeptides.com');
+    expect(groups[0]?.inFlight).toHaveLength(1);
+    expect(groups[0]?.runs).toHaveLength(1);
+  });
+
+  it('says whether the merchant has responded on an earlier run', () => {
+    // So an agent knows answers will carry forward before she runs it (D-204).
+    const groups = groupByDomain([OLDER, other], [], new Set(['895056af']));
+
+    expect(groups.find((g) => g.domain === 'swisschems.is')?.responded).toBe(true);
+    expect(groups.find((g) => g.domain === 'biotechpeptides.com')?.responded).toBe(false);
+  });
+
+  it('files a malformed request URL somewhere rather than dropping it', () => {
+    expect(domainOf('not a url')).toBe('not a url');
+    expect(domainOf('https://Shop.Example/x')).toBe('shop.example');
   });
 });
 

@@ -256,7 +256,7 @@ function OpenReport({
   useEffect(() => {
     if (identity !== null) return;
 
-    const stored = readVisit(opened.runId);
+    const stored = readVisit(token, opened.runId);
     if (stored !== null) setIdentity({ visitId: stored.visitId, email: stored.email });
     // `identity` is read but intentionally not a dependency: this restores once per opened report,
     // and re-running it after someone changes their address would undo the change.
@@ -309,7 +309,7 @@ function OpenReport({
 
     // Convenience for the writer, never evidence: `submit_merchant_comment` reads the address from
     // the visit row server-side, so what a comment is attributed to is what the database holds.
-    writeVisit({ visitId: payload.visitId, email, runId: opened.runId });
+    writeVisit(token, { visitId: payload.visitId, email, runId: opened.runId });
     return null;
   };
 
@@ -360,7 +360,7 @@ function OpenReport({
   }, [opened]);
 
   const forgetIdentity = (): void => {
-    clearVisit();
+    clearVisit(token);
     setIdentity(null);
   };
 
@@ -1085,7 +1085,7 @@ function ResponseFooter({
  * Verification is deliberately absent rather than missing: adding it would make Mintro the party
  * that established who spoke, and this is a supporting document, not a legal instrument.
  */
-function Identify({
+export function Identify({
   identity,
   onIdentify,
   onForget,
@@ -1118,7 +1118,7 @@ function Identify({
           whole per-comment attribution model exists for (D-063).
         */}
         <button className="ident-change" onClick={onForget}>
-          Someone else responding?
+          Not you? Enter your email
         </button>
       </div>
     );

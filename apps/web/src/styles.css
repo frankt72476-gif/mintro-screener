@@ -3035,3 +3035,59 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 @media print {
   .shot:has(.shot-missing) { display: none; }
 }
+
+/* ═══ The domain group list (D-211) ═════════════════════════════════════════════════════════════
+   One component in two places — the reports pane open, the scan form collapsed — so the shape an
+   agent learns once is the shape she meets everywhere. A domain screened once is a group of one and
+   looks identical to a group of five. */
+
+.dgroup + .dgroup { border-top: 0.5px solid var(--line); }
+
+.dgroup-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
+
+.dgroup-name {
+  display: flex; align-items: baseline; gap: var(--s3);
+  flex: 1 1 auto; min-width: 0;
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+}
+
+.dgroup-caret {
+  flex: none; width: 7px; height: 7px; align-self: center;
+  border-right: 1.5px solid var(--slate); border-bottom: 1.5px solid var(--slate);
+  transform: rotate(-45deg); transition: transform 120ms ease;
+}
+.dgroup[data-open] .dgroup-caret { transform: rotate(45deg); }
+
+.dgroup-domain { font-size: 14px; font-weight: 500; color: var(--ink); }
+.dgroup-n, .dgroup-when { font-size: 11.5px; color: var(--slate); }
+
+/* Whether answers will carry forward, said before she re-screens (D-204). Quiet: it is context for
+   a decision, not a state of the merchant. */
+.dgroup-responded {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--violet);
+}
+
+.dgroup-rescan { flex: none; }
+
+.dgroup-runs { list-style: none; margin: 0 0 var(--s3); padding: 0 0 0 calc(7px + var(--s3)); }
+
+.drun {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding: var(--s2) 0;
+  font-size: 12.5px;
+  border-top: 0.5px solid var(--line-soft);
+}
+
+.drun-when { color: var(--ink-mid); flex: 0 0 auto; }
+.drun-counts { color: var(--slate); flex: 1 1 auto; }
+.drun-flag { color: #A5620E; font-size: 11px; }
+.drun-open { flex: none; }
+.drun-none { color: var(--slate); }
+
+/* A run in flight sits in its group and says what the queue says (D-152). */
+.drun-live .queue-state { flex: 0 0 auto; }
+.drun-live.stalled .drun-when { color: var(--amber); }
+
+.dgroups-empty, .dgroups-source { font-size: 11.5px; color: var(--slate); margin: var(--s3) 0 0; }
