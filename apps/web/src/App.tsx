@@ -700,10 +700,18 @@ function Screener({
             <>
               <PrintHeader report={report} />
               {quarantine !== null && <QuarantineNotice reason={quarantine} />}
+              {/*
+                The eye test travels here too (D-200).
+
+                This is the `?print=1` surface reached without an injected payload — a signed-in
+                analyst printing from the browser. It was the one render site of three that never
+                got the prop, so the panel silently vanished from exactly the copy someone prints.
+              */}
               <ReportView
                 report={report}
                 access={access}
                 print
+                eyeTest={eyeTest}
               />
             </>
           )}

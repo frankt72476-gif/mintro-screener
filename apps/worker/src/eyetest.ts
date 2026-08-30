@@ -46,13 +46,29 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 
 /**
- * The ceiling, not the budget.
+ * How long the model has to answer (D-200).
  *
- * A judgment layer must not be able to cost a run. 20s against a run that takes 26–33s on Fly is
- * already a large fraction, and it is set as a hang guard rather than as an allowance — if a
- * typical call approaches it, the call belongs outside the run rather than inside it.
+ * **90 seconds, and the 20 it replaces was set before anyone measured a call.** It was a guess made
+ * while the layer still ran inside the crawl, where a long ceiling would have held up a scan
+ * somebody was watching — so it was chosen to protect the run, not to fit the work. Then the
+ * measurements came in at 18.6, 21.3, 22.7, 24.6 and 26.4 seconds, and every one of those is a coin
+ * flip against a 20s bound. Production ran at 100% timeout.
+ *
+ * The number now comes from the work rather than from the crawl:
+ *
+ * - The slowest call measured **26.4s**, so 90 leaves 3.4x.
+ * - Those calls answered under a 2000-token ceiling, which `MAX_ANSWER_TOKENS` has since doubled.
+ *   Output time dominates — 26.4s produced 2000 tokens — so a full 4000-token answer projects to
+ *   roughly **55-60s**. 90 clears that too, which 60 would not have.
+ *
+ * **A longer ceiling costs nothing a person waits on** (D-198): the eye test runs after the run
+ * completes, at the bottom of the queue, and holds no browser. What it costs is a worker slot for
+ * up to 90 seconds on a call that has already failed — which is the trade, and it is the right way
+ * round for a bound whose only job is to stop a hang.
+ *
+ * It is still a hang guard and not a budget. A call that reaches this has stopped answering.
  */
-export const EYE_TEST_TIMEOUT_MS = 20_000;
+export const EYE_TEST_TIMEOUT_MS = 90_000;
 
 /**
  * How long an answer may be.

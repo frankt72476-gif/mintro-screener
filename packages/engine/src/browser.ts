@@ -234,6 +234,7 @@ export {
 export {
   readRunEyeTest,
   resolveEyeTest,
+  type EyeTestRead,
   type EyeTestReader,
   type EyeTestRecord,
   type EyeTestRow,

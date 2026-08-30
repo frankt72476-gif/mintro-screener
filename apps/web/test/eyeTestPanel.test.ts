@@ -89,6 +89,69 @@ describe('not recorded yet is not a failure', () => {
   });
 });
 
+describe('a recorded absence', () => {
+  /*
+    The state that shipped untested, and the one that was reported missing from a live report. Every
+    other branch had a test; this one is what a timed-out call actually produces, so it is the branch
+    most runs will take when the vendor is slow.
+  */
+  const record: EyeTestRecord = {
+    kind: 'recorded',
+    outcome: {
+      kind: 'absent',
+      absence: {
+        rubricVersion: '2.1.0',
+        reason: 'the model did not answer within 90s',
+        detail: 'This operation was aborted',
+        captures: [
+          { surface: 'homepage', evidenceKey: 'k1.png', sourceUrl: 'https://x.test/', sent: true },
+          {
+            surface: 'signup',
+            evidenceKey: '',
+            sourceUrl: 'https://x.test/my-account/',
+            sent: false,
+            problem: 'no capture was taken for this surface',
+          },
+        ],
+      },
+    },
+  };
+
+  it('renders the panel rather than nothing', () => {
+    expect(render(record)).toContain('eye-panel');
+  });
+
+  it('names every capture it wanted and what became of each', () => {
+    // Hard constraint 3, one level up from a finding: the absence carries the requests attempted.
+    const body = text(render(record));
+
+    expect(body).toContain('the model did not answer within 90s');
+    expect(body).toContain('This operation was aborted');
+    expect(body).toContain('homepage');
+    expect(body).toContain('no capture was taken for this surface');
+  });
+
+  it('reaches the printed document too', () => {
+    expect(text(render(record, true))).toContain('the model did not answer within 90s');
+  });
+});
+
+describe('a read that failed', () => {
+  it('says it could not be read, and never that there is none', () => {
+    /*
+      The attestation convention renders nothing when its read fails, and that is right there — the
+      alternative is a merchant's silence invented from Mintro's error (D-036). It is wrong here:
+      an eye test that ran and recorded an absence has something to say, and a swallowed read leaves
+      a reader unable to tell a layer that failed from one that was never built (D-200).
+    */
+    const body = text(render({ kind: 'unreadable' }));
+
+    expect(body).toContain('could not be read');
+    expect(body).toContain('This is a failure to read it, not an absence of one');
+    expect(body).not.toContain('has not been recorded for this run yet');
+  });
+});
+
 describe('a run that predates the layer says so, and does not promise one', () => {
   it('renders the historical sentence rather than "not yet"', () => {
     const markup = render({ kind: 'predates' });

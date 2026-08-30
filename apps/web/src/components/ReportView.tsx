@@ -738,6 +738,7 @@ function StoppingPanel({
  * - **the job could not start** — said plainly, with no capture list to offer
  * - **the run predates the eye test** — and none is coming, because a read produced under a rubric
  *   the run predates is one nothing could attribute (D-198)
+ * - **the read failed** — said as a failure to read, never as an absence of a read (D-200)
  *
  * **The absence is evidenced.** It names every capture it wanted and what happened to each, because
  * *"the eye test did not run"* states an outcome and withholds the reason, and a reader cannot tell
@@ -776,6 +777,31 @@ function EyeTestPanel({ record }: { readonly record: EyeTestRecord | null }): JS
       <section className="panel eye-panel is-pending">
         {label}
         <p className="eye-read">The eye test has not been recorded for this run yet.</p>
+      </section>
+    );
+  }
+
+  /*
+    The read failed, and this branch has to be visible (D-200).
+
+    The attestation section renders nothing when its read fails, and that is right there: the
+    alternative is nineteen questions shown as unanswered, a read failure printed as the merchant's
+    silence (D-036). Nothing about the merchant is at stake here, and the cost runs the other way —
+    an eye test that ran and recorded an absence has something to say, and a swallowed read leaves
+    a reader unable to tell a layer that failed from one that was never built.
+
+    The same shape `commentaryNote` uses for the same problem: say that it is a failure to read,
+    not an absence of the thing.
+  */
+  if (record.kind === 'unreadable') {
+    return (
+      <section className="panel eye-panel is-absent">
+        {label}
+        <p className="eye-read">The eye test for this run could not be read.</p>
+        <p className="eye-why">
+          This is a failure to read it, not an absence of one. Whether a read was recorded for this
+          run is not known from this page.
+        </p>
       </section>
     );
   }

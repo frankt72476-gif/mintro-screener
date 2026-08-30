@@ -13280,3 +13280,85 @@ half about the merchant and keeps the half about the document.
 including the one that renders a whole page and reads both panels. The pre-existing
 `attestationSection.test.ts` now says which case it is asserting rather than relying on a default:
 every assertion in it was written about a run where the questions were put.
+## D-200 — A ceiling set before the work was measured, and a read failure shown as nothing
+
+**2026-08-30 · technical · `apps/worker/src/eyetest.ts`, `packages/engine/src/eyeTestStore.ts`, `apps/web/src/App.tsx`**
+
+### The eye test timed out on every production run
+
+Three consecutive live runs recorded the same absence: *"the model did not answer within 20s."* The
+measured calls are 18.6, 21.3, 22.7, 24.6 and 26.4 seconds. Every one of those is a coin flip
+against a 20-second bound, and in practice it came up tails every time.
+
+**The 20s was set before anyone measured a call.** It was chosen while the layer still ran inside the
+crawl, where a long ceiling would have held up a scan somebody was watching — so it was sized to
+protect the run, not to fit the work. D-198 moved the layer off the critical path and did not revisit
+the number, which is the actual mistake: the constraint that produced the figure was removed and the
+figure stayed.
+
+**90 seconds**, and the reasoning is now from the work:
+
+- The slowest measured call is 26.4s, so 90 leaves **3.4x**.
+- Those calls answered under a 2000-token ceiling that D-197 has since doubled. Output time
+  dominates — 26.4s produced 2000 tokens — so a full 4000-token answer projects to **55-60s**. 90
+  clears that; 60 would not have.
+- A longer ceiling costs nothing a person waits on. The job runs after the run completes, at the
+  bottom of the queue, holding no browser. What it costs is a worker slot for up to 90 seconds on a
+  call that has already failed, which is the right way round for a bound whose only job is to stop a
+  hang.
+
+Verified end to end against the real captures: the same run that recorded *"did not answer within
+20s"* returns **`eye test recorded in 25s`** with nine verdicts under the new ceiling.
+
+### A failed read rendered as "not recorded yet"
+
+`readRunEyeTest` returned `EyeTestRow | null` and mapped a failed query onto `null`, which
+`resolveEyeTest` read as *pending*. So a broken read rendered *"the eye test has not been recorded
+for this run yet"* — an assertion about the job, made by code that could not see the job at all.
+
+**This is a deliberate departure from the convention the other side reads follow.** `readRunCommentary`
+and `readRunAttestations` render nothing when they fail, and that is right there: the alternative is
+nineteen questions displayed as unanswered, a read failure printed as the merchant's silence (D-036).
+The cost runs the other way here. Nothing about the merchant is at stake, and an eye test that ran
+and recorded an evidenced absence **has something to say** — swallowing the read that would have
+shown it leaves a reader unable to tell a layer that failed from one that was never built.
+
+So `readRunEyeTest` returns `EyeTestRead`, the failure survives, and the panel gets a fifth state:
+
+> The eye test for this run could not be read. This is a failure to read it, not an absence of one.
+
+The same shape `commentaryNote` already uses for the same problem.
+
+### The `?print=1` surface never received the prop
+
+Three render sites take a report: the analyst view, the injected PDF payload, and `?print=1` reached
+without an injection — a signed-in analyst printing from the browser. D-198 wired the first two. The
+panel silently vanished from exactly the copy someone prints.
+
+### What was ruled out, with evidence
+
+The reported symptom was a live run — `6ae24f4a`, a `done` row with `kind: 'absent'` — showing
+nothing at all between the stopping conditions and the brief. Checked in order:
+
+- **Does the panel read `eye_tests`?** Yes. `readRunEyeTest` against the live row returns it, and
+  `resolveEyeTest` returns `{ kind: 'recorded' }`. The run carries a 7-entry manifest.
+- **Does RLS permit the analyst select?** Yes. Impersonating the role in Postgres —
+  `set local role authenticated` with a real analyst's `sub` — `is_analyst()` is true and the row
+  reads back. Grants match `runs` and `merchant_attestations` exactly; no migration in this schema
+  grants explicitly, so `eye_tests` inherits the same defaults as every other table.
+- **Is a failed side read silently returning null?** It was, and that is fixed above — but it could
+  not have produced *nothing*: null resolved to `pending`, which renders a sentence.
+
+**None of the three reproduces an empty gap, and this is recorded rather than smoothed over.** The
+remaining explanation is a stale bundle: the `vite preview` server on port 4173 has been running
+since 21 August and serves `apps/web/dist` from disk, and that bundle was rebuilt at 13:35 — three
+minutes *after* the eye test for `6ae24f4a` landed at 13:33. A report opened in that window was
+served a bundle with no panel in it. That is consistent with the symptom and unproven, and it is the
+same class of problem D-187 solved for `report-pdf` and did not solve for the app.
+
+### The state that shipped with no test
+
+Every branch of the panel had a test except the one a slow vendor actually produces: `recorded` with
+an `absent` outcome. It renders correctly — verified against the live row, capture list and all — but
+it shipped untested, and that is why a report of "the absence panel does not render" could not be
+answered from the suite.

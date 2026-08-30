@@ -1,5 +1,5 @@
 /**
- * The four things "there is no eye test" can mean (D-198).
+ * The five things "there is no eye test" can mean (D-198, D-200).
  *
  * The read arrives after the run, so a report can be on screen before its read exists. That makes
  * absence ambiguous in a way it was not when the layer ran at assembly, and every assertion here
@@ -10,6 +10,8 @@
  *   noticed last and matter most, because it is a false negative about Mintro's own work.
  * - **predates is not pending.** A run screened before the layer existed will never have a read.
  *   Promising one is a wait that never ends.
+ * - **a failed read is not a pending job.** It was, and that is how an eye test with a recorded
+ *   absence rendered as nothing at all (D-200).
  *
  * The historical case is decided by the run's own manifest rather than by comparing dates against
  * the rubric's `effective`. A date comparison gives a different answer every time the rubric is
@@ -40,15 +42,20 @@ const RAN: EyeTestOutcome = {
   },
 };
 
-const row = (over: Partial<EyeTestRow>): EyeTestRow => ({
-  status: 'queued',
-  outcome: null,
-  error: null,
-  finished_at: null,
-  ...over,
-});
+/** A successful read that found a row. */
+const row = (over: Partial<EyeTestRow>) =>
+  ({
+    ok: true as const,
+    row: { status: 'queued', outcome: null, error: null, finished_at: null, ...over },
+  });
 
-describe('resolveEyeTest keeps the four apart', () => {
+/** A successful read that found nothing — the job has not written yet. */
+const nothing = { ok: true as const, row: null };
+
+/** A read that did not happen. A different fact, and kept as one (D-200). */
+const broke = { ok: false as const, error: 'permission denied for table eye_tests' };
+
+describe('resolveEyeTest keeps the five apart', () => {
   it('a finished job is the outcome, whatever the outcome says', () => {
     const got = resolveEyeTest(WITH_MANIFEST, row({ status: 'done', outcome: RAN }));
     expect(got.kind).toBe('recorded');
@@ -71,7 +78,7 @@ describe('resolveEyeTest keeps the four apart', () => {
   });
 
   it('no row is pending, never failed', () => {
-    expect(resolveEyeTest(WITH_MANIFEST, null).kind).toBe('pending');
+    expect(resolveEyeTest(WITH_MANIFEST, nothing).kind).toBe('pending');
   });
 
   it.each(['queued', 'running'])('a %s job is pending, never failed', (status) => {
@@ -100,6 +107,17 @@ describe('resolveEyeTest keeps the four apart', () => {
     expect(got.reason).not.toBe('');
   });
 
+  it('a failed read says so, and is never mistaken for a job that has not run', () => {
+    /*
+      The defect this replaced: a failed query returned `null`, which read as *pending*. So a
+      broken read rendered "not recorded yet" — an assertion about the job, made by code that
+      could not see the job at all. On a run whose eye test had recorded an evidenced absence,
+      that showed a reader nothing where there was something to show.
+    */
+    expect(resolveEyeTest(WITH_MANIFEST, broke).kind).toBe('unreadable');
+    expect(resolveEyeTest(WITH_MANIFEST, nothing).kind).toBe('pending');
+  });
+
   it('a run with no manifest predates the layer, whatever rows exist', () => {
     /*
       The manifest is the signal, and it beats the row.
@@ -108,15 +126,18 @@ describe('resolveEyeTest keeps the four apart', () => {
       against a run screened weeks ago, is a read nothing could attribute — which is the one thing
       `rubricVersion` exists to prevent.
     */
-    expect(resolveEyeTest(WITHOUT_MANIFEST, null).kind).toBe('predates');
+    expect(resolveEyeTest(WITHOUT_MANIFEST, nothing).kind).toBe('predates');
     expect(resolveEyeTest(WITHOUT_MANIFEST, row({ status: 'done', outcome: RAN })).kind).toBe('predates');
     expect(resolveEyeTest(WITHOUT_MANIFEST, row({ status: 'failed', error: 'x' })).kind).toBe('predates');
+    // Including when the read failed: a run that never carried a manifest will never have a read,
+    // and that is knowable from the run alone.
+    expect(resolveEyeTest(WITHOUT_MANIFEST, broke).kind).toBe('predates');
   });
 
   it('an empty manifest is not the same as no manifest', () => {
     // A run that recorded a manifest with nothing in it did have the layer; it simply captured
     // nothing worth reading. That is pending, then an evidenced absence — not a historical run.
-    expect(resolveEyeTest({ eyeTestCaptures: [] }, null).kind).toBe('pending');
+    expect(resolveEyeTest({ eyeTestCaptures: [] }, nothing).kind).toBe('pending');
   });
 });
 
@@ -133,15 +154,27 @@ describe('readRunEyeTest', () => {
 
   it('reads the newest attempt', async () => {
     const got = await readRunEyeTest(reader([{ status: 'done', outcome: RAN, error: null, finished_at: 'x' }]), 'r');
-    expect(got?.status).toBe('done');
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    expect(got.row?.status).toBe('done');
   });
 
-  it('returns null when the read fails, so the panel says nothing rather than inventing a failure', async () => {
-    // The safe direction for a layer that cannot change a single finding: silence, not a claim.
-    expect(await readRunEyeTest(reader(null, { message: 'network' }), 'r')).toBeNull();
+  it('carries the failure out rather than flattening it into an absence', async () => {
+    /*
+      The attestation convention — a failed read renders nothing — is right where the alternative is
+      a merchant's silence invented from Mintro's error (D-036). It is wrong here, and this is where
+      that departure is held: the vendor's own words survive the read so the panel can say what
+      happened (D-200).
+    */
+    const got = await readRunEyeTest(reader(null, { message: 'permission denied' }), 'r');
+
+    expect(got.ok).toBe(false);
+    if (got.ok) return;
+    expect(got.error).toBe('permission denied');
   });
 
-  it('returns null when no attempt exists', async () => {
-    expect(await readRunEyeTest(reader([]), 'r')).toBeNull();
+  it('distinguishes no attempt from a failed read', async () => {
+    const got = await readRunEyeTest(reader([]), 'r');
+    expect(got).toEqual({ ok: true, row: null });
   });
 });

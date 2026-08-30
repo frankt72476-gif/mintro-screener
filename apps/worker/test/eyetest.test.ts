@@ -153,10 +153,25 @@ describe('it never costs a run', () => {
     expect(outcome.absence.reason).toContain('did not answer within');
   });
 
-  it('keeps the ceiling well under a run, because it is a hang guard and not a budget', () => {
-    // A run takes 26–33s on Fly. A judgment layer that could take longer than the crawl is one that
-    // belongs outside the run.
-    expect(EYE_TEST_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
+  it('clears the slowest measured call with real margin', () => {
+    /*
+      This asserted the opposite, and its own comment is why (D-200).
+
+      It read: *a run takes 26-33s on Fly, and a judgment layer that could take longer than the crawl
+      is one that belongs outside the run* — so the ceiling was held under 20s to protect the crawl.
+      D-198 moved the layer outside the run, which is what that comment argued for, and the number
+      stayed behind. Three consecutive production runs then recorded "did not answer within 20s"
+      against measured calls of 18.6, 21.3, 22.7, 24.6 and 26.4 seconds.
+
+      Nothing waits on it now, so the ceiling is sized to the work: clear of the slowest call, and
+      clear of a full 4000-token answer, which projects to 55-60s at the observed output rate.
+    */
+    const slowestMeasured = 26_400;
+    expect(EYE_TEST_TIMEOUT_MS).toBeGreaterThan(slowestMeasured * 2);
+
+    // Still a hang guard, not an open-ended wait. A call that reaches this has stopped answering,
+    // and it is holding a worker slot while it does.
+    expect(EYE_TEST_TIMEOUT_MS).toBeLessThanOrEqual(120_000);
   });
 });
 
