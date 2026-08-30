@@ -24,7 +24,7 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import { invitesComment, STATE_LABEL, STATE_ORDER, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
+import { invitesComment, STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
  * The bucket a `not_evaluable` finding belongs to for reading (D-044).
@@ -1101,11 +1101,30 @@ export interface HeaderLine {
  * arrived somewhere with a different name on it — a navigation label that does not match its
  * destination is the same defect as a count that disagrees with its heading.
  */
+/**
+ * What each header line is called.
+ *
+ * **`review` reads from `STATE_LABEL_LOWER` rather than restating it (D-188).** It was the literal
+ * `'need a look'`, and it survived the vocabulary change by being worded differently enough to
+ * escape a search for the label: the table said *Needs a look*, this said *need a look*. So the
+ * header lines went on showing the old vocabulary after every other surface had moved — a sixth
+ * copy, of exactly the kind D-175 moved this into the engine to prevent. **A line that paraphrases
+ * a label is a copy of it, whatever the wording.**
+ *
+ * `fail` needs a word in front of it to read correctly here — *"3 standards not met"* — so it is
+ * **composed from the label rather than restated with it**. A phrase containing a label is a copy of
+ * that label the moment it is typed out, and it is the harder kind to find: it does not match a
+ * search for the label, and it reads correctly right up until the label changes underneath it.
+ *
+ * `stopping` and `questions` name sections rather than states, so there is nothing to derive from.
+ * *"stopping conditions observed"* is not the `not_evaluable` label with words around it — the
+ * participle means the conditions were looked at, and it would not want to change if that label did.
+ */
 const HEADER_LABEL: Readonly<Record<string, string>> = {
   stopping: 'stopping conditions observed',
   questions: 'operational questions',
-  fail: 'standards not met',
-  review: 'need a look',
+  fail: `standards ${STATE_LABEL_LOWER.fail}`,
+  review: STATE_LABEL_LOWER.review,
 };
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
@@ -1122,7 +1141,7 @@ export const findingAnchor = (ruleId: string): string => `rule-${ruleId}`;
 /**
  * The four lines, in the order the sections are read.
  *
- * Section 3 contributes two lines — *not met* and *need a look* — because those are the two
+ * Section 3 contributes two lines — *not met* and *unclear* — because those are the two
  * numbers a reader is looking for, and both point at the same section. Sections 4's own count is
  * deliberately absent: what could not be seen is explained in a sentence inside the section, not
  * announced as a headline number, because a large "19 not observed" above the fold reads as a

@@ -103,7 +103,7 @@ describe.each(RUNS)('%s', (_label, report) => {
    */
   it.each(SURFACES)('splits section 3 into two labelled subsections on %s', (surface) => {
     const observed = reportParts(report, surface).find((p) => p.id === 'observed');
-    expect(observed?.blocks.map((b) => b.heading)).toEqual(['Not met', 'Needs a look']);
+    expect(observed?.blocks.map((b) => b.heading)).toEqual(['Not met', 'Unclear']);
     // Not met first: the list that is work, before the list that is a conversation.
     expect(observed?.blocks[0]?.state).toBe('fail');
     expect(observed?.blocks[1]?.state).toBe('review');

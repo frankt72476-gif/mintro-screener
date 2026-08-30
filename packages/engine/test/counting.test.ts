@@ -16,6 +16,7 @@ import {
   assembleReport,
   computeCoverage,
   distinctRuleCount,
+  STATE_LABEL_LOWER,
   type Evidence,
   type Finding,
 } from '@mintro/engine';
@@ -95,13 +96,15 @@ describe('the verdict', () => {
     expect(verdict).not.toContain('3 rule(s)');
   });
 
-  it('keeps saying finding(s) for review, which it always did', () => {
+  it('keeps saying finding(s) for review, in the current vocabulary (D-188)', () => {
     const verdict = report([
       ...perPage('NAME-002', 'fail', 1),
       ...perPage('CATG-005', 'review', 2),
     ]).verdict;
 
-    expect(verdict).toContain('2 finding(s) need a look');
+    // The unit is still findings, which is what this test is about. The word for the state is
+    // composed from `STATE_LABEL_LOWER`, so it followed `review` to *unclear* on its own.
+    expect(verdict).toContain(`2 finding(s) are ${STATE_LABEL_LOWER.review}`);
   });
 
   it('says nothing of rules when nothing failed', () => {

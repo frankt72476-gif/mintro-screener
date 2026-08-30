@@ -12228,3 +12228,100 @@ rebuild and the whole suite. **Do not symlink `node_modules` into a git worktree
 accept the install.
 
 ---
+
+## D-188 — `review` renders as *Unclear*
+
+**2026-08-29 · business owner · `docs/report-redesign-spec.md`, the vocabulary; part 1 of 3**
+
+    fail           Not met         unchanged
+    review         Unclear         was "Needs a look"
+    pass           Met             unchanged
+    not_evaluable  Not observed    unchanged
+
+State identifiers untouched (D-060). One line changed in `stateLabel.ts`.
+
+### Why
+
+**"Needs a look" named the reader's task, and the task is the same for three of the four.** Not met,
+unclear and not observed are all findings a merchant should read and may comment on. Naming one of
+them for the action implied the other two needed none.
+
+*Unclear* describes what the check saw rather than what the reader should do, which is what lets the
+three sit under one heading — the merge that parts 2 and 3 of the redesign depend on. It is also the
+only one of the four whose old label was a verb phrase: the set now reads as four observations
+rather than three observations and an instruction.
+
+### The sixth copy, found by rendering rather than by grep
+
+D-175 moved this vocabulary into the engine because there were five independent copies. **There was
+a sixth, and this change is what exposed it.**
+
+`grouping.ts`'s `HEADER_LABEL` carried the literal `'need a look'` for the header line above the
+fold. It escaped every search because **it paraphrased the label instead of quoting it** — the table
+said *Needs a look*, the line said *need a look*. So after the one-line change, every badge, band
+heading, checklist row, counts sentence and email said *unclear*, and the line at the top of page one
+still said *need a look*.
+
+It was found by rendering all six surface/medium combinations and reading the output, not by
+searching for the old string. **A line that paraphrases a label is a copy of it, whatever the
+wording**, and that is the form the next one will take too.
+
+### A phrase containing a label is a copy of that label
+
+`review` reads from `STATE_LABEL_LOWER`. `fail` needs a word in front of it to read correctly in
+that position — *"3 standards not met"* — so it is **composed**: `` `standards ${STATE_LABEL_LOWER.fail}` ``.
+Same string, and a rename carries through.
+
+That is the general form, and it is worth more than the one line it fixes: **a label typed inside a
+longer phrase is the hardest copy to find.** It does not match a search for the label, and it reads
+correctly right up until the label changes underneath it.
+
+Applied to every entry that is a label with words around it. `stopping` and `questions` name sections
+rather than states — *"stopping conditions observed"* is not the `not_evaluable` label with words
+around it; the participle means the conditions were looked at, and it would not want to change if
+that label did.
+
+### The seventh copy: the stored verdict
+
+Searching for the same shape found `describeVerdict`, which builds the run's `verdict` sentence and
+said **"finding(s) need a look"** in two places. Its own comment says it *"uses the vocabulary the
+report renders (D-175)"* — the intent was right and the implementation was four literals.
+
+**It is not rendered.** D-176 removed the top band that showed it, which is why the markup tripwire
+passed. But it is written into the stored `verdict` of every new run, so runs would have carried the
+retired word in immutable data (D-002) for some later surface to print. Now composed from the
+vocabulary throughout, and the tripwire asserts on a sentence built now rather than on what the
+fixtures hold — the reference runs predate this and their stored wording is correct as it stands,
+because a run says what it said.
+
+**Prose that happens to contain a label is not a copy of it.** `textMatch.ts`'s *"The expected value
+was not observed"* and `screen.ts`'s *"reported as not observed"* are ordinary English about what a
+check saw; they would not want to change if the label did. Only phrases whose job is to *name the
+state* are composed.
+
+### What is not this vocabulary
+
+Two other `STATE_LABEL` tables exist and neither is a copy:
+
+- **`DocumentsPane` / `DocumentsReportView`** label *slot* states — satisfied, waived, superseded,
+  missing. A different set for a different object.
+- **`scan.ts` and `scan-layer0.ts`** hold `FAIL` / `REVIEW` / `pass` as fixed-width padding for
+  terminal column alignment. Keyed on the same state type, so they *are* a duplication of the
+  mapping — but they are developer output, not a rendered surface, and their padding is the point.
+  Recorded here so the next audit does not rediscover them as a defect.
+
+And `"Not evaluable from the crawled surface: …"` is the prefix of a finding's stored `note`, written
+by `findings.ts` into every run. Runs are immutable (D-002): that is data, not a label, and renaming
+it would rewrite what past runs said.
+
+### The tripwire
+
+`apps/web/test/vocabulary.test.ts` renders both reference runs across all three surfaces in both
+media and fails if any retired word appears anywhere in the markup. Verified by putting
+`'need a look'` back in `HEADER_LABEL`: the suite goes red on the header lines and on every rendered
+surface.
+
+It also asserts that no label contains an instruction verb, which is the property D-188 turns on and
+the one that would be quietly lost by a future rename.
+
+---
