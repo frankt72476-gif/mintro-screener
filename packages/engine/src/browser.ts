@@ -151,8 +151,10 @@ export { readResponseRound } from './responseRoundStore.js';
 export {
   readRunAttestations,
   resolveAttestations,
+  attestationAsking,
   type AttestationOutcome,
   type AttestationReader,
+  type AttestationAsking,
   type AttestationSummary,
   type ResolvedAttestation,
   type RunAttestations,

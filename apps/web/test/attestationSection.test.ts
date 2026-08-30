@@ -26,9 +26,20 @@ import { AttestationSection, NotCheckedSection } from '../src/components/Attesta
 const RULESET = parseRuleset(JSON.parse(readFileSync('rules/ruleset.json', 'utf8')));
 const QUESTIONS = RULESET.attestations;
 
-const render = (stored: readonly StoredAttestation[] = []): string =>
+/*
+  Every assertion in this file is about a run where the questions were actually put (D-199).
+
+  The section now varies on that: where no comment link was transmitted it may not claim the
+  questions were asked, and where the commentary read failed it may not claim either way. Those
+  three renderings are held apart in `attestationAsking.test.ts`. This file is the asked case, and
+  it says so rather than relying on a default.
+*/
+const render = (stored: readonly StoredAttestation[] = [], invited = true): string =>
   renderToStaticMarkup(
-    createElement(AttestationSection, { attestations: resolveAttestations(QUESTIONS, stored) }),
+    createElement(AttestationSection, {
+      attestations: resolveAttestations(QUESTIONS, stored),
+      invited,
+    }),
   );
 
 const text = (markup: string): string =>

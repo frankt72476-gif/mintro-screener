@@ -28,6 +28,7 @@
 
 import { useState } from 'react';
 import type { Attestation, NotChecked } from '@mintro/ruleset';
+import { attestationAsking, type AttestationAsking } from '@mintro/engine';
 import type { AttestationOutcome, ResolvedAttestation, RunAttestations } from '@mintro/engine';
 
 /**
@@ -41,6 +42,20 @@ const OUTCOME_LABEL: Readonly<Record<AttestationOutcome, string>> = {
   answered: 'Answered',
   declined: 'Declined to answer',
   unanswered: 'Not answered',
+};
+
+/**
+ * What an unanswered row is called, which depends on whether anyone was asked (D-199).
+ *
+ * *Not answered* is a fact about the merchant, and it is only available once they were asked. On a
+ * run with no invitation it is the same false claim the lede was making, printed nineteen more
+ * times — and it is the one a reader actually scans, because the mark is what the eye lands on.
+ */
+const UNANSWERED_MARK: Readonly<Record<AttestationAsking, string>> = {
+  asked: 'Not answered',
+  not_asked: 'Not asked',
+  // Neither claim is available. States what the document holds, and nothing about anyone's conduct.
+  not_known: 'No answer recorded',
 };
 
 /**
@@ -58,6 +73,18 @@ const OUTCOME_LABEL: Readonly<Record<AttestationOutcome, string>> = {
 const UNANSWERED_MEANING =
   'A question shown as not answered was not observable by Mintro and was not stated by the ' +
   'merchant: nothing in this report speaks to it.';
+
+/**
+ * The same guarantee where it is not known whether anyone was asked (D-199).
+ *
+ * An unanswered row must never render as an empty space — it has to say that this is a gap and not
+ * a nothing-to-report. That holds whether or not the commentary read succeeded, so the sentence
+ * varies rather than disappearing: it drops the claim about the merchant and keeps the claim about
+ * the document, which is the half still available.
+ */
+const NO_ANSWER_MEANING =
+  'A question with no answer recorded was not observable by Mintro and no reply to it is on ' +
+  'file: nothing in this report speaks to it.';
 
 /**
  * Where the requirement comes from, spelled out rather than left as a code.
@@ -80,39 +107,102 @@ const AUTHORITY_LABEL: Readonly<Record<ResolvedAttestation['authority'], string>
  */
 export function AttestationSection({
   attestations,
+  invited,
   print = false,
 }: {
   readonly attestations: RunAttestations;
+  /**
+   * Whether a comment link was transmitted for this run (D-199).
+   *
+   * The same boolean the participation record renders from, passed rather than re-derived. The two
+   * panels contradicted each other precisely because each worked it out for itself.
+   *
+   * `undefined` means the commentary read failed or was never made — not that nobody was asked.
+   */
+  readonly invited?: boolean;
   readonly print?: boolean;
 }): JSX.Element | null {
   const { questions, counts } = attestations;
   if (questions.length === 0) return null;
 
+  const asking = attestationAsking(counts, invited);
+
   return (
     <section className="att" aria-labelledby="att-head">
       <div className="att-top">
-        <h2 id="att-head">Stated by the merchant</h2>
+        {/*
+          The heading names whose words these are — so on a run where nobody was asked, there are no
+          words for it to name. "Stated by the merchant" above nineteen rows where nothing was
+          stated is the lede's false claim again, in the larger type.
+        */}
+        <h2 id="att-head">
+          {asking === 'not_asked' ? 'Questions for the merchant' : 'Stated by the merchant'}
+        </h2>
         {/*
           The heading says whose words these are; this says what that means for reading them. Both
           are needed: a heading is skimmed, and the sentence beneath it is what stops a reader
           carrying a statement forward as though Mintro had confirmed it.
+
+          The middle clause is the one that varies, and it is the one that was wrong: where the
+          questions went. The first and last clauses hold on every run.
         */}
         <p className="att-lede">
-          These are published standards that a crawl of a website cannot observe. Mintro
-          put them to the merchant and recorded the replies exactly as written. <strong>Nothing in
-          this section was observed or verified by Mintro.</strong>
+          These are published standards that a crawl of a website cannot observe.{' '}
+          {asking === 'asked'
+            ? 'Mintro put them to the merchant and recorded the replies exactly as written.'
+            : asking === 'not_asked'
+              ? /*
+                  What is true, and no more. Said as Mintro's inaction rather than the merchant's
+                  silence — the wording the participation record already uses for this same fact,
+                  because an underwriter reading nineteen blanks would otherwise weigh them against
+                  the merchant (D-044).
+                */
+                'The merchant was not asked about them on this run, so nothing in this report speaks to them.'
+              : 'Whether they were put to the merchant could not be read for this run.'}{' '}
+          <strong>Nothing in this section was observed or verified by Mintro.</strong>
         </p>
+        {/*
+          The counts, and never a total called "asked" unless something was.
+
+          A run with no invitation shows how many questions exist, which is a fact about the rule
+          set, and says plainly that none went out. It does not report nineteen unanswered
+          questions: that is a tally of the merchant's conduct, and there was none to tally.
+        */}
         <p className="att-counts">
-          {counts.answered} answered · {counts.declined} declined · {counts.unanswered} not answered
-          · {counts.total} asked
+          {asking === 'not_asked' ? (
+            <>
+              {counts.total} question{counts.total === 1 ? '' : 's'} · none asked
+            </>
+          ) : (
+            <>
+              {counts.answered} answered · {counts.declined} declined · {counts.unanswered} not
+              answered
+              {asking === 'asked' ? ` · ${counts.total} asked` : ''}
+            </>
+          )}
         </p>
-        {/* Said once here rather than under each of nineteen rows (D-167). */}
-        {counts.unanswered > 0 && <p className="att-lede att-unanswered-note">{UNANSWERED_MEANING}</p>}
+        {/*
+          Said once here rather than under each of nineteen rows (D-167).
+
+          Only where the questions were actually put. Its middle clause — "was not stated by the
+          merchant" — is the same unscoped claim the lede was making, and on a run with no
+          invitation the lede above already carries the true version.
+        */}
+        {asking !== 'not_asked' && counts.unanswered > 0 && (
+          <p className="att-lede att-unanswered-note">
+            {asking === 'asked' ? UNANSWERED_MEANING : NO_ANSWER_MEANING}
+          </p>
+        )}
       </div>
 
       <ol className="att-list">
         {questions.map((question) => (
-          <AttestationRow key={question.questionId} question={question} print={print} />
+          <AttestationRow
+            key={question.questionId}
+            question={question}
+            asking={asking}
+            print={print}
+          />
         ))}
       </ol>
     </section>
@@ -121,9 +211,11 @@ export function AttestationSection({
 
 function AttestationRow({
   question,
+  asking,
   print,
 }: {
   readonly question: ResolvedAttestation;
+  readonly asking: AttestationAsking;
   readonly print: boolean;
 }): JSX.Element {
   const superseded = question.superseded ?? [];
@@ -131,7 +223,11 @@ function AttestationRow({
   return (
     <li className={`att-row att-${question.outcome}`}>
       <div className="att-q">
-        <span className="att-mark">{OUTCOME_LABEL[question.outcome]}</span>
+        <span className="att-mark">
+          {question.outcome === 'unanswered'
+            ? UNANSWERED_MARK[asking]
+            : OUTCOME_LABEL[question.outcome]}
+        </span>
         <span className="att-text">{question.question}</span>
       </div>
 

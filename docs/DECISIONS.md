@@ -13206,3 +13206,77 @@ next person to read that type is deciding what the PDF is allowed to show.
 carries no capture key, and the rubric's ninth question asks how the entry gate *reads* — a question
 about the picture. Returned from the finder rather than re-derived, because that is the only place
 that knows which of the candidate paths yielded a form.
+## D-199 — The attestation section may not claim the questions were asked
+
+**2026-08-30 · business owner · `apps/web/src/components/Attestations.tsx`, `packages/engine/src/attestations.ts`**
+
+One document said both of these, a few inches apart:
+
+> **Merchant participation** — No comment link was transmitted for this run, so the merchant was not
+> asked to respond.
+
+> **Stated by the merchant** — These are published standards that a crawl of a website cannot
+> observe. Mintro put them to the merchant and recorded the replies exactly as written.
+> 0 answered · 0 declined · 19 not answered · **19 asked**
+
+The second is false, and it reaches IQwallet.
+
+### Why it is worst on a re-screen
+
+Merchant responses belong to the run and are frozen with it (D-046) — every table holding them keys
+on `run_id` and none carries a `merchant_id`. That is right, and deliberately so: *"a packing-slip
+explanation given in August is not evidence about a January re-scan."*
+
+But the attestation section did not know that. **A merchant who answered all nineteen questions on
+run A was reported by run B as having answered none of nineteen questions asked** — a fact about
+Mintro's scoping, printed as a fact about the merchant, in the section whose entire purpose is to
+carry what they said.
+
+### One derivation, because two is how they drifted
+
+The panels disagreed because each worked it out for itself: the participation record read
+`invitation.issued`, and the attestation section assumed. `attestationAsking(counts, invited)` is now
+the single answer, and the section takes the boolean the participation record renders from rather
+than inferring anything.
+
+**An answer is its own proof of asking.** If anything was answered or declined, the questions reached
+someone, whatever a failed commentary read says — the evidence in hand outranks the missing read, so
+the section can never print a denial above a quotation.
+
+### The three cases, and the fourth
+
+| | heading | where the questions went | counts | unanswered row |
+|---|---|---|---|---|
+| **never invited** | Questions for the merchant | *The merchant was not asked about them on this run, so nothing in this report speaks to them.* | `19 questions · none asked` | **Not asked** |
+| **invited, nothing answered** | Stated by the merchant | *Mintro put them to the merchant and recorded the replies exactly as written.* | `0 answered · 0 declined · 19 not answered · 19 asked` | Not answered |
+| **invited, some answered** | Stated by the merchant | same | `3 answered · 1 declined · 15 not answered · 19 asked` | Not answered |
+| *read failed* | Stated by the merchant | *Whether they were put to the merchant could not be read for this run.* | `0 answered · 0 declined · 19 not answered` | No answer recorded |
+
+Two clauses hold on every run and did not move: *these are published standards a crawl cannot
+observe*, and *nothing in this section was observed or verified by Mintro*. Only the middle clause —
+where the questions went — varies, because only the middle clause was wrong.
+
+**The row mark changed too, and it matters more than the lede.** *Not answered* is a fact about the
+merchant and is only available once they were asked; leaving it would have printed the lede's false
+claim nineteen more times, in the position a reader's eye actually lands on.
+
+**The heading changed on the never-invited run.** *"Stated by the merchant"* above nineteen rows
+where nothing was stated is the same false claim in the larger type.
+
+**No count of unanswered questions where nobody was asked.** That is a tally of the merchant's
+conduct, and there was none to tally.
+
+### The fourth case was not in the brief and is not a tidy-up
+
+The commentary read can fail while the attestation read succeeds — `readRunCommentary` returns
+`null`, `readRunAttestations` returns rows — and the section then knows the answers without knowing
+whether anything was sent. Asserting *"not asked"* there would replace one false statement with its
+mirror. It claims neither, and keeps the gap-not-a-blank guarantee with a sentence that drops the
+half about the merchant and keeps the half about the document.
+
+### Proved by reverting it
+
+`attestationAsking(counts, true)` — the old unconditional behaviour — fails eight of the new tests,
+including the one that renders a whole page and reads both panels. The pre-existing
+`attestationSection.test.ts` now says which case it is asserting rather than relying on a default:
+every assertion in it was written about a run where the questions were put.

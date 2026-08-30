@@ -343,7 +343,11 @@ export function ReportView({
           if (part.id === 'stopping') return null;
           const questions =
             part.id === 'questions' && attestations !== undefined ? (
-              <AttestationSection attestations={attestations} print={print} />
+              <AttestationSection
+                attestations={attestations}
+                {...(participation === undefined ? {} : { invited: participation.invited })}
+                print={print}
+              />
             ) : null;
 
           return (

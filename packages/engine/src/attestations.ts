@@ -75,6 +75,56 @@ export interface AttestationSummary {
   readonly total: number;
 }
 
+/**
+ * Whether the merchant was actually asked these questions on this run (D-199).
+ *
+ * The attestation section used to state, unconditionally, that *"Mintro put them to the merchant
+ * and recorded the replies exactly as written"* and to count *"19 asked"*. On a run where no
+ * comment link was ever transmitted, all of that is false — and the participation record on the
+ * same page said the opposite in plain words: *"the merchant was not asked to respond."* Two panels
+ * of one document, contradicting each other, in the copy that reaches an underwriter.
+ *
+ * It matters most on a re-screen. Responses belong to the run and are frozen with it (D-046), so a
+ * merchant who answered all nineteen on run A answers none on run B — and run B was reporting that
+ * as nineteen questions asked and unanswered.
+ *
+ * ## Derived here, and derived once
+ *
+ * The two panels disagreed because each worked it out for itself. This is the one derivation, and
+ * the section reads it rather than inferring anything from a count.
+ */
+export type AttestationAsking =
+  /** A link was transmitted, or an answer exists — either way the questions were put. */
+  | 'asked'
+  /** No link was transmitted for this run. Nothing was put to anyone. */
+  | 'not_asked'
+  /**
+   * Whether they were asked could not be read.
+   *
+   * Real, and not a tidy-up: the commentary read can fail while the attestation read succeeds, and
+   * the section then knows the answers without knowing whether anything was sent. It must claim
+   * neither — asserting *"not asked"* here would replace one false statement with its mirror.
+   */
+  | 'not_known';
+
+/**
+ * Which of the three is true.
+ *
+ * **An answer is its own proof of asking.** If anything was answered or declined, the questions
+ * reached someone, whatever a failed or absent commentary read says about it — so the evidence in
+ * hand outranks the missing read, and the section never tells a reader the merchant was not asked
+ * while displaying what they said.
+ */
+export function attestationAsking(
+  counts: AttestationSummary,
+  invited: boolean | undefined,
+): AttestationAsking {
+  if (counts.answered > 0 || counts.declined > 0) return 'asked';
+  if (invited === true) return 'asked';
+  if (invited === false) return 'not_asked';
+  return 'not_known';
+}
+
 export interface RunAttestations {
   readonly questions: readonly ResolvedAttestation[];
   readonly counts: AttestationSummary;
