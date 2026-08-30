@@ -1057,6 +1057,30 @@ function ScanInput({
           )}
         </div>
 
+        {/*
+          The screening account, directly beneath the storefront it attaches to (D-192).
+
+          It sat at the foot of the form, below the queue, reading as a footnote to a page about
+          something else. It is not a footnote: it is the second thing an analyst might set before
+          pressing Run scan, and the only thing on this form the tool cannot work out for itself.
+
+          Adjacency is also what makes the copy true. The credential is saved against the **domain
+          in the box above**, not against this scan, and that sentence is only checkable by a reader
+          who can see the box while reading it.
+        */}
+        <CredentialCard
+          state={credentialState}
+          loading={credentialLoading}
+          domain={url}
+          available={credentialsAvailable}
+          onStore={() => onCredential(url.trim())}
+          {...(() => {
+            const folded = normaliseDomain(url);
+            const at = folded === null ? undefined : depositedAt[folded];
+            return at === undefined ? {} : { depositedAt: at };
+          })()}
+        />
+
         {queued.length > 0 && (
           <div className="field">
             <span className="flabel">Recent requests</span>
@@ -1151,18 +1175,6 @@ function ScanInput({
           What remains is the one thing an analyst can supply that the tool cannot work out for
           itself: the merchant's login, if they have been given one.
         */}
-        <CredentialCard
-          state={credentialState}
-          loading={credentialLoading}
-          domain={url}
-          available={credentialsAvailable}
-          onStore={() => onCredential(url.trim())}
-          {...(() => {
-            const folded = normaliseDomain(url);
-            const at = folded === null ? undefined : depositedAt[folded];
-            return at === undefined ? {} : { depositedAt: at };
-          })()}
-        />
 
         {error !== null && (
           <div className="err" style={{ marginTop: 16 }}>

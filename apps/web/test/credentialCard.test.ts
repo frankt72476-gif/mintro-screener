@@ -207,3 +207,85 @@ describe('a deposit that has not been collected', () => {
     expect(render(undefined, '2026-08-29T10:15:00.000Z')).not.toContain('Sealed and queued');
   });
 });
+
+/**
+ * The copy has to carry two things a button cannot (D-192).
+ *
+ * Neither is inferable from the control, and each changes what an analyst does next: one sends them
+ * re-entering a credential on every scan, the other has them read a public-mode report as evidence
+ * the credential failed.
+ */
+describe('what the copy must say', () => {
+  const render = (state: CredentialState | null | undefined, domain = 'https://www.comopeptides.com/') =>
+    renderToStaticMarkup(
+      createElement(CredentialCard, {
+        state,
+        loading: false,
+        domain,
+        available: true,
+        onStore: () => undefined,
+      }),
+    );
+
+  it('names the domain it attaches to, not the scan', () => {
+    // "The domain above" is only checkable by a reader who can see the box. This names it.
+    const markup = render(null);
+
+    expect(markup).toContain('www.comopeptides.com');
+    expect(markup).toContain('not against this scan');
+  });
+
+  it('says it is remembered for later scans', () => {
+    expect(render(null)).toContain('without re-entry');
+  });
+
+  it('says it is only used when the crawl is refused', () => {
+    // Without this, a public-mode report reads as the credential having failed.
+    expect(render(null)).toContain('only used if the crawl is refused');
+  });
+
+  it('keeps the sentence that gating is decided signed out', () => {
+    // A supplied account widens what is visible; it never changes what is reported (D-039).
+    expect(render(null)).toContain('access-gating checks are always decided signed out');
+  });
+
+  it('falls back to a domain-free sentence before one can be read', () => {
+    // An empty or unparseable box must not produce "saved against null".
+    const markup = render(null, '');
+
+    expect(markup).toContain('saved against the storefront domain');
+    expect(markup).not.toContain('null');
+  });
+});
+
+describe('the pending state does not contradict itself', () => {
+  const render = (depositedAt?: string) =>
+    renderToStaticMarkup(
+      createElement(CredentialCard, {
+        state: null,
+        loading: false,
+        domain: 'shop.example',
+        available: true,
+        onStore: () => undefined,
+        ...(depositedAt === undefined ? {} : { depositedAt }),
+      }),
+    );
+
+  it('says sealed rather than "no login stored" while one is queued', () => {
+    // The status line said one thing and the note beneath said the other, in the one state where an
+    // analyst most needs to know what is happening.
+    const markup = render('2026-08-29T10:15:00.000Z');
+
+    expect(markup).toContain('Sealed — not yet collected');
+    expect(markup).not.toContain('No login stored');
+  });
+
+  it('offers to store another rather than claiming either state', () => {
+    // "Store a login" reads as though none had been sent; "Replace" claims one is stored.
+    expect(render('2026-08-29T10:15:00.000Z')).toContain('Store another');
+  });
+
+  it('still says "No login stored" when nothing was deposited', () => {
+    expect(render()).toContain('No login stored');
+  });
+});

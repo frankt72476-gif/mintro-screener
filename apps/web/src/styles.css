@@ -824,6 +824,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 
 .cred-card[data-tone="failed"] { border-left-color: var(--amber); }
+.cred-card[data-tone="pending"] { border-left-color: var(--amber); }
 .cred-card[data-tone="ok"]     { border-left-color: var(--violet); }
 .cred-card[data-tone="stored"] { border-left-color: var(--violet); }
 
@@ -835,6 +836,23 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .cred-card[data-tone="failed"] .cred-status { color: var(--ink); font-weight: 600; }
 
 .cred-stale { margin-top: 6px; }
+
+/* A peer of the storefront field, not a section (D-192).
+
+   It sits directly beneath the URL box, so it takes that field's label and hint treatment exactly
+   — same size, same weight, same rhythm — and adds a rule above to separate two settings rather
+   than to introduce a new part of the page. Hierarchy from type and space (D-167). */
+.cred-field {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* Optional, said in the label where it costs nothing to read. */
+.flabel-optional { font-weight: 400; color: var(--slate); }
+
+/* The domain the credential attaches to, set in the same face as the box it came from. */
+.cred-domain { font-size: 11px; color: var(--ink); }
 
 /* Sealed here, not yet collected by the worker (D-191). Amber, like a stale login: something to
    notice, not an error — it clears on its own within a cycle on a healthy deployment. */

@@ -12632,3 +12632,53 @@ and it is left rather than deleted because removing an exported function is a wi
 one; it should go when something else touches that file.
 
 ---
+
+## D-192 — The screening account sits with the storefront it attaches to
+
+**2026-08-29 · business owner · scan form placement and copy**
+
+The card was at the foot of the scan form, below the queue of recent requests, reading as a
+footnote to a page about something else. It is not a footnote: it is **the second thing an analyst
+might set before pressing Run scan**, and the only thing on that form the tool cannot work out for
+itself (D-040).
+
+It now sits directly beneath the storefront field and above the recent requests, weighted as a peer
+of that field — the same label and hint treatment, the same rhythm, with a hairline above to
+separate two settings rather than to introduce a new part of the page.
+
+### Adjacency is what makes the copy true
+
+Two things a reader cannot infer from a button, and each changes what they do next:
+
+**It attaches to the domain, not to the scan.** An analyst who believes they are configuring one run
+either re-enters the credential every time, or assumes a run without it was screened without one. The
+copy names the folded domain — *"saved against `www.comopeptides.com` — not against this scan"* —
+rather than saying "the domain above", because **a reference to the box is only checkable by someone
+who can see the box**, which is exactly what the move provides. An empty or unparseable field falls
+back to a domain-free sentence rather than producing "saved against null".
+
+**It is remembered, and it is conditional.** *"Every later scan of that domain uses it without
+re-entry"*, and *"only used if the crawl is refused"*. Both halves are needed: without the first an
+analyst repeats work; without the second they read an ordinary public-mode report as evidence that
+the credential failed.
+
+Kept unchanged: *"The access-gating checks are always decided signed out."* A supplied account widens
+what is visible and never changes what is reported (D-039), and that sentence is the only place a
+reader is told so at the moment they are deciding whether to supply one.
+
+### Two contradictions the render exposed
+
+Both were visible only once the three states were rendered side by side, and neither would have been
+found by reading the component.
+
+**The status line said "No login stored" while the note beneath said the deposit was queued.** The
+card contradicted itself in the one state where an analyst most needs to know what is happening. It
+now reads *"Sealed — not yet collected"*, and the D-191 explanation follows it rather than arguing
+with it.
+
+**The button said "Store a login" with one already queued.** Following the rule that a label is a
+claim about what pressing it will do (D-186): "Store a login" reads as though none had been sent,
+"Replace" claims one is stored when it is not yet. Pressing it deposits a second, so it says **"Store
+another"**.
+
+---

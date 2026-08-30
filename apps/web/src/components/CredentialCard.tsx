@@ -20,7 +20,7 @@
  */
 
 import type { JSX } from 'react';
-import type { CredentialState } from '../lib/credentialState.js';
+import { normaliseDomain, type CredentialState } from '../lib/credentialState.js';
 
 interface Props {
   /**
@@ -66,8 +66,16 @@ function shortDate(iso: string): string {
 export function credentialLine(
   state: CredentialState | null | undefined,
   loading: boolean,
-): { readonly text: string; readonly tone: 'none' | 'stored' | 'ok' | 'failed' | 'unknown' } {
+  pending = false,
+): { readonly text: string; readonly tone: 'none' | 'stored' | 'ok' | 'failed' | 'unknown' | 'pending' } {
   if (loading) return { text: 'Checking…', tone: 'unknown' };
+  /*
+    Sealed here and not yet collected, which is not "no login stored" (D-192).
+
+    The status line said the latter while the note beneath said the former, so the card contradicted
+    itself in the one state where an analyst most needs to know what is happening.
+  */
+  if (pending && state === null) return { text: 'Sealed — not yet collected', tone: 'pending' };
   if (state === undefined) {
     return { text: 'Could not check whether a login is stored', tone: 'unknown' };
   }
@@ -99,8 +107,6 @@ export function CredentialCard({
   onStore,
   depositedAt,
 }: Props): JSX.Element {
-  const line = credentialLine(state, loading);
-
   /*
     Deposited here, and not yet collected (D-191).
 
@@ -110,6 +116,7 @@ export function CredentialCard({
     button and a stored-nothing card, with no way to tell the difference from never having tried.
   */
   const pending = depositedAt !== undefined && state === null && !loading;
+  const line = credentialLine(state, loading, pending);
 
   /*
     The button label is a claim about what pressing it will do, so it follows what is known.
@@ -120,21 +127,57 @@ export function CredentialCard({
     asserting something it cannot support.
   */
   const label =
-    state === undefined ? 'Store or replace' : state === null ? 'Store a login' : 'Replace';
+    pending
+      ? // One is already queued. "Store a login" reads as though none had been sent; "Replace"
+        // claims one is stored, which it is not yet. Pressing this deposits a second (D-192).
+        'Store another'
+      : state === undefined
+        ? 'Store or replace'
+        : state === null
+          ? 'Store a login'
+          : 'Replace';
+
+  const folded = normaliseDomain(domain);
 
   return (
-    <div className="field">
-      <span className="flabel">Screening account</span>
+    <div className="field cred-field">
+      <label className="flabel" htmlFor="cred-store">
+        Screening account <span className="flabel-optional">— optional</span>
+      </label>
+      {/*
+        Two things a reader cannot infer from a button, and both change what they do next (D-192).
+
+        **It attaches to the domain, not to this scan.** An analyst who thinks they are configuring
+        one run will re-enter it every time, or worse, assume a run without it was screened without
+        one. The domain is named here rather than referred to, because "the domain above" is only
+        checkable if you can see the box — and this now sits directly beneath it.
+
+        **It is remembered, and it is conditional.** Future scans of the same domain use it with no
+        re-entry, and only when the crawl is actually refused (D-040). Both halves matter: without
+        the first an analyst repeats work, and without the second they read a public-mode report as
+        evidence the credential failed.
+      */}
       <p className="fhint">
-        Every scan runs signed out. If a merchant's product pages turn out to be behind a login and
-        we hold an account they supplied, the scan uses it for those pages and the report says so.
-        The access-gating checks are always decided signed out.
+        {folded === null ? (
+          <>A login the merchant supplied, saved against the storefront domain — not against a
+          single scan.</>
+        ) : (
+          <>
+            A login the merchant supplied, saved against{' '}
+            <span className="mono cred-domain">{folded}</span> — not against this scan. Every later
+            scan of that domain uses it without re-entry.
+          </>
+        )}{' '}
+        It is only used if the crawl is refused: scans start signed out and stay that way unless the
+        product pages come back behind a login. <strong>The access-gating checks are always decided
+        signed out.</strong>
       </p>
 
       <div className="cred-card" data-tone={line.tone}>
         <span className="cred-status">{line.text}</span>
         <button
           className="btn btn-ghost"
+          id="cred-store"
           disabled={!available || domain.trim() === ''}
           onClick={onStore}
         >
