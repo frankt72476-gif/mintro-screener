@@ -12682,3 +12682,96 @@ claim about what pressing it will do (D-186): "Store a login" reads as though no
 another"**.
 
 ---
+
+## D-193 — The credential pair is set from the generator, not transcribed
+
+**2026-08-29 · business owner · `make-credential-key --set`**
+
+A 2048-bit key is about 1,700 characters of base64, and the procedure asked an operator to paste one
+into a `fly secrets set` command and another into a Netlify field.
+
+**The failure mode of copying it by hand is not "it does not work".** A truncated or re-wrapped key
+imports without complaint and then cannot open what the browser sealed — and by the time that shows,
+a merchant's login is sitting in a deposit nobody can read, with no recovery (D-038). The preflight
+(D-191) catches a mismatched *pair*; it cannot catch a correctly-formed key that is not the one the
+frontend holds.
+
+So `--set` takes the private half from the generator straight to the secret store.
+
+### The private half is never printed, and never in a command line
+
+`fly secrets set NAME=VALUE` puts the key in the process arguments, where anything that can list
+processes sees it and where shell history keeps it. `fly secrets import` reads `NAME=VALUE` from
+stdin instead — same result, and the key never exists as a command line.
+
+`--stage` is deliberately not used: a staged secret is one the running worker does not have, so the
+preflight would pass on a machine that has not restarted while the frontend sealed to a key it could
+not use.
+
+### Refusing to overwrite, and refusing before generating
+
+An existing `CREDENTIAL_PRIVATE_KEY` is the only key that can open every credential already stored.
+Replacing it is not an update — it is destroying the ability to read all of them.
+
+The check runs **before anything is generated**, which is the ordering that makes the refusal free of
+side effects: a pair generated and discarded is a pair that existed. `--force` is the only way past,
+and the output then says the previous key was replaced and what that cost.
+
+An app whose secrets *cannot be read* is also a refusal rather than an assumption. Treating an
+unreachable app as one with no secrets is how the guard would be bypassed by a network blip.
+
+### Netlify: yes, where it can
+
+Both CLIs are installed and signed in on this machine. `fly` needs nothing further. `netlify env:set`
+needs to know which site — a linked directory or `NETLIFY_SITE_ID` — and this repository is not
+linked, so the usual outcome here is the manual instruction.
+
+**Said plainly rather than skipped silently.** An operator who assumes both halves were set leaves
+the frontend sealing to a key nothing holds, which produces deposits that look successful and can
+never be opened. A Netlify refusal is reported too, and does not fail the run — the Fly half
+succeeded and that is worth knowing separately.
+
+### Written as well as printed
+
+The public half goes to `credential-public-key.txt` as well as to the terminal, because it is the
+value that has to reach another system and scraping it out of a scrollback is the step this flag
+exists to remove. Gitignored: public, but a generated artifact of one machine's run.
+
+### Testing the paths that cannot be run
+
+The interesting paths either overwrite a production secret or need one to already exist, so the
+effects sit behind a `Hosts` interface and the sequence is a function over it. Thirteen cases,
+including that nothing is generated when it refuses and that the private half never appears in what
+comes back for printing.
+
+**`--set` was not run against the live app.** It writes a production secret, and that is the
+operator's action to take.
+
+### A private key in the working tree, and the ignore that now stops it
+
+`credkey.txt` was found untracked and unignored in the repository root, carrying a full
+`BEGIN PRIVATE KEY` block. **It did not come from the tool** — `make-credential-key` prints and
+stores nothing. It came from a **suggested workaround** that redirected the generator's output to a
+file so it could be read back rather than scraped from a terminal, which is a reasonable thing to
+want and the reason `--set` now writes the *public* half to disk on purpose.
+
+One `git add -A` would have committed it. So `.gitignore` gained:
+
+    credkey.txt
+    *credential*key*.txt
+    *credential*key*.pem
+
+**Deliberately not root-anchored**, and the asymmetry with `/reports/` above it is the point.
+Anchoring *narrows* an ignore, and is right where over-ignoring would hide something the repository
+needs — `/reports/` is anchored precisely so `fixtures/reports/` stays trackable (D-170). Here it
+runs the other way: over-ignoring costs a rename, under-ignoring commits a private key, and a key
+written into a subdirectory is exactly as unrecoverable as one written to the root.
+
+Verified in both directions: the patterns catch the file at the root, in a subdirectory and as a
+`.pem`; `docs/`, the fixtures and the source stay trackable; and no tracked file matches any of them.
+
+**The wider lesson is about the workaround, not the file.** A tool that prints a secret invites
+somebody to redirect it somewhere, and where they redirect it is not the tool's choice. That is an
+argument for `--set` existing rather than for documenting the redirect more carefully.
+
+---

@@ -316,10 +316,28 @@ noticeably slower.
 
 Skip this if you are not using merchant-supplied logins yet. Everything else works without it.
 
+    npm run make-credential-key -- --set
+
+This generates the pair, sets `CREDENTIAL_PRIVATE_KEY` on the worker, writes the public half to
+`credential-public-key.txt`, and prints it delimited for Netlify. **The private half is never
+printed** — it goes from the generator to the secret store on stdin, so it never appears in a
+command line or in shell history.
+
+If the Netlify CLI is signed in *and* knows which site — a linked directory, or `NETLIFY_SITE_ID`
+set — it sets `VITE_CREDENTIAL_PUBLIC_KEY` too and says so. Otherwise it says why it could not and
+leaves that step to you. Either way, trigger a deploy afterwards: Netlify reads variables at build
+time.
+
+It refuses if `CREDENTIAL_PRIVATE_KEY` is already set. Overwriting it makes every credential already
+stored permanently unopenable, with no recovery (D-038) — `--force` is the only way past, and it
+says so in the output.
+
+Without `--set` it prints both halves and sets nothing:
+
     npm run make-credential-key
 
-It prints three blocks: a value for Netlify, a ready-to-paste `fly secrets set` command, and lines
-for `apps/web/.env`. Copy them out now — **the pair is printed once and stored nowhere.**
+Three blocks: a value for Netlify, a ready-to-paste `fly secrets set` command, and lines for
+`apps/web/.env`. Copy them out now — **the pair is printed once and stored nowhere.**
 
 The worker's boot line says which of three states it is in:
 
