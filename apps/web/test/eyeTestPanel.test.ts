@@ -188,11 +188,41 @@ describe('a recorded read', () => {
     expect(markup.match(/eye-saw/g) ?? []).toHaveLength(1);
   });
 
-  it('carries no count of concerns anywhere', () => {
-    // A tally makes the layer read as a rule set with pictures, and a number invites arithmetic —
-    // which is the determination this is not allowed to make (D-001).
-    const body = text(render(RECORDED));
-    expect(body).not.toMatch(/\b\d+ (of them )?(found|concern|issue)/i);
+  it('counts in the band and nowhere else, and never scores', () => {
+    /*
+      **This narrows D-196 rather than reading it** (D-206).
+
+      D-196 said "no count of concerns anywhere on this panel", and the band now states
+      *3 concerns · 6 clear*. That is a deliberate change and it is recorded as one: every section
+      band carries its statistics, and an eye-test band alone carrying none would be the one bar an
+      agent could not scan.
+
+      What the prohibition was protecting survives, and it is what this now asserts. **No score, no
+      grade, no ratio, no total.** Two counts and the name of the layer — never a single number over
+      nine judgments, which is the determination this may not make (D-001), and never a count
+      repeated among the rows where it would read as a tally of failures.
+    */
+    /*
+      Scoped to the panel, not the document.
+
+      A first draft asserted this over the whole report and failed on the stopping band's *7 of 9
+      checked and clear* — a legitimate count in a different section. An assertion about one
+      surface has to be made against that surface.
+    */
+    const markup = render(RECORDED);
+    const from = markup.indexOf('<section class="panel eye-panel');
+    const body = text(markup.slice(from, markup.indexOf('</section>', from)));
+
+    expect(body).toContain('Mintro’s impression');
+
+    // No score of any shape: nothing out of nine, no percentage, no grade.
+    expect(body).not.toMatch(/\b\d+\s*(\/|of)\s*9\b/);
+    expect(body).not.toMatch(/\d+\s*%/);
+    expect(body).not.toMatch(/\bscore\b|\brating\b|\bgrade\b/i);
+
+    // The *count* is stated once, in the band. The word itself still appears as a verdict on
+    // the rows, which is what a verdict is called and not a tally.
+    expect((body.match(/\d+ concerns?\b/g) ?? []).length).toBe(1);
   });
 });
 

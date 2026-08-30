@@ -181,6 +181,15 @@ function injectedPrint(): InjectedPrint | null {
  * almost nothing else — different credentials, different audiences, different things they are
  * allowed to do — so the choice is made here, before anything is constructed.
  */
+/**
+ * How often the report asks whether the eye test has landed.
+ *
+ * Four seconds. The job takes about twenty-five (D-200), so this is a handful of requests and the
+ * panel fills within a few seconds of the read being written — fast enough that a reader watching
+ * the page sees it arrive rather than finding it later.
+ */
+const EYE_POLL_MS = 4_000;
+
 export function App(): JSX.Element {
   /*
     Routing, before any client exists (D-071).
@@ -566,6 +575,51 @@ function Screener({
       setStage('input');
     }
   }
+
+  /**
+   * Waits for the eye test to land, and fills the panel in place (D-206).
+   *
+   * The layer runs after the crawl (D-198), so a report opened the moment a scan finishes shows
+   * *not recorded yet* and, until now, stayed that way until somebody navigated away and back. A
+   * reader who saw that once had no reason to look again.
+   *
+   * Polling, the same shape the run page uses while a scan runs: a handful of requests over the
+   * half-minute the job takes, against a realtime channel that would be more machinery for the same
+   * answer.
+   *
+   * **It stops the moment there is an answer.** `recorded`, `failed` and `unreadable` are all
+   * terminal — a failed read does not become a good one by asking again — and so is `predates`,
+   * which is a fact about the run that will never change. Only `pending` is worth another look.
+   *
+   * The run id is the dependency, not the record: an effect that re-ran on the thing it sets would
+   * restart its own timer on every tick.
+   */
+  useEffect(() => {
+    if (stage !== 'report' || report === null) return;
+    if (eyeTest !== null && eyeTest.kind !== 'pending') return;
+
+    const runId = report.runId;
+    let live = true;
+    let timer: number | undefined;
+
+    const tick = async (): Promise<void> => {
+      const next = resolveEyeTest(report, await readRunEyeTest(client, runId));
+      if (!live) return;
+
+      setEyeTest(next);
+      // Anything but `pending` is an answer, and asking again would not change it.
+      if (next.kind === 'pending') timer = setTimeout(() => void tick(), EYE_POLL_MS) as unknown as number;
+    };
+
+    timer = setTimeout(() => void tick(), EYE_POLL_MS) as unknown as number;
+    return () => {
+      live = false;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+    // `eyeTest` is set by this effect; depending on it would restart the timer on every tick. The
+    // guard above reads the current value once, which is what decides whether to start at all.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, report, client]);
 
   /**
    * Watches the queue.

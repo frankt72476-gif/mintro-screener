@@ -2721,100 +2721,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 @media print { .eye-panel { break-inside: avoid; } }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════════════════════════
-   Section identity (D-201)
 
-   `docs/report-visual-spec.md` §6 said "colour does one job, marking state", and the result was a
-   monochrome document. Colour marks structure too — but in a place state never occupies, so the
-   two can never be read for each other.
-
-   **Structure lives in the gutter; state lives on the row.** The bar sits 14px outside the card,
-   in the margin `.main` already reserves, so it touches no border a state class can set. A failed
-   stopping panel still turns its own border rose; a failing finding still carries a rose left edge
-   inside the card. Nothing overlaps, and neither had to move.
-
-   Not a background fill: a tinted surface would recolour the text sitting on it and start
-   competing with the state badges, which is the one thing §6 was right to guard.
-   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
-
-.stop-panel,
-.eye-panel,
-.part[data-section='notmet'],
-.part[data-section='review'],
-.part[data-section='questions'] {
-  position: relative;
-}
-
-.stop-panel::before,
-.eye-panel::before,
-.part[data-section='notmet']::before,
-.part[data-section='review']::before,
-.part[data-section='questions']::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--line);
-}
-
-/* Full height, so it is still there four screens into a long section — which is the whole point.
-   A rule under the heading marks a boundary; this marks a place. */
-.stop-panel::before                       { background: var(--sec-stopping); }
-.eye-panel::before                        { background: var(--sec-eye); }
-.part[data-section='notmet']::before      { background: var(--sec-notmet); }
-.part[data-section='review']::before      { background: var(--sec-review); }
-.part[data-section='questions']::before   { background: var(--sec-questions); }
-
-/*
-  The one heading rule that already existed, now carrying its section's colour rather than a
-  neutral (D-201). It was `--ink-mid`, a grey chosen when nothing else was coloured.
-*/
-.att { border-top-color: var(--sec-questions); }
-
-@media (max-width: 900px) {
-  /* The gutter closes at narrow widths; the bar comes inside rather than off-screen. */
-  .stop-panel::before,
-  .eye-panel::before,
-  .part[data-section='notmet']::before,
-  .part[data-section='review']::before,
-  .part[data-section='questions']::before { left: -8px; }
-}
-
-@media print {
-  /*
-    Print drops the mark entirely (D-201, requirement 4).
-
-    Not a grey ramp. Measured, the five convert to L* 14, 45, 26, 48, 33 — slate (45) against purple
-    (48) is three points apart, which is no difference at all on paper at 3px. A ramp that claims
-    five tones and delivers four is worse than none, because a reader would trust it.
-
-    And not a neutral bar either. The bar lives 14px outside the card, in a gutter that exists only
-    on screen; print has no such margin, so the first attempt at this simply had the bar clipped by
-    the page edge — dropped by accident rather than by decision, and one margin change away from
-    reappearing as a sliver. Moving it inside would be a structural change to a colour pass.
-
-    So it is removed, deliberately and in one place. **Nothing is lost that the page needs**: in
-    print, section identity is carried by the headings and the reading order, exactly as it was
-    before this pass. A 24-page PDF depends on colour for nothing.
-
-    The document already behaves this way for state — `.stop-panel.is-failed` prints its rose border
-    as #8A8598 and keeps the weight, so hue drops and geometry stays. Here the geometry has nowhere
-    to go, so it goes too.
-  */
-  .stop-panel::before,
-  .eye-panel::before,
-  .part[data-section='notmet']::before,
-  .part[data-section='review']::before,
-  .part[data-section='questions']::before {
-    display: none;
-  }
-
-  /* The one rule that is inside the content box, so it survives — as the neutral it always was. */
-  .att { border-top-color: var(--ink-mid); }
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -2982,4 +2889,113 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 @media print {
   /* It prints. An inherited answer that looked fresh on paper is the exact risk D-046 named. */
   .att-inherited, .mr-inherited { color: #57536A; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   Section bands (D-206)
+
+   Every section's heading is a solid filled bar: name left, statistics right. **Fixed colour per
+   section, and it never moves.** An agent on their tenth report should know where they are before
+   reading a word — and a band that changed with the contents would make the colour a state signal,
+   so a failed stopping condition changes the rows inside and never the bar above them.
+
+   This replaces the D-201 gutter bars, which are gone. A 3px mark in the margin could not survive
+   greyscale (five hues, two of them three L* apart) and had to be dropped in print; a filled band
+   survives as a tonal block, so this is the version that can print.
+
+   ## The five fills were measured, not chosen
+
+   White text at 12px needs 4.5:1. Every fill here clears it:
+
+       stopping   #2A0F63  L* 14   15.59:1
+       notmet     #4318A8  L* 26   10.85:1
+       questions  #5B23C9  L* 33    8.30:1
+       eye        #6D6788  L* 45    5.32:1
+       review     #A03CE8  L* 48    4.88:1
+
+   **The state hues are not among them, and contrast rules them out before semantics does.**
+   `--rose` reaches 4.5:1 against neither white (4.40) nor ink (4.04) at this size; `--jade` and
+   `--amber` need dark text, so the five bands could not share one text treatment. The semantic
+   reason stands behind that: a rose band is exactly what a reader would take for a fired stopping
+   condition, which is the one thing these bars must never say.
+
+   No hue was added. All five are tokens the palette already had.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.band-bar {
+  display: flex;
+  /* An h2 by element; the type is set here rather than inherited from the heading scale. */
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s4);
+  margin: 0 0 var(--s4);
+  padding: 9px var(--s3);
+  border-radius: 6px;
+  background: var(--sec-review);
+  color: #FFFFFF;
+}
+
+.band-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+/* Right-aligned, and quieter than the name — it is the qualifier, not the heading. */
+.band-stats {
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.band-bar[data-band='stopping']  { background: var(--sec-stopping); }
+.band-bar[data-band='notmet']    { background: var(--sec-notmet); }
+.band-bar[data-band='eye']       { background: var(--sec-eye); }
+.band-bar[data-band='questions'] { background: var(--sec-questions); }
+.band-bar[data-band='review']    { background: var(--sec-review); }
+
+/* The band is the heading, so the old heading furniture goes with it. */
+.part-head { display: none; }
+
+/* ── The part labels, which were class names and never words (D-206) ───────────────────────────
+   The bands name each section; this names the division between them, which they cannot. */
+.part-label {
+  margin: 0 0 var(--s3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* A heading stays with what it introduces, and repeats nothing. */
+@media print {
+  .band-bar { break-after: avoid; break-inside: avoid; }
+}
+
+@media print {
+  /*
+    Print keeps the bands as tinted fills (D-206, requirement 5).
+
+    A filled band survives greyscale as a tonal block, which is what the 3px gutter bars could not
+    do — five hues, two of them three L* apart, converge to the same grey at that width. This is the
+    version that can print.
+
+    **The tints are spread by tone, not derived by mixing.** A uniform tint of each hue would land
+    them all within a few points of one another on paper, which is the same collision one step
+    lighter. These five are chosen for greyscale separation first and hue second, so a photocopy
+    still tells the sections apart.
+  */
+  .band-bar { color: var(--ink); border: 0.5px solid #C9C4DA; }
+  .band-stats { color: #4A4265; }
+
+  .band-bar[data-band='stopping']  { background: #C9C4DA; }
+  .band-bar[data-band='notmet']    { background: #D6D2E4; }
+  .band-bar[data-band='eye']       { background: #E3E0EE; }
+  .band-bar[data-band='questions'] { background: #EDEBF4; }
+  .band-bar[data-band='review']    { background: #F5F3F9; }
 }

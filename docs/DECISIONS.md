@@ -13706,3 +13706,122 @@ head of a screening must not describe a different one.
 
 The form is seeded once per open and never re-seeded. After that the map is what this visitor has
 done, which is what it has always been; a later re-seed would overwrite their unsent edits.
+## D-206 — Section bands, and the counts stop being stated three times
+
+**2026-08-30 · business owner · `apps/web/src/components/Sections.tsx`, `ReportView.tsx`, `styles.css`, `lib/grouping.ts`**
+
+Every section's heading is now a solid filled band: name left, statistics right. **Fixed colour per
+section, and it never moves.** An agent on their tenth report should know where they are before
+reading a word — and a band that changed with the contents would make the colour a state signal, so
+a failed stopping condition changes the rows inside and never the bar above them. State stays on the
+rows.
+
+### The palette question, answered by measurement
+
+Five solid fills with white text at 12px need 4.5:1. Every one clears it:
+
+| Section | Token | L\* | contrast on white text |
+|---|---|---|---|
+| Stopping conditions | `--violet-deep` | 14 | 15.59 |
+| Standards not met | `--violet` | 26 | 10.85 |
+| Questions for you | `--violet-lift` | 33 | 8.30 |
+| Eye test | `--slate` | 45 | 5.32 |
+| For your review | `--purple` | 48 | 4.88 |
+
+**No addition was needed, and reusing the state hues is not safe** — contrast rules them out before
+the semantics do. `--rose` reaches 4.5:1 against *neither* white (4.40) nor ink (4.04) at this size;
+`--jade` and `--amber` need dark text, so the five bands could not share one text treatment even if
+the meaning collision were acceptable. And it is not: a rose band is exactly what a reader would take
+for a fired stopping condition, which is the one thing these bars must never say.
+
+### What the bands replaced
+
+Three nav cards and a sticky bar, both deleted. Between them they restated every section count at the
+top of the document and again in a bar that followed the reader down it — three places for one
+number, two of which could drift from the section they named. `bandStats` reads the part's own tally,
+so the figure and the heading it describes cannot come apart.
+
+**The band is an `h2`, not a styled paragraph.** A reader navigating a 25-page PDF by headings loses
+every section otherwise; an existing test caught that and was right to.
+
+**The D-201 gutter bars come out.** A 3px mark in the margin could not survive greyscale — five
+hues, two of them three L\* apart — and had to be dropped in print. A filled band survives as a
+tonal block, so this is the version that can print, and the print tints are spread by tone rather
+than derived by mixing so a photocopy still tells the sections apart.
+
+**PART ONE / PART TWO are now words.** They were class names and nothing else; the bands name each
+section and cannot name the division between them.
+
+### One rule narrowed rather than read
+
+D-196 said *"no count of concerns anywhere on this panel"*, and the eye-test band now states
+*3 concerns · 6 clear · Mintro's impression*. **That is a change to D-196, not an interpretation of
+it**, and it is recorded as one: every band carries its statistics, and an eye-test band alone
+carrying none would be the one bar an agent could not scan.
+
+What the prohibition protected survives and is now what the test asserts. **No score, no grade, no
+ratio, no total** — never a single number over nine judgments, which is the determination this layer
+may not make (D-001), and never a count repeated among the rows where it would read as a tally of
+failures.
+
+### The report fills the panel in place
+
+The eye test runs after the crawl (D-198), so a report opened as a scan finishes shows *not recorded
+yet* and used to stay that way until somebody navigated away and back. A reader who saw that once
+had no reason to look again.
+
+It polls every four seconds against a job that takes about twenty-five (D-200), the same shape the
+run page uses, and **stops the moment there is an answer**. `recorded`, `failed`, `unreadable` and
+`predates` are all terminal — a failed read does not become a good one by asking again.
+
+### Left alone, and worth a look
+
+The stopping panel's sub-line still says *"Seven of nine stopping conditions were checked and none
+applies"* directly under a band saying *7 of 9 checked and clear · 2 unverifiable*. That is the same
+figure twice, which is what this change removed everywhere else. It is copy rather than furniture and
+it carries two things the band does not — *none applies*, and *tell us if we have those wrong* — so
+it was not deleted on a colour pass. It is the obvious next cut.
+## D-207 — The stopping panel stops counting twice
+
+**2026-08-30 · business owner · `apps/web/src/lib/grouping.ts`, `ReportView.tsx`**
+
+D-206 moved every section's count into its band and left one duplication behind, flagged rather than
+cut. The panel read:
+
+> **Stopping conditions** · *7 of 9 checked and clear · 2 unverifiable*
+> ✓ Nothing here stops the application
+> Seven of nine stopping conditions were checked and none applies. Two could not be checked — tell
+> us if we have those wrong.
+
+The same figure twice, eight inches apart, which is what D-206 removed everywhere else. It survived
+because it is copy rather than furniture and it carried two things the band does not.
+
+**Only the half a band cannot say is kept.** A band states what was found; only a sentence can invite
+a correction, and those unchecked rows are the ones a merchant can actually resolve:
+
+> **Stopping conditions** · *7 of 9 checked and clear · 2 unverifiable*
+> ✓ Nothing here stops the application
+> Tell us if we have the two unchecked ones wrong.
+
+*Nothing here stops the application* is the heading and was never the sentence's to state; the
+counting clause is now `bandStats`'s alone, one derivation.
+
+**A run with nothing unchecked says nothing.** `run-c268f8d7` checked all eight, so there is no
+correction to invite and no sub-line at all — an empty paragraph under the heading would read as a
+sentence that failed to load.
+
+### What was kept, and why it is not the same duplication
+
+The partition anomaly stays. *"Six produced no finding on this run and are unaccounted for"* is a
+fact about the run's own arithmetic that **no band states**, because a band reports what was found
+rather than what is missing from the accounting. It is unreachable through `assembleReport` — the
+guard in `summariseBlocking` refuses to assemble such a run — and kept for stored reports written
+before that guard, since runs are immutable (D-002).
+
+### D-183's ordering argument no longer applies
+
+D-183 rewrote this sentence to lead with what was determined and disclose the gap second, because a
+reader took reassurance from the first clause and had it withdrawn by the next. That was a property
+of a sentence carrying both. A sentence that only asks has no order to get wrong, and the reassurance
+now sits in a band that states its own gap in the same breath: *7 of 9 checked and clear · 2
+unverifiable*.

@@ -20,7 +20,7 @@
 import type { JSX } from 'react';
 import { STATE_LABEL, type FindingCommentary, type ReportFinding } from '@mintro/engine';
 import type { FindingGroup, ReportPart, SectionBlock } from '../lib/grouping.js';
-import { findingAnchor, NOTHING_OBSERVED_ID, sectionAnchor, stoppingSentence } from '../lib/grouping.js';
+import { bandStats, findingAnchor, NOTHING_OBSERVED_ID, sectionAnchor, stoppingSentence } from '../lib/grouping.js';
 import { stateClass } from '../lib/format.js';
 
 /**
@@ -178,11 +178,51 @@ function Block({
  * `<section>` with the heading inside it, so the two cannot be separated by a page break and a
  * running header can carry the name down a long one.
  */
+export /**
+ * A section's heading: a solid filled band, name left, statistics right (D-206).
+ *
+ * **The colour is fixed per section and never moves.** An agent reading their tenth report should
+ * know where they are before reading a word, and a band that changed with the contents would make
+ * the colour a state signal — so a failed stopping condition changes the rows inside and never the
+ * bar above them. State stays on the rows.
+ *
+ * White on the fill, at 12px, and the five fills were measured rather than picked: every one clears
+ * 4.5:1 against white (15.6, 10.9, 8.3, 5.3, 4.9). See D-206 for why the state hues are not among
+ * them — `--rose` reaches 4.5 against neither white nor ink at this size, and jade and amber need
+ * dark text, so the set could not share one text treatment even before the semantics.
+ */
+function SectionBand({
+  id,
+  name,
+  stats,
+}: {
+  readonly id: string;
+  readonly name: string;
+  /** From the part's own tally. Nothing here is counted a second time. */
+  readonly stats: string;
+}): JSX.Element {
+  return (
+    /*
+      An `h2`, not a styled paragraph.
+
+      The band is the section's heading and has to be one in the document too — a reader using
+      headings to navigate a 25-page PDF loses every section if this is a `<p>` that happens to look
+      like a title. The statistics ride inside it and are read out with it, which is correct: they
+      qualify the heading.
+    */
+    <h2 className="band-bar" data-band={id}>
+      <span className="band-name">{name}</span>
+      <span className="band-stats">{stats}</span>
+    </h2>
+  );
+}
+
 export function ReportSectionView({
   part,
   children,
   passes,
   questions,
+  stats,
   commentaryOf,
 }: {
   readonly part: ReportPart;
@@ -193,6 +233,14 @@ export function ReportSectionView({
   readonly passes?: JSX.Element | null;
   /** Section 2's body, which is not findings at all. */
   readonly questions?: JSX.Element | null;
+  /**
+   * The band's right-hand statistics, where the section's own tally is not the whole story.
+   *
+   * Only the questions section passes one: its figures come from the attestation counts, which are
+   * a different derivation from the finding tally and are already computed where the answers are
+   * read. Everything else reads `bandStats`.
+   */
+  readonly stats?: string;
 }): JSX.Element {
   /*
     The old section-4 anchor now lives on the review section (D-189).
@@ -214,10 +262,15 @@ export function ReportSectionView({
         same element rather than two places that could drift apart.
       */}
       {anchored && <span id={NOTHING_OBSERVED_ID} />}
-      <div className="part-head">
-        <h2 className="part-name">{part.heading}</h2>
-        <TallyLine rules={part.tally.rules} findings={part.tally.findings} />
-      </div>
+      {/*
+        The heading is the band (D-206).
+
+        Name left, statistics right, one solid fill that never changes with the contents. It replaces
+        a heading, a count in the margin, a nav card at the top of the document and a line in the
+        sticky bar — four places one number was stated, three of which could drift from the section
+        they named.
+      */}
+      <SectionBand id={part.id} name={part.heading} stats={stats ?? bandStats(part)} />
 
       {part.id === 'stopping' ? (
         <StoppingAccountLine part={part} />

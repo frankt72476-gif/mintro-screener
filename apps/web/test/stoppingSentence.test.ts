@@ -1,14 +1,19 @@
 /**
- * The stopping-conditions sentence, and the arithmetic it puts on screen (D-183).
+ * The stopping-conditions sentence: the ask, and the anomaly (D-183, cut by D-207).
  *
- * The old wording led with the clean sweep and disclosed the gap second — *"None of the 9 stopping
- * conditions was observed failing on this run. Not observed either way, so not cleared: GATE-003,
- * NAME-001."* A reader takes the reassurance from the first sentence and withdraws it at the
- * second. The facts were right; the order made them mislead for a moment.
+ * **The counting sentence is gone.** It read *"Seven of nine stopping conditions were checked and
+ * none applies"* directly beneath a band saying *7 of 9 checked and clear · 2 unverifiable* — the
+ * same figure twice, which is the duplication D-206 removed everywhere else and left here because
+ * it was copy rather than furniture. The band states what was found; `bandStats` is the one
+ * derivation of it now.
  *
- * Leading with the denominator means the sentence now *asserts* a count, which it did not before.
- * That is the reason for the second half of this file: a claim of "7 of 9" is only true if the
- * parts add up, so a shortfall is stated rather than absorbed into the flattering direction.
+ * What survives is the half a band cannot say. Only a sentence can invite a correction, and those
+ * two unchecked rows are the ones a merchant can actually resolve. The order argument D-183 was
+ * written about — lead with what was determined, disclose the gap second — no longer applies to a
+ * sentence that only asks.
+ *
+ * The partition guard stays and is the second half of this file. It is unreachable through
+ * `assembleReport` and kept anyway: it is the one place the arithmetic is checked at all.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -24,29 +29,38 @@ const account = (over: Partial<StoppingAccount> = {}): StoppingAccount => ({
 });
 
 describe('the live comopeptides shape', () => {
-  it('leads with what was determined, then names the gap', () => {
+  it('asks about the unchecked ones and counts nothing', () => {
     const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
 
-    expect(lines).toEqual([
-      'Seven of nine stopping conditions were checked and none applies.',
-      'Two could not be checked — tell us if we have those wrong.',
-    ]);
+    expect(lines).toEqual(['Tell us if we have the two unchecked ones wrong.']);
   });
 
-  it('says nothing about a gap when there is none', () => {
+  it('says nothing at all when every condition was checked', () => {
+    /*
+      No sentence rather than a reassuring one. The band already says *9 of 9 checked and clear*,
+      and there is nothing to invite a correction about — an empty paragraph under the heading
+      would read as a sentence that failed to load.
+    */
     const lines = stoppingSentence(account({ passed: Array.from({ length: 9 }, (_, i) => `R-${i}`) }));
 
-    expect(lines).toEqual(['Nine of nine stopping conditions were checked and none applies.']);
+    expect(lines).toEqual([]);
   });
 
-  it('counts a failure as observed, because it was', () => {
-    // A failed condition is the strongest kind of observation. It belongs in the numerator.
+  it('asks in the singular for one unchecked condition', () => {
     const lines = stoppingSentence(
       account({ failed: [{ ruleId: 'CATG-001' }] as never, notEvaluable: ['GATE-003'] }),
     );
 
-    expect(lines[0]).toBe('Eight of nine stopping conditions were checked and one applies.');
-    expect(lines[1]).toBe('One could not be checked — tell us if we have those wrong.');
+    expect(lines).toEqual(['Tell us if we have the unchecked one wrong.']);
+  });
+
+  it('asks about this document, never about the storefront', () => {
+    // D-001: it invites a correction to what Mintro wrote. It never tells a merchant what to change
+    // about their site, and a shortened sentence is where that slips.
+    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
+
+    expect(lines.join(' ')).toContain('we have');
+    expect(lines.join(' ')).not.toMatch(/you (should|must|need)/i);
   });
 
   it('renders nothing for a run predating the flag', () => {
@@ -65,32 +79,34 @@ describe('the live comopeptides shape', () => {
  */
 describe('a stored report whose parts do not add up', () => {
   it('states the shortfall rather than absorbing it', () => {
+    /*
+      The counting sentence is gone (D-207) and this is not. A hole in the partition is an anomaly
+      about the run itself — six declared conditions that produced no finding either way — and no
+      band states it, because the band reports what was found rather than what is missing from the
+      accounting.
+    */
     const lines = stoppingSentence(account({ passed: ['PROD-006', 'PROD-007'], notEvaluable: ['GATE-003'] }));
 
-    // Not "2 of 9 … 1 could not be evaluated" and silence about the other six.
-    expect(lines[0]).toBe('Two of nine stopping conditions were checked and none applies.');
-    expect(lines[2]).toContain('Six produced no finding on this run');
-    expect(lines[2]).toContain('did not check every condition it declares');
+    expect(lines.join(' ')).toContain('Six produced no finding on this run');
+    expect(lines.join(' ')).toContain('did not check every condition it declares');
   });
 
   it('is silent when the parts do add up, which is every healthy run', () => {
     const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
 
-    expect(lines).toHaveLength(2);
-    expect(lines.join(' ')).not.toContain('unaccounted');
+    // Only the ask. Nothing about the arithmetic, because it holds.
+    expect(lines).toEqual(['Tell us if we have the two unchecked ones wrong.']);
   });
 });
 
 describe('grammar', () => {
-  it('agrees the verb with the observed count', () => {
-    const one = stoppingSentence(account({ passed: ['PAY-001'], notEvaluable: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] }));
-    expect(one[0]).toBe('One of nine stopping conditions was checked and none applies.');
-  });
+  it('agrees the ask with the unchecked count', () => {
+    const one = stoppingSentence(account({ passed: ['PAY-001'], notEvaluable: ['A'] }));
+    expect(one[0]).toBe('Tell us if we have the unchecked one wrong.');
 
-  it('agrees the verb with the failure count', () => {
     const many = stoppingSentence(
-      account({ failed: [{ ruleId: 'A' }, { ruleId: 'B' }] as never, passed: ['C', 'D', 'E', 'F', 'G', 'H', 'I'] }),
+      account({ passed: ['PAY-001'], notEvaluable: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] }),
     );
-    expect(many[0]).toBe('Nine of nine stopping conditions were checked and two apply.');
+    expect(many[0]).toBe('Tell us if we have the eight unchecked ones wrong.');
   });
 });

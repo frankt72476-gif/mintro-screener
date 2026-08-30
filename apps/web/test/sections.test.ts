@@ -177,10 +177,18 @@ describe('section 1 renders at zero', () => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report: load('run-c268f8d7'), access, surface: 'agent' }),
     );
-    // Leads with the count determined, not with the clean sweep (D-183). On this run all eight
-    // were observed, so the two readings coincide — which is exactly when the old wording was
-    // harmless and why the defect only showed on a run with a gap.
-    expect(markup).toContain('Eight of eight stopping conditions were checked and none applies.');
+
+    /*
+      The words are the heading and the band now (D-206, D-207).
+
+      "Nothing here stops the application" is the claim; "8 of 8 checked and clear" is the
+      arithmetic behind it. The sentence that used to carry both was cut because it stated the
+      figure the band states — and on this run there is nothing left for it to ask, because every
+      condition was checked.
+    */
+    expect(markup).toContain('Nothing here stops the application');
+    expect(markup).toContain('8 of 8 checked and clear');
+    expect(markup).not.toContain('stopping conditions were checked and');
   });
 
   /**
@@ -239,7 +247,10 @@ describe('print carries both headers, which it did not', () => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report, access, surface: 'iqwallet', print: true }),
     );
-    const headings = [...markup.matchAll(/class="part-name">([^<]+)</g)].map((m) => m[1]);
+    // The heading is the band's name now (D-206); the stopping band is rendered by the panel.
+    const headings = [...markup.matchAll(/class="band-name">([^<]+)</g)]
+      .map((m) => m[1])
+      .filter((name) => name !== 'Stopping conditions' && name !== 'Eye test');
 
     /*
       Stopping conditions are the panel at the top now, not a section heading here (D-194 §1). The

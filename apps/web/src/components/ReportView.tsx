@@ -27,10 +27,10 @@ import {
   describeGroup,
   inheritsEvidence,
   coverageSentence,
-  navCards,
   PART_ONE,
   stoppingSentence,
   reportParts,
+  bandStats,
   sectionAnchor,
   ordinalsFor,
   type FindingGroup,
@@ -41,7 +41,7 @@ import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
-import { ReportSectionView } from './Sections.js';
+import { ReportSectionView, SectionBand } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
@@ -308,6 +308,14 @@ export function ReportView({
         things that made the report read as a list of surfaces.
       */}
       <div className="part-one">
+      {/*
+        The part label, which was a class name and never a word (D-206).
+
+        The bands name each section; this names the division between them, which they cannot — an
+        agent needs to know that everything above the seam wants something from them and everything
+        below is the record. Stated once per part rather than repeated on every band.
+      */}
+      <p className="part-label">Part one · what needs an answer</p>
       <StoppingPanel
         report={report}
         parts={parts}
@@ -318,14 +326,15 @@ export function ReportView({
         {...(commentBox === undefined ? {} : { commentBox })}
       />
 
-      {print !== true && <NavCards parts={parts} />}
       <p className="top-coverage">{coverageSentence(report)}</p>
       {/*
-        The sentinel the sticky bar watches. When this scrolls out, the bar appears — done in CSS
-        with no scroll listener, so it costs nothing on a twenty-page document.
+        The nav cards and the sticky bar are gone (D-206).
+
+        They restated the section counts at the top of the document and again in a bar that followed
+        the reader down it. The counts now live in each section's own band, where the number and the
+        heading it describes cannot come apart — and on screen that removes the last thing the
+        report said twice.
       */}
-      {print !== true && <div className="headbar-sentinel" />}
-      {print !== true && <StickyLines parts={parts} />}
 
       {/*
         Two renderings of the same findings (D-042).
@@ -404,6 +413,9 @@ export function ReportView({
             <ReportSectionView
               part={part}
               questions={questions}
+              {...(part.id === 'questions' && attestations !== undefined
+                ? { stats: questionStats(attestations) }
+                : {})}
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
@@ -434,6 +446,7 @@ export function ReportView({
         on Mintro's review queue rather than on the merchant (D-009).
       */}
       <div className="part-two">
+      <p className="part-label">Part two · the record</p>
         {parts.filter((part) => !PART_ONE.has(part.id)).map((part) => {
           const questions =
             part.id === 'questions' && attestations !== undefined ? (
@@ -449,6 +462,9 @@ export function ReportView({
               key={part.id}
               part={part}
               questions={questions}
+              {...(part.id === 'questions' && attestations !== undefined
+                ? { stats: questionStats(attestations) }
+                : {})}
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
             >
               {(block) =>
@@ -609,6 +625,7 @@ const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Elemen
  * evidence and take a comment. **The clear ones do not** — they are a list, not findings, and giving
  * a satisfied rule a comment box invites noise for no gain (D-063).
  */
+
 function StoppingPanel({
   report,
   parts,
@@ -685,6 +702,11 @@ function StoppingPanel({
 
   return (
     <section className={`panel stop-panel ${failed.length > 0 ? 'is-failed' : 'is-clear'}`}>
+      <SectionBand
+        id="stopping"
+        name="Stopping conditions"
+        stats={bandStats(parts.find((part) => part.id === 'stopping') ?? parts[0]!)}
+      />
       <div className="stop-head">
         <span className="stop-icon" aria-hidden="true">{failed.length > 0 ? '!' : '✓'}</span>
         <div>
@@ -702,7 +724,15 @@ function StoppingPanel({
                 ? 'One stopping condition applies'
                 : `${failed.length} stopping conditions apply`}
           </h2>
-          <p className="stop-sub">{stoppingSentence(account).join(' ')}</p>
+          {/*
+            Nothing where there is nothing to ask (D-207).
+
+            A run with every condition checked has no correction to invite, and an empty paragraph
+            under the heading would read as a sentence that failed to load.
+          */}
+          {stoppingSentence(account).length > 0 && (
+            <p className="stop-sub">{stoppingSentence(account).join(' ')}</p>
+          )}
         </div>
       </div>
 
@@ -781,6 +811,57 @@ function StoppingPanel({
 }
 
 /**
+ * The eye test's band statistics (D-206).
+ *
+ * Counted from the verdicts already on the record — the same list the rows render, so the band and
+ * the rows cannot disagree. **Never a score.** Two counts and what the layer is, because a single
+ * number over nine judgments is the determination this may not make (D-001, D-196).
+ *
+ * The states that carry no verdicts say what they are instead of counting to zero, which would read
+ * as a clean storefront on a run where nothing was read at all.
+ */
+function eyeStats(record: EyeTestRecord): string {
+  if (record.kind === 'pending') return 'not recorded yet';
+  if (record.kind === 'predates') return 'not part of this screening';
+  if (record.kind === 'failed' || record.kind === 'unreadable') return 'no read recorded';
+  if (record.outcome.kind === 'absent') return 'no read recorded';
+
+  const verdicts = record.outcome.test.verdicts;
+  const concerns = verdicts.filter((v) => v.verdict === 'concern').length;
+  const clear = verdicts.filter((v) => v.verdict === 'clear').length;
+  const unsure = verdicts.filter((v) => v.verdict === 'cannot_tell').length;
+
+  return [
+    `${concerns} concern${concerns === 1 ? '' : 's'}`,
+    `${clear} clear`,
+    ...(unsure === 0 ? [] : [`${unsure} cannot tell`]),
+    'Mintro’s impression',
+  ].join(' · ');
+}
+
+/**
+ * The questions band's statistics (D-206).
+ *
+ * From `attestations.counts`, which is where the section's own numbers already come from — so the
+ * band cannot state a different total from the line inside it.
+ *
+ * *None answered yet* rather than *0 answered*: a zero in a row of counts reads as a measurement,
+ * and this is the absence of one. Carried-forward answers are named separately for the reason the
+ * counts line names them separately (D-204, §5).
+ */
+function questionStats(attestations: RunAttestations): string {
+  const { answered, inherited, declined, unanswered, total } = attestations.counts;
+  const done = answered + declined;
+
+  const parts = [`${total} question${total === 1 ? '' : 's'}`];
+  if (done === 0 && inherited === 0) return `${parts[0]} · none answered yet`;
+  if (done > 0) parts.push(`${done} answered`);
+  if (inherited > 0) parts.push(`${inherited} carried forward`);
+  if (unanswered > 0) parts.push(`${unanswered} outstanding`);
+  return parts.join(' · ');
+}
+
+/**
  * The eye test, or which of the four reasons there is none (D-196, D-198).
  *
  * The read arrives after the run, so this panel has to say four different things and must not blur
@@ -826,7 +907,15 @@ function EyeTestPanel({
       A reader learns it once. This is the one surface that is Mintro's impression rather than an
       observation, and it says so above itself rather than relying on tone to carry it.
     */
-    <p className="eye-label">Eye test · Mintro’s impression, not an observation</p>
+    /*
+      The band replaces the mono caption (D-206).
+
+      It was the smallest heading in the document, set as a caption because it was written as one,
+      on a surface that is one of five sections. The label it carried — *Mintro's impression, not an
+      observation* — moves into the band's right-hand statistics, where every other section states
+      what it is for.
+    */
+    <SectionBand id="eye" name="Eye test" stats={eyeStats(record)} />
   );
 
   /*
@@ -1013,60 +1102,6 @@ function EyeTestPanel({
   );
 }
 
-/**
- * Two count cards, and no third (D-194, visual spec §4).
- *
- * Screen only — paper does not navigate, and a card offering a jump is a control nobody can press.
- */
-function NavCards({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
-  return (
-    <div className="navcards">
-      {navCards(parts).map((card) => {
-        const body = (
-          <>
-            <span className="navcard-n">{card.count}</span>
-            <span className="navcard-label">{card.label}</span>
-            <span className="navcard-arrow" aria-hidden="true" />
-          </>
-        );
-        return card.href === null ? (
-          <div key={card.id} className="navcard is-empty">
-            {body}
-          </div>
-        ) : (
-          <a key={card.id} className="navcard" href={card.href}>
-            {body}
-          </a>
-        );
-      })}
-    </div>
-  );
-}
-
-function StickyLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
-  return (
-    <div className="headbar" aria-hidden="true">
-      <ul className="headbar-lines">
-        {navCards(parts).map((entry) => (
-          <li key={`bar-${entry.id}`} className={entry.count === 0 ? 'zero' : undefined}>
-            {entry.href === null ? (
-              <span>
-                <span className="headline-n">{entry.count}</span> {entry.label}
-              </span>
-            ) : (
-              <a href={entry.href}>
-                <span className="headline-n">{entry.count}</span> {entry.label}
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
-      <a className="headbar-top" href="#top">
-        Top
-      </a>
-    </div>
-  );
-}
 
 
 

@@ -770,20 +770,33 @@ export function stoppingSentence(account: StoppingAccount): readonly string[] {
   const unchecked = account.notEvaluable.length;
   const unaccounted = account.declared - checked - unchecked;
 
-  const verdict =
-    applies === 0
-      ? 'none applies'
-      : `${lower(spellOut(applies))} ${applies === 1 ? 'applies' : 'apply'}`;
+  /*
+    The counting sentence is gone (D-207).
 
-  const lines = [
-    `${spellOut(checked)} of ${lower(spellOut(account.declared))} stopping conditions ` +
-      `${checked === 1 ? 'was' : 'were'} checked and ${verdict}.`,
-  ];
+    It said *"Seven of nine stopping conditions were checked and none applies"* directly beneath a
+    band saying *7 of 9 checked and clear · 2 unverifiable* — the same figure twice, which is the
+    duplication D-206 removed everywhere else and left here because it was copy rather than
+    furniture.
+
+    What survives is the half the band cannot say: the ask. A band states what was found; only a
+    sentence can invite a correction, and that invitation is the reason these two rows exist at all
+    — they are the ones a merchant can resolve.
+  */
+  const lines: string[] = [];
 
   if (unchecked > 0) {
-    // The ids are not repeated here: each has its own row in the panel, with what could not be
-    // verified and a box to say so.
-    lines.push(`${spellOut(unchecked)} could not be checked — tell us if we have those wrong.`);
+    /*
+      Names the unchecked ones rather than counting them again.
+
+      The ids are not repeated: each has its own row in the panel, with what could not be verified
+      and a box to say so. And it asks about **this document**, which Mintro wrote, never about the
+      storefront — the distinction D-001 turns on.
+    */
+    lines.push(
+      unchecked === 1
+        ? 'Tell us if we have the unchecked one wrong.'
+        : `Tell us if we have the ${lower(spellOut(unchecked))} unchecked ones wrong.`,
+    );
   }
 
   if (unaccounted > 0) {
@@ -1290,6 +1303,43 @@ function sampleSentence(report: ScreeningReport): string {
   const sample = report.sample;
   if (sample === undefined) return '';
   return `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages. `;
+}
+
+/**
+ * What a section's band states, on the right (D-206).
+ *
+ * **One derivation.** Every figure here already existed on the part's own tally or its stopping
+ * account; the band reads them rather than counting anything a second time. Three nav cards and a
+ * sticky bar used to restate the same numbers at the top of the document, which is how a count
+ * comes to disagree with the section it names.
+ *
+ * The second clause is not a statistic. It says what the reader is for — *your comment helps*,
+ * *Mintro's impression* — because a band that carried only numbers would leave an agent scanning
+ * five bars with no sense of which of them wants anything from them. It never instructs (D-001):
+ * it says where an answer would land, not that anyone must give one.
+ */
+export function bandStats(part: ReportPart): string {
+  const n = part.tally.rules;
+
+  if (part.id === 'stopping') {
+    const account = part.stopping;
+    if (account === undefined) return 'stopping conditions';
+    const checked = account.passed.length;
+    const open = account.notEvaluable.length;
+    const failed = account.failed.length;
+    const clear = `${checked} of ${checked + open + failed} checked and clear`;
+    return open === 0 ? clear : `${clear} · ${open} unverifiable`;
+  }
+
+  if (part.id === 'notmet') {
+    return `${n} observation${n === 1 ? '' : 's'} · your comment helps`;
+  }
+
+  if (part.id === 'questions') {
+    return `${n} question${n === 1 ? '' : 's'}`;
+  }
+
+  return `${n} observation${n === 1 ? '' : 's'} · comment where it helps`;
 }
 
 /**

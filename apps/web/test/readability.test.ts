@@ -51,14 +51,23 @@ describe('1 — stopping conditions list every rule', () => {
     }
   });
 
-  it('keeps the summary line above the list', () => {
-    // The count and the list answer different questions and both are wanted.
+  it('keeps the summary above the list', () => {
+    /*
+      The count and the list answer different questions and both are wanted. The count moved into
+      the band (D-206) and the sub-line was cut to the ask (D-207), so the summary above the list is
+      the band — and on this run, where all eight were checked, there is no ask and no sub-line at
+      all.
+    */
     const markup = render(c268, 'agent');
-    const sub = markup.indexOf('stop-sub');
+    const band = markup.indexOf('data-band="stopping"');
     const groups = markup.indexOf('stop-grouphead');
 
-    expect(sub).toBeGreaterThan(-1);
-    expect(groups).toBeGreaterThan(sub);
+    expect(band).toBeGreaterThan(-1);
+    expect(groups).toBeGreaterThan(band);
+    expect(markup).toContain('8 of 8 checked and clear');
+
+    // Nothing to invite a correction about, so nothing is said.
+    expect(markup).not.toContain('stop-sub');
   });
 
   it('renders nothing for a run predating the flag rather than an empty checklist', () => {
@@ -139,40 +148,40 @@ describe('4 — section headings carry weight', () => {
   });
 
   it('still renders the section name as h2', () => {
-    expect(render(c268, 'agent')).toContain('<h2 class="part-name"');
+    /*
+      The heading is the band now (D-206), and it is still an `h2`.
+
+      That matters more than the class name: a reader navigating a 25-page PDF by headings loses
+      every section if the band is a styled paragraph.
+    */
+    const markup = render(c268, 'agent');
+    expect(markup).toContain('<h2 class="band-bar"');
+    expect(markup).toContain('class="band-name"');
   });
 });
 
-describe('6 — persistent navigation on screen only', () => {
-  it('renders the bar on screen', () => {
-    expect(render(c268, 'agent')).toContain('headbar');
-  });
+describe('6 — the counts are stated once, in the bands', () => {
+  /*
+    The nav cards and the sticky bar are gone (D-206).
 
-  it('renders nothing of it in print', () => {
-    // Paper does not scroll, and the running header already names the section on every page.
-    const markup = render(c268, 'iqwallet', true);
+    Between them they restated every section count at the top of the document and again in a bar
+    that followed the reader down it — three places for one number, two of which could drift from
+    the section they named. The band carries it beside the heading it describes, where they cannot
+    come apart.
+  */
+  it('renders no nav card and no sticky bar', () => {
+    const markup = render(c268, 'agent');
 
     expect(markup).not.toContain('headbar');
+    expect(markup).not.toContain('navcard');
   });
 
-  it('reads its counts from the same derivation as the header lines', () => {
-    /*
-      Two navigations with two vocabularies is how a document comes to disagree with itself. Both
-      render `headerLines`, so a count appears the same number of times in each.
-    */
+  it('states each section count inside its own band', () => {
     const markup = render(c268, 'agent');
-    /*
-      The header-lines block is gone (D-194). What remains is the nav cards and the sticky bar that
-      repeats them, so each count appears once per surface rather than three times at the top.
+    const bands = markup.match(/class="band-stats">([^<]*)</g) ?? [];
 
-      Three cards since D-202: *Not met* is a section of its own in part one, so it has a
-      destination of its own.
-    */
-    const cards = markup.match(/class="navcard-n">(\d+)</g) ?? [];
-    const bar = markup.match(/class="headline-n">(\d+)</g) ?? [];
-
-    expect(cards).toHaveLength(3);
-    expect(bar).toHaveLength(3);
-    expect(cards.map((c) => c.replace('navcard-n', 'headline-n'))).toEqual(bar);
+    // One per section rendered, and every one of them non-empty.
+    expect(bands.length).toBeGreaterThanOrEqual(3);
+    expect(bands.every((b) => b.replace(/class="band-stats">|</g, '').trim() !== '')).toBe(true);
   });
 });

@@ -93,17 +93,23 @@ describe('the top band is gone, and the count it carried is stated once', () => 
    * worth pinning is that nothing reintroduces a second one — which is how the four restatements
    * accumulated in the first place.
    */
-  it.each(RUNS)('%s: the review count is stated once, in the header lines', (_label, report) => {
+  it.each(RUNS)('%s: the review count is stated once, in its band', (_label, report) => {
     const rendered = text(report);
     const parts = reportParts(report, 'agent');
     const review = parts.find((p) => p.id === 'review');
 
     /*
-      Three sections became one, so the header lines carry one destination for all of it rather
-      than separate lines for not met and unclear (D-189). The count is the section's own tally —
-      the same one the heading and the bands read.
+      The count now sits in the section's own band, beside the heading it describes (D-206).
+
+      It used to be stated in a nav card, in a sticky bar and in the section — three places, two of
+      which could drift from the one they named. `bandStats` reads the part's own tally, so the
+      figure here is the same object the section counts from.
     */
-    expect(rendered).toContain(`${review?.tally.rules} for your review`);
+    const n = review?.tally.rules ?? 0;
+    expect(rendered).toContain(`${n} observation`);
+
+    // Stated once. The surfaces that repeated it are gone.
+    expect(rendered).not.toContain('for your review');
 
     // And none of what it replaced.
     expect(rendered).not.toContain('FAILED');
