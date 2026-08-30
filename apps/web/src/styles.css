@@ -803,6 +803,52 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .cred-note p:last-child { margin-bottom: 0; }
 
+/* The credential status line and its one action (D-185).
+
+   A status and a button on one row, because the two are read together: "this is stale" and "swap
+   it" are one thought. The tone is carried on the left edge rather than in the text colour — a
+   stale login is a fact to notice, not an error to alarm, and the same restraint the state
+   vocabulary follows (D-175). */
+.cred-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.cred-card[data-tone="failed"] { border-left-color: var(--amber); }
+.cred-card[data-tone="ok"]     { border-left-color: var(--violet); }
+.cred-card[data-tone="stored"] { border-left-color: var(--violet); }
+
+.cred-status {
+  font-size: 12.5px;
+  color: var(--ink-mid);
+}
+
+.cred-card[data-tone="failed"] .cred-status { color: var(--ink); font-weight: 600; }
+
+.cred-stale { margin-top: 6px; }
+
+/* The replace warning sits above the button that would do it, because the value it overwrites
+   cannot be recovered or compared afterwards by anyone in this application. */
+.cred-replacing {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+}
+
 /* ── Access note ─────────────────────────────────────────────────────────────────────────
    Shown only when an anonymous request was refused. It states what was reached and stops —
    never that a credential should be obtained (D-001, D-040). */

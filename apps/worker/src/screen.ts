@@ -67,6 +67,17 @@ import { runCheckoutFlow } from './flow.js';
 /** Product pages sampled per run. ARCHITECTURE.md budgets 3-5. */
 export const SAMPLE_SIZE = 5;
 
+/**
+ * What happened when a walled crawl tried to escalate to a stored login (D-185).
+ *
+ * Three outcomes, and they are three different facts about the merchant and about us. Collapsing
+ * the middle one into the first is what made a dead credential invisible.
+ */
+export type Escalation =
+  | { readonly kind: 'no_credential' }
+  | { readonly kind: 'sign_in_failed'; readonly reason: string }
+  | { readonly kind: 'signed_in'; readonly context: BrowserContext };
+
 export interface ScreenOptions {
   readonly runId: string;
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
@@ -92,7 +103,16 @@ export interface ScreenOptions {
    * parameter that could carry a session, against an anonymous access built here from a fresh
    * context (D-039). A credential widens what is visible; it never narrows what is reported.
    */
-  readonly escalate?: () => Promise<BrowserContext | null>;
+  /**
+   * Signs in with the merchant's stored account, when the crawl is refused.
+   *
+   * Reports **which** of three things happened rather than returning a bare context-or-null
+   * (D-185). `null` used to mean both "no credential is stored" and "one is stored and it did not
+   * sign in", and the caller assumed the first — so a report told a reader that no account had
+   * been supplied when one had, and had stopped working. The person reading the report is not
+   * always the person who would look at the credential card.
+   */
+  readonly escalate?: () => Promise<Escalation>;
 }
 
 export interface ScreenResult {
@@ -203,6 +223,8 @@ export async function screenStorefront(
   let sampled = await renderSample();
   let wall = assessWall(sampled.map((entry) => entry.page));
   let usedCredential = false;
+  /** What escalation found, when it ran. `undefined` means the crawl was never refused. */
+  let escalation: Escalation | undefined;
   let mode: ScanMode = 'public';
 
   progress.sampleIs(sampled.filter((entry) => wasServed(entry.page)).length);
@@ -224,14 +246,21 @@ export async function screenStorefront(
   // the anonymous crawl was refused and one exists; otherwise the report says coverage was
   // limited and why. Nobody is asked to predict which it will be (D-040).
   if (wall.walled && options.escalate !== undefined) {
-    const context = await options.escalate();
+    escalation = await options.escalate();
 
-    if (context === null) {
+    if (escalation.kind === 'no_credential') {
       progress.enter(
         'escalate',
         'a login wall was met and no screening account is stored for this merchant',
       );
+    } else if (escalation.kind === 'sign_in_failed') {
+      // Distinct from the line above, and the distinction reaches the report (D-185).
+      progress.enter(
+        'escalate',
+        `a login wall was met and the stored screening account did not sign in: ${escalation.reason}`,
+      );
     } else {
+      const context = escalation.context;
       progress.enter(
         'escalate',
         'a login wall was met; re-rendering the sample with the stored screening account',
@@ -384,7 +413,7 @@ export async function screenStorefront(
   const report = assembleReport(
     {
       runId,
-      access: describeAccess(wall, mode, usedCredential, options.escalate !== undefined),
+      access: describeAccess(wall, mode, usedCredential, escalation),
       merchantDomain: new URL(layer0.origin).host,
       ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
       ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
@@ -490,11 +519,11 @@ function commonSegment(urls: readonly string[]): string | null {
  * a screening account" is an observation about this run; "get a screening account" would be an
  * instruction, and the difference is the whole of D-001.
  */
-function describeAccess(
+export function describeAccess(
   wall: WallAssessment,
   mode: ScanMode,
   usedCredential: boolean,
-  escalationAvailable: boolean,
+  escalation: Escalation | undefined,
 ): ReportAccess {
   if (usedCredential) {
     return {
@@ -509,14 +538,34 @@ function describeAccess(
   }
 
   if (wall.walled) {
+    /*
+      Why coverage was limited, distinguishing a missing account from a broken one (D-185).
+
+      This branch used to say "No screening account was stored for this merchant" whenever the
+      escalation returned nothing — which covered both the merchant never having supplied one and
+      the one they supplied having stopped working. A reader was told the first when the second was
+      true, and the two call for different actions by whoever holds the relationship.
+
+      Still descriptive (D-001): it says what happened and stops. "The stored account did not sign
+      in" is an observation about this run. "Get a new account" would be an instruction.
+    */
+    const why =
+      escalation?.kind === 'sign_in_failed'
+        ? 'A screening account is stored for this merchant and it did not sign in on this run, so it was not used'
+        : escalation?.kind === 'signed_in'
+          ? 'A stored screening account signed in but the product pages were still not served'
+          : escalation === undefined
+            ? 'No screening account was available to this run'
+            : 'No screening account is stored for this merchant';
+
     return {
       mode,
       wall: true,
       usedCredential: false,
       note:
-        `${wall.reason}. No screening account was ${escalationAvailable ? 'stored for this merchant' : 'available to this run'}, ` +
+        `${wall.reason}. ${why}, ` +
         'so product-surface rules could not be observed and are reported as not observed. ' +
-        'Coverage of those rules would be wider with a merchant-supplied login.',
+        'Coverage of those rules would be wider with a merchant-supplied login that signs in.',
     };
   }
 

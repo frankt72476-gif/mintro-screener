@@ -34,13 +34,14 @@
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
-import { screenStorefront } from '../src/screen.js';
+import { screenStorefront , type Escalation } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun } from '../src/store/completeness.js';
 import { createSealedVault, readVaultKeys, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
 import { collectDeposits } from '../src/auth/deposits.js';
+import { recordSignIn } from '../src/auth/credentialState.js';
 import { establishSession } from '../src/auth/login.js';
 import {
   createHttpFetcher,
@@ -524,8 +525,8 @@ async function handle(
           // Sign-in is `escalate`, which has no denominator and never carries one (D-173).
           progress.write({ phase: 'escalate', line: step });
         }
-        held.context = established.context;
-        return established.context;
+        held.context = established.outcome.kind === 'signed_in' ? established.outcome.context : null;
+        return established.outcome;
       },
 
       onProgress: (event) => {
@@ -636,14 +637,16 @@ async function signIn(
   browser: Browser,
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
-): Promise<{ context: BrowserContext | null; steps: readonly string[] }> {
+): Promise<{ outcome: Escalation; steps: readonly string[] }> {
   // Null, not an exception. A merchant we hold no credential for is the ordinary case, and the
   // report says coverage was limited by a wall rather than the run failing. Failing here would
   // turn "we could not see past their login" into "the scan broke", which is a worse answer to a
   // question the analyst can act on.
   if (keys === undefined) {
+    // No key, so no credential could be opened whatever is stored. Reported as absent rather than
+    // as a failed sign-in: nothing was attempted (D-185).
     return {
-      context: null,
+      outcome: { kind: 'no_credential' },
       steps: ['no credential key is configured on this worker, so no stored login can be opened'],
     };
   }
@@ -655,7 +658,7 @@ async function signIn(
 
   const credentials = await vault.open(vaultRef, `screening scan of ${origin}`);
   if (credentials === null) {
-    return { context: null, steps: [`no screening account is stored for ${hostname}`] };
+    return { outcome: { kind: 'no_credential' }, steps: [`no screening account is stored for ${hostname}`] };
   }
 
   // The homepage markup, for platform detection. A plain fetch rather than a render: it is one
@@ -674,14 +677,23 @@ async function signIn(
   // A sign-in that failed is reported and the run continues anonymously. It is honest about
   // coverage either way, and a merchant whose login script we cannot drive is a coverage limit,
   // not a broken scan.
+  /*
+    The other two of the three points a credential's state changes (D-185).
+
+    A credential was found and a sign-in was attempted, so the outcome is known either way. Recorded
+    before returning, and never allowed to fail the run — `recordSignIn` swallows its own errors,
+    because a scan that screened the storefront correctly is not spoiled by a status row.
+  */
+  const signedIn = established.context !== null;
+  await recordSignIn(supabase, hostname, signedIn);
+
+  const failure = `could not sign in to ${origin}${established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`}`;
+
   return {
-    context: established.context,
-    steps: [
-      ...established.steps,
-      ...(established.context === null
-        ? [`could not sign in to ${origin}${established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`}`]
-        : []),
-    ],
+    outcome: signedIn
+      ? { kind: 'signed_in', context: established.context as BrowserContext }
+      : { kind: 'sign_in_failed', reason: established.needsHuman ?? 'the sign-in did not take' },
+    steps: [...established.steps, ...(signedIn ? [] : [failure])],
   };
 }
 

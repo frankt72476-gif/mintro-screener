@@ -1,0 +1,129 @@
+/**
+ * Whether this merchant has a screening account, and whether it still works (D-185).
+ *
+ * ## Why it lives in the scan form
+ *
+ * The app has four panes — scan, docs, reports, rules — and **no per-merchant view**. There is no
+ * merchant page for this to sit on, and building one to hold a four-line card would be the larger
+ * change rather than the smaller one.
+ *
+ * The scan form turns out to be the right place anyway, not a compromise. The analyst has just
+ * typed the domain, and this is the moment the answer matters: about to run a scan, wanting to
+ * know whether a login is stored and whether it worked last time. It replaces a bare "Store a
+ * merchant's login" button that said nothing about what was already there.
+ *
+ * ## What it does not do
+ *
+ * There is no reveal and no delete, and the omission is deliberate rather than pending. The
+ * property worth keeping is that the worker is the only party that can read a credential; a reveal
+ * would make it two, and the need here — see that it is stale, swap it — does not require one.
+ */
+
+import type { JSX } from 'react';
+import type { CredentialState } from '../lib/credentialState.js';
+
+interface Props {
+  /**
+   * `null` when no credential is stored, `undefined` while the lookup is in flight or after it
+   * failed. The two are rendered differently: "none stored" is a claim about the merchant, and
+   * making it because a query errored would send someone to ask for an account they already have.
+   */
+  readonly state: CredentialState | null | undefined;
+  /** False while the lookup is still running, so a pending state is not read as a failed one. */
+  readonly loading: boolean;
+  readonly domain: string;
+  readonly available: boolean;
+  readonly onStore: () => void;
+}
+
+/** `2026-08-12T…` → `12 Aug`. Short, because these sit inline in a status line. */
+function shortDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'an unknown date';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/**
+ * The status line, as a pure function of the state.
+ *
+ * Separate from the markup so the four states can be read — and tested — without rendering React.
+ * Each is a distinct fact and none of them is a default: a lookup that failed says so rather than
+ * falling through to "none stored", which is the direction that would cost someone an email to a
+ * merchant.
+ */
+export function credentialLine(
+  state: CredentialState | null | undefined,
+  loading: boolean,
+): { readonly text: string; readonly tone: 'none' | 'stored' | 'ok' | 'failed' | 'unknown' } {
+  if (loading) return { text: 'Checking…', tone: 'unknown' };
+  if (state === undefined) {
+    return { text: 'Could not check whether a login is stored', tone: 'unknown' };
+  }
+  if (state === null) {
+    return { text: 'No login stored', tone: 'none' };
+  }
+
+  const stored = `stored ${shortDate(state.updatedAt)}`;
+
+  if (state.lastLoginOk === null || state.lastLoginAt === null) {
+    // Never opened. Escalation only runs when an anonymous crawl is refused (D-040), so this is
+    // the ordinary state for a merchant who has not walled their products since.
+    return { text: `Stored login · ${stored} · not needed by a scan yet`, tone: 'stored' };
+  }
+
+  return state.lastLoginOk
+    ? { text: `Stored login · ${stored} · signed in ${shortDate(state.lastLoginAt)}`, tone: 'ok' }
+    : {
+        text: `Stored login · ${stored} · last sign-in failed ${shortDate(state.lastLoginAt)}`,
+        tone: 'failed',
+      };
+}
+
+export function CredentialCard({ state, loading, domain, available, onStore }: Props): JSX.Element {
+  const line = credentialLine(state, loading);
+
+  /*
+    The button label is a claim about what pressing it will do, so it follows what is known.
+
+    "Store a login" over an existing credential is the silent overwrite this change exists to stop,
+    and after a failed lookup we do not know whether one exists — so the label says both rather
+    than picking the reassuring one. The modal re-checks and warns regardless; this stops the card
+    asserting something it cannot support.
+  */
+  const label =
+    state === undefined ? 'Store or replace' : state === null ? 'Store a login' : 'Replace';
+
+  return (
+    <div className="field">
+      <span className="flabel">Screening account</span>
+      <p className="fhint">
+        Every scan runs signed out. If a merchant's product pages turn out to be behind a login and
+        we hold an account they supplied, the scan uses it for those pages and the report says so.
+        The access-gating checks are always decided signed out.
+      </p>
+
+      <div className="cred-card" data-tone={line.tone}>
+        <span className="cred-status">{line.text}</span>
+        <button
+          className="btn btn-ghost"
+          disabled={!available || domain.trim() === ''}
+          onClick={onStore}
+        >
+          {available ? label : 'Needs VITE_CREDENTIAL_PUBLIC_KEY'}
+        </button>
+      </div>
+
+      {line.tone === 'failed' && (
+        /*
+          Said here as well as in the report, because the two are read by different people at
+          different times (D-185). The report's coverage note reaches whoever reads the report; this
+          reaches the analyst about to run another scan that will hit the same wall.
+        */
+        <p className="fhint cred-stale">
+          A scan reached this merchant's login wall and the stored account did not sign in, so
+          product pages were not read. Replacing it needs a fresh account from the merchant.
+        </p>
+      )}
+    </div>
+  );
+}

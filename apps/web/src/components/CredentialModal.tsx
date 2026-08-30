@@ -16,23 +16,59 @@
  *     changes the gate findings; the honest answer belongs where the question is asked.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CredentialDeposit } from '../lib/credentials.js';
+import { readCredentialState, normaliseDomain, type CredentialState } from '../lib/credentialState.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface Props {
   readonly deposit: CredentialDeposit;
   readonly domain: string;
+  readonly client: SupabaseClient;
   readonly onClose: () => void;
   readonly onDeposited: (domain: string) => void;
 }
 
-export function CredentialModal({ deposit, domain, onClose, onDeposited }: Props): JSX.Element {
+export function CredentialModal({ deposit, domain, client, onClose, onDeposited }: Props): JSX.Element {
   const [merchantDomain, setMerchantDomain] = useState(domain);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginUrl, setLoginUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /*
+    Whether this will replace an existing credential (D-185).
+
+    Depositing the same domain twice overwrote the first with no warning and no sign one existed:
+    `writeCredentials` upserts on the vault path, so the old value was gone. Silent replacement of
+    an unrecoverable secret is a defect on its own — nobody can check afterwards what was there,
+    because nobody in this application can read either value.
+
+    Read from `credential_state`, which holds no secret. Following `merchantDomain` rather than the
+    prop, because the field is editable and someone can retype the domain here.
+  */
+  const [existing, setExisting] = useState<CredentialState | null | undefined>(null);
+
+  useEffect(() => {
+    const folded = normaliseDomain(merchantDomain);
+    if (folded === null) {
+      setExisting(null);
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(() => {
+      void readCredentialState(client, folded).then((result) => {
+        if (live) setExisting(result);
+      });
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [merchantDomain, client]);
+
+  const replacing = existing !== null && existing !== undefined;
 
   const submit = async (): Promise<void> => {
     setBusy(true);
@@ -124,6 +160,20 @@ export function CredentialModal({ deposit, domain, onClose, onDeposited }: Props
           />
         </div>
 
+        {replacing && (
+          /*
+            Said before the button, not after the fact. The old credential cannot be recovered and
+            cannot be compared against the new one by anyone here, so the only moment this warning
+            is useful is now (D-185).
+          */
+          <div className="cred-replacing">
+            <strong>This replaces the login already stored for this merchant.</strong> The current
+            one was stored on {new Date(existing.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
+            {existing.lastLoginOk === false ? ' and its last sign-in failed' : existing.lastLoginOk === true ? ' and it last signed in successfully' : ' and no scan has needed it yet'}.
+            It cannot be read back or recovered once this is stored.
+          </div>
+        )}
+
         <div className="cred-note">
           <p>
             <strong>Sealed in this browser before it is sent.</strong> It is encrypted to a key held
@@ -149,7 +199,7 @@ export function CredentialModal({ deposit, domain, onClose, onDeposited }: Props
             disabled={busy || username.trim() === '' || password === '' || merchantDomain.trim() === ''}
             onClick={() => void submit()}
           >
-            {busy ? 'Sealing…' : 'Store credential'}
+            {busy ? 'Sealing…' : replacing ? 'Replace credential' : 'Store credential'}
           </button>
         </div>
       </div>

@@ -22,7 +22,9 @@ import {
   type ScanRequestSummary,
 } from './lib/scanQueue.js';
 import { formatReportDate } from './lib/format.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createCredentialDeposit } from './lib/credentials.js';
+import { readCredentialState, normaliseDomain, type CredentialState } from './lib/credentialState.js';
 import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
 import { createInviteQueue, describeInvite } from './lib/inviteQueue.js';
 import { createSendQueue, describeSend } from './lib/sendQueue.js';
@@ -43,6 +45,7 @@ import {
   type RunCommentary,
 } from '@mintro/engine';
 import { CredentialModal } from './components/CredentialModal.js';
+import { CredentialCard } from './components/CredentialCard.js';
 import { HeartbeatLine, LiveDot } from './components/Heartbeat.js';
 import { describePhaseLine, describeQueueLine } from './lib/phaseLine.js';
 import { QuarantineNotice } from './components/QuarantineNotice.js';
@@ -309,6 +312,8 @@ function Screener({
     [client, analyst.id],
   );
   const [credentialFor, setCredentialFor] = useState<string | null>(null);
+  /** Bumped after a deposit, so the card re-reads rather than showing the pre-deposit state. */
+  const [credentialEpoch, setCredentialEpoch] = useState(0);
   const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
   const [pdfBusy, setPdfBusy] = useState(false);
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
@@ -747,6 +752,8 @@ function Screener({
               queued={queued}
               credentialsAvailable={credentials.available}
               onCredential={(domain) => setCredentialFor(domain)}
+              client={client}
+              credentialEpoch={credentialEpoch}
               onRequest={async (url) => {
                 const result = await queue.request(url);
                 if (result.ok) {
@@ -865,9 +872,13 @@ function Screener({
         <CredentialModal
           deposit={credentials}
           domain={credentialFor}
+          client={client}
           onClose={() => setCredentialFor(null)}
           onDeposited={(domain) => {
             setCredentialFor(null);
+            // The card is reading `credential_state`, which the worker writes when it collects the
+            // deposit. Bumping the epoch makes it re-read rather than showing the pre-deposit state.
+            setCredentialEpoch((n) => n + 1);
             setToast(`Credential stored for ${domain} — it cannot be read back`);
           }}
         />
@@ -894,6 +905,8 @@ function ScanInput({
   onRequest,
   credentialsAvailable,
   onCredential,
+  client,
+  credentialEpoch,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
@@ -902,6 +915,9 @@ function ScanInput({
   readonly queued: readonly ScanRequestSummary[];
   readonly credentialsAvailable: boolean;
   readonly onCredential: (domain: string) => void;
+  readonly client: SupabaseClient;
+  /** Changes when a deposit lands, so the card re-reads (D-185). */
+  readonly credentialEpoch: number;
   readonly onRequest: (
     url: string,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
@@ -909,6 +925,45 @@ function ScanInput({
   const [url, setUrl] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  /*
+    Whether the merchant now in the URL box has a stored login (D-185).
+
+    Debounced, because it follows a text field: a lookup per keystroke would be a request per
+    character for an answer that only matters once the domain is complete.
+
+    `undefined` covers "the lookup failed" and is rendered differently from `null`, which is "no
+    login is stored". Reporting the first as the second would send someone to ask a merchant for an
+    account they had already supplied.
+  */
+  const [credentialState, setCredentialState] = useState<CredentialState | null | undefined>(null);
+  const [credentialLoading, setCredentialLoading] = useState(false);
+
+  useEffect(() => {
+    const domain = normaliseDomain(url);
+    if (domain === null) {
+      setCredentialState(null);
+      setCredentialLoading(false);
+      return;
+    }
+
+    setCredentialLoading(true);
+    let live = true;
+    const timer = setTimeout(() => {
+      void readCredentialState(client, domain).then((result) => {
+        // A response for a domain the analyst has already typed past is not an answer about the
+        // one on screen. Dropped rather than rendered.
+        if (!live) return;
+        setCredentialState(result);
+        setCredentialLoading(false);
+      });
+    }, 400);
+
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [url, client, credentialEpoch]);
 
   /*
     No run selection is held here any more (D-047).
@@ -1083,23 +1138,13 @@ function ScanInput({
           What remains is the one thing an analyst can supply that the tool cannot work out for
           itself: the merchant's login, if they have been given one.
         */}
-        <div className="field">
-          <span className="flabel">Merchant logins</span>
-          <p className="fhint">
-            Every scan runs signed out. If a merchant's product pages turn out to be behind a
-            login and we hold an account they supplied, the scan uses it for those pages and the
-            report says so. The access-gating checks are always decided signed out.
-          </p>
-          <button
-            className="btn btn-ghost"
-            disabled={!credentialsAvailable}
-            onClick={() => onCredential(url.trim())}
-          >
-            {credentialsAvailable
-              ? "Store a merchant's login"
-              : 'Storing a login needs VITE_CREDENTIAL_PUBLIC_KEY'}
-          </button>
-        </div>
+        <CredentialCard
+          state={credentialState}
+          loading={credentialLoading}
+          domain={url}
+          available={credentialsAvailable}
+          onStore={() => onCredential(url.trim())}
+        />
 
         {error !== null && (
           <div className="err" style={{ marginTop: 16 }}>

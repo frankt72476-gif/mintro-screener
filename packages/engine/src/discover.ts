@@ -14,6 +14,7 @@
  */
 
 import type { Fetcher, FetchResult } from './fetcher.js';
+import { establishesAbsence } from './fetcher.js';
 import { EMPTY_ROBOTS, parseRobotsTxt, type RobotsTxt } from './robots.js';
 import { isParsedSitemap, parseSitemap } from './sitemap.js';
 import { toSlugUrl, type ScopeOverrides, type SlugUrl } from './slug.js';
@@ -86,6 +87,18 @@ export interface Layer0Result {
   /** Why the surface could not be observed. Present only when `usable` is false. */
   readonly unusableReason?: string;
   /**
+   * True when **our request failed** rather than the merchant publishing nothing (D-184).
+   *
+   * Same field and same meaning as `FlowObservation.obstructed` and `Located.obstructed`, and here
+   * for the same reason: `usable: false` merges a storefront with no catalogue and a catalogue we
+   * were refused, and the consumer cannot tell them apart from `unusableReason` without reading
+   * prose — which hard constraint 9 forbids.
+   *
+   * Set at the point the shortfall happens, never derived afterwards. Absent means every request
+   * completed and the origin's own answers add up to "nothing is published here".
+   */
+  readonly obstructed?: true;
+  /**
    * Whether the URL surface was obtained **in full** (D-156).
    *
    * `usable` and `complete` are different questions and conflating them is what let a
@@ -146,7 +159,8 @@ export async function discoverLayer0(
   try {
     base = new URL(origin);
   } catch {
-    return unusable(origin, EMPTY_ROBOTS, `'${origin}' is not a valid URL`, [], [], [], startedAt, started);
+    // Nothing was asked of the merchant, so nothing about the merchant was learned (D-184).
+    return unusable(origin, EMPTY_ROBOTS, `'${origin}' is not a valid URL`, [], [], [], startedAt, started, true);
   }
 
   const documents: FetchedDocument[] = [];
@@ -212,6 +226,15 @@ export async function discoverLayer0(
       ? parseRobotsTxt(robotsResponse.body, base.origin)
       : EMPTY_ROBOTS;
 
+  /*
+    A robots.txt we could not read leaves us unable to say what the merchant declared (D-184).
+
+    404 is ordinary and definitive — the merchant publishes none, the well-known paths are tried
+    and that is the whole story. A 403 or a timeout is different: the file may name a sitemap we
+    will now never look for, so a later "no sitemap was found" is partly a fact about this request.
+  */
+  const robotsUnread = robotsResponse.status !== 200 && !establishesAbsence(robotsResponse.status);
+
   // A missing robots.txt is ordinary and not itself a problem — the well-known sitemap paths
   // are tried regardless.
   const candidates =
@@ -227,6 +250,15 @@ export async function discoverLayer0(
 
   let sitemapsFetched = 0;
   let anySitemapParsed = false;
+  /**
+   * Set wherever **we** failed to read something, as opposed to the origin answering that it is
+   * not there (D-184).
+   *
+   * Distinct from `gaps`, which is prose for the reader and mixes both parties: *"returned HTTP
+   * 404"* sits in the same list as *"returned no response"*. Classifying on that list would be
+   * reading a party out of a sentence.
+   */
+  let acquisitionFailed = false;
   let urlCapReached = false;
   // Structural record of everything the URL discovery did not obtain (D-156). Appended where the
   // gap happens, so nothing has to infer it later from prose.
@@ -242,6 +274,8 @@ export async function discoverLayer0(
       const line = `stopped after ${limits.maxSitemaps} sitemap documents; ${queue.length + 1} more were listed and not fetched`;
       truncations.push(line);
       gaps.push(line);
+      // Our own limit. The merchant published those; we chose not to read them (D-184).
+      acquisitionFailed = true;
       break;
     }
 
@@ -250,6 +284,9 @@ export async function discoverLayer0(
     record(response);
 
     if (response.status !== 200) {
+      // 404 and 410 are the origin saying nothing is there. A 403, a 429, a 5xx or no answer at
+      // all leave the question open, and an open question is ours (D-184).
+      if (!establishesAbsence(response.status)) acquisitionFailed = true;
       documents.push(describe(response, 'sitemap'));
       // A sitemap that did not answer is a piece of the catalogue we did not read. It produced no
       // truncation before this, so the shortened URL list looked complete (D-156).
@@ -281,6 +318,8 @@ export async function discoverLayer0(
         const line = `sitemap index at ${next.url} was not followed: depth limit ${limits.maxDepth} reached`;
         truncations.push(line);
         gaps.push(line);
+        // Also ours: the index named more and we stopped descending (D-184).
+        acquisitionFailed = true;
         continue;
       }
       for (const location of parsed.locations) {
@@ -318,32 +357,66 @@ export async function discoverLayer0(
   }
 
   if (!anySitemapParsed) {
+    /*
+      Nothing parsed, and **whether that is the merchant's doing is not what `robots.sitemaps`
+      says** (D-184).
+
+      This used to branch on whether robots.txt declared any sitemaps, and file the declared case as
+      *"none of them could be fetched and parsed"* — reading as ours — and the undeclared case as
+      *"no sitemap could be found"* — reading as theirs. Both readings were guesses. Declaration
+      says what the merchant advertised; it says nothing about whether we obtained what we asked
+      for, and the two are orthogonal:
+
+        - declared, every candidate 404s — the merchant's robots.txt points at files they do not
+          serve. We asked and got a definitive answer. Theirs.
+        - undeclared, every well-known path answers 403 — we were refused, and a refusal is not an
+          absence. Ours. **This is the case that actually occurs**: `peptidesciences.com` produced
+          eight `not_exposed` findings this way, four of them stopping conditions.
+
+      So the party comes from `acquisitionFailed`, set where each shortfall happened. The
+      declaration still shapes the sentence, because it is the useful thing to tell a reader.
+    */
     return unusable(
       base.origin,
       robots,
       robots.sitemaps.length > 0
-        ? 'robots.txt declared sitemaps but none of them could be fetched and parsed'
-        : 'no sitemap could be found or parsed at robots.txt or the well-known paths',
+        ? 'robots.txt declared sitemaps and none of them could be read as one'
+        : 'no sitemap was obtained at robots.txt or the well-known paths',
       documents,
       artifacts,
       attempts,
       startedAt,
       started,
+      acquisitionFailed || robotsUnread,
     );
   }
 
-  // A sitemap that parsed but listed nothing is a real observation of an empty surface, not a
-  // failure to observe — but it supports no conclusion about a catalogue, so it is not usable.
+  /*
+    Parsed and listed nothing — and that is a real observation **only if everything was read**
+    (D-184).
+
+    A sitemap that parsed and is empty is the merchant publishing an empty catalogue. But
+    `anySitemapParsed` needs only *one* to have parsed, so this branch is also reached when one
+    sitemap parsed empty and a second answered 403 or was dropped at the depth limit. The unread one
+    is exactly where the URLs would have been, and reporting an empty catalogue on that evidence
+    states an absence we did not establish.
+
+    The old code discarded `gaps` here and replaced it with the reason string, so the record of what
+    was not read did not survive to the finding either.
+  */
   if (urls.length === 0) {
     return unusable(
       base.origin,
       robots,
-      'sitemaps were parsed but listed no URLs',
+      acquisitionFailed
+        ? `the sitemaps that could be read listed no URLs, and not all of them could be read: ${gaps.join('; ')}`
+        : 'sitemaps were parsed and listed no URLs',
       documents,
       artifacts,
       attempts,
       startedAt,
       started,
+      acquisitionFailed,
     );
   }
 
@@ -382,11 +455,14 @@ function unusable(
   attempts: readonly FetchAttempt[],
   startedAt: string,
   started: number,
+  /** True when the shortfall is ours. Required, so a new call site has to decide (D-184). */
+  obstructed: boolean,
 ): Layer0Result {
   return {
     origin,
     usable: false,
     unusableReason: reason,
+    ...(obstructed ? { obstructed: true as const } : {}),
     // Nothing was obtained, so nothing was obtained in full.
     surface: { complete: false, gaps: [reason] },
     robots,

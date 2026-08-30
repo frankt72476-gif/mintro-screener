@@ -19,6 +19,7 @@ import { unseal } from '@mintro/engine';
 import type { WorkerSupabase } from '../store/supabase.js';
 import type { MerchantCredentials } from './vault.js';
 import { vaultRefFor, type SealedVaultKeys } from './supabaseVault.js';
+import { recordCredentialStored } from './credentialState.js';
 
 export interface DepositOutcome {
   readonly merchantDomain: string;
@@ -30,6 +31,7 @@ interface DepositRow {
   readonly id: string;
   readonly merchant_domain: string;
   readonly sealed: string;
+  readonly deposited_by: string;
 }
 
 /**
@@ -45,7 +47,7 @@ export async function collectDeposits(
 ): Promise<DepositOutcome[]> {
   const { data, error } = await supabase.client
     .from('credential_deposits')
-    .select('id, merchant_domain, sealed')
+    .select('id, merchant_domain, sealed, deposited_by')
     .order('deposited_at', { ascending: true })
     .limit(50);
 
@@ -61,6 +63,17 @@ export async function collectDeposits(
     try {
       const credentials = parseCredentials(await unseal(keys.privateKey, row.sealed));
       await store(vaultRef, credentials, `deposit collected for ${row.merchant_domain}`);
+
+      /*
+        The first of the three points a credential's state changes (D-185).
+
+        After the vault write and before the delete: the row now says a credential exists for this
+        merchant, which is true from this moment. Recording it earlier would claim one exists for a
+        vault write that failed.
+
+        It clears the login outcome, because a replaced credential has not been tried.
+      */
+      await recordCredentialStored(supabase, row.merchant_domain, row.deposited_by);
 
       // Only after the vault write succeeded. The order matters: deleting first would lose the
       // credential if the vault write failed, and there is no second copy anywhere.

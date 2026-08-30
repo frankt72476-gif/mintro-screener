@@ -58,6 +58,33 @@ export interface FetchResult {
  */
 export type Fetcher = (url: string) => Promise<FetchResult>;
 
+/**
+ * Whether a status is the origin stating that nothing is published at a path (D-184).
+ *
+ * **Only `404` and `410`.** They are the two statuses that mean *there is nothing here* — one
+ * without commitment, one permanently. Everything else that is not a success either fails to
+ * establish anything or establishes something different:
+ *
+ *   - **`403`, `401`** — *you may not read this.* A refusal is not an absence. It is at least as
+ *     likely that the resource exists and we were turned away, which is exactly what happened on
+ *     `peptidesciences.com`: `robots.txt` served fine, and three sitemap paths answered `403`. The
+ *     run reported eight `not_exposed` findings — four of them stopping conditions — asserting the
+ *     merchant published no catalogue, on evidence that says only that we were refused.
+ *   - **`429`** — *not now.* A rate limit is our request failing, and re-running would answer.
+ *   - **`5xx`** — the origin failed to serve something it may well carry.
+ *   - **`0`** — nothing answered at all.
+ *
+ * One definition, used by every caller that has to say which party a shortfall belongs to. It was
+ * written twice before this — `renderFailure` treated the whole `4xx` range as absence, and Layer 0
+ * did not ask at all — and two answers to one question is how they diverge (D-181).
+ *
+ * Success statuses never reach this: a `2xx` is content, and what it contains is the caller's
+ * question, not this one.
+ */
+export function establishesAbsence(status: number): boolean {
+  return status === 404 || status === 410;
+}
+
 const sha256 = (body: string): string => createHash('sha256').update(body, 'utf8').digest('hex');
 
 /** A failed fetch, shaped like any other result. */

@@ -11814,3 +11814,227 @@ unobservable-because-merchant could be unobservable-because-us — and leading w
 that reading more prominence than the old wording did. That producer is next.
 
 ---
+
+## D-184 — Only 404 and 410 establish absence, and the catalogue producer now says whose shortfall it was
+
+**2026-08-29 · engineering · the last of D-181's three undecidable producers, and a row of D-181's own table corrected**
+
+`urlPattern.ts:40` filed every unusable URL surface as `not_exposed` — *the merchant published no
+catalogue*. `layer0.usable` merges a storefront that publishes no sitemap with a sitemap we were
+refused, and the consumer guessed.
+
+**This one had already got a real run wrong**, which the other two had not. It matters more because
+five of the nine `url_pattern` rules are stopping conditions, so the branch can report that an
+underwriter's own decline criteria could not be checked — and name the merchant as the reason when
+it was us. D-183 made that worse by design: the summary now leads with *"7 of 9 were observed"*, so
+an unevaluated stopping condition is more prominent than it was.
+
+### The cases, and what actually distinguishes them
+
+The three named at the outset were *sitemaps declared and fetched*, *declared and unfetchable*, and
+*none declared*. Working through the producer, **declaration turns out not to be the discriminator
+at all** — and there are five leaves, not three:
+
+| # | what happened | how it is told | party |
+|---|---|---|---|
+| 1 | the origin is not a valid URL | `new URL()` threw; no request was made | ours |
+| 2 | nothing parsed, and every candidate answered `404`/`410` | no acquisition failure recorded | merchant |
+| 3 | nothing parsed, and a candidate answered `403`/`429`/`5xx`/nothing | flag set where the request fell short | **ours** |
+| 4 | a sitemap parsed and listed no URLs, everything read | no acquisition failure recorded | merchant |
+| 5 | a sitemap parsed empty **and another was not read** | flag set at the refusal, the cap, or the depth limit | **ours** |
+
+**Case 5 is the one nobody had named.** `anySitemapParsed` needs only *one* sitemap to have parsed,
+so "parsed but listed no URLs" is also reached when one parsed empty and a second answered 403 or
+was dropped at our own cap — and the unread one is exactly where the URLs would have been. The old
+branch also discarded `gaps` here and replaced it with the reason string, so the record of what went
+unread did not survive to the finding either.
+
+**And the old branch tested the wrong thing.** It asked whether `robots.txt` declared any sitemaps,
+filing the declared case as *"none of them could be fetched and parsed"* — which reads as ours — and
+the undeclared case as *"no sitemap could be found"* — which reads as theirs. Both were guesses, and
+they are orthogonal to the question:
+
+- *declared, every candidate 404s* — the merchant's robots.txt points at files they do not serve.
+  We asked, we got an answer. **Theirs.**
+- *undeclared, the well-known paths answer 403* — we were refused. **Ours.** This is the case that
+  actually occurs.
+
+Declaration still shapes the sentence, because it is worth telling a reader. It no longer decides
+the field.
+
+### `establishesAbsence`, and a row of D-181 corrected
+
+The corpus settled the predicate. Across every stored run there is **not one `status: 0` in Layer 0**
+— fifteen 200s and three 403s. So "the request completed" is useless as a discriminator: the failure
+that actually happens is an origin answering, definitively, *no*.
+
+**Only `404` and `410` establish absence.** Everything else that is not a success establishes
+something different or nothing at all: `403` and `401` are *you may not read this*, `429` is *not
+now*, `5xx` is the origin failing, `0` is nothing answering. A refusal is not an absence — it is at
+least as likely the resource exists and we were turned away.
+
+This contradicts D-181, which wrote the render-failure table as *5xx is ours, the whole 4xx range is
+theirs*. **That was wrong on 403 and it is corrected here.** Rather than fix it twice, the predicate
+now lives in one function that both callers use — which is the same consolidation D-181 made for
+`renderFailure` itself, for the same reason: this question was already being answered in two places
+with two answers.
+
+### What it would have changed
+
+Stored runs are immutable (D-002), so nothing is rewritten. Re-run today:
+
+    peptidesciences.com    8 findings  not_exposed -> not_retrieved
+                           NAME-001, NAME-002, CATG-001, CATG-002, CATG-003, CATG-004,
+                           OFFS-001, OFFS-006
+                           five of them stopping conditions
+
+    every other run        no change
+
+`robots.txt` served fine and declared no sitemaps; the three well-known paths each answered `403`.
+The report asserted that a merchant published no catalogue, on evidence saying only that we were
+refused — and told an underwriter that five of its own decline criteria were unobservable because of
+the merchant.
+
+The three runs reporting `NAME-001` as *"no URLs in scope 'collections' were listed in the sitemap"*
+are untouched and must stay so. That is a different branch, `urlPattern.ts:83`: the sitemap parsed,
+was read in full, and carries no `collections` URLs. Reading is what makes it an observation.
+
+### D-181's sweep is now closed
+
+Three producers were listed as structurally unable to decide. `layer3.ts:249` was closed by D-182,
+`signupForm.ts:177` remains, and this closes `urlPattern.ts:40`.
+
+**Correction to that list: it named three and there were four.** `signupForm.ts:177` is still open —
+`unlocated` cannot tell *"the account pages were read and none carried a registration form"* from
+*"no account page loaded"* — and it has the same shape as the two now fixed. It is the next one.
+
+The general form, restated because this is the third instance: **a producer that can fail in more
+than one party's name must carry a field saying which, set where the failure happens.** The consumer
+reads the field. It never reads the prose, never infers from a status it did not receive, and never
+defaults — because the default is always `not_exposed`, and `not_exposed` is a claim about a
+merchant.
+
+---
+
+## D-185 — An analyst can see that a screening account exists and that it has stopped working
+
+**2026-08-29 · engineering · a status table, a card, a replace warning, and a sentence in the report**
+
+Depositing a merchant's login was one-way and one-time. There was a single button, buried in the
+scan form, that wrote a sealed envelope and told the analyst nothing afterwards — no list, no sign
+one existed, no sign it had stopped working. And **a dead credential and no credential produced
+nearly the same report**, because the escalation path returned a bare `null` and the caller assumed
+the first of two possibilities.
+
+### `credential_state`
+
+One row per merchant domain: when the credential was deposited and by whom, when a scan last tried
+to sign in with it, and whether that worked.
+
+**Analysts may read it, and that is not a softening of D-038.** There is nothing here a leak would
+compromise — a domain, two timestamps, an analyst id and a boolean, all of it already visible to
+someone who can queue a scan and read the coverage note. `credential_deposits`, `vault_entries` and
+`credentials` still refuse `select` to everyone but the worker. The number of parties who can read a
+merchant's password is still one, and it is still a machine.
+
+`last_login_ok` is nullable and the null is a **third state, not a missing value**: escalation only
+runs when an anonymous crawl is refused (D-040), so a credential for a storefront that has not walled
+its products is never opened. *Never used* must not read as *failed*, and a check constraint keeps
+the outcome and its timestamp whole so a half-written row cannot fake either.
+
+Written by the worker alone, at the three moments the answer changes: a deposit lands in the vault,
+a sign-in succeeds, a sign-in fails. Letting the browser write here would let it claim a credential
+exists for a deposit that never landed. Every write swallows its own failure — a scan that screened
+the storefront correctly is not spoiled by a status row.
+
+Storing a credential **clears** the login outcome. A replaced credential has not been tried, and
+carrying the old verdict forward would show a fresh account as failing.
+
+### Where the card lives, having checked
+
+The app has four panes — scan, docs, reports, rules — and **no per-merchant view**. Rather than build
+a merchant page to hold a four-line card, it goes in the scan form, where the deposit button already
+was.
+
+That turns out to be the right place rather than a compromise: the analyst has just typed the domain,
+and this is the moment the answer matters — about to run a scan, wanting to know whether a login is
+stored and whether it worked last time. The lookup follows the URL field, debounced, and a response
+for a domain already typed past is dropped rather than rendered.
+
+Five states, of which four were asked for:
+
+    No login stored                                            [ Store a login ]
+    Stored login · stored 12 Aug · not needed by a scan yet     [ Replace ]
+    Stored login · stored 12 Aug · signed in 28 Aug             [ Replace ]
+    Stored login · stored 12 Aug · last sign-in failed 28 Aug   [ Replace ]
+    Could not check whether a login is stored                   [ Store or replace ]
+
+**The fifth is the one that had to be added.** A failed lookup is not "no login stored" — rendering
+it as one would send someone to ask a merchant for an account they had already supplied. And the
+button label is a claim about what pressing it will do, so on an unknown state it says both rather
+than the reassuring one.
+
+Tone is carried on the left edge, not in the text colour. A stale login is a fact to notice, not an
+error to alarm — the same restraint the state vocabulary follows (D-175).
+
+### The silent overwrite
+
+Depositing the same domain twice replaced the first with no warning and no sign one existed:
+`writeCredentials` upserts on the vault path, so the old value was simply gone. **Silent replacement
+of an unrecoverable secret is a defect on its own**, and it would be one whether or not the card were
+built — nobody in this application can read either value, so nobody can check afterwards what was
+there.
+
+The modal now reads `credential_state` for whatever domain is in its own field, and when one exists
+it says so above the button, with when it was stored and how it last fared. The button says "Replace
+credential".
+
+### A sign-in failure reaches the report
+
+`escalate` returned `BrowserContext | null`, and `describeAccess` read the null as *"No screening
+account was stored for this merchant."* A reader was told the merchant had supplied nothing when they
+had supplied something that had stopped working — and those call for different actions by whoever
+holds the relationship.
+
+The escalation now reports which of three things happened, and the coverage note says it:
+
+| outcome | the note says |
+|---|---|
+| `no_credential` | No screening account is stored for this merchant |
+| `sign_in_failed` | A screening account is stored for this merchant and it did not sign in on this run |
+| `signed_in`, still walled | A stored screening account signed in but the product pages were still not served |
+
+Said in the report **as well as** on the card, deliberately: the person reading a report is not always
+the person who would look at the card. Still descriptive (D-001) — *"coverage would be wider with a
+login that signs in"* is an observation about this run; *"obtain a new login"* would be an
+instruction, and a test pins the difference.
+
+This is the same shape as D-181, D-182 and D-184: a producer returning a bare null that merged two
+outcomes, and a consumer guessing. It is the fourth instance in a week.
+
+### Two rulings recorded
+
+**The credential is keyed per merchant domain, not per run**, so a re-run picks it up without anyone
+re-supplying it. That was already true — the vault path is `merchants/<domain>` — and
+`credential_state` is keyed the same way rather than introducing a second identity for one thing.
+
+**A sign-in failure is visible in the report's coverage note**, not only in `credential_state`. See
+above.
+
+### Declined, and why the omission is deliberate rather than pending
+
+**No reveal.** An analyst still cannot read a credential back. A reveal path was designed — an
+ephemeral browser keypair, the worker resealing to it, the access logged in `credential_access` —
+and declined: the property worth keeping is that the worker is the only party that can read a
+credential, and the need here is *see that it is stale and swap it*, which this covers without adding
+a second reader. If an analyst later genuinely needs to read one back, that is its own decision with
+its own record.
+
+**No delete.** Same reasoning, and replacing covers the case that occurs.
+
+**The dead `credentials` table from migration 0003 stays.** It is referenced only by
+`verify-supabase.ts`'s table list; nothing reads or writes it, and it was superseded by
+`vault_entries` in 0013. Noted here so the next person does not spend an afternoon working out what
+it is for. A migration against production for zero benefit is not worth it today.
+
+---

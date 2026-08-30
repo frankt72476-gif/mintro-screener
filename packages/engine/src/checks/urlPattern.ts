@@ -33,11 +33,27 @@ const MAX_NAMED_URLS = 5;
  */
 export function checkUrlPattern(rule: RuleOfType<'url_pattern'>, layer0: Layer0Result): Finding {
   if (!layer0.usable) {
+    /*
+      Which party the shortfall belongs to, read from the crawl rather than assumed (D-184).
+
+      This was an unconditional `not_exposed` — *the merchant published no catalogue* — and it was
+      the last of the three sites D-181's sweep listed as structurally unable to decide, because
+      `usable: false` merges a storefront with no sitemap and a sitemap we were refused.
+
+      It matters more here than at the other two. Five `url_pattern` rules are stopping conditions,
+      so this branch can report that an underwriter's decline criteria could not be checked — and
+      say it was the merchant's doing when it was ours. On `peptidesciences.com` it did exactly
+      that: `robots.txt` served, three sitemap paths answered `403`, and eight findings went out as
+      `not_exposed`, four of them stopping conditions.
+
+      `obstructed` is set in `discoverLayer0` at each point a request fell short. Never inferred
+      from `unusableReason`, which is prose (hard constraint 9).
+    */
     return notEvaluable(
       rule,
       layer0.unusableReason ?? 'the URL surface could not be observed',
       LAYER0_EVIDENCE_KIND,
-      'not_exposed',
+      layer0.obstructed === true ? 'not_retrieved' : 'not_exposed',
       unobservableEvidence(layer0),
     );
   }

@@ -11,6 +11,7 @@ import type { Rule } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import { isRendered } from '../page.js';
 import { notEvaluable, type Evidence, type EvidenceKind, type Finding } from '../findings.js';
+import { establishesAbsence } from '../fetcher.js';
 
 /** Layer 1 and above observe a rendered page. Stated, never inferred. */
 export const RENDERED: EvidenceKind = 'rendered_page';
@@ -77,11 +78,17 @@ export function hasRenderedCaptures(page: PageContext): boolean {
  * `isRendered` is false for three different things, and they are not one fact:
  *
  *   - **`renderError` set** — the browser threw. Ours. `not_retrieved`.
- *   - **`5xx`** — the origin failed to serve a page it may well carry. A 503 establishes nothing
- *     about what the merchant publishes, so it is not evidence of absence. `not_retrieved`.
- *   - **`4xx`** — the origin answered, and its answer is that it has no such page. That is an
- *     observation about the merchant, and widening `not_retrieved` to swallow it would lose a
+ *   - **`404` or `410`** — the origin answered, and its answer is that it has no such page. That is
+ *     an observation about the merchant, and widening `not_retrieved` to swallow it would lose a
  *     real finding. `not_exposed`.
+ *   - **everything else** — `403`, `401`, `429`, `5xx`, `0`. None of them establishes that the page
+ *     is absent. `not_retrieved`.
+ *
+ * **The middle two lines used to read "5xx" and "4xx", and the `4xx` half was wrong (D-184).** A
+ * `403` is *you may not read this*, which is a refusal and not an absence — it is at least as
+ * likely the page exists. The same mistake at Layer 0 sent eight `not_exposed` findings out about
+ * `peptidesciences.com` on the strength of three `403`s. The predicate now lives in one place,
+ * `establishesAbsence`, because this question was already being answered twice.
  *
  * Read from the fields the renderer set, never from the wording of the error, which hard
  * constraint 9 forbids and which would silently reclassify every finding whose phrasing changed.
@@ -91,7 +98,7 @@ export function hasRenderedCaptures(page: PageContext): boolean {
 export function renderFailure(rule: Rule, page: PageContext): Finding | null {
   if (isRendered(page)) return null;
 
-  const obstructed = page.renderError !== undefined || page.httpStatus >= 500;
+  const obstructed = page.renderError !== undefined || !establishesAbsence(page.httpStatus);
 
   return notEvaluable(
     rule,

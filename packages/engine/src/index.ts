@@ -22,6 +22,7 @@ export {
   createHttpFetcher,
   createStubFetcher,
   DEFAULT_HEADERS,
+  establishesAbsence,
   USER_AGENT,
   type Fetcher,
   type FetchResult,

@@ -106,13 +106,26 @@ describe.each(HANDLERS)('%s on a page that did not render', (_name, check) => {
     expect(finding.notEvaluableKind).toBe('not_retrieved');
   });
 
-  it('stays not_exposed on a 4xx, where the origin answered that it has no such page', () => {
-    // The control on the pair above. A 404 is the origin's own statement about what it carries,
-    // and widening `not_retrieved` to swallow it would lose a real observation.
-    const finding = check(page({ httpStatus: 404 }));
+  it.each([404, 410])('stays not_exposed on %i, where the origin answered that it has no such page', (httpStatus) => {
+    // The control on the pair above. These two are the origin's own statement about what it
+    // carries, and widening `not_retrieved` to swallow them would lose a real observation.
+    const finding = check(page({ httpStatus }));
 
     expect(finding.state).toBe('not_evaluable');
     expect(finding.notEvaluableKind).toBe('not_exposed');
+  });
+
+  it.each([403, 401, 429])('is not_retrieved on %i, which is a refusal and not an absence', (httpStatus) => {
+    /*
+      D-181 wrote this row as "the whole 4xx range is the merchant's" and that was wrong (D-184).
+
+      A 403 is *you may not read this*, which leaves entirely open whether the page exists. The
+      same mistake at Layer 0 sent eight `not_exposed` findings out about a real storefront — four
+      of them stopping conditions — on the strength of three 403s on sitemap paths.
+    */
+    const finding = check(page({ httpStatus }));
+
+    expect(finding.notEvaluableKind).toBe('not_retrieved');
   });
 
   it('reports the render error itself as the reason, whichever kind it lands on', () => {
