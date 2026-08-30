@@ -45,6 +45,7 @@
       "tier": "auto_fail",
       "title": "No therapeutic categories",
       "clause": "Cannot categorize products under therapeutic headings.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "patterns": [
@@ -63,6 +64,7 @@
       "tier": "review_only",
       "title": "CAS number listed",
       "clause": "Exact Chemical Abstracts Service registry number for the compound.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -79,6 +81,7 @@
       "tier": "review_only",
       "title": "No dosing information",
       "clause": "Never include dosing information.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "surface": "product",
@@ -100,6 +103,7 @@
       "tier": "review_only",
       "title": "Research field stored with each order",
       "clause": "Store the selected field with every order in your database.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "reason": "Order records are server-side. Requires merchant attestation."
@@ -114,6 +118,7 @@
       "tier": "review_only",
       "title": "Age affirmation before entry",
       "clause": "Every visitor must be stopped before accessing the website.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "surface": "homepage",
@@ -132,6 +137,7 @@
       "tier": "auto_fail",
       "title": "Purity at or above 98%",
       "clause": "98% purity for all products.",
+      "subject": "the fixture subject is stated",
       "source": "programme",
       "params": {
         "extract": "purity_pct",

@@ -32,24 +32,33 @@ describe('1 — stopping conditions list every rule', () => {
     expect(part?.stopping?.checklist).toHaveLength(8);
   });
 
-  it('names each one and states what was observed against it', () => {
+  it('names each one, in the panel at the top of the document (D-194)', () => {
+    /*
+      The checklist moved into the stopping-conditions panel, above the brief. All eight are still
+      named — that is the requirement D-186 established and D-194 relocated rather than relaxed.
+    */
     const markup = render(c268, 'agent');
+    const panel = markup.match(/<section class="panel stop-panel[\s\S]*?<\/section>/)?.[0] ?? '';
 
-    // Eight rows, each carrying a rule id — the section used to render a sentence and nothing else.
-    expect((markup.match(/class="stopcheck-row/g) ?? []).length).toBe(8);
-    for (const id of c268.blocking?.passed ?? []) {
-      expect(markup).toContain(id);
+    /*
+      The clear ones are one line of names under a group heading carrying the count (D-195), not a
+      row each. All eight are still named — the requirement D-186 established and D-194 relocated.
+    */
+    expect(panel).toContain('Checked and clear');
+    expect(panel).toContain('>8<');
+    for (const title of ['No needles or syringes', 'No HCG or HGH']) {
+      expect(panel).toContain(title);
     }
   });
 
   it('keeps the summary line above the list', () => {
     // The count and the list answer different questions and both are wanted.
     const markup = render(c268, 'agent');
-    const account = markup.indexOf('stopping-account');
-    const list = markup.indexOf('stopcheck');
+    const sub = markup.indexOf('stop-sub');
+    const groups = markup.indexOf('stop-grouphead');
 
-    expect(account).toBeGreaterThan(-1);
-    expect(list).toBeGreaterThan(account);
+    expect(sub).toBeGreaterThan(-1);
+    expect(groups).toBeGreaterThan(sub);
   });
 
   it('renders nothing for a run predating the flag rather than an empty checklist', () => {
@@ -147,10 +156,15 @@ describe('6 — persistent navigation on screen only', () => {
       render `headerLines`, so a count appears the same number of times in each.
     */
     const markup = render(c268, 'agent');
-    const lines = markup.match(/class="headline-n">(\d+)</g) ?? [];
+    /*
+      The header-lines block is gone (D-194). What remains is two nav cards and the sticky bar that
+      repeats them, so each count appears once per surface rather than three times at the top.
+    */
+    const cards = markup.match(/class="navcard-n">(\d+)</g) ?? [];
+    const bar = markup.match(/class="headline-n">(\d+)</g) ?? [];
 
-    // Three header lines now (D-189), each appearing twice: once in the block, once in the bar.
-    expect(lines).toHaveLength(6);
-    expect(lines.slice(0, 3)).toEqual(lines.slice(3));
+    expect(cards).toHaveLength(2);
+    expect(bar).toHaveLength(2);
+    expect(cards.map((c) => c.replace('navcard-n', 'headline-n'))).toEqual(bar);
   });
 });

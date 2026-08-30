@@ -26,6 +26,14 @@ export interface ReportFinding extends Finding {
   readonly title: string;
   readonly clause: string;
   /**
+   * One clause completing *"Could not verify whether ___"* (D-194, visual spec §2a).
+   *
+   * Snapshotted like `title` and `clause`, so a run reopened later composes the sentence it was
+   * produced under. Absent on runs recorded before the field existed, and `notObservedSentence`
+   * returns the original reason unchanged for those — a run says what it said (D-002).
+   */
+  readonly subject?: string;
+  /**
    * Whose statement `clause` is (D-138).
    *
    * Snapshotted onto the finding like `title` and `clause`, so a run reopened later renders the
@@ -367,6 +375,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         ...finding,
         title: rule.title,
         clause: rule.clause,
+        subject: rule.subject,
         source: rule.source,
         severity: rule.sev,
         tier: rule.tier,
@@ -389,6 +398,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
       ...notEvaluable(rule, reasonForUnrun(rule), 'document', kindForUnrun(rule)),
       title: rule.title,
       clause: rule.clause,
+      subject: rule.subject,
       // The unrun path carries `source` too. It was missed when the field was added and only the
       // evaluated path got it, which left twelve findings on a live run with no attribution — see
       // D-138. Invisible today, because every unrun rule happens to be a program rule and the
@@ -832,4 +842,49 @@ function sortFindings(findings: readonly ReportFinding[]): ReportFinding[] {
       sevRank[a.severity] - sevRank[b.severity] ||
       (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0),
   );
+}
+
+
+/**
+ * What a `not_evaluable` finding opens with (D-194, visual spec §2a).
+ *
+ * The old copy stated the mechanism and never the question. *"No region labelled 'molecular weight'
+ * was observed, so there was nothing to examine"* does not tell a reader what is unknown — and
+ * beside a title asserting the compliant state, *"Guest checkout disabled · not observed"*, it is
+ * genuinely ambiguous between *we could not tell* and *it is not disabled*.
+ *
+ * So every one of them opens with the question it could not answer, and the mechanism follows as a
+ * second sentence where there is one.
+ *
+ * ## Two forms, and the difference is not cosmetic
+ *
+ *   - **`Could not verify whether …`** — this run did not establish it.
+ *   - **`Cannot be verified from a website: whether …`** — no crawl of any storefront could.
+ *
+ * A merchant reading *"could not"* against something no website could ever show would reasonably
+ * ask why we did not try harder. The second form says the question is out of reach of the method,
+ * not out of reach of this run.
+ *
+ * **Chosen from `notEvaluableKind`, never from the rule's type.** `not_reachable` is the
+ * producer-set signal for "no crawl could answer this" (D-044), and reading the type instead would
+ * be inferring a party from a shape — the mistake D-181 catalogued four times.
+ *
+ * Returns the original reason unchanged when the finding carries no subject, which is every run
+ * recorded before this existed. Runs are immutable (D-002): an old finding says what it said.
+ */
+export function notObservedSentence(finding: ReportFinding): string {
+  const reason = finding.notEvaluableReason ?? finding.note;
+  if (finding.state !== 'not_evaluable' || finding.subject === undefined) return reason;
+
+  const opener =
+    finding.notEvaluableKind === 'not_reachable'
+      ? `Cannot be verified from a website: whether ${finding.subject}.`
+      : `Could not verify whether ${finding.subject}.`;
+
+  const mechanism = reason.trim();
+  if (mechanism === '') return opener;
+
+  // The mechanism is a sentence of its own, capitalised, after the question.
+  const tidied = mechanism.charAt(0).toUpperCase() + mechanism.slice(1);
+  return `${opener} ${tidied.endsWith('.') ? tidied : `${tidied}.`}`;
 }

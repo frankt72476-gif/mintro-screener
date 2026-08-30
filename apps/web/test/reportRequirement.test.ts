@@ -50,6 +50,7 @@ const base = {
   title: 'Non-peptide research compounds in the catalogue',
   note: '5 of 6 URLs matched this rule\u2019s patterns.',
   clause: 'This rule reports which of them are present and names them.',
+  subject: 'the fixture subject is stated',
   severity: 'minor',
   tier: 'review_only',
   checkType: 'url_pattern',

@@ -122,21 +122,38 @@ describe.each(RUNS)('%s', (_label, report) => {
     expect(reportParts(report, 'agent').map((p) => p.heading)).not.toContain('Met');
   });
 
-  it('derives section counts and the report tally from the same arithmetic', () => {
-    // Part 2's header lines will read `reportTally`. Nothing does yet; this is what stops the two
-    // from being separately derived when it does.
+  it('accounts for every finding exactly once across the panel and the sections', () => {
+    /*
+      Stronger than it was, because there is somewhere new for a finding to be (D-194). The stopping
+      conditions moved into the panel at the top, so the sections no longer hold them — and the
+      thing worth asserting is not that the sections add up but that **nothing is lost or counted
+      twice** between the two surfaces.
+    */
     const parts = reportParts(report, 'agent');
-    const findings =
-      parts.reduce((n, p) => n + p.tally.findings + (p.passes?.tally.findings ?? 0), 0) -
+
+    /*
+      The stopping part's own `tally` counts **failures** — that is what the account line and the
+      brief read from it — so the panel's rows are counted from its blocks instead. Adding them to
+      that tally would make "0 stopping conditions failed" say eight.
+    */
+    const panel = parts
+      .find((p) => p.id === 'stopping')
+      ?.blocks.flatMap((b) => b.groups)
+      .reduce((n, g) => n + g.findings.length + g.consequences.reduce((c, x) => c + x.findings.length, 0), 0) ?? 0;
+
+    const sections =
+      parts
+        .filter((p) => p.id !== 'stopping')
+        .reduce((n, p) => n + p.tally.findings + (p.passes?.tally.findings ?? 0), 0) -
       // Section 2 counts questions, which are not findings.
       (parts.find((p) => p.id === 'questions')?.tally.findings ?? 0);
 
-    expect(findings).toBe(reportTally(report).findings);
+    expect(panel + sections).toBe(reportTally(report).findings);
   });
 });
 
 describe('section 1 renders at zero', () => {
-  it('says so in words when nothing was observed failing', () => {
+  it('says so in words when nothing applies', () => {
     const part = reportParts(load('run-c268f8d7'), 'agent').find((p) => p.id === 'stopping');
     expect(part?.stopping?.declared).toBe(8);
     expect(part?.stopping?.failed).toHaveLength(0);
@@ -147,7 +164,7 @@ describe('section 1 renders at zero', () => {
     // Leads with the count determined, not with the clean sweep (D-183). On this run all eight
     // were observed, so the two readings coincide — which is exactly when the old wording was
     // harmless and why the defect only showed on a run with a gap.
-    expect(markup).toContain('8 of 8 stopping conditions were observed, and none was failing.');
+    expect(markup).toContain('Eight of eight stopping conditions were checked and none applies.');
   });
 
   /**
@@ -171,6 +188,7 @@ describe('print carries both headers, which it did not', () => {
     );
 
     const groupHeaders = (markup.match(/class="cat-head/g) ?? []).length;
+    // The panel's groups render outside the sections now (D-194) and are excluded from `rendered`.
     const groups = rendered(report, 'iqwallet');
     const multiRow = groups.filter((g) => g.findings.length > 1).length;
 
@@ -183,9 +201,22 @@ describe('print carries both headers, which it did not', () => {
     expect(groupHeaders).toBe(multiRow);
     expect(multiRow).toBeGreaterThan(0);
 
-    // And print opens every disclosure, so every finding is on the page.
+    /*
+      Print opens every disclosure, so every finding is on the page — including the stopping
+      conditions, which are now rows in the panel above rather than in a section (D-194).
+    */
     const rows = (markup.match(/class="find /g) ?? []).length;
-    expect(rows).toBe(ungrouped(report).length);
+
+    /*
+      A met stopping condition is a checklist line, not an expanded finding — the visual spec is
+      explicit that the clear ones do not expand, because they are reassurance rather than something
+      to read. So the export accounts for every finding in one of two shapes, and asserting a single
+      shape would force the panel to print seven rows nobody needs.
+    */
+    const panel = reportParts(report, 'iqwallet').find((p) => p.id === 'stopping');
+    const clear = panel?.stopping?.checklist.filter((c) => c.state === 'pass').length ?? 0;
+
+    expect(rows + clear).toBe(ungrouped(report).length);
   });
 
   it.each(RUNS)('%s: all three section headings appear, in the one order (D-186, D-189)', (_label, report) => {
@@ -194,11 +225,12 @@ describe('print carries both headers, which it did not', () => {
     );
     const headings = [...markup.matchAll(/class="part-name">([^<]+)</g)].map((m) => m[1]);
 
-    expect(headings).toEqual([
-      'Stopping conditions',
-      'For your review',
-      'Operational questions',
-    ]);
+    /*
+      Stopping conditions are the panel at the top now, not a section heading here (D-194 §1). The
+      part still exists and is still the one derivation the panel, the brief and the cards read; it
+      is simply not rendered a second time further down.
+    */
+    expect(headings).toEqual(['For your review', 'Operational questions']);
   });
 
   it('keeps a heading with what it introduces, and repeats the section name down the page', () => {

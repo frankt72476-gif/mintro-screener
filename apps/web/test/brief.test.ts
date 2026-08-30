@@ -40,18 +40,26 @@ describe('priority ordering', () => {
     expect(b.items.every((i) => !i.stopping)).toBe(true);
   });
 
-  it('a failed stopping condition takes that space instead', () => {
-    // A failed one means the package does not proceed. It is not one item among several.
+  it('still renders its not-met items when a stopping condition failed (D-194)', () => {
+    /*
+      D-190 had the failure displace them, because the brief was then the top of the document. It is
+      not — the panel is, and it carries the failure. The two do not compete: different surfaces,
+      and the panel is louder. A brief that emptied itself here would lose the ordinary findings at
+      exactly the moment there is most to read.
+    */
     const b = briefOf(load('constructed-stopfail'));
 
-    expect(b.headline).toBe('One stopping condition was not met');
-    expect(b.items).toHaveLength(1);
-    expect(b.items[0]?.ruleId).toBe('CATG-003');
-    expect(b.items[0]?.stopping).toBe(true);
+    expect(b.headline).toBe('Three observations did not meet a standard');
+    expect(b.items.map((i) => i.ruleId)).not.toContain('CATG-003');
+    expect(b.items.every((i) => !i.stopping)).toBe(true);
   });
 
-  it('marks the stopping item so the surface can render it distinctly', () => {
-    expect(markupOf(load('constructed-stopfail'))).toContain('data-stopping');
+  it('leaves the failure to the panel above', () => {
+    const markup = markupOf(load('constructed-stopfail'));
+
+    // Stated once, in the panel — not a second time in the brief.
+    expect(markup).toContain('stop-panel is-failed');
+    expect(markup).not.toContain('data-stopping');
   });
 
   it('says so plainly where nothing fell short, and the counts carry the page', () => {

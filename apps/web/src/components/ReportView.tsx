@@ -26,7 +26,8 @@ import {
   describeGroup,
   inheritsEvidence,
   coverageSentence,
-  headerLines,
+  navCards,
+  stoppingSentence,
   reportParts,
   sectionAnchor,
   ordinalsFor,
@@ -41,6 +42,7 @@ import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
+import { notObservedSentence } from '@mintro/engine';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
 
@@ -257,8 +259,25 @@ export function ReportView({
         it points at cannot disagree. **Nothing was moved into the space this vacated**: the point is
         fewer things and more air.
       */}
+      {/*
+        Document order, and nothing above the stopping conditions (D-194, visual spec §1).
+
+        The panel is first because a failed stopping condition means the package does not proceed,
+        and because it was rendered as a count card three times during design — each time the reader
+        lost the thing that matters most. There is no "0" card standing in for the list.
+      */}
+      <StoppingPanel
+        report={report}
+        parts={parts}
+        print={print === true}
+        access={access}
+        ordinals={ordinals}
+        {...(commentaryOf === undefined ? {} : { commentaryOf })}
+        {...(commentBox === undefined ? {} : { commentBox })}
+      />
       <Brief brief={brief(report, parts)} />
-      <HeaderLines parts={parts} />
+      {print !== true && <NavCards parts={parts} />}
+      <p className="top-coverage">{coverageSentence(report)}</p>
       {/*
         The sentinel the sticky bar watches. When this scrolls out, the bar appears — done in CSS
         with no scroll listener, so it costs nothing on a twenty-page document.
@@ -302,6 +321,13 @@ export function ReportView({
       */}
       <div>
         {parts.map((part) => {
+          /*
+            The stopping conditions are the panel at the top, not a section here (D-194, §1).
+
+            `reportParts` still builds the part — the panel, the brief and the nav cards all read its
+            tally, and one derivation is the point (D-186). It is simply not rendered a second time.
+          */
+          if (part.id === 'stopping') return null;
           const questions =
             part.id === 'questions' && attestations !== undefined ? (
               <AttestationSection attestations={attestations} print={print} />
@@ -479,23 +505,237 @@ function Brief({ brief: content }: { readonly brief: BriefModel }): JSX.Element 
         </ul>
       )}
 
-      {content.more > 0 && (
-        <p className="brief-more">
-          {content.more} more of the same below.
-        </p>
-      )}
-
-      <ul className="brief-counts">
-        {content.counts.map((count) => (
-          <li key={count.label}>
-            <span className="brief-n">{count.count}</span>{' '}
-            {count.href === null ? count.label : <a href={count.href}>{count.label}</a>}
-          </li>
-        ))}
-      </ul>
-
-      <p className="brief-coverage">{content.coverage}</p>
+      {content.more > 0 && <p className="brief-more">{content.more} more of the same below.</p>}
     </section>
+  );
+}
+
+/** `exactOptionalPropertyTypes`: an absent box is an absent prop, not a prop holding undefined. */
+const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Element } =>
+  box === null || box === undefined ? {} : { commentBox: box };
+
+/**
+ * The stopping conditions, at the top of the document (D-194, visual spec §2).
+ *
+ * A bordered surface above the brief, naming **all nine** — not a section further down, and not a
+ * count card. The spec records that it was reduced to a card three times during design and that each
+ * time the reader lost the thing that matters most, so the list is the panel and there is no "0"
+ * standing in for it.
+ *
+ * ## Two states, one slot
+ *
+ * **None failed** — a tick, the count, then the nine in two columns with the *not observed* rows
+ * first and at full weight. The eye should land on what was not determined, because those are the
+ * rows a reader has to think about; the met rows are reassurance, not information.
+ *
+ * **One or more failed** — the panel turns. Same slot and position, different weight: the failures
+ * get their title and their observation sentence, and the met rows collapse to one line.
+ *
+ * ## Which rows expand
+ *
+ * A failed condition is the highest-stakes claim in the document, and one that could not be checked
+ * is exactly where a merchant can supply what the crawl could not reach. Both expand, carry their
+ * evidence and take a comment. **The clear ones do not** — they are a list, not findings, and giving
+ * a satisfied rule a comment box invites noise for no gain (D-063).
+ */
+function StoppingPanel({
+  report,
+  parts,
+  print,
+  access,
+  commentaryOf,
+  commentBox,
+  ordinals,
+}: {
+  readonly report: ScreeningReport;
+  readonly parts: readonly ReportPart[];
+  readonly print: boolean;
+  readonly access?: EvidenceAccess;
+  readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element | null;
+  readonly ordinals?: ReadonlyMap<ReportFinding, number>;
+}): JSX.Element | null {
+  const part = parts.find((candidate) => candidate.id === 'stopping');
+  const account = part?.stopping;
+  if (account === undefined) return null;
+
+  if (account.declared === null) {
+    // Predates the flag. Says so rather than reporting a clean sweep (D-044, D-161).
+    return (
+      <section className="panel stop-panel is-unknown">
+        <p className="stop-lede">{part?.lede}</p>
+      </section>
+    );
+  }
+
+  const failed = account.checklist.filter((row) => row.state === 'fail' || row.state === 'review');
+  const unobserved = account.checklist.filter((row) => row.state === 'not_evaluable');
+  const met = account.checklist.filter((row) => row.state === 'pass');
+
+  const groupFor = (ruleId: string): FindingGroup | undefined =>
+    part?.blocks.flatMap((block) => block.groups).find((group) => group.ruleId === ruleId);
+
+  /** The same group in both states: one definition, so they cannot drift apart. */
+  const unchecked =
+    unobserved.length === 0 ? null : (
+      <div className="stop-group">
+        <p className="stop-grouphead">
+          Could not be checked <span className="stop-groupn">{unobserved.length}</span>
+        </p>
+        {unobserved.map((row) => {
+          const group = groupFor(row.ruleId);
+          if (group === undefined || access === undefined) {
+            return (
+              <p key={row.ruleId} className="stop-openrow">
+                <span className="stop-name">{row.title}</span>
+                <span className="mono stop-id">{row.ruleId}</span>
+              </p>
+            );
+          }
+          return (
+            <div key={row.ruleId} id={findingAnchor(row.ruleId)}>
+              {group.findings.map((finding, i) => (
+                <FindingRow
+                  key={`${row.ruleId}-${i}`}
+                  finding={finding}
+                  access={access}
+                  {...(print ? { print: true } : {})}
+                  {...(commentaryOf === undefined
+                    ? {}
+                    : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
+                  {...boxProp(commentBox?.(finding, ordinals?.get(finding)))}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+
+  return (
+    <section className={`panel stop-panel ${failed.length > 0 ? 'is-failed' : 'is-clear'}`}>
+      <div className="stop-head">
+        <span className="stop-icon" aria-hidden="true">{failed.length > 0 ? '!' : '✓'}</span>
+        <div>
+          {/*
+            "Applies", never "met" (D-195).
+
+            *Met* meant **fired** in this heading and **passed** in the rows beneath it — two senses
+            of one word inside one panel, and nothing told a reader which was which. A condition
+            applies or it does not; a row that was checked and clear says so in its own words.
+          */}
+          <h2 className="stop-title">
+            {failed.length === 0
+              ? 'Nothing here stops the application'
+              : failed.length === 1
+                ? 'One stopping condition applies'
+                : `${failed.length} stopping conditions apply`}
+          </h2>
+          <p className="stop-sub">{stoppingSentence(account).join(' ')}</p>
+        </div>
+      </div>
+
+      {failed.length > 0 ? (
+        <>
+          <ul className="stop-failed">
+            {failed.map((row) => {
+              const group = groupFor(row.ruleId);
+              return (
+                <li key={row.ruleId} id={findingAnchor(row.ruleId)}>
+                  {group === undefined || access === undefined ? (
+                    <>
+                      <span className="stop-failed-title">{row.title}</span>
+                      <span className="mono stop-id">{row.ruleId}</span>
+                    </>
+                  ) : (
+                    group.findings.map((finding, i) => (
+                      <FindingRow
+                        key={`${row.ruleId}-${i}`}
+                        finding={finding}
+                        access={access}
+                        {...(print ? { print: true } : {})}
+                        {...(commentaryOf === undefined
+                          ? {}
+                          : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
+                        {...boxProp(commentBox?.(finding, ordinals?.get(finding)))}
+                      />
+                    ))
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {/*
+            The sub-line says how many could not be checked, so the panel shows them (D-195).
+
+            Naming a count and rendering none of it leaves a reader told there are two open
+            questions and given no way to answer either — and these are the rows a merchant can
+            actually resolve.
+          */}
+          {unchecked}
+
+          {met.length > 0 && (
+            <p className="stop-others">
+              {met.length} other{met.length === 1 ? '' : 's'} checked and clear.
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          {/*
+            Two groups, not a nine-row grid (D-195).
+
+            A condition that could not be checked is exactly where a merchant can supply what the
+            crawl could not reach, so it expands, carries its evidence and takes a comment — the same
+            affordance a finding row has. The clear ones are one line of names: they are reassurance
+            rather than something to read, and a state label on each would repeat what the group
+            heading already says.
+          */}
+          {unchecked}
+
+          {met.length > 0 && (
+            <div className="stop-group">
+              <p className="stop-grouphead">
+                Checked and clear <span className="stop-groupn">{met.length}</span>
+              </p>
+              <p className="stop-clear">
+                {met.map((row) => row.title).join(' · ')}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Two count cards, and no third (D-194, visual spec §4).
+ *
+ * Screen only — paper does not navigate, and a card offering a jump is a control nobody can press.
+ */
+function NavCards({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
+  return (
+    <div className="navcards">
+      {navCards(parts).map((card) => {
+        const body = (
+          <>
+            <span className="navcard-n">{card.count}</span>
+            <span className="navcard-label">{card.label}</span>
+            <span className="navcard-arrow" aria-hidden="true" />
+          </>
+        );
+        return card.href === null ? (
+          <div key={card.id} className="navcard is-empty">
+            {body}
+          </div>
+        ) : (
+          <a key={card.id} className="navcard" href={card.href}>
+            {body}
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
@@ -503,8 +743,8 @@ function StickyLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.
   return (
     <div className="headbar" aria-hidden="true">
       <ul className="headbar-lines">
-        {headerLines(parts).map((entry) => (
-          <li key={`bar-${entry.id}-${entry.label}`} className={entry.count === 0 ? 'zero' : undefined}>
+        {navCards(parts).map((entry) => (
+          <li key={`bar-${entry.id}`} className={entry.count === 0 ? 'zero' : undefined}>
             {entry.href === null ? (
               <span>
                 <span className="headline-n">{entry.count}</span> {entry.label}
@@ -524,24 +764,6 @@ function StickyLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.
   );
 }
 
-function HeaderLines({ parts }: { readonly parts: readonly ReportPart[] }): JSX.Element {
-  return (
-    <ul className="headlines">
-      {headerLines(parts).map((entry) => (
-        <li key={`${entry.id}-${entry.label}`} className={entry.count === 0 ? 'zero' : undefined}>
-          <span className="headline-n">{entry.count}</span>
-          {entry.href === null ? (
-            <span className="headline-label">{entry.label}</span>
-          ) : (
-            <a className="headline-label" href={entry.href}>
-              {entry.label}
-            </a>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 
 /**
@@ -708,7 +930,19 @@ function FindingRow({
               every sentence stating the limits of the observation survives here too, because those
               differ between checks and are the reason a reader can trust a line without opening it.
             */
-            <span className={`find-note${isOpen ? ' full' : ''}`}>{rowSentence(finding.note)}</span>
+            <span className={`find-note${isOpen ? ' full' : ''}`}>
+              {/*
+                A not-observed row opens with the question it could not answer, in the collapsed row
+                as well as the expanded one (D-194 §2a, D-195).
+
+                It showed `note` here — *"Not evaluable from the crawled surface: no region labelled
+                'molecular weight' was observed"* — which is the mechanism and the old prefix, in the
+                one line a reader scans without opening anything.
+              */}
+              {finding.state === 'not_evaluable'
+                ? rowSentence(notObservedSentence(finding))
+                : rowSentence(finding.note)}
+            </span>
           )}
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
         </span>
@@ -799,7 +1033,14 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
           {notEvaluable ? REQUIREMENT_HEADINGS.notAssessed : REQUIREMENT_HEADINGS.observed}
         </span>
         <p className="req-t">
-          {notEvaluable ? finding.notEvaluableReason ?? finding.note : finding.note}
+          {/*
+            A not-observed finding opens with the question it could not answer (D-194, §2a).
+
+            The mechanism follows as a second sentence. It used to lead, which told a reader how the
+            check worked and never what was unknown — and beside a title asserting the compliant
+            state it read as though the state had been observed to be absent.
+          */}
+          {notEvaluable ? notObservedSentence(finding) : finding.note}
         </p>
       </div>
       <div className="req-col">

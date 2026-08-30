@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER, describeCounts, describeVerdict } from '@mintro/engine';
 import type { ScreeningReport } from '@mintro/engine';
 import { ReportView } from '../src/components/ReportView.js';
-import { headerLines, reportParts } from '../src/lib/grouping.js';
+import { navCards, reportParts } from '../src/lib/grouping.js';
 
 const access = { description: 'none needed for markup', urlFor: async () => null };
 const load = (n: string): ScreeningReport =>
@@ -78,7 +78,7 @@ describe('no surface carries a retired word', () => {
     expect(sentence).toContain(STATE_LABEL_LOWER.review);
   });
 
-  it.each(RUNS)('%s: the header lines', (name) => {
+  it.each(RUNS)('%s: the navigation cards', (name) => {
     /*
       The line that was missed by D-188's first pass: it paraphrased the label, so it escaped a
       search for the label itself.
@@ -87,10 +87,10 @@ describe('no surface carries a retired word', () => {
       section — so there is no state label here to assert on. What must still hold is that no
       retired word survives anywhere in them.
     */
-    const labels = headerLines(reportParts(load(name), 'agent')).map((l) => l.label);
+    const labels = navCards(reportParts(load(name), 'agent')).map((l) => l.label);
 
     for (const retired of RETIRED) expect(labels.join(' ')).not.toContain(retired);
-    expect(labels).toEqual(['stopping conditions failed', 'for your review', 'operational questions']);
+    expect(labels).toEqual(['for your review', 'questions for you']);
   });
 
   it.each(RUNS)('%s: the stored verdict sentence', (name) => {

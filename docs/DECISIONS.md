@@ -12775,3 +12775,172 @@ somebody to redirect it somewhere, and where they redirect it is not the tool's 
 argument for `--set` existing rather than for documenting the redirect more carefully.
 
 ---
+
+## D-194 — The visual system, and the stopping conditions at the top
+
+**2026-08-30 · business owner · `docs/report-visual-spec.md`, built in one pass**
+
+The spec was iterated against rendered mockups and is settled; this records what building it found.
+
+### The panel, first, with all nine
+
+**Nothing above the stopping conditions.** They are a bordered panel at the top of the document —
+not a section further down, and not a count card. The spec records that they were reduced to a card
+three times during design and that each time the reader lost the thing that matters most.
+
+Two states in one slot. Clear: a tick, the count, and the nine in two columns with the *not
+observed* rows first and at full weight, because those are the rows a reader has to think about.
+Failed: the panel turns, each failure carries its title and observation, and the met rows collapse
+to one line.
+
+### Three things the render found that the spec did not name
+
+**The section still rendered below the panel.** `reportParts` builds a `stopping` part that the
+panel, the brief and the cards all read — one derivation (D-186) — and it was also being rendered a
+second time as a section. The part stays; it is simply not rendered twice.
+
+**The brief took over the failure.** D-190 had a failed stopping condition displace the brief's
+not-met items, because the brief was then the top of the document. It is not — the panel is. The
+brief renders its own items whether or not a condition failed, and its headline says nothing about
+stopping conditions: two surfaces announcing one failure is the duplication this change removes.
+
+**`stoppingRuleIds` returned only the *failed* conditions.** So the panel could not find the ones it
+had to expand, and the not-observed ones were rows in "For your review" as well. Both are fixed by a
+`declaredStoppingIds` covering all nine — **a judgment the spec leaves implicit**: it says stopping
+conditions are the panel and not a section further down, and this is what that means for the rows
+that are neither failed nor met. All nine leave the sections; a rule is one row wherever it appears
+(D-166).
+
+### §2a — every not-observed finding opens with the question
+
+The old copy stated the mechanism and never the question. *"No region labelled 'molecular weight'
+was observed"* beside a title asserting the compliant state is genuinely ambiguous between *we could
+not tell* and *it is not there*.
+
+Each rule gained a `subject` — **required in the schema**, so a rule cannot arrive without one and
+silently produce the old shape. All 59 written as neutral questions, never as assertions of the
+compliant state. For a prohibition the clause names the prohibited thing (*"products are filed under
+therapeutic categories"*), because *"free of X"* inside *"could not verify whether"* is a double
+negative a reader has to unpick.
+
+Two forms, chosen from `notEvaluableKind` and never from the rule's type:
+
+    not_reachable   →  Cannot be verified from a website: whether the research field is stored …
+    everything else →  Could not verify whether guest checkout is disabled. The add-to-cart control
+                       was clicked but the cart remained empty, so the flow never began.
+
+Reading the type would be inferring a party from a shape — the mistake D-181 catalogued four times.
+`not_reachable` is the producer-set signal for *no crawl could answer this* (D-044). 48 rules take
+the first form, 11 the second.
+
+A finding with no `subject` returns its reason unchanged, which is every run recorded before this.
+A run says what it said (D-002).
+
+### The header-lines block is gone
+
+It stated the distribution a third time at the top, beside the brief and the panel — and two of the
+three disagreed, because the stopping line counted failures while its label said *observed*. Two nav
+cards replace it: **for your review** and **questions for you**, and no third. Asserted on all three
+reference runs that no `headlines` block renders and the counts appear once per surface.
+
+The brief's own count links went with it. They were hidden in CSS at first, which left a live
+`#section-stopping` link pointing at an element that no longer exists — caught by the anchor
+reachability test, and fixed by removing the markup rather than hiding it.
+
+### The visual system
+
+Type: the observation sentence moves from 11px tight to **13px at 1.6**, which the spec names as the
+single biggest readability problem and not a spacing issue. Surfaces: hairline panels with a 12px
+radius, rows inside a bordered container with no radius of their own — the container carries the
+corners.
+
+State becomes a **3px left edge**, and the badge column goes: the band heading already states the
+word once per group, so a badge per row was one label per row for a fact that changes once per
+group. Met and not-observed carry no edge — an edge marks something to look at.
+
+Inside the panel state stays a text label. Those rows are a checklist, and an edge would claim they
+are rows to open.
+
+### Print
+
+Every finding is accounted for in one of **two shapes**, and the test says so rather than assuming
+one: expanded rows, plus the panel's checklist lines for the met conditions. The spec is explicit
+that the clear ones do not expand, so asserting a single shape would have forced seven rows nobody
+needs onto paper. The 3px edge is kept — it survives greyscale as a tonal band, which a badge does
+not.
+
+### Page counts
+
+| run | before | after |
+|---|---|---|
+| `c268f8d7` sportstechnologylabs | 23 | **21** |
+| `5b29036d` comopeptides | 24 | 24 |
+| `f66f7299` comopeptides, live | 25 | 25 |
+| constructed stopping failure | — | 24 |
+
+Two pages off `c268f8d7`, where eight met conditions became eight checklist lines instead of eight
+expanded rows. The other two are unchanged: their stopping conditions were already mostly not
+observed, so they moved rather than collapsed. Measured on a fresh `vite build` (D-187), and the
+PDFs differ in digest and size on every run.
+
+---
+
+## D-195 — "Applies", not "met", and the panel becomes two groups
+
+**2026-08-30 · business owner · `docs/report-visual-spec.md` §2, reworded**
+
+    was                                   now
+    No stopping condition was met         Nothing here stops the application
+    One stopping condition was met        One stopping condition applies
+    n stopping conditions were met        n stopping conditions apply
+
+**"Met" carried two senses inside one panel.** In the heading it meant *fired* — a condition was
+met, so the application stops. In the rows it meant *passed* — the merchant met the requirement. The
+same word, eight inches apart, pointing opposite ways, and nothing on the page to tell a reader
+which was which.
+
+*Applies* collides with nothing: a condition applies or it does not. A row that was checked and
+found clear says so in its own words rather than borrowing the heading's verb.
+
+The sub-line follows:
+
+> Seven of nine stopping conditions were checked and none applies. Two could not be checked — tell
+> us if we have those wrong.
+
+*"Tell us if we have those wrong"* asks about **this document**, which Mintro wrote — not about the
+storefront. The same distinction the review section's lede turns on (D-001).
+
+### Two groups, not a nine-row grid
+
+    COULD NOT BE CHECKED · 2      expands, carries evidence, takes a comment
+    CHECKED AND CLEAR · 7         one line of names, no state labels, does not expand
+
+The group heading carries the state word and the count once, so the rows beneath carry none — the
+same argument that removed the per-row badge in D-194.
+
+### Three things the re-render found
+
+**The collapsed row still showed the mechanism.** §2a composed *"Could not verify whether guest
+checkout is disabled"* into the expanded view only; the one line a reader scans without opening
+anything still read *"Not evaluable from the crawled surface: the add-to-cart control was
+clicked…"* — the old prefix and the mechanism, in the position where the question matters most.
+The row now composes the same sentence.
+
+**The failed panel promised two unchecked conditions and showed none.** Its sub-line names the
+count, and the body rendered only the failures and the collapsed clear line. A reader was told there
+are two open questions and given no way to answer either — and those are precisely the rows a
+merchant can resolve. Both states now render the same group, from one definition.
+
+**The reference fixtures cannot show §2a at all.** They were assembled before `subject` existed, so
+`notObservedSentence` returns their reason unchanged — correct, and the rule is D-002's: a run says
+what it said. But it meant the panel rendered the old wording no matter what the code did. Verified
+against a **fresh run of comopeptides**, whose 71 findings all carry a subject:
+
+> Could not verify whether products are filed under therapeutic categories. No URLs in scope
+> 'collections' were listed in the sitemap, so there was nothing to examine.
+
+Worth knowing generally: **a change to how findings are composed cannot be demonstrated on stored
+runs.** The fixtures are outputs, immutable, and they will always render the vocabulary they were
+produced under.
+
+---

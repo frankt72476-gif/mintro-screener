@@ -2474,3 +2474,189 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .conseq-item { break-inside: avoid; }
   .conseq { break-before: avoid; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   The visual system (D-194, docs/report-visual-spec.md §6)
+   ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+   An override layer at the end, as D-167 established: one place to read, one place to revert, and
+   the rules being answered stay legible above it.
+
+   No colour is added to the palette. Colour does one job — marking state — and the accent is
+   reserved for links and interactive affordances. Titles, body text and headings are never
+   coloured.
+   ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Type ─────────────────────────────────────────────────────────────────────────────────────
+   The observation sentence at 11px on tight leading was the single biggest readability problem in
+   the document, and it was never a spacing issue. 13px at 1.6 is the change. */
+
+.rhead h1                { font-size: 24px; font-weight: 500; letter-spacing: -0.015em; }
+.part-name               { font-size: 21px; font-weight: 500; }
+.stop-title,
+.brief-head              { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+.find-title              { font-size: 15px; font-weight: 500; line-height: 1.45; }
+.find-note,
+.req-t                   { font-size: 13px; font-weight: 400; line-height: 1.6; }
+.find-ev,
+.state,
+.group-rule              { font-size: 11px; }
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────────────────────────
+   Content sits in surfaces; the page does not. A hairline and a radius, white on the page ground —
+   no fills, no shadows. */
+
+.panel,
+.brief,
+.cat {
+  border: 0.5px solid var(--line);
+  border-radius: 12px;
+  background: #FFFFFF;
+  padding: 18px 20px;
+}
+
+.brief { margin-bottom: 20px; }
+
+/* Rows live inside the container and the container carries the corners, so a row has no radius of
+   its own — a rounded row inside a rounded box is two frames around one thing. */
+.cat { padding: 0; overflow: hidden; }
+.cat .find { border-bottom: 0.5px solid var(--line); }
+.cat .find:last-child { border-bottom: 0; }
+
+/* ── State as a left edge ─────────────────────────────────────────────────────────────────────
+   3px down the row, not a badge column. The band heading above the group states the word once, so
+   repeating it on every row was one label per row for a fact that changes once per group.
+
+   Met and not-observed carry no edge: an edge is a mark for something to look at. */
+
+.find-head { border-left: 3px solid transparent; }
+.find.fail .find-head    { border-left-color: var(--rose); }
+.find.review .find-head  { border-left-color: var(--amber); }
+.find.pass .find-head,
+.find.na .find-head      { border-left-color: transparent; }
+
+/* The badge column goes. The band heading carries the word (D-194 §6). */
+.find-head > .state { display: none; }
+
+/* Inside the stopping panel state stays a text label — those rows are a checklist, not findings,
+   and an edge would claim they are rows to open. */
+.stop-list .stop-state { display: inline; }
+
+/* ── Interaction ──────────────────────────────────────────────────────────────────────────────
+   A row must be visibly interactive *before* it is hovered, so the chevron is always present and
+   never revealed on hover. */
+
+.find-head { cursor: pointer; }
+.find-head:disabled { cursor: default; }
+.find-head:hover:not(:disabled) { background: var(--paper); }
+.find-head:focus-visible { outline: 2px solid var(--violet); outline-offset: -2px; }
+
+/* ── The stopping-conditions panel (§2) ───────────────────────────────────────────────────────
+   Top of the document, above the brief, all nine named. Not a section further down and not a count
+   card — it was reduced to one three times during design and each time the reader lost the thing
+   that matters most. */
+
+.stop-panel { margin: 0 0 20px; }
+.stop-panel.is-failed { border-color: var(--rose); }
+
+.stop-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+
+.stop-icon {
+  flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700;
+  background: #E3F6EE; color: #0A7A54;
+}
+.stop-panel.is-failed .stop-icon { background: #FDE7EB; color: #B0203A; }
+
+.stop-title { margin: 0; }
+.stop-sub { margin: 3px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--slate); }
+.stop-lede { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-mid); }
+
+/* Two groups, not a nine-row grid (D-195). The heading carries the state word once, so the rows
+   beneath carry none — a label per row would repeat what the group already says. */
+
+.stop-group + .stop-group { margin-top: 16px; }
+
+.stop-grouphead {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 0 0 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--slate);
+}
+.stop-groupn { font-size: 11px; letter-spacing: 0; color: var(--ink); }
+
+/* The clear ones: one line of names in secondary text. Nothing to open. */
+.stop-clear { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--slate); }
+
+/* A could-not-be-checked row with no group behind it — the fallback where a finding is missing. */
+.stop-openrow { display: flex; gap: 9px; align-items: baseline; margin: 0 0 4px; font-size: 13px; }
+.stop-id { font-size: 11px; color: var(--slate); }
+
+.stop-failed { list-style: none; margin: 0; padding: 0; }
+.stop-failed > li { border-top: 0.5px solid var(--line); }
+.stop-failed > li:first-child { border-top: 0; }
+.stop-others { margin: 12px 0 0; font-size: 12px; color: var(--slate); }
+
+
+/* ── The brief (§3) ───────────────────────────────────────────────────────────────────────────
+   Title at full weight, the selected line following in secondary text on the same line. */
+
+.brief-items { margin-bottom: 0; }
+.brief-item { border-left: 0; padding-left: 0; margin-bottom: 7px; }
+.brief-title { display: inline; font-size: 14px; }
+.brief-line { display: inline; font-size: 13px; color: var(--slate); }
+.brief-line::before { content: ' — '; }
+.brief-counts, .brief-coverage { display: none; }
+
+/* ── Navigation (§4) ──────────────────────────────────────────────────────────────────────────
+   Two cards. There is no stopping-conditions card: the panel above is the stopping conditions. */
+
+.navcards { display: flex; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
+
+.navcard {
+  flex: 1 1 220px;
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 13px 16px;
+  border: 0.5px solid var(--line); border-radius: 12px;
+  background: #FFFFFF;
+  text-decoration: none;
+  color: var(--violet);
+}
+.navcard:hover { border-color: var(--violet); }
+.navcard.is-empty { color: var(--slate); }
+
+.navcard-n { font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 600; color: var(--ink); }
+.navcard-label { font-size: 13px; }
+.navcard-arrow {
+  margin-left: auto; align-self: center;
+  width: 7px; height: 7px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+/* ── Coverage (§5) ────────────────────────────────────────────────────────────────────────────
+   One sentence under the cards, unchanged wording. */
+.top-coverage {
+  margin: 0 0 30px;
+  font-size: 12.5px; line-height: 1.6; color: var(--slate);
+  max-width: 80ch;
+}
+
+/* ── Print (§6) ───────────────────────────────────────────────────────────────────────────────
+   No hover, no chevrons, no sticky bar, no cards. Every row expanded. The 3px edge is kept: it
+   survives greyscale as a tonal band, which a colour badge does not. */
+
+@media print {
+  .navcards, .headbar, .headbar-sentinel, .find-caret { display: none; }
+
+  .panel, .brief, .cat { background: none; border-color: #C9C4DA; }
+  .stop-panel.is-failed { border-color: #8A8598; border-left-width: 3px; }
+  .stop-icon { background: none; border: 0.5px solid #8A8598; }
+
+  .stop-panel, .brief { break-inside: avoid; }
+  .stop-head { break-after: avoid; }
+}

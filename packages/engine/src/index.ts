@@ -274,6 +274,7 @@ export {
   distinctRuleCount,
   pairSameObservation,
   describeVerdict,
+  notObservedSentence,
   type AssembleInput,
   type ReportCategory,
   type ReportAccess,

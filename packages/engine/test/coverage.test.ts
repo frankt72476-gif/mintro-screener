@@ -168,6 +168,7 @@ describe('the kind is what the finding declared', () => {
         ...finding,
         title: 'x',
         clause: 'x',
+        subject: 'the fixture subject is stated',
         severity: 'minor',
         tier: 'review_only',
         checkType: 'text_match',

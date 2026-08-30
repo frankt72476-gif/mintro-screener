@@ -28,15 +28,15 @@ describe('the live comopeptides shape', () => {
     const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
 
     expect(lines).toEqual([
-      '7 of 9 stopping conditions were observed, and none was failing.',
-      '2 could not be evaluated: GATE-003, NAME-001.',
+      'Seven of nine stopping conditions were checked and none applies.',
+      'Two could not be checked — tell us if we have those wrong.',
     ]);
   });
 
   it('says nothing about a gap when there is none', () => {
     const lines = stoppingSentence(account({ passed: Array.from({ length: 9 }, (_, i) => `R-${i}`) }));
 
-    expect(lines).toEqual(['9 of 9 stopping conditions were observed, and none was failing.']);
+    expect(lines).toEqual(['Nine of nine stopping conditions were checked and none applies.']);
   });
 
   it('counts a failure as observed, because it was', () => {
@@ -45,8 +45,8 @@ describe('the live comopeptides shape', () => {
       account({ failed: [{ ruleId: 'CATG-001' }] as never, notEvaluable: ['GATE-003'] }),
     );
 
-    expect(lines[0]).toBe('8 of 9 stopping conditions were observed, and 1 was failing.');
-    expect(lines[1]).toBe('1 could not be evaluated: GATE-003.');
+    expect(lines[0]).toBe('Eight of nine stopping conditions were checked and one applies.');
+    expect(lines[1]).toBe('One could not be checked — tell us if we have those wrong.');
   });
 
   it('renders nothing for a run predating the flag', () => {
@@ -68,9 +68,9 @@ describe('a stored report whose parts do not add up', () => {
     const lines = stoppingSentence(account({ passed: ['PROD-006', 'PROD-007'], notEvaluable: ['GATE-003'] }));
 
     // Not "2 of 9 … 1 could not be evaluated" and silence about the other six.
-    expect(lines[0]).toBe('2 of 9 stopping conditions were observed, and none was failing.');
-    expect(lines[2]).toContain('6 produced no finding on this run');
-    expect(lines[2]).toContain('did not observe every condition it declares');
+    expect(lines[0]).toBe('Two of nine stopping conditions were checked and none applies.');
+    expect(lines[2]).toContain('Six produced no finding on this run');
+    expect(lines[2]).toContain('did not check every condition it declares');
   });
 
   it('is silent when the parts do add up, which is every healthy run', () => {
@@ -84,13 +84,13 @@ describe('a stored report whose parts do not add up', () => {
 describe('grammar', () => {
   it('agrees the verb with the observed count', () => {
     const one = stoppingSentence(account({ passed: ['PAY-001'], notEvaluable: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] }));
-    expect(one[0]).toBe('1 of 9 stopping conditions was observed, and none was failing.');
+    expect(one[0]).toBe('One of nine stopping conditions was checked and none applies.');
   });
 
   it('agrees the verb with the failure count', () => {
     const many = stoppingSentence(
       account({ failed: [{ ruleId: 'A' }, { ruleId: 'B' }] as never, passed: ['C', 'D', 'E', 'F', 'G', 'H', 'I'] }),
     );
-    expect(many[0]).toBe('9 of 9 stopping conditions were observed, and 2 were failing.');
+    expect(many[0]).toBe('Nine of nine stopping conditions were checked and two apply.');
   });
 });

@@ -176,6 +176,7 @@ describe('a pattern with no labels reads case-preserved text', () => {
     tier: 'review_only',
     title: 'An uppercase token is present',
     clause: 'Test fixture.',
+    subject: 'the fixture subject is stated',
     // String.raw, so the word boundaries are regex syntax rather than backspace characters.
     params: { surface: 'product', pattern: String.raw`\b[A-Z]{3}\b`, expect: 'present' },
   } as unknown as RuleOfType<'text_match'>;

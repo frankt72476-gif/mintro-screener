@@ -60,6 +60,18 @@ const ruleCommon = {
   tier: z.enum(TIERS),
   title: z.string().min(1),
   clause: z.string().min(1),
+  /**
+   * One clause completing *"Could not verify whether ___"* (D-194, visual spec §2a).
+   *
+   * Data, not code: the sentence a `not_evaluable` finding opens with is built from this, and a new
+   * rule that arrives without one would produce a finding stating a mechanism and never a question —
+   * which is the ambiguity §2a exists to remove. Required, so it cannot be forgotten.
+   *
+   * A neutral question about the subject, never an assertion of the compliant state. For a
+   * prohibition it names the prohibited thing — "products are filed under therapeutic categories" —
+   * because "free of X" inside "could not verify whether" is a double negative.
+   */
+  subject: z.string().min(1),
   /** Whose statement `clause` is. Required — see `RULE_SOURCES`. */
   source: z.enum(RULE_SOURCES),
   /**

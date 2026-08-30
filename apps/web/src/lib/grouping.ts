@@ -743,51 +743,63 @@ export interface StoppingAccount {
 }
 
 /**
- * The stopping-conditions sentence, leading with what was determined (D-183).
+ * The stopping-conditions sub-line, in the panel's vocabulary (D-183, reworded by D-195).
  *
- * It used to open on the clean sweep and disclose the gap second:
+ * It used to open on the clean sweep and disclose the gap second, which let a reader take the
+ * reassurance from the first sentence and withdraw it at the next. The denominator comes first, so
+ * the gap is part of the claim rather than a qualification of it. That ordering is unchanged.
  *
- *     None of the 9 stopping conditions was observed failing on this run.
- *     Not observed either way, so not cleared: GATE-003, NAME-001.
+ * **What changed is the word.** *"Met"* meant *fired* in the heading and *passed* in the rows — two
+ * senses of one word in one panel, and the reader has no way to tell which is which. *Applies*
+ * collides with nothing: a condition applies or it does not, and a row that was checked and clear
+ * says so in its own words.
  *
- * A reader takes the reassurance from the first line and has to withdraw it at the second. Same
- * facts, and the order decides whether the sentence misleads for a moment. The denominator comes
- * first, so the gap is part of the claim rather than a qualification of it.
+ * *"Tell us if we have those wrong"* asks about **this document**, which Mintro wrote — not about
+ * the storefront. The same distinction the review section's lede turns on (D-001).
  *
- * **The parts are counted, never assumed to add up.** `summariseBlocking` now refuses to assemble a
- * run whose lists do not partition the declared set, but a report stored before that guard existed
- * could carry a hole, and runs are immutable. So a shortfall is stated rather than absorbed: the
- * alternative is a sentence claiming "7 of 9 were observed" on a report where the ninth is simply
- * missing, which is the flattering direction and the one worth being loud about.
+ * **The parts are counted, never assumed to add up.** `summariseBlocking` refuses to assemble a run
+ * whose lists do not partition the declared set, but a report stored before that guard could carry a
+ * hole, and runs are immutable. A shortfall is stated rather than absorbed: the alternative is a
+ * sentence claiming "seven of nine were checked" on a report where the ninth is simply missing,
+ * which is the flattering direction and the one worth being loud about.
  */
 export function stoppingSentence(account: StoppingAccount): readonly string[] {
   if (account.declared === null) return [];
 
-  const failed = account.failed.length;
-  const observed = failed + account.passed.length;
-  const unaccounted = account.declared - observed - account.notEvaluable.length;
+  const applies = account.failed.length;
+  const checked = applies + account.passed.length;
+  const unchecked = account.notEvaluable.length;
+  const unaccounted = account.declared - checked - unchecked;
 
-  const were = observed === 1 ? 'was' : 'were';
+  const verdict =
+    applies === 0
+      ? 'none applies'
+      : `${lower(spellOut(applies))} ${applies === 1 ? 'applies' : 'apply'}`;
+
   const lines = [
-    `${observed} of ${account.declared} stopping conditions ${were} observed, and ` +
-      (failed === 0 ? 'none was failing.' : `${failed} ${failed === 1 ? 'was' : 'were'} failing.`),
+    `${spellOut(checked)} of ${lower(spellOut(account.declared))} stopping conditions ` +
+      `${checked === 1 ? 'was' : 'were'} checked and ${verdict}.`,
   ];
 
-  if (account.notEvaluable.length > 0) {
-    const n = account.notEvaluable.length;
-    lines.push(`${n} could not be evaluated: ${account.notEvaluable.join(', ')}.`);
+  if (unchecked > 0) {
+    // The ids are not repeated here: each has its own row in the panel, with what could not be
+    // verified and a box to say so.
+    lines.push(`${spellOut(unchecked)} could not be checked — tell us if we have those wrong.`);
   }
 
   if (unaccounted > 0) {
     // Never expected. Said plainly rather than hidden inside the arithmetic above.
     lines.push(
-      `${unaccounted} produced no finding on this run and ${unaccounted === 1 ? 'is' : 'are'} ` +
-        `unaccounted for, so this run did not observe every condition it declares.`,
+      `${spellOut(unaccounted)} produced no finding on this run and ${unaccounted === 1 ? 'is' : 'are'} ` +
+        `unaccounted for, so this run did not check every condition it declares.`,
     );
   }
 
   return lines;
 }
+
+/** `Seven` → `seven`, for a spelled-out number that is not starting a sentence. */
+const lower = (word: string): string => word.charAt(0).toLowerCase() + word.slice(1);
 
 export interface ReportPart {
   readonly id: SectionId;
@@ -861,6 +873,26 @@ function stoppingRuleIds(report: ScreeningReport): ReadonlySet<string> {
 }
 
 /**
+ * Every declared stopping condition, whatever this run observed (D-194).
+ *
+ * The panel holds all nine, and the ones that could not be checked expand there and take a comment —
+ * so those rows have to be *removed* from "For your review" as well, or the same rule is a row in
+ * two places and D-166's "a rule is one row wherever it appears" stops holding.
+ *
+ * A judgment the visual spec leaves implicit: it says stopping conditions are the panel and not a
+ * section further down, and this is what that means for the rows that are neither failed nor met.
+ */
+function declaredStoppingIds(report: ScreeningReport): ReadonlySet<string> {
+  const blocking = report.blocking;
+  if (blocking === undefined) return new Set();
+  return new Set([
+    ...blocking.failed.map((entry) => entry.ruleId),
+    ...blocking.notEvaluable,
+    ...blocking.passed,
+  ]);
+}
+
+/**
  * The four sections, in this surface's order.
  *
  * Every group lands in exactly one. A stopping condition that failed is in section 1 and nowhere
@@ -870,12 +902,23 @@ function stoppingRuleIds(report: ScreeningReport): ReadonlySet<string> {
 export function reportParts(report: ScreeningReport, surface: Surface): readonly ReportPart[] {
   const groups = nestCascades(groupByRule(ungrouped(report)));
   const stoppingIds = stoppingRuleIds(report);
-  const isStopping = (group: FindingGroup): boolean => stoppingIds.has(group.ruleId);
+  // Failed conditions are what section 1's account counts; the panel holds all of them (D-194).
+  const declared = declaredStoppingIds(report);
+  const isStopping = (group: FindingGroup): boolean => declared.has(group.ruleId);
 
   const parts: Record<SectionId, ReportPart> = {
     stopping: stoppingPart(
       report,
-      groups.filter((group) => isStopping(group) && group.state === 'fail'),
+      groups.filter((group) => stoppingIds.has(group.ruleId) && group.state === 'fail'),
+      /*
+        Every stopping group, not only the failed ones (D-194).
+
+        The panel expands a condition that could not be checked as well as one that failed — that is
+        where a merchant supplies what the crawl could not reach — so it needs those groups to have
+        somewhere to read them from. `stopping.failed` stays the failed subset, because the account
+        line and the checklist are about failures.
+      */
+      groups.filter((group) => isStopping(group)),
     ),
     questions: questionsPart(report),
     review: reviewPart(
@@ -961,7 +1004,11 @@ function stoppingChecklist(
   ];
 }
 
-function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]): ReportPart {
+function stoppingPart(
+  report: ScreeningReport,
+  failed: readonly FindingGroup[],
+  all: readonly FindingGroup[] = failed,
+): ReportPart {
   const blocking = report.blocking;
   return {
     id: 'stopping',
@@ -970,7 +1017,7 @@ function stoppingPart(report: ScreeningReport, failed: readonly FindingGroup[]):
       blocking === undefined
         ? 'This run was screened before stopping conditions were recorded, so which rules counted as one was not written down.'
         : 'Conditions an underwriter has stated it declines applications on, and what this run observed against each.',
-    blocks: [{ key: 'stopping', heading: null, lede: '', groups: failed, tally: tally(failed) }],
+    blocks: [{ key: 'stopping', heading: null, lede: '', groups: all, tally: tally(all) }],
     tally: tally(failed),
     stopping: {
       declared: blocking?.declared ?? null,
@@ -1144,22 +1191,18 @@ function spellOut(n: number): string {
    ═════════════════════════════════════════════════════════════════════════════════════════════ */
 
 /**
- * One line per section, above the fold.
+ * A navigation card at the top of the document (D-194, visual spec §4).
  *
- * Replaces the whole top band: the verdict sentence, the tick strip and its legend, the six
- * coverage columns and the coverage line under the chips. Those were four statements of one
- * distribution, and a reader had to parse three of them to learn what a numeral says.
+ * Two of them: **for your review** and **questions for you**. There is no stopping-conditions card —
+ * the panel above *is* the stopping conditions, and a "0" card standing in for that list is the
+ * mistake the spec names as having been made three times during design.
  *
- * **Counts come from the section's own tally**, so a line and the heading it points at cannot
- * disagree. That is what the derivation in part 1 was for; this is the second reader.
- *
- * A zero section still renders its line, with `0` and no link. An absent line reads as an absent
- * section, which is an absent value shown as an answer (D-044).
+ * Counts come from each section's own tally, the same derivation the section heading and the bands
+ * read. A second count of the same rows is how a summary comes to disagree with what it summarises.
  */
-export interface HeaderLine {
+export interface NavCard {
   readonly id: SectionId;
   readonly count: number;
-  /** `stopping conditions observed` — the section's own name, in the reader's terms. */
   readonly label: string;
   /** The anchor to jump to, or null at zero: there is nothing to arrive at. */
   readonly href: string | null;
@@ -1178,29 +1221,11 @@ export interface HeaderLine {
  * arrived somewhere with a different name on it — a navigation label that does not match its
  * destination is the same defect as a count that disagrees with its heading.
  */
-/**
- * What each header line is called.
- *
- * **`review` reads from `STATE_LABEL_LOWER` rather than restating it (D-188).** It was the literal
- * `'need a look'`, and it survived the vocabulary change by being worded differently enough to
- * escape a search for the label: the table said *Needs a look*, this said *need a look*. So the
- * header lines went on showing the old vocabulary after every other surface had moved — a sixth
- * copy, of exactly the kind D-175 moved this into the engine to prevent. **A line that paraphrases
- * a label is a copy of it, whatever the wording.**
- *
- * `fail` needs a word in front of it to read correctly here — *"3 standards not met"* — so it is
- * **composed from the label rather than restated with it**. A phrase containing a label is a copy of
- * that label the moment it is typed out, and it is the harder kind to find: it does not match a
- * search for the label, and it reads correctly right up until the label changes underneath it.
- *
- * `stopping` and `questions` name sections rather than states, so there is nothing to derive from.
- * *"stopping conditions observed"* is not the `not_evaluable` label with words around it — the
- * participle means the conditions were looked at, and it would not want to change if that label did.
- */
-const HEADER_LABEL: Readonly<Record<string, string>> = {
-  stopping: 'stopping conditions failed',
-  questions: 'operational questions',
-  'review-section': 'for your review',
+/** What each card is called. Sections, not states, so there is nothing to derive from. */
+const NAV_LABEL: Readonly<Record<SectionId, string>> = {
+  review: 'for your review',
+  questions: 'questions for you',
+  stopping: '',
 };
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
@@ -1263,15 +1288,21 @@ export function brief(report: ScreeningReport, parts: readonly ReportPart[]): Br
   const failedStopping = groups.filter((g) => stoppingIds.has(g.ruleId) && g.state === 'fail');
   const failed = groups.filter((g) => !stoppingIds.has(g.ruleId) && g.state === 'fail');
 
-  // Stopping conditions first, always. Everything else is what fills the space they leave.
-  const leading = failedStopping.length > 0 ? failedStopping : failed;
-  const shown = leading.slice(0, MAX_BRIEF_ITEMS);
+  /*
+    The brief renders its not-met items whether or not a stopping condition failed (D-194, §3).
+
+    D-190 had the failures displace them, because the brief was then the top of the document. It is
+    not: the panel is, and it carries the failure. The two do not compete — they are in different
+    surfaces and the panel is louder — and a brief that emptied itself of the ordinary findings
+    would lose them at exactly the moment there is most to read.
+  */
+  const shown = failed.slice(0, MAX_BRIEF_ITEMS);
 
   const items: BriefItem[] = shown.map((group) => ({
     ruleId: group.ruleId,
     title: group.title,
     line: briefLine(group.findings[0]?.note ?? '', group.title),
-    stopping: failedStopping.length > 0,
+    stopping: false,
   }));
 
   const part = (id: SectionId): ReportPart | undefined => parts.find((p) => p.id === id);
@@ -1283,9 +1314,9 @@ export function brief(report: ScreeningReport, parts: readonly ReportPart[]): Br
   const stoppingFailed = part('stopping')?.tally.rules ?? 0;
 
   return {
-    headline: briefHeadline(failedStopping.length, failed.length),
+    headline: briefHeadline(failed.length),
     items,
-    more: Math.max(0, leading.length - shown.length),
+    more: Math.max(0, failed.length - shown.length),
     counts: [
       { label: `question${questions === 1 ? '' : 's'} for you`, count: questions, href: anchor('questions', questions) },
       { label: STATE_LABEL_LOWER.review, count: unclear, href: anchor('review', unclear) },
@@ -1306,12 +1337,9 @@ export function brief(report: ScreeningReport, parts: readonly ReportPart[]): Br
  * characterises the merchant — *"observations did not meet a standard"* is about observations
  * against a standard, not about a storefront's intent.
  */
-function briefHeadline(stopping: number, failed: number): string {
-  if (stopping > 0) {
-    return stopping === 1
-      ? 'One stopping condition was not met'
-      : `${spellOut(stopping)} stopping conditions were not met`;
-  }
+function briefHeadline(failed: number): string {
+  // Says nothing about stopping conditions: the panel above is where those are stated, and two
+  // surfaces announcing the same failure is the duplication the visual spec removes (D-194).
   if (failed === 0) return 'No observation fell short of a standard';
   return failed === 1
     ? 'One observation did not meet a standard'
@@ -1334,50 +1362,29 @@ function sampleSentence(report: ScreeningReport): string {
 export const findingAnchor = (ruleId: string): string => `rule-${ruleId}`;
 
 /**
- * One line per section — three of them now, not four (D-189).
+ * The two cards, in reading order (D-194).
  *
- * Section 3 used to contribute two lines, *not met* and *unclear*, both pointing at the same
- * section. With the three review sections merged there is one destination for all of it, and a
- * navigation offering two links to one place is a navigation that has stopped describing the
- * document.
- *
- * **The counts come from each section's own tally**, which is the same derivation the section
- * heading and the bands read. A second count of the same rows is how a summary comes to disagree
- * with the thing it summarises.
- *
- * A zero section still renders its line, with `0` and no link. An absent line reads as an absent
- * section, which is an absent value shown as an answer (D-044).
+ * **The header-lines block this replaces is gone.** It stated the distribution a third time at the
+ * top of the document, beside the brief and the panel — and two of the three disagreed, because the
+ * stopping line counted failures while its label said "observed". One statement of a number is the
+ * only number that cannot contradict itself.
  */
-export function headerLines(parts: readonly ReportPart[]): readonly HeaderLine[] {
-  const lines: HeaderLine[] = [];
+export function navCards(parts: readonly ReportPart[]): readonly NavCard[] {
+  const cards: NavCard[] = [];
 
-  for (const part of parts) {
-    if (part.id === 'stopping') {
-      /*
-        The count is failures, so the label says failures (D-189).
-
-        It read *"0 stopping conditions observed"* on a run where seven were observed and met —
-        the number is `stoppingPart`'s tally, which covers only the failed rows. A reader met a
-        zero beside the word "observed" and could reasonably conclude nothing had been checked,
-        which is the opposite of what the run found.
-      */
-      lines.push(line('stopping', part.tally.rules, part.id));
-    } else if (part.id === 'questions') {
-      lines.push(line('questions', part.tally.rules, part.id));
-    } else if (part.id === 'review') {
-      lines.push(line('review-section', part.tally.rules, part.id));
-    }
+  for (const id of ['review', 'questions'] as const) {
+    const part = parts.find((candidate) => candidate.id === id);
+    if (part === undefined) continue;
+    cards.push({
+      id,
+      count: part.tally.rules,
+      label: NAV_LABEL[id],
+      href: part.tally.rules === 0 ? null : `#${sectionAnchor(id)}`,
+    });
   }
 
-  return lines;
+  return cards;
 }
-
-const line = (key: string, count: number, id: SectionId): HeaderLine => ({
-  id,
-  count,
-  label: HEADER_LABEL[key] as string,
-  href: count === 0 ? null : `#${sectionAnchor(id)}`,
-});
 
 /**
  * Coverage, as one sentence, in Mintro's own vocabulary (spec §4).

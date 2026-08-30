@@ -19,7 +19,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { STATE_LABEL, type ScreeningReport } from '@mintro/engine';
 import { ReportView } from '../src/components/ReportView.js';
-import { headerLines, reportParts } from '../src/lib/grouping.js';
+import { navCards, reportParts } from '../src/lib/grouping.js';
 
 const access = { description: 'none needed for markup', urlFor: async () => null };
 const load = (n: string): ScreeningReport =>
@@ -137,35 +137,24 @@ describe('print', () => {
   });
 });
 
-describe('the header lines', () => {
-  it.each(RUNS)('%s: three destinations, not four', (name) => {
-    const lines = headerLines(reportParts(load(name), 'agent'));
+describe('the navigation cards', () => {
+  it.each(RUNS)('%s: two destinations, and no stopping card', (name) => {
+    /*
+      The panel above *is* the stopping conditions (D-194). A "0" card standing in for that list is
+      the reduction the visual spec records as having been made three times during design.
+    */
+    const cards = navCards(reportParts(load(name), 'agent'));
 
-    expect(lines).toHaveLength(3);
-    expect(lines.map((l) => l.id)).toEqual(['stopping', 'review', 'questions']);
+    expect(cards).toHaveLength(2);
+    expect(cards.map((c) => c.id)).toEqual(['review', 'questions']);
   });
 
   it.each(RUNS)('%s: counts come from the sections own tallies', (name) => {
-    // Not a second derivation. The line and the heading it points at read the same number.
+    // Not a second derivation. The card and the heading it points at read the same number.
     const parts = reportParts(load(name), 'agent');
-    const lines = headerLines(parts);
 
-    for (const line of lines) {
-      const part = parts.find((p) => p.id === line.id);
-      expect(line.count, line.id).toBe(part?.tally.rules);
+    for (const card of navCards(parts)) {
+      expect(card.count, card.id).toBe(parts.find((p) => p.id === card.id)?.tally.rules);
     }
-  });
-
-  it('says stopping conditions failed, not observed', () => {
-    /*
-      It read "0 stopping conditions observed" on a run where seven were observed and met. The
-      number is the failure count; the word said otherwise, so a reader could conclude nothing had
-      been checked — the opposite of what the run found.
-    */
-    const report = load('run-c268f8d7');
-    const stopping = headerLines(reportParts(report, 'agent')).find((l) => l.id === 'stopping');
-
-    expect(stopping?.label).toBe('stopping conditions failed');
-    expect(stopping?.count).toBe(report.blocking?.failed.length ?? 0);
   });
 });
