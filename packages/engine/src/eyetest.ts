@@ -46,6 +46,15 @@ export interface EyeTestItem {
 export interface EyeTestRubric {
   readonly version: string;
   readonly effective: string;
+  /**
+   * Which model answers (D-196, amended).
+   *
+   * **Data, with the questions.** Changing model is a calibration decision and not a code change —
+   * the same reasoning the rubric itself rests on. Keeping it here means a rubric version
+   * identifies both the questions asked and the model that answered them, which is what a
+   * calibration log needs before it can compare two reads.
+   */
+  readonly model: string;
   readonly note: string;
   /** What to ask for as the read — the two-to-four sentences a reader actually reads (§3). */
   readonly read_instruction: string;
@@ -139,6 +148,9 @@ export function parseEyeTestRubric(raw: unknown, source: string): EyeTestRubric 
   if (typeof doc['version'] !== 'string' || doc['version'] === '') {
     return fail('no version, so a stored result could not be traced to the questions that produced it');
   }
+  if (typeof doc['model'] !== 'string' || doc['model'] === '') {
+    return fail('no model, so a stored read could not be attributed to the model that produced it');
+  }
   if (!Array.isArray(doc['items']) || doc['items'].length === 0) return fail('it declares no items');
 
   const items = doc['items'].map((entry, index): EyeTestItem => {
@@ -166,6 +178,7 @@ export function parseEyeTestRubric(raw: unknown, source: string): EyeTestRubric 
 
   return {
     version: doc['version'] as string,
+    model: doc['model'] as string,
     effective: typeof doc['effective'] === 'string' ? doc['effective'] : '',
     note: typeof doc['note'] === 'string' ? doc['note'] : '',
     read_instruction: typeof doc['read_instruction'] === 'string' ? doc['read_instruction'] : '',

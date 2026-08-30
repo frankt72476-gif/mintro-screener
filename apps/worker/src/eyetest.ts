@@ -52,8 +52,6 @@ const API_VERSION = '2023-06-01';
  */
 export const EYE_TEST_TIMEOUT_MS = 20_000;
 
-const DEFAULT_MODEL = 'claude-sonnet-5';
-
 /** A capture the eye test wants, named by the surface the rubric asks about. */
 export interface CaptureRequest {
   readonly surface: string;
@@ -66,6 +64,7 @@ export interface CaptureRequest {
 
 export interface EyeTestOptions {
   readonly apiKey?: string;
+  /** Overrides the rubric's model. For tests; production reads the rubric. */
   readonly model?: string;
   readonly timeoutMs?: number;
   readonly rubricPath?: string;
@@ -134,6 +133,20 @@ export async function runEyeTest(
     return absent(rubric.version, 'none of the captures the eye test reads was available on this run', captures);
   }
 
+  /*
+    Resolved once, and the value sent is the value recorded (D-196, amended).
+
+    It was computed twice — once for the request and once for the result — so the stored `model` was
+    a second evaluation that happened to agree rather than the string that actually went. The field
+    exists so a later reader knows which model produced a read; a recomputation cannot promise that.
+
+    **The rubric is the source.** `ANTHROPIC_VISION_MODEL` is deliberately not consulted: an
+    environment variable that moved the model without moving the rubric version would leave a
+    calibration log unable to reproduce a read from the version alone, which is the one thing
+    keeping the model beside the questions is for. `options.model` remains, for tests.
+  */
+  const model = options.model ?? rubric.model;
+
   const controller = new AbortController();
   const timeout = options.timeoutMs ?? EYE_TEST_TIMEOUT_MS;
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -148,7 +161,7 @@ export async function runEyeTest(
         'anthropic-version': API_VERSION,
       },
       body: JSON.stringify({
-        model: options.model ?? process.env['ANTHROPIC_VISION_MODEL'] ?? DEFAULT_MODEL,
+        model,
         max_tokens: 2000,
         // Deterministic: the same captures should not produce a different reading run to run.
         temperature: 0,
@@ -176,7 +189,7 @@ export async function runEyeTest(
       test: {
         read: parsed.read,
         rubricVersion: rubric.version,
-        model: options.model ?? process.env['ANTHROPIC_VISION_MODEL'] ?? DEFAULT_MODEL,
+        model,
         ranAt: new Date().toISOString(),
         elapsedMs: now() - started,
         verdicts: parsed.verdicts,

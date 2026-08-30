@@ -7,6 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { EvidenceArtifact } from '@mintro/engine';
+import { parseEyeTestRubric } from '@mintro/engine';
 import { loadEyeTestRubric, runEyeTest, EYE_TEST_TIMEOUT_MS, type CaptureRequest } from '../src/eyetest.js';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
@@ -59,6 +60,20 @@ describe('the rubric is data', () => {
       expect(item.look_for.length, item.id).toBeGreaterThan(10);
       expect(item.surfaces.length, item.id).toBeGreaterThan(0);
     }
+  });
+
+  it('carries the model, so a read can be attributed to what produced it', () => {
+    /*
+      Changing model is a calibration decision, not a code change — the same reasoning the rubric
+      itself rests on. Keeping it here means a rubric version identifies both the questions and the
+      model that answered them, which is what a calibration log needs before it can compare reads.
+    */
+    expect(loadEyeTestRubric().model).toMatch(/\S/);
+  });
+
+  it('refuses a rubric with no model rather than falling back to one in code', () => {
+    // A default in code is a model that can move without the version moving.
+    expect(() => parseEyeTestRubric({ version: '1.0.0', items: [] }, 'test')).toThrow(/no model/);
   });
 
   it('says for every question why no rule answers it', () => {
@@ -278,6 +293,36 @@ describe('what it accepts back', () => {
     });
 
     expect(outcome.kind).toBe('absent');
+  });
+
+  it('records the model it actually sent, not a second computation of it', async () => {
+    /*
+      The stored value was recomputed rather than captured — two evaluations of one expression that
+      happened to agree. The field exists so a later reader knows which model produced a read, and a
+      recomputation cannot promise that.
+    */
+    const spy = answered([]);
+    const outcome = await runEyeTest([want()], [artifact('run-1/layer1/home.png')], {
+      ...KEY,
+      model: 'a-specific-model',
+      fetchImpl: spy,
+    });
+
+    const sent = JSON.parse(String((spy.mock.calls[0]?.[1] as { body: string }).body)).model;
+
+    if (outcome.kind !== 'ran') throw new Error('expected a result');
+    expect(sent).toBe('a-specific-model');
+    expect(outcome.test.model).toBe(sent);
+  });
+
+  it('takes the model from the rubric when nothing overrides it', async () => {
+    const outcome = await runEyeTest([want()], [artifact('run-1/layer1/home.png')], {
+      ...KEY,
+      fetchImpl: answered([]),
+    });
+
+    if (outcome.kind !== 'ran') throw new Error('expected a result');
+    expect(outcome.test.model).toBe(loadEyeTestRubric().model);
   });
 
   it('stores the rubric version with the result', async () => {
