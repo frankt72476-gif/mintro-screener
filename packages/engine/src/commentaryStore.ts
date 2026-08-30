@@ -162,7 +162,7 @@ export async function readRunCommentary(
   const comments = await rows<CommentRow>(
     db,
     'merchant_comments',
-    'rule_id, ordinal, body, identified_as, submitted_at, subject',
+    'rule_id, ordinal, body, identified_as, submitted_at, subject, inherited_from_run, originally_answered_at, commented_on',
     runId,
     'submitted_at',
   );
@@ -236,6 +236,15 @@ export async function readRunCommentary(
         ruleId: row.rule_id ?? '',
         ...(row.ordinal === null ? {} : { ordinal: row.ordinal }),
         ...(row.subject === 'eye-test' ? { subject: 'eye-test' as const } : {}),
+        ...(row.inherited_from_run === null || row.originally_answered_at === null
+          ? {}
+          : {
+              inherited: {
+                fromRunId: row.inherited_from_run,
+                originallyAt: row.originally_answered_at,
+              },
+            }),
+        ...(row.commented_on === null ? {} : { commentedOn: row.commented_on }),
         body: row.body,
         identifiedAs: row.identified_as,
         submittedAt: row.submitted_at,
@@ -271,6 +280,9 @@ interface SendRow {
 interface CommentRow {
   rule_id: string | null;
   subject: string | null;
+  inherited_from_run: string | null;
+  originally_answered_at: string | null;
+  commented_on: string | null;
   ordinal: number | null;
   body: string;
   identified_as: string;

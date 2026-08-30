@@ -67,6 +67,20 @@ export function commentToken(): string | null {
   return commentTokenFrom(window.location.href);
 }
 
+/**
+ * One stored answer as the form shows it back (D-205).
+ *
+ * `writtenBy` and `writtenAt` are always present — an answer in this map came from somewhere, and
+ * the form says where. `carriedForwardFrom` is set only where it came from an earlier screening.
+ */
+interface StoredAnswer {
+  readonly outcome: 'answered' | 'declined';
+  readonly body?: string;
+  readonly writtenBy: string;
+  readonly writtenAt: string;
+  readonly carriedForwardFrom?: string;
+}
+
 interface OpenedReport {
   readonly runId: string;
   readonly merchantDomain: string;
@@ -99,7 +113,22 @@ interface OpenedReport {
    * record anything, because an answer to one of the nineteen questions is text the merchant added
    * exactly as a comment is. The database asks the same question over the same two channels.
    */
-  readonly attestations: readonly { readonly identifiedAs: string; readonly submittedAt: string }[];
+  /**
+   * The answers already stored for this run, in full (D-205).
+   *
+   * Bodies included since 0052. They were withheld on the reasoning that the page had never
+   * replayed another visitor's answers back at them — which withheld nothing, because the `report`
+   * in this same payload renders every one of them with its attribution, on this page, at this link.
+   */
+  readonly attestations: readonly {
+    readonly questionId?: string;
+    readonly outcome?: 'answered' | 'declined';
+    readonly body?: string | null;
+    readonly identifiedAs: string;
+    readonly submittedAt: string;
+    readonly inheritedFromRun?: string | null;
+    readonly originallyAnsweredAt?: string | null;
+  }[];
 }
 
 type Opened =
@@ -318,8 +347,42 @@ function OpenReport({
    */
   /** What this visitor has sent this session, for showing back to them. Never a source of truth. */
   const [answers, setAnswers] = useState<
-    ReadonlyMap<string, { readonly outcome: 'answered' | 'declined'; readonly body?: string }>
+    ReadonlyMap<string, StoredAnswer>
   >(new Map());
+
+  /*
+    What is already stored for this run, replayed into the form (D-205).
+
+    Including answers carried forward from an earlier screening of this domain (D-204) — which is
+    the whole point: a merchant who answered nineteen questions in August should not answer them
+    again in October because we re-crawled.
+
+    Each one keeps **who wrote it and when**. Under a forwardable link (D-063) that attribution is
+    the safeguard rather than the risk: a merchant seeing that their agent answered this on 12
+    August is better placed than one typing blind into a box and contradicting them.
+
+    Seeded once per open, and never again — after that this map is what *this* visitor has done,
+    which is what it has always been. A later re-seed would overwrite their unsent edits.
+  */
+  useEffect(() => {
+    setAnswers((existing) => {
+      if (existing.size > 0) return existing;
+      const seeded = new Map<string, StoredAnswer>();
+      for (const stored of opened.attestations) {
+        if (stored.questionId === undefined || stored.outcome === undefined) continue;
+        seeded.set(stored.questionId, {
+          outcome: stored.outcome,
+          ...(typeof stored.body === 'string' ? { body: stored.body } : {}),
+          writtenBy: stored.identifiedAs,
+          writtenAt: stored.submittedAt,
+          ...(typeof stored.originallyAnsweredAt === 'string'
+            ? { carriedForwardFrom: stored.originallyAnsweredAt }
+            : {}),
+        });
+      }
+      return seeded;
+    });
+  }, [opened]);
 
   const forgetIdentity = (): void => {
     clearVisit();
@@ -370,7 +433,19 @@ function OpenReport({
 
     setAnswers((existing) => {
       const next = new Map(existing);
-      next.set(questionId, outcome === 'declined' ? { outcome } : { outcome, body: body ?? '' });
+      /*
+        Editing makes it theirs (D-204, §4).
+
+        No `carriedForwardFrom`: the row the write path just appended carries no provenance columns,
+        so the stored answer is theirs on this run, and the form has to agree with the database
+        rather than keep showing a mark the row no longer has.
+      */
+      next.set(questionId, {
+        outcome,
+        ...(outcome === 'declined' ? {} : { body: body ?? '' }),
+        writtenBy: identity.email,
+        writtenAt: payload.submittedAt ?? new Date().toISOString(),
+      });
       return next;
     });
     return null;

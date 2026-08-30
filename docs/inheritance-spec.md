@@ -67,6 +67,33 @@ not copied. There is nothing for it to attach to.
 
 ---
 
+## 3a — The eye-test comment inherits, and always says the read has moved
+
+The eye-test reply arrived after this spec was drafted (D-203). It carries a `subject` rather than a
+rule id, because `merchant_comments.rule_id` takes only `^[A-Z]+-[0-9]{3}$` and a value that passed
+would be read as a finding by everything above it.
+
+**It inherits.** It is the one response in the package that is about the storefront as a whole rather
+than about a specific observation — *"the Fire Sale ran for two days in August and is gone"* is true
+of the business whichever crawl produced the read. It has no rule to disappear out from under it, so
+the §3 test that gates finding comments does not apply: it inherits unconditionally.
+
+**And it always carries the changed-read line.** For a finding comment that line is conditional: it
+fires when this run's observation differs from the one commented on. Here the condition is
+permanently true. The read is generated prose written fresh from each run's captures, and it differs
+every time — four calls against *identical* captures produced four differently-worded reads (D-197).
+
+So the line is not written as a condition. A conditional that is always true implies there are runs
+where it does not hold, and a reader who saw it absent once would take its presence as significant:
+
+> Written on an earlier screening of this domain, 12 Aug, about the read as it stood then. The read
+> above was written for this run.
+
+The merchant's account is not discarded — it is the most useful thing in the package and it is
+durable — but nobody is told it answers the paragraph printed above it.
+
+---
+
 ## 4 — Editing
 
 **An inherited response is editable like any other**, and stays editable until the merchant submits
@@ -116,7 +143,7 @@ storefront already hang off one merchant row.
 
 | Surface | Inherited response shows |
 |---|---|
-| Comment page (merchant) | the answer, "answered 12 Aug on an earlier screening", editable |
+| Comment page (merchant) | the answer, who wrote it, "answered 12 Aug on an earlier screening", editable (D-205) |
 | Report (agent, IQwallet) | the answer, its original date, and that it is inherited |
 | Participation record | counted separately, never folded into this run's answered count |
 

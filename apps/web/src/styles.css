@@ -2965,3 +2965,21 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .part-two > .part  { border: 0; }
   .part-two > .part + .part { border-top: 0.5px solid #D8D4E2; }
 }
+
+/* ── Inherited provenance (D-204) ───────────────────────────────────────────────────────────────
+   Quiet, and never hidden. It sits with the text it qualifies rather than in a legend, because the
+   whole argument for reversing D-046 is that provenance travels with the words. */
+.att-inherited,
+.mr-inherited {
+  margin: var(--s2) 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--slate);
+}
+
+.att-inherited { margin-left: calc(82px + var(--s3)); }
+
+@media print {
+  /* It prints. An inherited answer that looked fresh on paper is the exact risk D-046 named. */
+  .att-inherited, .mr-inherited { color: #57536A; }
+}

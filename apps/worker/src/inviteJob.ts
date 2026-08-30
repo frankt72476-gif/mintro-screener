@@ -101,6 +101,39 @@ export async function issueInvitation(
     throw new Error('the invitation link was inserted but its id did not come back');
   }
 
+  /*
+    The merchant's earlier answers, carried into this run (D-204).
+
+    Here rather than at read time, and here rather than at run completion: a run that was never
+    invited inherits nothing, because nothing was asked of anyone. After the link exists and before
+    the mail goes, so a merchant who opens the invitation the second it arrives finds their previous
+    answers already in place.
+
+    **Never fatal.** A merchant who has to retype nineteen answers has been inconvenienced; one who
+    never receives the invitation has been failed. The inheritance is a saving, not a precondition,
+    and it says so in the log rather than taking the invitation down with it.
+  */
+  try {
+    const { data: inherited, error: inheritError } = await supabase.client.rpc(
+      'inherit_responses_for_link',
+      { p_link_id: linkId },
+    );
+    if (inheritError !== null) throw new Error(inheritError.message);
+
+    const counts = inherited as { attestations?: number; comments?: number } | null;
+    const answers = counts?.attestations ?? 0;
+    const comments = counts?.comments ?? 0;
+    if (answers > 0 || comments > 0) {
+      console.log(`  carried forward ${answers} answer(s) and ${comments} comment(s) from earlier runs`);
+    }
+  } catch (cause) {
+    // Caught rather than propagated, and caught around the call rather than only on its error
+    // field: a client that cannot make the call at all must not take the invitation down either.
+    console.error(
+      `  earlier responses were not carried forward: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+
   const invitation = composeInvitation({
     merchantDomain: report.merchantDomain,
     link: commentLinkFor(input.webOrigin, token),

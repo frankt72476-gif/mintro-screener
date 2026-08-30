@@ -970,6 +970,22 @@ function EyeTestPanel({
             Written by someone who identified themselves as {response.identifiedAs} ·{' '}
             {formatStamp(response.submittedAt)}
           </p>
+          {/*
+            An inherited eye-test reply always says the read has moved (D-204, §3a).
+
+            For a finding comment the changed-observation line is conditional. Here it is not: the
+            read is generated prose regenerated from fresh captures, and it differs every run — four
+            calls against *identical* captures produced four differently-worded reads (D-197). A
+            conditional line would fire every time anyway, and writing it as a condition would imply
+            there are runs where it does not hold.
+          */}
+          {response.inherited !== undefined && (
+            <p className="mr-inherited">
+              Written on an earlier screening of this domain,{' '}
+              {formatStamp(response.inherited.originallyAt)}, about the read as it stood then. The
+              read above was written for this run.
+            </p>
+          )}
         </div>
       ))}
 

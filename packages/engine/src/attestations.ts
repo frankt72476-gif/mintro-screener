@@ -37,6 +37,13 @@ export interface StoredAttestation {
    */
   readonly identifiedAs: string;
   readonly submittedAt: string;
+  /**
+   * Where this answer was first given, when it was carried forward (D-204).
+   *
+   * Absent means it was answered on this run. The distinction is load-bearing for the counts: an
+   * inherited answer never counts as answered on this screening (§5, and D-199's reasoning).
+   */
+  readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
 }
 
 /**
@@ -60,6 +67,14 @@ export interface ResolvedAttestation {
   readonly identifiedAs?: string;
   readonly submittedAt?: string;
   /**
+   * Where this answer was first given, when it was carried forward (D-204).
+   *
+   * Every surface that renders the answer renders this beside it. Inherited text that looks fresh
+   * is the risk D-046 named; making the provenance impossible to miss is what lets the merchant
+   * keep their work.
+   */
+  readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
+  /**
    * Earlier answers to the same question, newest first, when the merchant revised.
    *
    * Kept rather than dropped because the table is append-only and a reader who was sent the first
@@ -69,9 +84,19 @@ export interface ResolvedAttestation {
 }
 
 export interface AttestationSummary {
+  /** Answered **on this run**. An inherited answer is not one of these (D-204, §5). */
   readonly answered: number;
   readonly declined: number;
   readonly unanswered: number;
+  /**
+   * Carried forward from an earlier screening of the same domain (D-204).
+   *
+   * Its own bucket rather than folded into `answered`, for D-199's reason: a section must not claim
+   * something happened on this screening that happened on a different one. The question is answered
+   * — the merchant did the work and the words are in the document — but it was not answered *here*,
+   * and the counts head a run.
+   */
+  readonly inherited: number;
   readonly total: number;
 }
 
@@ -185,16 +210,30 @@ export function resolveAttestations(
       ...(current.body === undefined ? {} : { body: current.body }),
       identifiedAs: current.identifiedAs,
       submittedAt: current.submittedAt,
+      ...(current.inherited === undefined ? {} : { inherited: current.inherited }),
       ...(older.length === 0 ? {} : { superseded: older }),
     };
   });
 
   return {
     questions,
+    /*
+      Inherited answers are counted apart from answered ones (D-204, §5).
+
+      `answered` means *answered on this run*. A carried-forward answer is real work by a real
+      person and is not discarded — it is in the document, with its date — but counting it here
+      would make the line at the head of a screening describe a different screening. That is D-199's
+      defect exactly: a false claim about what happened on this run, in the summary a reader trusts
+      most.
+
+      A declined answer that was inherited counts as inherited too. The distinction the reader needs
+      is *did this happen here*, and it does not become less true of a refusal.
+    */
     counts: {
-      answered: questions.filter((q) => q.outcome === 'answered').length,
-      declined: questions.filter((q) => q.outcome === 'declined').length,
+      answered: questions.filter((q) => q.outcome === 'answered' && q.inherited === undefined).length,
+      declined: questions.filter((q) => q.outcome === 'declined' && q.inherited === undefined).length,
       unanswered: questions.filter((q) => q.outcome === 'unanswered').length,
+      inherited: questions.filter((q) => q.outcome !== 'unanswered' && q.inherited !== undefined).length,
       total: questions.length,
     },
   };
@@ -220,6 +259,8 @@ interface AttestationRow {
   readonly body: unknown;
   readonly identified_as: unknown;
   readonly submitted_at: unknown;
+  readonly inherited_from_run: unknown;
+  readonly originally_answered_at: unknown;
 }
 
 /**
@@ -235,7 +276,7 @@ export async function readRunAttestations(
 ): Promise<readonly StoredAttestation[] | null> {
   const { data, error } = await db
     .from('merchant_attestations')
-    .select('question_id, outcome, body, identified_as, submitted_at')
+    .select('question_id, outcome, body, identified_as, submitted_at, inherited_from_run, originally_answered_at')
     .eq('run_id', runId)
     .order('submitted_at', { ascending: true });
 
@@ -254,6 +295,14 @@ export async function readRunAttestations(
         ...(body === undefined ? {} : { body }),
         identifiedAs: String(row.identified_as),
         submittedAt: String(row.submitted_at),
+        ...(typeof row.inherited_from_run === 'string' && typeof row.originally_answered_at === 'string'
+          ? {
+              inherited: {
+                fromRunId: row.inherited_from_run,
+                originallyAt: row.originally_answered_at,
+              },
+            }
+          : {}),
       },
     ];
   });

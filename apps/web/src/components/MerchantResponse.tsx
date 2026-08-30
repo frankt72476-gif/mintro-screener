@@ -28,7 +28,7 @@
  * unmistakably theirs.
  */
 
-import type { FindingCommentary } from '@mintro/engine';
+import type { FindingCommentary, MerchantComment } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
 
 /**
@@ -44,6 +44,30 @@ export function MerchantResponse({
   readonly commentary: FindingCommentary;
 }): JSX.Element | null {
   if (commentary.state === 'not_invited') return null;
+
+  /*
+    A carried-forward comment says so, right where it is read (D-204).
+
+    Composed once here so every surface that renders a merchant's words renders its provenance with
+    them. The alternative — a legend at the top of the section — is how inherited text comes to look
+    fresh three screens down, which is the risk D-046 named and answered by discarding the work.
+  */
+  const provenance = (comment: MerchantComment): JSX.Element | null =>
+    comment.inherited === undefined ? null : (
+      <p className="mr-inherited">
+        Written on an earlier screening of this domain, {formatStamp(comment.inherited.originallyAt)}.
+        {comment.observationChanged === true && (
+          /*
+            The case that matters most (D-204, §3).
+
+            A comment inherits by rule id, and this run observed something different under that rule
+            from what the merchant answered. Their words stand — they are not discarded and not
+            edited — but they are not presented as a reply to an observation they never saw.
+          */
+          <> What Mintro observed under this rule has changed since it was written.</>
+        )}
+      </p>
+    );
 
   if (commentary.state === 'unopened') {
     return (
@@ -116,6 +140,7 @@ export function MerchantResponse({
             Identified themselves as {comment.identifiedAs}, {formatStamp(comment.submittedAt)}
             {index > 0 && ' — added after an earlier response'}
           </cite>
+          {provenance(comment)}
         </blockquote>
       ))}
       <p className="mr-note">

@@ -51,6 +51,8 @@ describe('every question appears, answered or not', () => {
       answered: 0,
       declined: 0,
       unanswered: ruleset.attestations.length,
+      // Nothing carried forward either: this run inherited nothing because nothing was asked.
+      inherited: 0,
       total: ruleset.attestations.length,
     });
   });

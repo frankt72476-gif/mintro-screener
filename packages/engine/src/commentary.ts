@@ -41,6 +41,29 @@ export interface MerchantComment {
    * the point of the separation rather than a side effect of it.
    */
   readonly subject?: CommentSubject;
+  /**
+   * Where this was first written, when it was carried forward from an earlier run (D-204).
+   *
+   * Absent on a response given on this run. Present, it is what stops inherited text reading as
+   * fresh — the risk D-046 named and solved by discarding the merchant's work instead.
+   */
+  readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
+  /**
+   * The observation this was written about, as it read then (D-204, §3).
+   *
+   * Present only on an inherited comment. A comment inherits by rule id, and the same rule can
+   * produce a different observation on a re-screen — so this is what makes it possible to say
+   * *"what we observed has changed since"* rather than presenting a merchant's words as a reply to
+   * something they never saw.
+   */
+  readonly commentedOn?: string;
+  /**
+   * Set by `commentaryFor` where the observation moved under an inherited comment (D-204, §3).
+   *
+   * Derived rather than stored: what a run observed is a property of that run's report, and freezing
+   * a verdict about it at copy time would go stale the moment either side changed.
+   */
+  readonly observationChanged?: true;
   /** Their words, exactly as written. Never trimmed, normalised or summarised. */
   readonly body: string;
   /**
@@ -217,7 +240,13 @@ export function collapseDrafts(
  * the four a reader is looking at — and never infers one from another.
  */
 export function commentaryFor(
-  finding: { readonly state: State; readonly ruleId: string; readonly notEvaluableKind?: NotEvaluableKind },
+  finding: {
+    readonly state: State;
+    readonly ruleId: string;
+    readonly notEvaluableKind?: NotEvaluableKind;
+    /** What this run observed, for comparison against what an inherited comment answered (D-204). */
+    readonly note?: string;
+  },
   ordinal: number | undefined,
   invitation: CommentInvitation,
   all: readonly MerchantComment[],
@@ -235,8 +264,26 @@ export function commentaryFor(
     return { state: 'not_invited', comments: [] };
   }
 
+  /*
+    An inherited comment whose observation has moved says so (D-204, §3).
+
+    Decided here, where both halves are in hand: the comment carries what it was written about, and
+    the finding carries what this run observed. Comparing them anywhere else would mean a renderer
+    holding one of the two and guessing.
+
+    Compared verbatim. A sentence that differs by a count — *"2 of 37 URLs"* against *"5 of 64"* —
+    is a different observation, and treating it as the same one because the wording is close is how
+    a merchant's explanation of one thing comes to stand as an answer to another.
+  */
+  const withChange = (c: MerchantComment): MerchantComment =>
+    c.commentedOn === undefined || finding.note === undefined || c.commentedOn === finding.note
+      ? c
+      : { ...c, observationChanged: true };
+
   const comments = collapseDrafts(
-    all.filter((c) => c.ruleId === finding.ruleId && (c.ordinal ?? undefined) === ordinal),
+    all
+      .filter((c) => c.ruleId === finding.ruleId && (c.ordinal ?? undefined) === ordinal)
+      .map(withChange),
     sentAt,
   );
 

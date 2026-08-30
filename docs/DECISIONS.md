@@ -13563,3 +13563,146 @@ it answers would be one-sided: the package would carry Mintro's read of a storef
 merchant's account of it. Supplied from `commentaryProps`, the same helper the finding comments come
 from, so a reply cannot appear on screen and be missing from the export — the failure that has
 already happened once on this component.
+## D-204 — A merchant's answers carry forward, and D-046 is reversed
+
+**2026-08-30 · business owner · `docs/inheritance-spec.md`, migration `0051_inherited_responses.sql`**
+
+An agent re-screens a domain and the merchant redoes nineteen questions and every comment they
+wrote. That is rework the merchant did not cause, and an agent moving fast hits it repeatedly.
+
+### The reversal, recorded as one
+
+D-046 froze commentary with its run:
+
+> **Ownership.** It belongs to the **run**, and is frozen with it. A packing-slip explanation given
+> in August is not evidence about a January re-scan. Carrying it forward would make a stale
+> statement look current.
+
+**Right about the risk, wrong about the remedy.** It prevented a stale statement from looking
+current by preventing the statement from appearing at all — and the cost of that lands on the one
+party in this system doing unpaid work. Visible provenance solves the same risk without discarding
+anything: every carried-forward response renders with its original date and the screening it came
+from, on every surface, and never counts as answered on this run. Nothing is silently promoted,
+which is what D-046 was actually protecting.
+
+### Copy at invitation, not join at read time
+
+Each run keeps its own complete rows, so a stored run still says what it said (D-002), the merchant
+edits through the ordinary write path rather than a special one, and a report rendered later reads
+one place. `inherit_responses_for_link` runs once, when a link is issued — a run nobody was invited
+on inherits nothing, because nothing was asked of anyone.
+
+**Never fatal.** A merchant who has to retype has been inconvenienced; one who never receives the
+invitation has been failed. The copy is wrapped so that a client which cannot make the call at all
+does not take the invitation down with it.
+
+### What `visit_id` holds, which the spec did not settle
+
+**The original visit.** The column is `not null` and an inherited row has no visit on this run. A
+new visit would be a fabricated event — a record saying somebody identified themselves and wrote
+this, on a run they have not opened. Making the column nullable would lose the link between the
+words and the moment they were written, on exactly the rows where it matters most. So the row points
+at the visit where the words were actually written, which is what provenance means.
+
+### The changed-observation case
+
+A comment inherits by rule id, and the same rule can produce a different observation on a re-screen.
+`commented_on` stores the observation as it read when the merchant answered it, on the row rather
+than resolved by joining back — the same reason the whole design copies. `commentaryFor` compares it
+against what this run observed, because that is the one place both halves are in hand, and marks the
+row. Compared verbatim: a sentence differing by a count is a different observation, and treating it
+as the same because the wording is close is how an explanation of one thing comes to stand as an
+answer to another.
+
+A comment whose rule produced no finding at all is not copied. There is nothing for it to attach to,
+and rendering it would invent a finding.
+
+### The eye-test reply inherits, and always says the read has moved
+
+It carries a `subject` rather than a rule id (D-203), and it is the one response about the storefront
+as a whole rather than about an observation — *"the Fire Sale ran for two days and is gone"* is true
+of the business whichever crawl produced the read. It has no rule to disappear out from under it, so
+it inherits unconditionally.
+
+**But the changed-read line is not conditional there.** The read is generated prose written fresh
+from each run's captures and differs every time — four calls against *identical* captures produced
+four differently-worded reads (D-197). A conditional that is always true implies there are runs where
+it does not hold, so it is written as a statement.
+
+### Inherited never counts as answered on this run
+
+    3 answered · 4 carried forward · 1 declined · 11 not answered · 19 asked
+
+D-199's reasoning exactly: a section must not claim something happened on this screening that
+happened on a different one. **The row mark moved too** — an inherited row reads *Carried forward*,
+not *Answered*. The counts and the mark have to agree, and the mark is the thing a reader scans;
+that was D-199's own argument about this same column.
+
+### One thing stopped rather than decided
+
+**The merchant's comment page does not yet replay inherited answers into its form**, and I did not
+make it. `open_report_for_comment` deliberately returns attestation times without bodies, with a
+stated reason: *"the page has never replayed another visitor's answers back at them."*
+
+The spec's §7 says the comment page shows the inherited answer. The two collide, and the collision
+has a dimension the spec does not mention: **the link is forwardable** (D-063), so whoever holds it
+is not necessarily who wrote the answer — and an inherited answer may have been written by the agent
+on an earlier screening rather than by the merchant reading it now. Replaying bodies to the current
+holder is a defensible decision and it is a decision, not an implementation detail. Asked rather
+than assumed.
+
+Everything else is built: the columns, the copy, the changed-observation line, the counts, the marks,
+and the provenance on the report and the PDF.
+## D-205 — The comment form replays what is already on the page
+
+**2026-08-30 · business owner · migration `0052_replay_inherited_answers.sql`, `apps/web/src/components/CommentPane.tsx`, `Attestations.tsx`**
+
+D-204 carried a merchant's answers across runs and stopped one step short: the form on the merchant's
+own page still opened empty, because `open_report_for_comment` returned attestation times without
+bodies. It said why, at the line:
+
+> Bodies are deliberately absent: `AttestationForm` shows what this visitor sent this session, and
+> the page has never replayed another visitor's answers back at them.
+
+**That reason is withdrawn, and 0052 is where it stops being repeated** — corrected at the line
+rather than left as a comment contradicting the code.
+
+### It withheld nothing
+
+The `report` returned in the same payload, rendered on the same page at the same link, already
+carries every one of those answers with its text and the address that wrote it. A holder of the link
+can read them by scrolling. Keeping them out of the form protected no one and forced a retype of what
+was visible two inches above — which is the rework D-204 exists to remove, reintroduced lower down
+the same page.
+
+### The forwardable link argues for replay, not against it
+
+D-063 makes the link forwardable, so whoever holds it is not necessarily who wrote the answer. That
+was read as a reason to withhold. It is the reason to show.
+
+If an agent answered on an earlier screening and the merchant now holds the link, seeing *"answered
+12 Aug by someone who identified themselves as sue@agency.example"* is strictly better than answering
+blind — the alternative is a merchant unknowingly contradicting their own agent in a document that
+goes to an underwriter, with no way to have seen it coming.
+
+**So the attribution is what makes replay safe.** Every replayed answer names its author and its date
+in the form, not only on the report. Withholding the body while showing the time was the worst of
+both: no help, and no safeguard either.
+
+### Three consequences that had to be got right
+
+**"You" only where it was this visitor.** *"Recorded: you chose not to answer this one"* is a false
+statement when the decision was the agent's, in the one place a merchant acts on it. An inherited
+declination reads *"Recorded: not answered."*
+
+**Editing makes it theirs.** The write path appends a new row and a new row carries no provenance
+columns, so an edited answer is theirs, on this run, with today's date and their identification. The
+form drops the carried-forward mark at the same moment, because the form has to agree with the
+database rather than keep showing a mark the row no longer has.
+
+**Leaving it alone is valid and says so** — *"It stands unless you change it."* It submits as carried
+forward rather than as answered on this run, which is D-204 §5 and D-199's reasoning: a count at the
+head of a screening must not describe a different one.
+
+The form is seeded once per open and never re-seeded. After that the map is what this visitor has
+done, which is what it has always been; a later re-seed would overwrite their unsent edits.

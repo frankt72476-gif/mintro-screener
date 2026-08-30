@@ -29,6 +29,7 @@
 import { useState } from 'react';
 import type { Attestation, NotChecked } from '@mintro/ruleset';
 import { attestationAsking, type AttestationAsking } from '@mintro/engine';
+import { formatStamp } from '../lib/format.js';
 import type { AttestationOutcome, ResolvedAttestation, RunAttestations } from '@mintro/engine';
 
 /**
@@ -175,8 +176,16 @@ export function AttestationSection({
             </>
           ) : (
             <>
-              {counts.answered} answered · {counts.declined} declined · {counts.unanswered} not
-              answered
+              {counts.answered} answered
+              {/*
+                Its own figure, never folded into `answered` (D-204, §5).
+
+                The merchant did this work and it is in the document — but it was not done on this
+                screening, and a count at the head of a run has to be about that run. D-199's
+                reasoning, one layer along.
+              */}
+              {counts.inherited > 0 ? ` · ${counts.inherited} carried forward` : ''} ·{' '}
+              {counts.declined} declined · {counts.unanswered} not answered
               {asking === 'asked' ? ` · ${counts.total} asked` : ''}
             </>
           )}
@@ -224,9 +233,18 @@ function AttestationRow({
     <li className={`att-row att-${question.outcome}`}>
       <div className="att-q">
         <span className="att-mark">
+          {/*
+            An inherited answer is marked as carried forward, not as answered (D-204, §5).
+
+            The counts already separate them, and the mark has to agree: it is the thing a reader
+            scans, and "Answered" above a row that was answered on a different screening is the
+            claim §5 exists to prevent — D-199's argument, which was about this same column.
+          */}
           {question.outcome === 'unanswered'
             ? UNANSWERED_MARK[asking]
-            : OUTCOME_LABEL[question.outcome]}
+            : question.inherited !== undefined
+              ? 'Carried forward'
+              : OUTCOME_LABEL[question.outcome]}
         </span>
         <span className="att-text">{question.question}</span>
       </div>
@@ -234,6 +252,20 @@ function AttestationRow({
       <div className="att-meta">
         {AUTHORITY_LABEL[question.authority]} · {question.sev}
       </div>
+
+      {/*
+        Where a carried-forward answer came from (D-204).
+
+        On every surface, beside the answer itself rather than in a legend somewhere — the whole
+        argument for reversing D-046 is that provenance travels with the text. A reader must never
+        have to work out which screening an answer belongs to.
+      */}
+      {question.inherited !== undefined && (
+        <p className="att-inherited">
+          Answered on an earlier screening of this domain, {formatStamp(question.inherited.originallyAt)}.
+          Not answered again on this run.
+        </p>
+      )}
 
       {question.outcome === 'unanswered' ? (
         // The meaning is in the section lede; the row carries only its mark (D-167).
@@ -411,7 +443,15 @@ function AttestationField({
 }: {
   readonly questionId: string;
   readonly question: string;
-  readonly sent?: { readonly outcome: 'answered' | 'declined'; readonly body?: string };
+  readonly sent?: {
+    readonly outcome: 'answered' | 'declined';
+    readonly body?: string;
+    /** Who wrote it. Always known — an answer in this form came from somebody (D-205). */
+    readonly writtenBy?: string;
+    readonly writtenAt?: string;
+    /** Set where it came from an earlier screening of this domain (D-204). */
+    readonly carriedForwardFrom?: string;
+  };
   readonly identified: boolean;
   readonly onAnswer: (
     questionId: string,
@@ -437,11 +477,38 @@ function AttestationField({
       <p className="att-text">{question}</p>
 
       {sent !== undefined && (
-        <p className="att-sent">
-          {sent.outcome === 'declined'
-            ? 'Recorded: you chose not to answer this one.'
-            : `Recorded: "${sent.body ?? ''}"`}
-        </p>
+        <>
+          <p className="att-sent">
+            {/*
+              "You" only where it was this visitor (D-205).
+
+              The link is forwardable, so the person reading this may not be the person who answered
+              — and telling a merchant "you chose not to answer this" about their agent's decision
+              would be a false statement in the one place they act on it.
+            */}
+            {sent.outcome === 'declined'
+              ? sent.carriedForwardFrom === undefined
+                ? 'Recorded: you chose not to answer this one.'
+                : 'Recorded: not answered.'
+              : `Recorded: "${sent.body ?? ''}"`}
+          </p>
+          {sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
+            /*
+              Who wrote it and when, in the form and not only on the report (D-205).
+
+              This is what makes replay safe rather than risky. An agent answered on an earlier
+              screening and the merchant now holds the link: seeing whose answer this is beats
+              answering blind and contradicting them in a document that goes to an underwriter.
+            */
+            <p className="att-attrib">
+              {sent.carriedForwardFrom === undefined
+                ? `Answered ${formatStamp(sent.writtenAt)} by someone who identified themselves as ${sent.writtenBy}.`
+                : `Answered ${formatStamp(sent.carriedForwardFrom)} on an earlier screening of this ` +
+                  `domain, by someone who identified themselves as ${sent.writtenBy}. It stands ` +
+                  `unless you change it.`}
+            </p>
+          )}
+        </>
       )}
 
       <textarea
