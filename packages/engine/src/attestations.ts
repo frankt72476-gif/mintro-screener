@@ -36,6 +36,16 @@ export interface StoredAttestation {
    * rendering says so — the same rule commentary follows (D-063).
    */
   readonly identifiedAs: string;
+  /**
+   * The analyst who recorded this on the merchant's behalf (D-212).
+   *
+   * Present only where the merchant did not write it themselves. **Every surface that renders the
+   * words renders this beside them** — an operator answer must never read as the merchant's own
+   * statement, and the schema makes that hard rather than merely asking: `identified_as` is null on
+   * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
+   * address.
+   */
+  readonly recordedBy?: { readonly email: string; readonly at: string };
   readonly submittedAt: string;
   /**
    * Where this answer was first given, when it was carried forward (D-204).
@@ -73,6 +83,16 @@ export interface ResolvedAttestation {
    * is the risk D-046 named; making the provenance impossible to miss is what lets the merchant
    * keep their work.
    */
+  /**
+   * The analyst who recorded this on the merchant's behalf (D-212).
+   *
+   * Present only where the merchant did not write it themselves. **Every surface that renders the
+   * words renders this beside them** — an operator answer must never read as the merchant's own
+   * statement, and the schema makes that hard rather than merely asking: `identified_as` is null on
+   * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
+   * address.
+   */
+  readonly recordedBy?: { readonly email: string; readonly at: string };
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * Earlier answers to the same question, newest first, when the merchant revised.
@@ -97,6 +117,16 @@ export interface AttestationSummary {
    * and the counts head a run.
    */
   readonly inherited: number;
+  /**
+   * Answered by an operator on the merchant's behalf (D-212).
+   *
+   * Its own bucket for the reason `inherited` has one, and D-199's before that: **the participation
+   * record must never say the merchant answered something the operator wrote.** The answer is in the
+   * document and it is useful — an agent who has it from a call should record it — but it is not the
+   * merchant's statement and a count that said so would be a false claim in the summary a reader
+   * trusts most.
+   */
+  readonly recorded: number;
   readonly total: number;
 }
 
@@ -211,6 +241,7 @@ export function resolveAttestations(
       identifiedAs: current.identifiedAs,
       submittedAt: current.submittedAt,
       ...(current.inherited === undefined ? {} : { inherited: current.inherited }),
+      ...(current.recordedBy === undefined ? {} : { recordedBy: current.recordedBy }),
       ...(older.length === 0 ? {} : { superseded: older }),
     };
   });
@@ -230,10 +261,19 @@ export function resolveAttestations(
       is *did this happen here*, and it does not become less true of a refusal.
     */
     counts: {
-      answered: questions.filter((q) => q.outcome === 'answered' && q.inherited === undefined).length,
-      declined: questions.filter((q) => q.outcome === 'declined' && q.inherited === undefined).length,
+      answered: questions.filter(
+        (q) => q.outcome === 'answered' && q.inherited === undefined && q.recordedBy === undefined,
+      ).length,
+      declined: questions.filter(
+        (q) => q.outcome === 'declined' && q.inherited === undefined && q.recordedBy === undefined,
+      ).length,
       unanswered: questions.filter((q) => q.outcome === 'unanswered').length,
-      inherited: questions.filter((q) => q.outcome !== 'unanswered' && q.inherited !== undefined).length,
+      inherited: questions.filter(
+        (q) => q.outcome !== 'unanswered' && q.inherited !== undefined && q.recordedBy === undefined,
+      ).length,
+      // An operator answer carried forward counts here, not under `inherited`: whose words they are
+      // outranks which run they were written on.
+      recorded: questions.filter((q) => q.outcome !== 'unanswered' && q.recordedBy !== undefined).length,
       total: questions.length,
     },
   };
@@ -261,6 +301,8 @@ interface AttestationRow {
   readonly submitted_at: unknown;
   readonly inherited_from_run: unknown;
   readonly originally_answered_at: unknown;
+  readonly recorded_by_email: unknown;
+  readonly recorded_at: unknown;
 }
 
 /**
@@ -276,7 +318,7 @@ export async function readRunAttestations(
 ): Promise<readonly StoredAttestation[] | null> {
   const { data, error } = await db
     .from('merchant_attestations')
-    .select('question_id, outcome, body, identified_as, submitted_at, inherited_from_run, originally_answered_at')
+    .select('question_id, outcome, body, identified_as, submitted_at, inherited_from_run, originally_answered_at, recorded_by_email, recorded_at')
     .eq('run_id', runId)
     .order('submitted_at', { ascending: true });
 
@@ -293,7 +335,10 @@ export async function readRunAttestations(
         questionId: String(row.question_id),
         outcome,
         ...(body === undefined ? {} : { body }),
-        identifiedAs: String(row.identified_as),
+        identifiedAs: typeof row.identified_as === 'string' ? row.identified_as : '',
+        ...(typeof row.recorded_by_email === 'string' && typeof row.recorded_at === 'string'
+          ? { recordedBy: { email: row.recorded_by_email, at: row.recorded_at } }
+          : {}),
         submittedAt: String(row.submitted_at),
         ...(typeof row.inherited_from_run === 'string' && typeof row.originally_answered_at === 'string'
           ? {

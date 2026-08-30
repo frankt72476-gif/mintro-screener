@@ -47,6 +47,16 @@ export interface MerchantComment {
    * Absent on a response given on this run. Present, it is what stops inherited text reading as
    * fresh — the risk D-046 named and solved by discarding the merchant's work instead.
    */
+  /**
+   * The analyst who recorded this on the merchant's behalf (D-212).
+   *
+   * Present only where the merchant did not write it themselves. **Every surface that renders the
+   * words renders this beside them** — an operator answer must never read as the merchant's own
+   * statement, and the schema makes that hard rather than merely asking: `identified_as` is null on
+   * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
+   * address.
+   */
+  readonly recordedBy?: { readonly email: string; readonly at: string };
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * The observation this was written about, as it read then (D-204, §3).
@@ -73,6 +83,7 @@ export interface MerchantComment {
    * agent answering some findings, the merchant others. Every rendering says "identified
    * themselves as" and never presents the address as established (D-063).
    */
+  /** Empty on an operator-recorded row: nobody declared an address (D-212). */
   readonly identifiedAs: string;
   readonly submittedAt: string;
 }

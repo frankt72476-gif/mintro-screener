@@ -63,6 +63,8 @@ import { Rail } from './components/Rail.js';
 import { CommentPane, commentToken } from './components/CommentPane.js';
 import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
+import { AttestationForm } from './components/Attestations.js';
+import { recordAnswer, recordComment } from './lib/operatorAnswers.js';
 import type { InFlightRun } from './lib/domainGroups.js';
 import { groupByDomain } from './lib/domainGroups.js';
 import { DomainGroups } from './components/DomainGroups.js';
@@ -284,6 +286,67 @@ function AnalystWorkspace(): JSX.Element {
   if (state.status !== 'signed_in') return <SignIn />;
 
   return <Screener client={state.client} analyst={state.analyst} />;
+}
+
+/**
+ * The box an operator records an answer in (D-212).
+ *
+ * Deliberately not `CommentBox`, which is the merchant's. That one says *"your response"* and shows
+ * what you have already written; this one says whose answer is being written down and for whom.
+ * Sharing a component would have meant one of the two lying about who is typing.
+ */
+function RecordBox({
+  label,
+  value,
+  savedAt,
+  onChange,
+  onSave,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly savedAt: string | undefined;
+  readonly onChange: (next: string) => void;
+  readonly onSave: () => Promise<string | null>;
+}): JSX.Element {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  return (
+    <div className="recbox">
+      <label className="recbox-l">{label}</label>
+      <textarea
+        className="recbox-t"
+        rows={2}
+        value={value}
+        placeholder="What the merchant told you"
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <div className="recbox-foot">
+        <button
+          className="btn btn-ghost"
+          disabled={busy || value.trim() === ''}
+          onClick={() => {
+            setBusy(true);
+            void onSave().then((failure) => {
+              setBusy(false);
+              setProblem(failure);
+            });
+          }}
+        >
+          {busy ? 'Recording…' : 'Record on their behalf'}
+        </button>
+        {/*
+          Says whose statement it will be, before it is one.
+
+          An operator writing here is putting words into a document that reaches an underwriter, and
+          the surface should say so while she types rather than only after (D-212).
+        */}
+        <span className="recbox-note">
+          {problem ?? (savedAt === undefined ? 'Recorded as yours, on the merchant’s behalf.' : 'Recorded.')}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function Screener({
@@ -553,6 +616,22 @@ function Screener({
    * run with its own findings and its own comment round, and what carries across is the merchant's
    * answers and comments (D-204).
    */
+  /*
+    Answering on the merchant's behalf (D-212).
+
+    An agent often has the answer already — from a call, an email, an earlier package — and had to
+    send a comment link to herself to record it. These are the same fields the comment page offers,
+    on the report, where she is when she has the answer.
+
+    Held here rather than in the boxes so a saved answer shows back immediately: the read that would
+    otherwise refresh it is the commentary read, and it runs once per report.
+    */
+  const [recordedDrafts, setRecordedDrafts] = useState<ReadonlyMap<string, string>>(new Map());
+  const [recordedSaved, setRecordedSaved] = useState<ReadonlyMap<string, string>>(new Map());
+
+  /** Who an operator-recorded answer is attributed to. The policy pins it to this same id. */
+  const recorder = { analystId: analyst.id, email: analyst.email };
+
   /** Runs whose group header should say the merchant has already responded (D-204). */
   const responded = new Set(available.filter((run) => run.responded).map((run) => run.runId));
 
@@ -961,6 +1040,85 @@ function Screener({
                 {...commentaryProps(commentary, report)}
                 {...(attestations === undefined ? {} : { attestations })}
                 eyeTest={eyeTest}
+                {...({
+                      /*
+                        The same boxes the comment page offers, on the report (D-212).
+
+                        `ReportView` already accepted these; nothing rendered them for an analyst.
+                        What they write is attributed to them and never to the merchant.
+                      */
+                      commentBox: (finding: ReportFinding, ordinal?: number) => (
+                        <RecordBox
+                          key={`rec-${finding.ruleId}-${ordinal ?? 'x'}`}
+                          label="Record the merchant’s answer"
+                          value={recordedDrafts.get(`${finding.ruleId}::${ordinal ?? 'x'}`) ?? ''}
+                          savedAt={recordedSaved.get(`${finding.ruleId}::${ordinal ?? 'x'}`)}
+                          onChange={(next: string) =>
+                            setRecordedDrafts((existing) =>
+                              new Map(existing).set(`${finding.ruleId}::${ordinal ?? 'x'}`, next),
+                            )
+                          }
+                          onSave={async () => {
+                            const key = `${finding.ruleId}::${ordinal ?? 'x'}`;
+                            const result = await recordComment(client, recorder, {
+                              runId: report.runId,
+                              ruleId: finding.ruleId,
+                              ordinal,
+                              subject: null,
+                              body: recordedDrafts.get(key) ?? '',
+                            });
+                            if (result.ok) {
+                              setRecordedSaved((e) => new Map(e).set(key, new Date().toISOString()));
+                            }
+                            return result.ok ? null : (result.error ?? 'That could not be saved.');
+                          }}
+                        />
+                      ),
+                      eyeCommentBox: () => (
+                        <RecordBox
+                          label="Record the merchant’s response to this read"
+                          value={recordedDrafts.get('subject:eye-test') ?? ''}
+                          savedAt={recordedSaved.get('subject:eye-test')}
+                          onChange={(next: string) =>
+                            setRecordedDrafts((existing) =>
+                              new Map(existing).set('subject:eye-test', next),
+                            )
+                          }
+                          onSave={async () => {
+                            const result = await recordComment(client, recorder, {
+                              runId: report.runId,
+                              ruleId: null,
+                              ordinal: undefined,
+                              subject: 'eye-test',
+                              body: recordedDrafts.get('subject:eye-test') ?? '',
+                            });
+                            if (result.ok) {
+                              setRecordedSaved((e) =>
+                                new Map(e).set('subject:eye-test', new Date().toISOString()),
+                              );
+                            }
+                            return result.ok ? null : (result.error ?? 'That could not be saved.');
+                          }}
+                        />
+                      ),
+                      questionsForm: (
+                        <AttestationForm
+                          questions={report.attestationQuestions ?? []}
+                          answers={new Map()}
+                          identified
+                          recordingFor="the merchant"
+                          onAnswer={async (questionId, outcome, body) => {
+                            const result = await recordAnswer(client, recorder, {
+                              runId: report.runId,
+                              questionId,
+                              outcome,
+                              body,
+                            });
+                            return result.ok ? null : (result.error ?? 'That could not be saved.');
+                          }}
+                        />
+                      ),
+                    })}
               />
 
               {/*

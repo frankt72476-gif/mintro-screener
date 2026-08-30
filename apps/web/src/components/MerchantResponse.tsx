@@ -122,7 +122,10 @@ export function MerchantResponse({
     <div className="mr mr-said">
       <span className="mr-head">Merchant response</span>
       {commentary.comments.map((comment, index) => (
-        <blockquote className="mr-body" key={`${comment.submittedAt}-${index}`}>
+        <blockquote
+          className={`mr-body${comment.recordedBy === undefined ? '' : ' mr-recorded'}`}
+          key={`${comment.submittedAt}-${index}`}
+        >
           {/*
             Verbatim, and `white-space: pre-wrap` in the stylesheet keeps their line breaks. A
             merchant's paragraphing is part of what they wrote.
@@ -137,7 +140,16 @@ export function MerchantResponse({
               agent and the merchant both, and a later entry is an addition rather than a
               correction that replaced anything (D-002).
             */}
-            Identified themselves as {comment.identifiedAs}, {formatStamp(comment.submittedAt)}
+            {/*
+              Whose words these are (D-212).
+
+              An operator answer never says *"identified themselves as"* — nobody declared anything;
+              an analyst wrote down what a merchant told them elsewhere. It is useful and it is in
+              the document, and it is not the merchant's own statement.
+            */}
+            {comment.recordedBy === undefined
+              ? `Identified themselves as ${comment.identifiedAs}, ${formatStamp(comment.submittedAt)}`
+              : `Recorded by ${comment.recordedBy.email} on the merchant’s behalf, ${formatStamp(comment.recordedBy.at)}`}
             {index > 0 && ' — added after an earlier response'}
           </cite>
           {provenance(comment)}

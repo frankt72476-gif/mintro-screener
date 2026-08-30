@@ -3091,3 +3091,46 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .drun-live.stalled .drun-when { color: var(--amber); }
 
 .dgroups-empty, .dgroups-source { font-size: 11.5px; color: var(--slate); margin: var(--s3) 0 0; }
+
+/* ═══ Recorded on the merchant's behalf (D-212) ══════════════════════════════════════════════════
+   Never styled as the merchant's own words. The serif face and the amber rule belong to what a
+   merchant wrote; an operator record keeps the page's own voice, because that is whose it is. */
+
+.att-recorded, .att-recording {
+  margin: var(--s2) 0 0;
+  font-size: 11.5px; line-height: 1.55;
+  color: var(--violet);
+}
+/* The indent belongs to the report's row gutter. The merchant's form has none, and the line sat
+   floating in the middle of it. */
+.att-row:not(.att-field) .att-recorded { margin-left: calc(82px + var(--s3)); }
+.att-field .att-recorded { margin-left: 0; }
+.att-recording { margin-left: 0; }
+
+/* A recorded finding comment: same block, sans-serif, so it does not read as a quotation. */
+.mr-body.mr-recorded {
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  border-left-color: var(--violet);
+}
+
+.recbox { margin-top: var(--s3); }
+.recbox-l {
+  display: block; margin-bottom: var(--s1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--slate);
+}
+.recbox-t {
+  width: 100%; padding: var(--s2) var(--s3);
+  border: 0.5px solid var(--line); border-radius: 8px;
+  font-family: Inter, sans-serif; font-size: 13px; line-height: 1.5; color: var(--ink);
+  background: var(--card); resize: vertical;
+}
+.recbox-foot { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s2); }
+.recbox-note { font-size: 11.5px; color: var(--slate); }
+
+@media print {
+  /* A box is a control, and a printed control is a promise the page cannot keep. */
+  .recbox { display: none; }
+}

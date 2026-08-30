@@ -53,6 +53,8 @@ describe('every question appears, answered or not', () => {
       unanswered: ruleset.attestations.length,
       // Nothing carried forward either: this run inherited nothing because nothing was asked.
       inherited: 0,
+      // And nothing recorded on the merchant's behalf (D-212).
+      recorded: 0,
       total: ruleset.attestations.length,
     });
   });

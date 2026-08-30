@@ -162,7 +162,7 @@ export async function readRunCommentary(
   const comments = await rows<CommentRow>(
     db,
     'merchant_comments',
-    'rule_id, ordinal, body, identified_as, submitted_at, subject, inherited_from_run, originally_answered_at, commented_on',
+    'rule_id, ordinal, body, identified_as, submitted_at, subject, inherited_from_run, originally_answered_at, commented_on, recorded_by_email, recorded_at',
     runId,
     'submitted_at',
   );
@@ -245,8 +245,11 @@ export async function readRunCommentary(
               },
             }),
         ...(row.commented_on === null ? {} : { commentedOn: row.commented_on }),
+        ...(row.recorded_by_email === null || row.recorded_at === null
+          ? {}
+          : { recordedBy: { email: row.recorded_by_email, at: row.recorded_at } }),
         body: row.body,
-        identifiedAs: row.identified_as,
+        identifiedAs: row.identified_as ?? '',
         submittedAt: row.submitted_at,
       }),
     ),
@@ -283,9 +286,12 @@ interface CommentRow {
   inherited_from_run: string | null;
   originally_answered_at: string | null;
   commented_on: string | null;
+  recorded_by_email: string | null;
+  recorded_at: string | null;
   ordinal: number | null;
   body: string;
-  identified_as: string;
+  /** Null on an operator-recorded row: nobody declared an address (D-212). */
+  identified_as: string | null;
   submitted_at: string;
 }
 

@@ -13977,3 +13977,98 @@ three sort keys over groups would be three ways of asking the same question. Its
 than went, and one of them **caught a real defect on the way**: `groupByDomain` was not a total
 order, so two runs finished at the same timestamp reshuffled between renders. Two runs of one
 merchant on one day is the ordinary case (D-045); the tie-break came across with the tests.
+## D-212 — The operator may answer on the merchant's behalf
+
+**2026-08-30 · business owner · migration `0053_operator_recorded_answers.sql`, `apps/web/src/lib/operatorAnswers.ts`**
+
+An agent often has the answer already — from a call, an email, an earlier package — and had no way
+to record it short of sending a comment link to herself.
+
+### What blocked it, and which one decided the shape
+
+Three things, and a fourth that made it a migration rather than a component change:
+
+1. **The UI.** `commentBox` appeared zero times in `App.tsx`; the analyst report rendered no response
+   field anywhere. `ReportView` already accepted the props — the merchant page passes them.
+2. **The write path.** Every insert goes through a `security definer` function whose first argument
+   is a link token, and which then requires a visit row belonging to that link. An analyst fails both.
+3. **RLS.** `insert` revoked from `authenticated` on both tables; the only policy on each was
+   `select`.
+4. **The schema could not say who wrote it.** `link_id` and `visit_id` were `not null` and both point
+   at merchant-link machinery, so on a run the merchant was never invited on an operator answer had
+   nothing to hang on — and `identified_as` is read by every surface as the merchant's own
+   declaration.
+
+The fourth is the real one. Inventing a link and a visit would record that somebody was sent a link,
+arrived and identified themselves when nobody did — the objection D-204 raised about `visit_id`,
+where the answer was to point at the *original* visit. Here there is none, because the case this
+exists for is a run nobody was invited on.
+
+### Exclusive, in the constraint
+
+A row is **either** merchant-written (link, visit, declared address, no recorder) **or**
+operator-recorded (recorder, none of those). A row that were both is one the document could render
+twice saying different things about who said it. Held the way `comment_provenance_is_whole` holds
+inheritance — in the constraint, not in the caller.
+
+**`identified_as` becomes nullable, and that is the point.** Putting an analyst's address there would
+make a renderer that missed the discriminator print something *plausible and false*: the merchant
+saying what the operator said. Null makes the same mistake print an obvious gap. This project has
+resolved that trade-off the same way before (D-044, D-199) — a visible hole beats a credible
+falsehood, because only one of them gets noticed. **It caught a live one immediately**: the report
+rendered *"identified themselves as  on 2026-08-30"* until the line was branched.
+
+### Who may write one
+
+Copied from `response_nonresponses` (0045), the schema's existing operator-authored row on a merchant
+surface: an analyst may insert **under their own id and no other**, and the policy enforces it rather
+than the caller. An operator who could write a colleague's id could put words in their mouth in a
+document that reaches an underwriter, and no care in the browser would be evidence that they had not.
+
+Insert only. Update and delete stay revoked, so **a merchant answering the same question does not
+supersede the operator's** — both stand with their own attributions and dates, because a merchant
+contradicting what the agent recorded is information an underwriter should see rather than something
+the system quietly resolves.
+
+### Counted apart, and marked apart
+
+    2 answered · 1 carried forward · 2 recorded for them · 0 declined · 14 not answered · 19 asked
+
+Its own bucket beside `inherited`, for D-199's reason: **the participation record must never say the
+merchant answered something the operator wrote.** The row mark reads `RECORDED`, never `Answered`,
+and the line beneath it says *"Recorded by frankt@gomintro.com on the merchant's behalf … Not the
+merchant's own statement."*
+
+The declined copy branches too. *"The merchant declined to answer this question"* is false of a row
+the operator recorded; it reads *"Recorded as not answered."*
+
+### The two checks asked for by name
+
+**An operator answer inherits as the operator's.** `inherit_responses_for_link` copied `link_id` from
+the new link unconditionally — for an operator row that is a link with no visit, which the constraint
+refuses, and had it passed would have been a merchant answer nobody wrote. The copy now carries
+whichever half the source row had. Asserted against a real Postgres.
+
+**The token path is unchanged.** `submit_merchant_comment` and `submit_merchant_attestation` are not
+touched by this migration: they insert a link, a visit and an address and no recorder, satisfying the
+merchant side of the constraint exactly as before. An analyst path must not weaken the merchant one,
+and the way to be sure is to not touch it — with a test that the merchant path still produces all
+four fields and still refuses a bad token.
+
+### A guard narrowed, not relaxed
+
+An existing schema test asserted **zero** write grants on `merchant_attestations` to `anon` *and*
+`authenticated` together. It now splits: `anon` keeps nothing, absolutely — a merchant is not a user
+of this system and the link is the whole of what they hold — and `authenticated` gains `INSERT` and
+nothing else, with the policy's `with_check` asserted to pin `is_analyst()`, `auth.uid()`, and the
+operator shape.
+
+### What the merchant sees
+
+The question they were already answered for shows the answer, who recorded it, and:
+
+> Recorded by frankt@gomintro.com on your behalf. If that is wrong, answer below — your answer is
+> added beside it rather than replacing it.
+
+Shown rather than hidden: they are entitled to see what was recorded in their name and to disagree
+with it.

@@ -184,7 +184,14 @@ export function AttestationSection({
                 screening, and a count at the head of a run has to be about that run. D-199's
                 reasoning, one layer along.
               */}
-              {counts.inherited > 0 ? ` · ${counts.inherited} carried forward` : ''} ·{' '}
+              {counts.inherited > 0 ? ` · ${counts.inherited} carried forward` : ''}
+              {/*
+                Its own figure, never folded into `answered` (D-212).
+
+                The participation record must not say the merchant answered something the operator
+                wrote — D-199's reasoning, and the same reason `carried forward` stands apart.
+              */}
+              {counts.recorded > 0 ? ` · ${counts.recorded} recorded for them` : ''} ·{' '}
               {counts.declined} declined · {counts.unanswered} not answered
               {asking === 'asked' ? ` · ${counts.total} asked` : ''}
             </>
@@ -242,9 +249,19 @@ function AttestationRow({
           */}
           {question.outcome === 'unanswered'
             ? UNANSWERED_MARK[asking]
-            : question.inherited !== undefined
-              ? 'Carried forward'
-              : OUTCOME_LABEL[question.outcome]}
+            : question.recordedBy !== undefined
+              ? /*
+                   Never "Answered": the merchant did not answer it (D-212).
+
+                   One word, because this shares the 96px gutter the four state words were sized for
+                   — "Recorded for them" set two lines wide and ran under the question beside it,
+                   which is D-208's block-heading defect in the column it was actually sized for.
+                   The line beneath says the rest.
+                 */
+                'Recorded'
+              : question.inherited !== undefined
+                ? 'Carried forward'
+                : OUTCOME_LABEL[question.outcome]}
         </span>
         <span className="att-text">{question.question}</span>
       </div>
@@ -260,6 +277,18 @@ function AttestationRow({
         argument for reversing D-046 is that provenance travels with the text. A reader must never
         have to work out which screening an answer belongs to.
       */}
+      {/*
+        Who wrote it, where it was not the merchant (D-212).
+
+        Above the inheritance line, because whose words they are matters more than which run they
+        were written on — and an operator answer that carried forward is still the operator's.
+      */}
+      {question.recordedBy !== undefined && (
+        <p className="att-recorded">
+          Recorded by {question.recordedBy.email} on the merchant’s behalf,{' '}
+          {formatStamp(question.recordedBy.at)}. Not the merchant’s own statement.
+        </p>
+      )}
       {question.inherited !== undefined && (
         <p className="att-inherited">
           Answered on an earlier screening of this domain, {formatStamp(question.inherited.originallyAt)}.
@@ -278,19 +307,32 @@ function AttestationRow({
               "declined to answer, which may indicate…". The reader draws the conclusion (D-001).
             */
             <p className="att-declined">
-              The merchant declined to answer this question.
+              {question.recordedBy === undefined
+                ? 'The merchant declined to answer this question.'
+                : // Recorded, so the refusal is what the operator was told — not a refusal made here.
+                  'Recorded as not answered.'}
             </p>
           ) : (
             <blockquote className="att-body">{question.body}</blockquote>
           )}
-          <p className="att-attrib">
-            {/*
-              "Identified themselves as", never "from" — the address is self-declared and Mintro
-              verifies nothing about it, exactly as commentary states it (D-063).
-            */}
-            Written by someone who identified themselves as {question.identifiedAs}
-            {question.submittedAt === undefined ? '' : ` on ${question.submittedAt.slice(0, 10)}`}.
-          </p>
+          {/*
+            Only a merchant row has a self-declaration (D-212).
+
+            On an operator row nobody declared an address — `identified_as` is null in the database
+            for exactly this reason — and this line rendered *"identified themselves as  on
+            2026-08-30"*, a sentence with a hole where a person should be. The recorder line above
+            says who wrote it; this one has nothing left to say.
+          */}
+          {question.recordedBy === undefined && (
+            <p className="att-attrib">
+              {/*
+                "Identified themselves as", never "from" — the address is self-declared and Mintro
+                verifies nothing about it, exactly as commentary states it (D-063).
+              */}
+              Written by someone who identified themselves as {question.identifiedAs}
+              {question.submittedAt === undefined ? '' : ` on ${question.submittedAt.slice(0, 10)}`}.
+            </p>
+          )}
         </div>
       )}
 
@@ -380,6 +422,7 @@ export function AttestationForm({
   questions,
   answers,
   identified,
+  recordingFor,
   onAnswer,
 }: {
   /**
@@ -393,6 +436,14 @@ export function AttestationForm({
   /** What this visitor has already sent, by question id, for showing back to them. */
   readonly answers: ReadonlyMap<string, { readonly outcome: 'answered' | 'declined'; readonly body?: string }>;
   readonly identified: boolean;
+  /**
+   * Set on the analyst's copy, where the operator answers for the merchant (D-212).
+   *
+   * The merchant's own form says *"your answers"*; this one has to say whose answers they are and
+   * who is writing them down, because the same words in the same boxes mean different things
+   * depending on which of the two is at the keyboard.
+   */
+  readonly recordingFor?: string;
   readonly onAnswer: (
     questionId: string,
     outcome: 'answered' | 'declined',
@@ -409,12 +460,26 @@ export function AttestationForm({
           headings for one section is the duplication the bands removed everywhere else, and the
           merchant's copy below still says what these questions are and why they are being asked.
         */}
+        {recordingFor !== undefined && (
+          /*
+            Whose answers these are, said before any are written (D-212).
+
+            The merchant's copy of this form says "your answers". An operator using the same boxes is
+            writing down somebody else's, and every one of them will carry her name.
+          */
+          <p className="att-recording">
+            You are recording answers on {recordingFor}’s behalf. Each one is attributed to you and
+            shown as recorded for them, never as their own statement.
+          </p>
+        )}
+        {recordingFor === undefined && (
         <p className="att-lede">
           Some of these standards are about what happens away from your website — where you
           ship, what your support team says, who tests your batches. Mintro has no way to observe
           those, so they are put to you directly. Your answers are recorded exactly as you write
           them and passed on with the report, shown as yours.
         </p>
+        )}
         <p className="att-lede">
           You can answer any of these, or none. If you would rather not answer one, saying so is
           recorded as its own reply.
@@ -457,6 +522,8 @@ function AttestationField({
     readonly writtenAt?: string;
     /** Set where it came from an earlier screening of this domain (D-204). */
     readonly carriedForwardFrom?: string;
+    /** Set where an operator recorded it on the merchant's behalf (D-212). */
+    readonly recordedByEmail?: string;
   };
   readonly identified: boolean;
   readonly onAnswer: (
@@ -484,6 +551,20 @@ function AttestationField({
 
       {sent !== undefined && (
         <>
+          {sent.recordedByEmail !== undefined && (
+            /*
+              What the merchant sees for a question the operator already answered (D-212).
+
+              Shown, not hidden: they are entitled to see what was recorded in their name, and to
+              disagree with it. **Their answer does not replace it** — both stand, with their
+              attributions, because a merchant contradicting what the agent recorded is information
+              an underwriter should see rather than something the page quietly resolves.
+            */
+            <p className="att-recorded">
+              Recorded by {sent.recordedByEmail} on your behalf. If that is wrong, answer below —
+              your answer is added beside it rather than replacing it.
+            </p>
+          )}
           <p className="att-sent">
             {/*
               "You" only where it was this visitor (D-205).
@@ -493,12 +574,12 @@ function AttestationField({
               would be a false statement in the one place they act on it.
             */}
             {sent.outcome === 'declined'
-              ? sent.carriedForwardFrom === undefined
+              ? sent.carriedForwardFrom === undefined && sent.recordedByEmail === undefined
                 ? 'Recorded: you chose not to answer this one.'
                 : 'Recorded: not answered.'
               : `Recorded: "${sent.body ?? ''}"`}
           </p>
-          {sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
+          {sent.recordedByEmail === undefined && sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
             /*
               Who wrote it and when, in the form and not only on the report (D-205).
 

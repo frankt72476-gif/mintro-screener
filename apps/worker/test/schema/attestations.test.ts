@@ -270,12 +270,52 @@ describe('the token is the whole credential', () => {
   });
 
   it('leaves no write path open to an unauthenticated caller outside the function', async () => {
+    /*
+      `anon` keeps nothing, and that half is absolute.
+
+      A merchant is not a user of this system: what they have is a link, and
+      `submit_merchant_attestation` is the whole of what it can do. Any grant here would be a way to
+      write an answer without holding one.
+    */
     const [grant] = await schema.query<{ n: number }>(
       `select count(*)::int as n from information_schema.role_table_grants
        where table_name = 'merchant_attestations'
-         and grantee in ('anon', 'authenticated')
+         and grantee = 'anon'
          and privilege_type in ('INSERT', 'UPDATE', 'DELETE')`,
     );
     expect(grant?.n).toBe(0);
+  });
+
+  it('lets an analyst insert, and only under their own id', async () => {
+    /*
+      **This narrows the guard above rather than relaxing it** (D-212).
+
+      It asserted zero write grants to `anon` *and* `authenticated` together. An operator recording
+      an answer on the merchant's behalf needs one — so the assertion splits: `anon` keeps nothing,
+      and `authenticated` gains `INSERT` and nothing else, behind a policy that pins who the row may
+      be attributed to.
+
+      The policy is the guarantee, not the frontend. An operator who could write another analyst's
+      id could put words in a colleague's mouth in a document that reaches an underwriter, and no
+      amount of care in the browser would be evidence that they had not.
+    */
+    const held = await schema.query<{ privilege_type: string }>(
+      `select privilege_type from information_schema.role_table_grants
+        where table_name = 'merchant_attestations' and grantee = 'authenticated'
+          and privilege_type in ('INSERT', 'UPDATE', 'DELETE')`,
+    );
+    expect(held.map((g) => (g as { privilege_type: string }).privilege_type)).toEqual(['INSERT']);
+
+    const [policy] = await schema.query<{ with_check: string }>(
+      `select with_check from pg_policies
+        where tablename = 'merchant_attestations' and policyname = 'merchant_attestations_operator_insert'`,
+    );
+    const check = (policy as { with_check: string } | undefined)?.with_check ?? '';
+
+    expect(check).toContain('is_analyst()');
+    expect(check).toContain('auth.uid()');
+    // And it may only write the operator shape: no link, no visit.
+    expect(check).toContain('link_id IS NULL');
+    expect(check).toContain('visit_id IS NULL');
   });
 });
