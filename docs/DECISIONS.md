@@ -13104,3 +13104,105 @@ rub…' to match /cut off/"* is the confusion the branch removes, stated by the 
 through the production `runEyeTest` against the six real comopeptides captures: `ran` in 24.6s,
 nine verdicts, and the sign-up surface recorded `sent=false — no capture was taken for this
 surface`, which is hard constraint 3 holding at the layer above a finding.
+## D-198 — The eye test moves off the crawl, and absence becomes four things
+
+**2026-08-30 · business owner · migration `0049_eye_tests.sql`, `apps/worker/src/eyeTestJob.ts`, `packages/engine/src/eyeTestStore.ts`, `docs/eye-test-spec.md` §5**
+
+Three real calls against the comopeptides captures took **18.6s, 22.7s and 26.4s** — 22 seconds
+typical against a 26-33s run. Cost was never the question: 24,498 input tokens, about ten cents.
+Roughly doubling the crawl for a layer that by design changes no state, no count, no coverage
+number and no verdict is not a trade worth making, so the eye test became a job that runs after the
+run completes. This resolves the first open question in the spec's §9.
+
+### The report carries the manifest, and the outcome lives beside the run
+
+Not a preference. `finishRun` writes `finished_at`, `status` and `report` in one update, and
+`runs_are_immutable_once_finished` raises on **every** later update to that row (D-002). A layer
+that finishes half a minute after the run has nowhere in the report to write.
+
+What forced the shape is subtler than that, and it is the part worth remembering. **The crawl knows
+which page is which; a job reading the finished report does not.** `screenStorefront` rendered the
+homepage, sampled the product pages and located the sign-up form — it holds that structurally. The
+report holds evidence keys and source URLs and nothing that says what a page *was*.
+
+The first working version of this recovered the surface by matching `/shop/` in the URL. That is
+exactly the mistake hard constraint 9 forbids: it worked on the storefront it was written against
+and would have mislabelled every merchant who names things differently, answering the homepage
+questions against a product page with nothing downstream able to tell. So `ScreeningReport` gained
+`eyeTestCaptures` — the manifest — and `ScreeningReport.eyeTest` was deleted.
+
+> **Assembly decides what to look at. The job does the looking.**
+
+The manifest carries page text already cut to the send limit, from one shared constant. Storing the
+whole text would put an unbounded copy of every sampled page into an immutable report to no purpose,
+and storing a different amount than gets sent would make the manifest a description of something
+that never happened.
+
+Deleting `ScreeningReport.eyeTest` regressed nothing: `screenStorefront` never called `runEyeTest`,
+so the field was `undefined` on every run ever assembled and the panel had always returned null.
+
+### The trigger, and a departure stated plainly
+
+Enqueued by a trigger on `runs`, firing when a run reaches `complete`. **This schema has 37 triggers
+and every one of them refuses a write** — rows that are append-only, runs immutable once finished,
+documents never deleted. This is the first that creates a row, and that is a real change in what a
+trigger means here.
+
+The justification is the requirement, not convenience. The eye test's value is calibration, and the
+storefronts that most need judging are the ones on blocked packages nobody reads. **A layer that
+produces calibration data only when someone remembers produces none.** An analyst-triggered read
+would be forgotten; so, eventually, would a call site — three code paths finish a run today, and
+enqueueing in code covers the three that exist while the trigger covers the fourth.
+
+Enqueued on `complete` only. A `failed` run has no assembled report, so no manifest and no panel to
+render beside.
+
+### Absence became four things, and three of them are not failures
+
+The read now arrives after the run, so a report is routinely on screen before its read exists. That
+turns one rendering problem into four, and D-044's argument applies exactly:
+
+| what is true | what the reader is told |
+|---|---|
+| the job finished | the read, or its evidenced absence |
+| the job has not run | *not recorded yet* |
+| the job could not start | why, plainly, with no capture list to offer |
+| the run predates the layer | that, and that none is coming |
+
+**"Not recorded yet" must never render as failure.** The absence panel says Mintro tried to form an
+impression and could not. Shown for a pending job it says that thirty seconds before the read lands,
+and a reader who saw it does not come back to check — a false statement about Mintro's own work, on
+a document that reaches an underwriter. It gets its own quiet treatment: a softer border, one
+sentence, no reason line and no capture list, because nothing has gone wrong.
+
+**The historical case is decided by the manifest, not by a date.** A run carrying no
+`eyeTestCaptures` was assembled before the layer existed, and that is fixed forever. Comparing the
+run's date against the rubric's `effective` would give a different answer every time the rubric is
+revised, and would eventually claim that runs which *do* carry reads predate the layer.
+
+**No backfill.** A read produced today, under today's rubric, filed against a run screened weeks ago
+is a read nothing could attribute — and attribution is the whole of what `rubricVersion` is for. The
+job closes such a row with that as its reason rather than guessing at a manifest.
+
+### Nothing gates on it
+
+The send does not wait, and neither does the PDF. The send modal states whether the read is on the
+report and leaves the button enabled; an operator who would rather it went with the report can close
+the dialog and reopen it in a minute. **Mintro does not block on Mintro's own judgment layer** —
+§7's blocker-tier ruling, one level over. A screener that withheld a report until its own impression
+was ready would have made the layer load-bearing, which is the one thing it is not allowed to be.
+
+A PDF taken in the half-minute before the job lands prints *not recorded yet*, which is what was
+true when it was taken and claims nothing about the merchant.
+
+### Two things found on the way
+
+**`pdf.ts`'s injection contract was missing `attestations`.** The field was being injected and the
+type said the page never received it — the call site passes it through a conditional spread, which
+TypeScript exempts from excess-property checking. Declared now, alongside the eye test, because the
+next person to read that type is deciding what the PDF is allowed to show.
+
+**The sign-up page had to travel out of `discoverLayer3`.** `SignupForm` describes the fields and
+carries no capture key, and the rubric's ninth question asks how the entry gate *reads* — a question
+about the picture. Returned from the finder rather than re-derived, because that is the only place
+that knows which of the candidate paths yielded a form.

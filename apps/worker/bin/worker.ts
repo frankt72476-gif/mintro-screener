@@ -57,6 +57,7 @@ import { runResponseNotice } from '../src/responseNoticeJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
+import { claimNextEyeTest, runEyeTestJob } from '../src/eyeTestJob.js';
 import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
 import {
   claimNextExport, claimNextExportDiscard, runExport, runExportDiscard,
@@ -413,6 +414,24 @@ async function main(argv: readonly string[]): Promise<number> {
       const notice = await claimNextNotice(supabase);
       if (notice !== null) {
         await handleNotice(supabase, notice, addresses);
+        continue;
+      }
+
+      /*
+        The eye test, last of everything (D-198).
+
+        Below the notifications, which is as far down as this loop goes. Every job above it is work
+        somebody is waiting on — a scan, a download, a send, a merchant who pressed Submit. Nobody
+        is holding a tab open for this one: it produces observations that cannot move a state, and
+        on a blocked package nobody reads it at all. It is calibration data, and calibration data
+        yields to everything.
+
+        It needs no browser and no `WEB_ORIGIN`. What it needs is 22 seconds, which is exactly why
+        it is here rather than inside the crawl.
+      */
+      const eyeTest = await claimNextEyeTest(supabase, STALE_CLAIM_MS);
+      if (eyeTest !== null) {
+        await runEyeTestJob(supabase, eyeTest);
         continue;
       }
 

@@ -357,12 +357,23 @@ export {
   parseEyeTestRubric,
   isEyeVerdict,
   eyeVerdictToState,
+  eyeTestManifest,
+  EYE_TEST_TEXT_LIMIT,
   type EyeTest,
   type EyeTestAbsence,
   type EyeTestCapture,
+  type EyeTestCaptureRequest,
   type EyeTestItem,
   type EyeTestOutcome,
   type EyeTestRubric,
   type EyeTestVerdict,
   type EyeVerdict,
 } from './eyetest.js';
+/* Reading the eye test back, and the four things a reader can be told (D-198). */
+export {
+  readRunEyeTest,
+  resolveEyeTest,
+  type EyeTestReader,
+  type EyeTestRecord,
+  type EyeTestRow,
+} from './eyeTestStore.js';

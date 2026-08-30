@@ -129,6 +129,14 @@ export const MAX_LINKED_CANDIDATES = 4;
 
 export interface Layer3Discovery {
   readonly signup: SignupForm;
+  /**
+   * The rendered sign-up page, where one was reached (D-198).
+   *
+   * Carried so the eye-test manifest can name its capture. `SignupForm` describes the fields and
+   * has no key; the rubric asks whether the gate reads as a control or a formality, which is a
+   * question about the picture.
+   */
+  readonly signupPage?: PageContext;
   /*
     `Located<PageContext>` rather than `PageContext | undefined` (D-182).
 
@@ -215,7 +223,8 @@ export async function discoverLayer3(
   };
 
   step('sign-up form');
-  const signup = await findSignupForm(browser, origin, options, attempts, artifacts, say);
+  const signupFound = await findSignupForm(browser, origin, options, attempts, artifacts, say);
+  const signup = signupFound.form;
   done += 1;
 
   const probe = { undecided: 0, total: 0 };
@@ -233,6 +242,7 @@ export async function discoverLayer3(
 
   return {
     signup,
+    ...(signupFound.page === undefined ? {} : { signupPage: signupFound.page }),
     terms: surface('terms document'),
     shipping: surface('shipping policy'),
     faq: surface('FAQ'),
@@ -250,7 +260,7 @@ async function findSignupForm(
   attempts: FetchAttempt[],
   artifacts: EvidenceArtifact[],
   say: (line: string) => void,
-): Promise<SignupForm> {
+): Promise<{ readonly form: SignupForm; readonly page?: PageContext }> {
   // The most informative thing seen while looking. A page that carried a sign-in form but no
   // account-creation form says something quite different from nothing being found at all, and
   // the finding should carry whichever actually happened.
@@ -299,12 +309,22 @@ async function findSignupForm(
     }
 
     say(`  sign-up form located at ${page.finalUrl} · ${raw.fields.length} field(s)`);
+    /*
+      The page travels out beside the form (D-198).
+
+      The eye test asks how the entry gate *reads*, which needs the picture; `SignupForm` describes
+      the fields and carries no capture key. Returned rather than re-derived, because this is the
+      only place that knows which of the candidate paths was the one that yielded a form.
+    */
     return {
-      found: true,
-      locatedBy: raw.locatedBy,
-      url: page.finalUrl,
-      fields: raw.fields,
-      candidateForms: raw.candidateForms,
+      form: {
+        found: true,
+        locatedBy: raw.locatedBy,
+        url: page.finalUrl,
+        fields: raw.fields,
+        candidateForms: raw.candidateForms,
+      },
+      page,
     };
   }
 
@@ -313,7 +333,7 @@ async function findSignupForm(
       ? `  no sign-up form reached · ${attempts.length} path(s) tried`
       : `  no sign-up form reached · closest: ${closest}`,
   );
-  return closest === '' ? NO_SIGNUP_FORM : { ...NO_SIGNUP_FORM, locatedBy: closest };
+  return { form: closest === '' ? NO_SIGNUP_FORM : { ...NO_SIGNUP_FORM, locatedBy: closest } };
 }
 
 /**

@@ -9,18 +9,30 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { auditAnalystNote, describeNoteWarning, STATE_LABEL_LOWER, type ScreeningReport } from '@mintro/engine';
+import {
+  auditAnalystNote,
+  describeNoteWarning,
+  STATE_LABEL_LOWER,
+  type EyeTestRecord,
+  type ScreeningReport,
+} from '@mintro/engine';
 import { describeSend, isSendPending, type SendQueue, type SendSummary } from '../lib/sendQueue.js';
 
 interface Props {
   readonly report: ScreeningReport;
+  /**
+   * Whether Mintro's own read is on the report yet (D-198).
+   *
+   * Shown, never enforced. See the line in the dialog body for why.
+   */
+  readonly eyeTest?: EyeTestRecord | null;
   readonly queue: SendQueue;
   readonly onCancel: () => void;
   /** Called once the worker has finished the attempt, accepted or refused. */
   readonly onSent: (send: SendSummary) => void;
 }
 
-export function SendModal({ report, queue, onCancel, onSent }: Props): JSX.Element {
+export function SendModal({ report, eyeTest = null, queue, onCancel, onSent }: Props): JSX.Element {
   const [to, setTo] = useState('underwriting@iqwallet.com');
   const [note, setNote] = useState(
     `${report.counts.fail} ${STATE_LABEL_LOWER.fail}, ${report.counts.review} ${STATE_LABEL_LOWER.review}, ${report.counts.not_evaluable} ${STATE_LABEL_LOWER.not_evaluable}. Captures attached.`,
@@ -140,6 +152,28 @@ export function SendModal({ report, queue, onCancel, onSent }: Props): JSX.Eleme
               <b>Reads as a recommendation</b>
               {describeNoteWarning(audit)}
             </div>
+          )}
+
+          {/*
+            Whether the eye test is on the report, stated and not enforced (D-198).
+
+            **The send does not wait for it.** Nothing in Mintro gates on Mintro's own judgment
+            layer — the same ruling that lets a blocked package be sent, one level over. A screener
+            that withheld a report until its own impression was ready would be making the layer
+            load-bearing, which is exactly what it is not allowed to be.
+
+            So this is a line of text, not a disabled button. An operator who would rather the read
+            went with it can close this and reopen it in a minute; one who does not care sends now,
+            and the panel prints "not recorded yet", which claims nothing about the merchant.
+          */}
+          {eyeTest !== null && eyeTest.kind !== 'predates' && (
+            <p className="send-eye" role="status">
+              {eyeTest.kind === 'recorded'
+                ? 'Mintro’s eye test is on this report.'
+                : eyeTest.kind === 'pending'
+                  ? 'Mintro’s eye test is not recorded yet. Sending now omits it; it usually lands within a minute.'
+                  : 'Mintro’s eye test could not be recorded for this run. Sending now omits it.'}
+            </p>
           )}
 
           <div className="attach">

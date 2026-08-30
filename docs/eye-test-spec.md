@@ -120,16 +120,37 @@ answers to different questions.
 
 ## 5 — Immutability and failure
 
-**The eye test is written once, at assembly, and stored with the run.** Never recomputed at render
-time. D-002 applies exactly as it does to findings: a run says what it said.
+**The eye test is written once and stored beside the run.** Never recomputed at render time. D-002
+applies exactly as it does to findings: a run says what it said.
+
+**It is written after the run, not at assembly** (D-198, resolving §9's first open question). A
+typical call measured 22 seconds — 18.6, 22.7 and 26.4 across three real calls — against a 26-33s
+run, so running it inline roughly doubled the crawl for a layer that by design changes nothing. It
+became a job, enqueued automatically when a run completes.
+
+That has one consequence worth stating: **the result cannot live in `runs.report`**, which is sealed
+the moment the run finishes. What the report carries instead is the *manifest* — which page was the
+homepage, which were sampled products, which was the sign-up form — because that is knowledge the
+crawl has and a later job cannot recover without guessing at URL shapes. Assembly decides what to
+look at; the job does the looking.
 
 **When the model call fails, the eye test is absent** and the report says so plainly — "no eye test
 was recorded for this run". It is never partially rendered, never retried at render time, and its
 absence never blocks the run. A crawl that produced 71 findings is not wasted because a judgment
 layer timed out.
 
+**"Not recorded yet" is a fourth state and never renders as failure.** Because the read arrives after
+the run, a report is routinely on screen before its read exists. Showing a pending job in the absence
+treatment tells a reader the layer broke, half a minute before it succeeds.
+
 **A run predating the rubric** says it was screened before the eye test existed, rather than
-rendering an empty panel (D-044).
+rendering an empty panel (D-044). Never backfilled: a read taken today, under today's rubric, filed
+against a run that predates it is a read nothing could attribute — and attribution is the whole of
+what `rubricVersion` is for.
+
+**Nothing gates on it.** Not the send, not the PDF. The send modal states whether the read is on the
+report and leaves the button enabled; an operator who wants to wait can. Mintro does not block on
+Mintro's own judgment layer — the blocker-tier ruling of §7, one level over.
 
 ---
 
@@ -172,8 +193,9 @@ the same error as a summary line that characterises an observation.
 
 ## 9 — Open
 
-- **Cost and latency per run.** Measure before deciding whether it runs synchronously in the crawl
-  or as a job after it. The run should not slow materially for a judgment layer.
+- ~~**Cost and latency per run.**~~ **Settled — see §5 and D-198.** Measured at 22s typical against a
+  26-33s run, so it moved out of the crawl into a post-run job. Cost was never the constraint: about
+  $0.10 a run at 24.5k input tokens.
 - **Whether the read should name the storefront's strengths.** The current draft does — "reads as a
   working laboratory supplier" — which is fair and useful, but it is also the closest the document
   comes to endorsement. Watch it in calibration.

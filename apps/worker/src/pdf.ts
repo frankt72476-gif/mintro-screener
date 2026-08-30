@@ -11,7 +11,7 @@
  */
 
 import type { Browser } from 'playwright';
-import type { RunCommentary, ScreeningReport } from '@mintro/engine';
+import type { EyeTestRecord, RunAttestations, RunCommentary, ScreeningReport } from '@mintro/engine';
 
 export interface PdfOptions {
   /** Origin serving the report route. */
@@ -49,6 +49,23 @@ export interface PdfOptions {
      * that decides their application without anything on the page saying so.
      */
     readonly commentary?: RunCommentary | null;
+    /**
+     * What the merchant stated about what no crawl can see (D-134).
+     *
+     * **Was already being injected and was not declared here.** The call site passes it through a
+     * conditional spread, which TypeScript exempts from excess-property checking — so the field
+     * reached the page while this contract said the page never received it. Declared now, because
+     * the next person to read this type is deciding what the PDF is allowed to show.
+     */
+    readonly attestations?: RunAttestations;
+    /**
+     * The eye test, resolved to one of its four states (D-198).
+     *
+     * Injected rather than read in the page: the print surface has no Supabase session, and
+     * resolving it in two places is two places free to disagree about whether a missing read means
+     * pending, failed, or a run that predates the layer.
+     */
+    readonly eyeTest?: EyeTestRecord | null;
   };
 }
 

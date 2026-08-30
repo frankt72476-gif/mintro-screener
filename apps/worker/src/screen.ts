@@ -26,6 +26,7 @@ import type { ProgressEvent } from '@mintro/engine';
 import { createScanProgress } from './scanProgress.js';
 import type { Ruleset } from '@mintro/ruleset';
 import {
+  eyeTestManifest,
   createHttpFetcher,
   createPacer,
   describeCrawlDelay,
@@ -452,6 +453,23 @@ export async function screenStorefront(
         and the stored record cannot disagree, because there is one of each fact.
       */
       sample: progress.sampleBasis(),
+
+      /*
+        What the eye test should read — not what it found (D-198).
+
+        The call takes 22 seconds and produces observations that can never move a state, so it does
+        not belong on the crawl's critical path. It runs afterwards, as a job, and writes to
+        `eye_tests` rather than here — `runs.report` is sealed the moment the run finishes.
+
+        What the job cannot work out for itself is which page was which. That is known here and
+        nowhere else, and recovering it downstream by matching URL shapes is the blindness hard
+        constraint 9 describes. So the manifest is built now and the looking happens later.
+      */
+      eyeTestCaptures: eyeTestManifest({
+        homepage: rendered.page,
+        products: sampled.map((entry) => entry.page),
+        ...(discovered.signupPage === undefined ? {} : { signup: discovered.signupPage }),
+      }),
     },
     ruleset,
   );

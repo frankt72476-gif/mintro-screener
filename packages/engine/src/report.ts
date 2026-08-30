@@ -16,7 +16,7 @@
 import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State } from '@mintro/ruleset';
 import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { STATE_LABEL_LOWER } from './stateLabel.js';
-import type { EyeTestOutcome } from './eyetest.js';
+import type { EyeTestCaptureRequest } from './eyetest.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
@@ -267,17 +267,21 @@ export interface ScreeningReport {
    */
   readonly obstruction?: ReportObstruction;
   /**
-   * What a person notices by looking at the captures, or why there is none (D-196).
+   * Which captures the eye test should read, and nothing about what it found (D-198).
    *
-   * **Optional, and nothing depends on it.** It produces no findings, moves no state and enters no
-   * count — the report is complete without it, and a reader that finds it absent renders nothing
-   * rather than a "0 of 11". Absent on every run recorded before it existed, like `blocking` and
-   * `sample` before it.
+   * **The outcome is not here and cannot be.** `runs.report` is written once when the run finishes
+   * and `runs_are_immutable_once_finished` refuses every later update — so a judgment layer that
+   * takes 22 seconds and runs after the crawl has nowhere to write. The result lives in `eye_tests`,
+   * keyed on the run, and the report carries only what the crawl knew: which page was the homepage,
+   * which were sampled products, which was the sign-up form.
    *
-   * When it did not run, the outcome still carries **which captures it wanted and what happened**,
-   * to the standard hard constraint 3 sets for a `not_evaluable` finding.
+   * That division is not incidental. **Assembly decides what to look at; the job does the looking.**
+   * The structural knowledge exists only while the crawl is running, and a job that recovered it by
+   * matching URL shapes would be blind in exactly the way hard constraint 9 describes.
+   *
+   * Absent on every run recorded before it existed, like `blocking` and `sample` before it.
    */
-  readonly eyeTest?: EyeTestOutcome;
+  readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
 }
 
 /**
@@ -360,8 +364,8 @@ export interface AssembleInput {
   readonly access?: ReportAccess;
   /** How thin the sample was, and which surfaces were read (D-162). */
   readonly sample?: SampleBasis;
-  /** The eye test, or why there is none. Omitted entirely on a worker that does not run it. */
-  readonly eyeTest?: EyeTestOutcome;
+  /** Which captures the eye test should read. Omitted where the crawl took none (D-198). */
+  readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
 }
 
 /**
@@ -447,7 +451,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     sameObservation: pairSameObservation(enriched, ruleset),
     blocking: summariseBlocking(enriched, ruleset),
     ...(input.sample === undefined ? {} : { sample: input.sample }),
-    ...(input.eyeTest === undefined ? {} : { eyeTest: input.eyeTest }),
+    ...(input.eyeTestCaptures === undefined ? {} : { eyeTestCaptures: input.eyeTestCaptures }),
     verdict: describeVerdict(enriched, counts),
     categories,
     strip: categories.flatMap((category) =>

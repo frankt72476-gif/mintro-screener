@@ -30,6 +30,42 @@
  */
 
 import type { State } from '@mintro/ruleset';
+import type { PageContext } from './page.js';
+
+/**
+ * How much page text travels with a capture.
+ *
+ * One constant, read by the manifest that records the text and by the call that sends it. Two
+ * numbers here would let the report store text that never goes, or send text the report does not
+ * show — and the manifest is meant to be exactly what was sent.
+ */
+export const EYE_TEST_TEXT_LIMIT = 4000;
+
+/**
+ * One capture the eye test should read, named by the crawl that took it (D-198).
+ *
+ * **Built at assembly, consumed after the run.** `screenStorefront` knows structurally which page
+ * is the homepage, which are the sampled products and which is the sign-up form; a job reading the
+ * finished report does not, and recovering it by matching URL shapes — `/shop/`, `/product/` — is
+ * exactly the mistake hard constraint 9 forbids. It would work on the storefronts it was written
+ * against and mislabel every other one.
+ *
+ * So the crawl records what it knows and the job does the looking.
+ */
+export interface EyeTestCaptureRequest {
+  /** `homepage`, `product`, `signup`. Structural, never inferred from the URL. */
+  readonly surface: string;
+  readonly sourceUrl: string;
+  /** The evidence key, or empty where the capture was never taken. */
+  readonly evidenceKey: string;
+  /**
+   * Rendered page text, already cut to `EYE_TEST_TEXT_LIMIT`.
+   *
+   * Stored cut rather than whole. Text beyond the limit would never be sent, so keeping it would
+   * put an unbounded copy of every sampled page into an immutable report to no purpose.
+   */
+  readonly text: string;
+}
 
 /** What the model may answer. Deliberately not the four finding states — these are not findings. */
 export type EyeVerdict = 'clear' | 'concern' | 'cannot_tell';
@@ -185,6 +221,38 @@ export function parseEyeTestRubric(raw: unknown, source: string): EyeTestRubric 
     verdicts: (doc['verdicts'] ?? {}) as Readonly<Record<EyeVerdict, string>>,
     items,
   };
+}
+
+/**
+ * What the eye test should look at, decided by the crawl that did the looking (D-198).
+ *
+ * Pure, and the only place a surface label is assigned. Every entry is recorded whether or not its
+ * capture exists: a page that failed to render appears with an empty `evidenceKey`, so the job
+ * reports *"no capture was taken for this surface"* rather than never mentioning it. A surface
+ * dropped here is a question silently unasked, which is the shape hard constraint 3 forbids.
+ *
+ * The labels come from **which crawl step produced the page**, never from its URL. `/shop/` and
+ * `/product/` are conventions of the storefronts this was written against, and a job that read
+ * them would mislabel every merchant who names things differently — hard constraint 9, applied to
+ * a manifest rather than a check.
+ */
+export function eyeTestManifest(pages: {
+  readonly homepage: PageContext;
+  readonly products: readonly PageContext[];
+  readonly signup?: PageContext;
+}): readonly EyeTestCaptureRequest[] {
+  const of = (surface: string, page: PageContext): EyeTestCaptureRequest => ({
+    surface,
+    sourceUrl: page.finalUrl === '' ? page.requestedUrl : page.finalUrl,
+    evidenceKey: page.screenshotKey ?? '',
+    text: page.text.slice(0, EYE_TEST_TEXT_LIMIT),
+  });
+
+  return [
+    of('homepage', pages.homepage),
+    ...pages.products.map((page) => of('product', page)),
+    ...(pages.signup === undefined ? [] : [of('signup', pages.signup)]),
+  ];
 }
 
 /**

@@ -2714,4 +2714,24 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .eye-source { flex: 1 1 auto; font-size: 11px; color: var(--slate); }
 .eye-problem { flex: 0 0 auto; color: var(--slate); }
 
+/*
+  Not yet, and not a failure (D-198).
+
+  The read arrives after the run, so this panel is often on screen before its content exists. It
+  gets a lighter border and a quieter line than `.is-absent`, and no capture list — nothing has gone
+  wrong, and a pending job dressed as a failure tells a reader the layer broke thirty seconds before
+  it succeeds. The same treatment carries the run that predates the layer, which is the other case
+  where there is nothing wrong to report.
+
+  The quiet pass, applied to a panel: hierarchy from weight and colour, no new palette entry (D-167).
+*/
+.eye-panel.is-pending { border-color: var(--line-soft); }
+.eye-panel.is-pending .eye-read { color: var(--slate); font-size: 12.5px; margin: 0; }
+
+/* The send dialog's one line about it. States, never gates — the button beside it stays enabled. */
+.send-eye {
+  margin: 13px 0 0;
+  font-size: 12px; line-height: 1.55; color: var(--slate);
+}
+
 @media print { .eye-panel { break-inside: avoid; } }

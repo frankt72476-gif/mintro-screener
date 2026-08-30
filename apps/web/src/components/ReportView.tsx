@@ -17,6 +17,7 @@ import {
   type Participation,
   type ReportCategory,
   type ReportFinding,
+  type EyeTestRecord,
   type RunAttestations,
   type ScreeningReport,
 } from '@mintro/engine';
@@ -120,6 +121,15 @@ interface Props {
    */
   readonly attestations?: RunAttestations;
   /**
+   * The eye test, resolved to one of its four states (D-198).
+   *
+   * `undefined` from a caller that has not read it, `null` from a read that failed — both render
+   * nothing, because a panel is not worth a claim this layer cannot support. Anything else renders,
+   * including *not recorded yet*, which is a true statement about the job and none about the
+   * merchant.
+   */
+  readonly eyeTest?: EyeTestRecord | null;
+  /**
    * Who this rendering is for (spec §1).
    *
    * Decides section order and whether section 3 splits — nothing else. Defaults to the IQwallet
@@ -140,6 +150,7 @@ export function ReportView({
   surface: surfaceProp,
   commentBox,
   attestations,
+  eyeTest = null,
 }: Props): JSX.Element {
   // Both branches read from this, so a comment keys the same way whichever view is rendering.
   const ordinals = useMemo(() => ordinalsFor(report), [report]);
@@ -276,7 +287,7 @@ export function ReportView({
         {...(commentaryOf === undefined ? {} : { commentaryOf })}
         {...(commentBox === undefined ? {} : { commentBox })}
       />
-      <EyeTestPanel report={report} />
+      <EyeTestPanel record={eyeTest} />
       <Brief brief={brief(report, parts)} />
       {print !== true && <NavCards parts={parts} />}
       <p className="top-coverage">{coverageSentence(report)}</p>
@@ -712,20 +723,32 @@ function StoppingPanel({
 }
 
 /**
- * The eye test, or the reason there is none (D-196).
+ * The eye test, or which of the four reasons there is none (D-196, D-198).
  *
- * Renders nothing at all on a run that predates it — absent is not "0 of 11", which would be a
- * statement about a merchant drawn from the age of the file (D-044's rule).
+ * The read arrives after the run, so this panel has to say four different things and must not blur
+ * them (D-044's rule, one level up from a finding):
+ *
+ * - **recorded** — the read, or the evidenced absence
+ * - **not recorded yet** — the job has not run. *Never* the absence treatment: showing a pending
+ *   job as a failure tells a reader the layer broke, thirty seconds before it succeeds
+ * - **the job could not start** — said plainly, with no capture list to offer
+ * - **the run predates the eye test** — and none is coming, because a read produced under a rubric
+ *   the run predates is one nothing could attribute (D-198)
  *
  * **The absence is evidenced.** It names every capture it wanted and what happened to each, because
  * *"the eye test did not run"* states an outcome and withholds the reason, and a reader cannot tell
  * a vendor outage from a run that had no captures to send. Same standard hard constraint 3 sets for
  * a `not_evaluable` finding.
  */
-function EyeTestPanel({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
-  const outcome = report.eyeTest;
-  // A run predating the rubric renders nothing. Not an empty panel, and not "0 of 9" (D-044).
-  if (outcome === undefined) return null;
+function EyeTestPanel({ record }: { readonly record: EyeTestRecord | null }): JSX.Element | null {
+  /*
+    Nothing at all in two cases, and they are not the same case.
+
+    `null` is a side read that failed — the panel cannot say anything true, so it says nothing. A
+    run that predates the layer renders the historical line below rather than nothing, because "no
+    eye test" on a report that never could have had one is a fact worth stating once.
+  */
+  if (record === null) return null;
 
   const label = (
     /*
@@ -736,6 +759,58 @@ function EyeTestPanel({ report }: { readonly report: ScreeningReport }): JSX.Ele
     */
     <p className="eye-label">Eye test · Mintro’s impression, not an observation</p>
   );
+
+  /*
+    Not yet, and not a failure.
+
+    `is-pending`, never `is-absent`: no dashed-failure treatment, no capture list, no reason — there
+    is nothing wrong to report. The sentence says what is true and what happens next, and says
+    nothing whatever about the merchant.
+  */
+  if (record.kind === 'pending') {
+    return (
+      <section className="panel eye-panel is-pending">
+        {label}
+        <p className="eye-read">The eye test has not been recorded for this run yet.</p>
+      </section>
+    );
+  }
+
+  /*
+    Screened before the layer existed, and no read is coming.
+
+    Deliberately not "not yet". Backfilling would file a read taken under today's rubric against a
+    run that predates it, and a rubric version that cannot be trusted to describe the questions
+    asked is the one thing calibration cannot survive (D-198).
+  */
+  if (record.kind === 'predates') {
+    return (
+      <section className="panel eye-panel is-pending">
+        {label}
+        <p className="eye-read">This run was screened before the eye test existed.</p>
+      </section>
+    );
+  }
+
+  /*
+    The job could not start.
+
+    Distinct from an evidenced absence: `runEyeTest` returns a capture list for everything that goes
+    wrong at the vendor, so reaching here means the job never got as far as asking. There is no
+    capture list to show, and the panel says so rather than rendering an empty one.
+  */
+  if (record.kind === 'failed') {
+    return (
+      <section className="panel eye-panel is-absent">
+        {label}
+        <p className="eye-read">No eye test was recorded for this run.</p>
+        <p className="eye-why">{record.reason}</p>
+        <p className="eye-why">No captures were requested, so there is nothing further to show.</p>
+      </section>
+    );
+  }
+
+  const outcome = record.outcome;
 
   if (outcome.kind === 'absent') {
     const { absence } = outcome;

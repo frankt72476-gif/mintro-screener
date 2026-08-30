@@ -33,6 +33,8 @@ import {
   commentaryFor,
   participationFor,
   readRunAttestations,
+  readRunEyeTest,
+  resolveEyeTest,
   readRunCommentary,
   readResponseRound,
   RUN_PARAM,
@@ -41,6 +43,7 @@ import {
   type Participation,
   type FindingCommentary,
   type ReportFinding,
+  type EyeTestRecord,
   type RunAttestations,
   type RunCommentary,
 } from '@mintro/engine';
@@ -123,6 +126,17 @@ interface InjectedPrint {
    * documents. That defect has happened once already on this component.
    */
   readonly attestations?: RunAttestations;
+  /**
+   * The eye test, resolved by the worker before the page is opened (D-198).
+   *
+   * Here for the same reason `attestations` is. The PDF is the document that reaches IQwallet, and
+   * a screen carrying Mintro's read beside an export that drops it is two documents — the defect
+   * ARCHITECTURE.md forbids a second rendering stack to prevent.
+   *
+   * It can legitimately say *not recorded yet*: the send does not wait for the eye test, and a PDF
+   * taken in the half-minute before the job lands prints what was true when it was taken.
+   */
+  readonly eyeTest?: EyeTestRecord | null;
   /** Evidence key → signed URL, pre-minted by the worker. */
   readonly evidence: Readonly<Record<string, string>>;
   /**
@@ -351,6 +365,9 @@ function Screener({
   );
   /** Undefined while unread or unreadable; a resolved set once read. See the read site below. */
   const [attestations, setAttestations] = useState<RunAttestations | undefined>(undefined);
+  // null until read, and null again when the read fails — the panel renders nothing either way
+  // rather than asserting something about a layer it could not reach (D-198).
+  const [eyeTest, setEyeTest] = useState<EyeTestRecord | null>(null);
 
   /**
    * Where runs come from.
@@ -503,6 +520,7 @@ function Screener({
     setCommentary(undefined);
     setRound(undefined);
     setAttestations(undefined);
+    setEyeTest(null);
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
@@ -527,6 +545,17 @@ function Screener({
         "nineteen questions, none answered", which would be a read failure shown as the merchant's
         silence (D-036, D-044).
       */
+      /*
+        The eye test, last and least gating of all (D-198).
+
+        It runs after the crawl, so this read can legitimately find nothing — and *nothing yet* is
+        not *nothing wrong*. `resolveEyeTest` decides which of the four states is true from the
+        run's own manifest, so the panel never has to guess whether a missing read is pending, a
+        failure, or a run that predates the layer.
+      */
+      const eye = await readRunEyeTest(client, runId);
+      setEyeTest(resolveEyeTest(loaded.report, eye));
+
       const stored = await readRunAttestations(client, runId);
       // A rule set that failed to parse renders no report at all a few lines down, so there is
       // nothing to attach statements to either.
@@ -811,6 +840,7 @@ function Screener({
                 }}
                 {...commentaryProps(commentary, report)}
                 {...(attestations === undefined ? {} : { attestations })}
+                eyeTest={eyeTest}
               />
 
               {/*
@@ -847,6 +877,7 @@ function Screener({
 
       {sending && report !== null && (
         <SendModal
+          eyeTest={eyeTest}
           report={report}
           queue={sends}
           onCancel={() => setSending(false)}
@@ -1369,6 +1400,7 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
           print
           {...commentaryProps(injected.commentary, injected.report)}
           {...(injected.attestations === undefined ? {} : { attestations: injected.attestations })}
+          eyeTest={injected.eyeTest ?? null}
         />
       </main>
     </div>

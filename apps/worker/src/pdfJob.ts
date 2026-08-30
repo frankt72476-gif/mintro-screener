@@ -22,6 +22,8 @@
 import type { Browser } from 'playwright';
 import {
   readRunAttestations,
+  readRunEyeTest,
+  resolveEyeTest,
   readRunCommentary,
   resolveAttestations,
   type ScreeningReport,
@@ -91,6 +93,19 @@ export async function renderRunPdf(
     A failed read leaves the section out rather than rendering nineteen unanswered questions,
     which would be Mintro's read failure printed as the merchant's silence.
   */
+  /*
+    And so does the eye test, in whichever of its four states it is (D-198).
+
+    **The PDF does not wait for it.** Nothing in Mintro gates on Mintro's own judgment layer — the
+    same ruling that lets a blocked package still be sent. A download taken in the half-minute
+    before the job lands prints *not recorded yet*, which is what was true when it was taken, and
+    the panel says so in words that make no claim about the merchant.
+
+    Resolved here rather than in the page so the print surface and the screen cannot disagree about
+    which of the four is true.
+  */
+  const eyeTest = resolveEyeTest(report, await readRunEyeTest(supabase.client, input.runId));
+
   const storedAttestations = await readRunAttestations(supabase.client, input.runId);
   const attestations =
     storedAttestations === null ? undefined : resolveAttestations(report.attestationQuestions ?? [], storedAttestations);
@@ -110,6 +125,7 @@ export async function renderRunPdf(
         report,
         evidence,
         commentary,
+        eyeTest,
         ...(attestations === undefined ? {} : { attestations }),
       },
     });

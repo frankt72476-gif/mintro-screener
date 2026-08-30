@@ -1,0 +1,156 @@
+/**
+ * The eye-test panel, in each of the four states it can be in (D-198).
+ *
+ * The layer moved off the crawl's critical path, so a report is routinely on screen before its read
+ * exists. That turns one rendering problem into four, and the one that matters is the cheapest to
+ * get wrong: **a job that has not run yet must not be dressed as a job that failed.**
+ *
+ * The failure treatment says Mintro tried to form an impression and could not. Shown for a pending
+ * job it says that thirty seconds before the read lands — and a reader who saw it does not come
+ * back to check. That is a false statement about Mintro's own work, printed on a document that
+ * reaches an underwriter.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
+import type { EyeTestRecord, ScreeningReport } from '@mintro/engine';
+import { ReportView } from '../src/components/ReportView.js';
+
+const access = { description: 'none needed for markup', urlFor: async () => null };
+const REPORT = JSON.parse(
+  readFileSync('fixtures/reports/live-comopeptides.json', 'utf8'),
+) as ScreeningReport;
+
+const render = (eyeTest: EyeTestRecord | null, print = false): string =>
+  renderToStaticMarkup(
+    createElement(ReportView, {
+      report: REPORT,
+      access,
+      eyeTest,
+      surface: print ? 'iqwallet' : 'agent',
+      print,
+    } as never),
+  );
+
+const text = (markup: string): string =>
+  markup
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&#x2019;/g, '’')
+    .replace(/\s+/g, ' ');
+
+const RECORDED: EyeTestRecord = {
+  kind: 'recorded',
+  outcome: {
+    kind: 'ran',
+    test: {
+      read: 'A dark catalogue site with vial photography and a fire-sale banner.',
+      rubricVersion: '2.1.0',
+      model: 'claude-sonnet-5',
+      ranAt: '2026-08-30T00:00:00.000Z',
+      elapsedMs: 22_000,
+      verdicts: [
+        { id: 'EYE-01', question: 'Does the homepage read as a research supplier?', verdict: 'concern', saw: 'A fire sale banner.', looked_at: [] },
+        { id: 'EYE-02', question: 'Do product pages lead with chemical data?', verdict: 'clear', looked_at: [] },
+      ],
+      captures: [],
+    },
+  },
+};
+
+describe('not recorded yet is not a failure', () => {
+  it('renders the pending panel, and never the absence treatment', () => {
+    const markup = render({ kind: 'pending' });
+
+    expect(markup).toContain('eye-panel is-pending');
+    expect(markup).not.toContain('is-absent');
+    expect(text(markup)).toContain('has not been recorded for this run yet');
+  });
+
+  it('offers no reason and no capture list, because nothing went wrong', () => {
+    /*
+      The absence panel's furniture is what makes it read as a failure: a reason line and a list of
+      captures that did not arrive. A pending job has neither — there is nothing to explain.
+    */
+    const markup = render({ kind: 'pending' });
+
+    expect(markup).not.toContain('eye-why');
+    expect(markup).not.toContain('eye-captures');
+  });
+
+  it('says nothing about the merchant', () => {
+    // The sentence is about the job. A pending layer must not put a word about the storefront on
+    // the page, because it has not looked at it.
+    const body = text(render({ kind: 'pending' }));
+    expect(body).not.toMatch(/no concern|nothing (was )?found|appears (clean|fine)/i);
+  });
+});
+
+describe('a run that predates the layer says so, and does not promise one', () => {
+  it('renders the historical sentence rather than "not yet"', () => {
+    const markup = render({ kind: 'predates' });
+
+    expect(text(markup)).toContain('screened before the eye test existed');
+    expect(text(markup)).not.toContain('not been recorded for this run yet');
+    expect(markup).not.toContain('is-absent');
+  });
+});
+
+describe('a job that could not start', () => {
+  it('says why, and says there is no capture list rather than showing an empty one', () => {
+    const markup = render({ kind: 'failed', reason: 'run 1 has no stored report' });
+
+    expect(markup).toContain('is-absent');
+    expect(text(markup)).toContain('run 1 has no stored report');
+    expect(markup).not.toContain('eye-captures');
+  });
+});
+
+describe('a recorded read', () => {
+  it('renders the read, the verdicts, and the rubric it was produced under', () => {
+    const body = text(render(RECORDED));
+
+    expect(body).toContain('A dark catalogue site');
+    expect(body).toContain('Rubric 2.1.0');
+    expect(body).toContain('claude-sonnet-5');
+  });
+
+  it('gives a clear row no evidence line and a concern row one', () => {
+    const markup = render(RECORDED);
+    expect(markup).toContain('A fire sale banner.');
+    // Two verdicts, one evidence line.
+    expect(markup.match(/eye-saw/g) ?? []).toHaveLength(1);
+  });
+
+  it('carries no count of concerns anywhere', () => {
+    // A tally makes the layer read as a rule set with pictures, and a number invites arithmetic —
+    // which is the determination this is not allowed to make (D-001).
+    const body = text(render(RECORDED));
+    expect(body).not.toMatch(/\b\d+ (of them )?(found|concern|issue)/i);
+  });
+});
+
+describe('a caller that read nothing', () => {
+  it('renders no panel at all rather than asserting a state', () => {
+    // `null` is a side read that failed. The panel cannot say anything true, so it says nothing —
+    // the same convention the attestation section follows (D-036).
+    expect(render(null)).not.toContain('eye-panel');
+  });
+});
+
+describe('print carries the same four', () => {
+  it.each([
+    ['pending', { kind: 'pending' } as EyeTestRecord, 'has not been recorded'],
+    ['predates', { kind: 'predates' } as EyeTestRecord, 'screened before the eye test existed'],
+    ['recorded', RECORDED, 'A dark catalogue site'],
+  ])('%s reaches the printed document', (_name, record, expected) => {
+    /*
+      The PDF is what reaches IQwallet. A state that renders on screen and not on paper is two
+      documents, which is the defect ARCHITECTURE.md forbids a second rendering stack to prevent.
+    */
+    expect(text(render(record, true))).toContain(expected);
+  });
+});

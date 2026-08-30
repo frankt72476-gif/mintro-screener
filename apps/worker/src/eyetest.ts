@@ -30,11 +30,13 @@
 
 import { readFileSync } from 'node:fs';
 import {
+  EYE_TEST_TEXT_LIMIT,
   isEyeVerdict,
   parseEyeTestRubric,
   type EvidenceArtifact,
   type EyeTest,
   type EyeTestCapture,
+  type EyeTestCaptureRequest,
   type EyeTestOutcome,
   type EyeTestRubric,
   type EyeTestVerdict,
@@ -70,15 +72,14 @@ export const EYE_TEST_TIMEOUT_MS = 20_000;
  */
 const MAX_ANSWER_TOKENS = 4000;
 
-/** A capture the eye test wants, named by the surface the rubric asks about. */
-export interface CaptureRequest {
-  readonly surface: string;
-  readonly sourceUrl: string;
-  /** The evidence key, or empty where the capture was never taken. */
-  readonly evidenceKey: string;
-  /** Rendered page text, sent as context beside the image and never in place of it. */
-  readonly text: string;
-}
+/**
+ * A capture the eye test wants, named by the surface the rubric asks about.
+ *
+ * The type lives in the engine because the crawl writes it into the report and a job reads it back
+ * out (D-198). One shape, so the manifest a run records and the manifest a job consumes cannot
+ * drift into two.
+ */
+export type CaptureRequest = EyeTestCaptureRequest;
 
 export interface EyeTestOptions {
   readonly apiKey?: string;
@@ -307,7 +308,7 @@ function content(
     if (request.text.trim() !== '') {
       parts.push({
         type: 'text',
-        text: `Context only, the rendered text of that page:\n${request.text.slice(0, 4000)}`,
+        text: `Context only, the rendered text of that page:\n${request.text.slice(0, EYE_TEST_TEXT_LIMIT)}`,
       });
     }
   }
