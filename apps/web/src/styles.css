@@ -34,6 +34,28 @@
   --ink:#1B1233;
   --ink-mid:#4A4265;
 
+  /*
+    Section identity (D-201).
+
+    Aliases, not new hues. Every one resolves to a token already above — the report was grey with
+    two violet accents because colour had been given one job (state), and this gives it a second
+    without adding a sixth thing to learn.
+
+    **Ordered so that no two neighbours are close.** Measured L*: stopping 14, eye test 45, brief
+    26, review 48, questions 33. Reading down the document that is 14 → 45 → 26 → 48 → 33, and
+    every adjacent pair differs by at least 15. The weakest pair in the set is violet (26) and
+    violet-lift (33), and they are deliberately never adjacent.
+
+    Slate for the eye test on purpose: it is the one surface that is Mintro's impression rather
+    than an observation, it is already the only dashed thing in the document, and grey is what a
+    layer that changes no state should look like.
+  */
+  --sec-stopping:  var(--violet-deep);
+  --sec-eye:       var(--slate);
+  --sec-brief:     var(--violet);
+  --sec-review:    var(--purple);
+  --sec-questions: var(--violet-lift);
+
   --r:10px;
   --shadow:0 1px 2px rgba(42,15,99,.06), 0 8px 24px -12px rgba(42,15,99,.18);
 }
@@ -2735,3 +2757,100 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 }
 
 @media print { .eye-panel { break-inside: avoid; } }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   Section identity (D-201)
+
+   `docs/report-visual-spec.md` §6 said "colour does one job, marking state", and the result was a
+   monochrome document. Colour marks structure too — but in a place state never occupies, so the
+   two can never be read for each other.
+
+   **Structure lives in the gutter; state lives on the row.** The bar sits 14px outside the card,
+   in the margin `.main` already reserves, so it touches no border a state class can set. A failed
+   stopping panel still turns its own border rose; a failing finding still carries a rose left edge
+   inside the card. Nothing overlaps, and neither had to move.
+
+   Not a background fill: a tinted surface would recolour the text sitting on it and start
+   competing with the state badges, which is the one thing §6 was right to guard.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.stop-panel,
+.eye-panel,
+.brief,
+.part[data-section='review'],
+.part[data-section='questions'] {
+  position: relative;
+}
+
+.stop-panel::before,
+.eye-panel::before,
+.brief::before,
+.part[data-section='review']::before,
+.part[data-section='questions']::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+/* Full height, so it is still there four screens into a long section — which is the whole point.
+   A rule under the heading marks a boundary; this marks a place. */
+.stop-panel::before                       { background: var(--sec-stopping); }
+.eye-panel::before                        { background: var(--sec-eye); }
+.brief::before                            { background: var(--sec-brief); }
+.part[data-section='review']::before      { background: var(--sec-review); }
+.part[data-section='questions']::before   { background: var(--sec-questions); }
+
+/*
+  The one heading rule that already existed, now carrying its section's colour rather than a
+  neutral (D-201). It was `--ink-mid`, a grey chosen when nothing else was coloured.
+*/
+.att { border-top-color: var(--sec-questions); }
+
+@media (max-width: 900px) {
+  /* The gutter closes at narrow widths; the bar comes inside rather than off-screen. */
+  .stop-panel::before,
+  .eye-panel::before,
+  .brief::before,
+  .part[data-section='review']::before,
+  .part[data-section='questions']::before { left: -8px; }
+}
+
+@media print {
+  /*
+    Print drops the mark entirely (D-201, requirement 4).
+
+    Not a grey ramp. Measured, the five convert to L* 14, 45, 26, 48, 33 — slate (45) against purple
+    (48) is three points apart, which is no difference at all on paper at 3px. A ramp that claims
+    five tones and delivers four is worse than none, because a reader would trust it.
+
+    And not a neutral bar either. The bar lives 14px outside the card, in a gutter that exists only
+    on screen; print has no such margin, so the first attempt at this simply had the bar clipped by
+    the page edge — dropped by accident rather than by decision, and one margin change away from
+    reappearing as a sliver. Moving it inside would be a structural change to a colour pass.
+
+    So it is removed, deliberately and in one place. **Nothing is lost that the page needs**: in
+    print, section identity is carried by the headings and the reading order, exactly as it was
+    before this pass. A 24-page PDF depends on colour for nothing.
+
+    The document already behaves this way for state — `.stop-panel.is-failed` prints its rose border
+    as #8A8598 and keeps the weight, so hue drops and geometry stays. Here the geometry has nowhere
+    to go, so it goes too.
+  */
+  .stop-panel::before,
+  .eye-panel::before,
+  .brief::before,
+  .part[data-section='review']::before,
+  .part[data-section='questions']::before {
+    display: none;
+  }
+
+  /* The one rule that is inside the content box, so it survives — as the neutral it always was. */
+  .att { border-top-color: var(--ink-mid); }
+}
+}

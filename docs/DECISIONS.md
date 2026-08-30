@@ -13362,3 +13362,73 @@ Every branch of the panel had a test except the one a slow vendor actually produ
 an `absent` outcome. It renders correctly — verified against the live row, capture list and all — but
 it shipped untested, and that is why a report of "the absence panel does not render" could not be
 answered from the suite.
+## D-201 — Colour marks structure as well as state
+
+**2026-08-30 · business owner · `apps/web/src/styles.css`, `docs/report-visual-spec.md` §6**
+
+The spec said *"colour does one job: marking state."* That was over-specified, and it produced
+exactly what it asked for: a grey document with two violet accents, in which a reader four screens
+into a section had nothing but the heading they had already scrolled past to tell them where they
+were.
+
+Colour now does two jobs. **They never share a place**, which is the whole of how they stay apart:
+
+- **State marks the row** — a 3px coloured left edge, inside the card. Unchanged.
+- **Structure marks the surface** — a 3px bar in the left gutter, 14px *outside* the card, running
+  the surface's full height.
+
+Nothing had to move. A failed stopping panel still turns its own border rose; a failing finding still
+carries a rose edge inside the card. The structural bar sits in a margin `.main` already reserved and
+touches no border a state class can set.
+
+Full height rather than a heading rule, because a rule marks a boundary and this has to mark a
+place. Never a background fill: a tinted surface recolours the text sitting on it and starts
+competing with the state badges, which is the one thing the original sentence was right to guard.
+
+### The palette was measured before it was used
+
+| Surface | Token | L* |
+|---|---|---|
+| Stopping conditions | `--violet-deep` | 14 |
+| Eye test | `--slate` | 45 |
+| The brief | `--violet` | 26 |
+| For your review | `--purple` | 48 |
+| Questions for the merchant | `--violet-lift` | 33 |
+
+**No hue was added.** All five are aliases of existing tokens, and rose, amber and jade stay reserved
+for state.
+
+Read down the document that is 14 → 45 → 26 → 48 → 33, and **every adjacent pair differs by at least 15 points of lightness**. The assignment is chosen for that, not for the order the surfaces happen to fall in: the
+two closest violets in the set, 26 and 33, are deliberately never neighbours. Verified by sampling
+the rendered pixels rather than by reading the CSS — all five resolve to the intended token.
+
+Slate for the eye test on purpose. It is the one surface that is Mintro's impression rather than an
+observation, it is already the only dashed thing in the document, and grey is what a layer that
+changes no state should look like.
+
+**Where the palette runs out, said plainly.** Six non-state tokens exist, but they occupy four tonal
+bands: `--violet` 26, `--ink-mid` 30 and `--violet-lift` 33 are within 7 L\* of each other, and
+`--slate` 45 against `--purple` 48 is within 3. Five surfaces fit only because chroma separates the
+last pair — grey against magenta — and because the two closest violets are kept apart by ordering.
+There is no sixth surface in this palette. If one is ever needed, the smallest addition is a single
+light violet in the empty band above 50, not a new hue: that region is already rose, jade and amber.
+
+### Print drops the mark, deliberately
+
+Not a grey ramp. The five convert to L\* 14, 45, 26, 48, 33, and slate against purple is three points
+apart — no difference at all on paper at 3px. A ramp that claims five tones and delivers four is
+worse than none, because a reader would trust it.
+
+Not a neutral bar either, and this is worth recording because the first attempt looked correct and
+was not. The bar lives in a gutter that exists only on screen; print has no such margin, so the bar
+was simply **clipped by the page edge** — dropped by accident rather than by decision, and one margin
+change away from returning as a sliver at the trim. Moving it inside would have been a structural
+change to a colour pass.
+
+So it is removed in one place, on purpose. Nothing is lost that the page needs: in print, section
+identity is carried by the headings and the reading order, exactly as before. **A 24-page PDF depends
+on colour for nothing.** The document already behaves this way for state — `.stop-panel.is-failed`
+prints its rose border as `#8A8598` and keeps the weight — so hue drops and geometry stays, except
+here the geometry has nowhere to go and goes too.
+
+Structure, copy and type are untouched.

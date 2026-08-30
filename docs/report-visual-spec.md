@@ -233,8 +233,41 @@ Focus ring on keyboard focus.
 
 ### Colour
 
-Colour does one job: marking state. Titles, body text and headings are never coloured. Accent is
-reserved for links and interactive affordances. No colour is added to the palette.
+Colour does **two** jobs, and they never share a place.
+
+*This said "colour does one job: marking state", and that was over-specified (D-201). It produced a
+monochrome document — grey with two violet accents — in which a reader four screens into a scroll
+had nothing but the heading they had already passed to tell them where they were.*
+
+**State marks the row.** A 3px coloured left edge, inside the card, per the table above. Unchanged.
+
+**Structure marks the surface.** A 3px bar in the left gutter, 14px *outside* the card, running the
+full height of the surface. Outside is the whole of why the two cannot be confused: state lives on
+the row inside the card, structure lives in the margin, and neither had to move to make room for
+the other. A full-height bar rather than a heading rule, because a rule marks a boundary and this
+has to mark a place.
+
+| Surface | Colour | L* |
+|---|---|---|
+| Stopping conditions | `--violet-deep` | 14 |
+| Eye test | `--slate` | 45 |
+| The brief | `--violet` | 26 |
+| For your review | `--purple` | 48 |
+| Questions for the merchant | `--violet-lift` | 33 |
+
+Read down the document that is 14 → 45 → 26 → 48 → 33: **every adjacent pair differs by at least 15 points of lightness**. The ordering is the design, not the sequence the surfaces happen to appear in — the two
+closest violets in the set, 26 and 33, are deliberately never neighbours.
+
+Slate for the eye test on purpose. It is the one surface that is Mintro's impression rather than an
+observation, it is already the only dashed thing in the document, and grey is what a layer that
+changes no state should look like.
+
+**No hue is added to the palette.** All five are aliases of tokens that already existed, and none is
+a state colour — rose, amber and jade stay reserved. Titles, body text and headings are still never
+coloured. Accent is still reserved for links and interactive affordances.
+
+Never a background fill. A tinted surface recolours the text sitting on it and starts competing with
+the state badges, which is the one thing the original sentence was right to guard.
 
 ### Print
 
