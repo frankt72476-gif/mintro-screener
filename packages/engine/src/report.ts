@@ -16,6 +16,7 @@
 import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State } from '@mintro/ruleset';
 import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { STATE_LABEL_LOWER } from './stateLabel.js';
+import type { EyeTestOutcome } from './eyetest.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
@@ -265,6 +266,18 @@ export interface ScreeningReport {
    * probes and a payment capture had timed out.
    */
   readonly obstruction?: ReportObstruction;
+  /**
+   * What a person notices by looking at the captures, or why there is none (D-196).
+   *
+   * **Optional, and nothing depends on it.** It produces no findings, moves no state and enters no
+   * count — the report is complete without it, and a reader that finds it absent renders nothing
+   * rather than a "0 of 11". Absent on every run recorded before it existed, like `blocking` and
+   * `sample` before it.
+   *
+   * When it did not run, the outcome still carries **which captures it wanted and what happened**,
+   * to the standard hard constraint 3 sets for a `not_evaluable` finding.
+   */
+  readonly eyeTest?: EyeTestOutcome;
 }
 
 /**
@@ -347,6 +360,8 @@ export interface AssembleInput {
   readonly access?: ReportAccess;
   /** How thin the sample was, and which surfaces were read (D-162). */
   readonly sample?: SampleBasis;
+  /** The eye test, or why there is none. Omitted entirely on a worker that does not run it. */
+  readonly eyeTest?: EyeTestOutcome;
 }
 
 /**
@@ -432,6 +447,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     sameObservation: pairSameObservation(enriched, ruleset),
     blocking: summariseBlocking(enriched, ruleset),
     ...(input.sample === undefined ? {} : { sample: input.sample }),
+    ...(input.eyeTest === undefined ? {} : { eyeTest: input.eyeTest }),
     verdict: describeVerdict(enriched, counts),
     categories,
     strip: categories.flatMap((category) =>

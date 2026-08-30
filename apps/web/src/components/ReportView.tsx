@@ -266,6 +266,7 @@ export function ReportView({
         and because it was rendered as a count card three times during design — each time the reader
         lost the thing that matters most. There is no "0" card standing in for the list.
       */}
+      {/* Between the stopping conditions and the brief (eye-test spec §6). */}
       <StoppingPanel
         report={report}
         parts={parts}
@@ -275,6 +276,7 @@ export function ReportView({
         {...(commentaryOf === undefined ? {} : { commentaryOf })}
         {...(commentBox === undefined ? {} : { commentBox })}
       />
+      <EyeTestPanel report={report} />
       <Brief brief={brief(report, parts)} />
       {print !== true && <NavCards parts={parts} />}
       <p className="top-coverage">{coverageSentence(report)}</p>
@@ -705,6 +707,94 @@ function StoppingPanel({
           )}
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * The eye test, or the reason there is none (D-196).
+ *
+ * Renders nothing at all on a run that predates it — absent is not "0 of 11", which would be a
+ * statement about a merchant drawn from the age of the file (D-044's rule).
+ *
+ * **The absence is evidenced.** It names every capture it wanted and what happened to each, because
+ * *"the eye test did not run"* states an outcome and withholds the reason, and a reader cannot tell
+ * a vendor outage from a run that had no captures to send. Same standard hard constraint 3 sets for
+ * a `not_evaluable` finding.
+ */
+function EyeTestPanel({ report }: { readonly report: ScreeningReport }): JSX.Element | null {
+  const outcome = report.eyeTest;
+  // A run predating the rubric renders nothing. Not an empty panel, and not "0 of 9" (D-044).
+  if (outcome === undefined) return null;
+
+  const label = (
+    /*
+      The label is the signal, and nothing else in the document is dashed (§6).
+
+      A reader learns it once. This is the one surface that is Mintro's impression rather than an
+      observation, and it says so above itself rather than relying on tone to carry it.
+    */
+    <p className="eye-label">Eye test · Mintro’s impression, not an observation</p>
+  );
+
+  if (outcome.kind === 'absent') {
+    const { absence } = outcome;
+    return (
+      <section className="panel eye-panel is-absent">
+        {label}
+        <p className="eye-read">No eye test was recorded for this run.</p>
+        {/*
+          The absence names what it wanted and what happened to each capture — the standard hard
+          constraint 3 sets for a `not_evaluable` finding. "It did not run" states an outcome and
+          withholds the reason, and a reader cannot tell a vendor outage from a run with nothing
+          to send.
+        */}
+        <p className="eye-why">
+          {absence.reason}
+          {absence.detail === undefined ? '' : ` — ${absence.detail}`}
+        </p>
+        <ul className="eye-captures">
+          {absence.captures.map((capture) => (
+            <li key={`${capture.surface}-${capture.evidenceKey}-${capture.sourceUrl}`}>
+              <span className="eye-surface">{capture.surface}</span>
+              <span className="eye-source mono">{shorten(capture.sourceUrl)}</span>
+              <span className="eye-problem">{capture.sent ? 'sent' : capture.problem ?? 'not sent'}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  const { test } = outcome;
+
+  return (
+    <section className="panel eye-panel">
+      {label}
+
+      {/* The read is the part a reader actually reads (§3). Prose, at full size. */}
+      <p className="eye-read">{test.read}</p>
+
+      {/*
+        No count of concerns anywhere on this panel (§3).
+
+        A tally of problems makes the layer read as a rule set with pictures, and a number invites
+        arithmetic — which is the determination this is not allowed to make (D-001).
+      */}
+      <ul className="eye-list">
+        {test.verdicts.map((verdict) => (
+          <li key={verdict.id} data-verdict={verdict.verdict}>
+            <span className="eye-v">{verdict.verdict.replace('_', ' ')}</span>
+            <span className="eye-q">{verdict.question}</span>
+            {/* A clear row is the question and the word, nothing more. */}
+            {verdict.saw !== undefined && <span className="eye-saw">{verdict.saw}</span>}
+          </li>
+        ))}
+      </ul>
+
+      <p className="eye-foot">
+        Rubric {test.rubricVersion} · {test.model}
+      </p>
     </section>
   );
 }

@@ -210,3 +210,18 @@ export {
   type ManifestMember,
   type VerificationResult,
 } from './export/verify.js';
+
+/* The eye test (D-196). Types and the rubric parser; the call itself lives in the worker. */
+export {
+  parseEyeTestRubric,
+  isEyeVerdict,
+  eyeVerdictToState,
+  type EyeTest,
+  type EyeTestAbsence,
+  type EyeTestCapture,
+  type EyeTestItem,
+  type EyeTestOutcome,
+  type EyeTestRubric,
+  type EyeTestVerdict,
+  type EyeVerdict,
+} from './eyetest.js';

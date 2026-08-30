@@ -1,0 +1,76 @@
+{
+  "version": "2.0.0",
+  "effective": "2026-08-30",
+  "note": "Nine questions, per docs/eye-test-spec.md §2. Nothing here re-answers a rule: a report that says the same thing twice in different words is worse than saying it once, and the second saying carries less authority than the first. Deliberately excluded — certificate depth (COA-001..006), disclaimer presence and legibility (DISC-002, DISC-003), testimonials (OFFS-002), sign-up form fields (GATE-004, GATE-005), product naming (NAME-002, NAME-003), and the off-site trail, which the captures cannot answer. Revising this file is a data change and must never require touching the engine.",
+  "read_instruction": "Write two to four sentences describing how this storefront presents itself. Say what it looks like, not whether it complies. This is the part a reader actually reads.",
+  "verdicts": {
+    "clear": "Looked at, and nothing of this kind was visible.",
+    "concern": "Something of this kind was visible in the captures.",
+    "cannot_tell": "The captures do not settle it either way."
+  },
+  "items": [
+    {
+      "id": "EYE-01",
+      "question": "Does the homepage read as a research supplier or a consumer storefront?",
+      "why_no_rule": "no rule reads layout",
+      "look_for": "Lifestyle photography, promotional banners, countdown timers, bundles, offers. Against: catalogue layout, chemical names, batch and purity language.",
+      "surfaces": ["homepage"]
+    },
+    {
+      "id": "EYE-02",
+      "question": "Do product pages lead with chemical data or with benefit language?",
+      "why_no_rule": "rules check for prohibited terms, not emphasis",
+      "look_for": "What occupies the top of the page and the largest type. Purity, CAS and formula, or what the compound will do for the reader. Emphasis, not presence.",
+      "surfaces": ["product"]
+    },
+    {
+      "id": "EYE-03",
+      "question": "Do photographs show the product, or people and bodies?",
+      "why_no_rule": "no rule reads images",
+      "look_for": "Bodies, faces, torsos, muscle definition, hands holding the product, before-and-after pairs. A vial or box photographed alone is the ordinary case.",
+      "surfaces": ["product", "homepage"]
+    },
+    {
+      "id": "EYE-04",
+      "question": "Do any images show needles, syringes, measurement or dosing?",
+      "why_no_rule": "CATG-001 checks catalogue URLs, not pictures",
+      "look_for": "Needles, syringes, pen injectors, alcohol wipes, syringe graduations, reconstitution diagrams, mg markings, step-by-step preparation imagery.",
+      "surfaces": ["product", "homepage"]
+    },
+    {
+      "id": "EYE-05",
+      "question": "Are there badges or marks implying medical endorsement?",
+      "why_no_rule": "uncovered",
+      "look_for": "Seals reading clinically proven, doctor approved, FDA, GMP, lab verified. Pharmacy crosses, caduceus marks, white-coat imagery.",
+      "surfaces": ["homepage", "product"]
+    },
+    {
+      "id": "EYE-06",
+      "question": "Does the design imitate a pharmacy or telehealth service?",
+      "why_no_rule": "uncovered",
+      "look_for": "Prescription-style typography, pill and capsule motifs, dosage cards, consultation or quiz entry points, clinical blue-and-white palettes.",
+      "surfaces": ["homepage", "product"]
+    },
+    {
+      "id": "EYE-07",
+      "question": "Does anything undercut the research framing?",
+      "why_no_rule": "the composition, which nothing can match on",
+      "look_for": "Not any single element — the composition. A site can state research-use-only in the footer and surround it with a discount code, a bundle named for an outcome, subscribe-and-save, free shipping over $99, and a chat widget offering to help you choose. Each is individually defensible; together the site is selling to people. Answer on the whole picture.",
+      "surfaces": ["homepage", "product", "signup"]
+    },
+    {
+      "id": "EYE-08",
+      "question": "Does checkout read consumer — discounts, bundles, subscriptions?",
+      "why_no_rule": "uncovered",
+      "look_for": "Discount codes, percentage-off badges, bundle and stack pricing, subscribe-and-save, free-shipping thresholds, urgency or scarcity messaging.",
+      "surfaces": ["homepage", "product"]
+    },
+    {
+      "id": "EYE-09",
+      "question": "Does the entry gate read as a control or a formality?",
+      "why_no_rule": "GATE-001 checks it exists, not how it reads",
+      "look_for": "Where a gate is present: whether it stops the reader or waves them through. Prominence, wording, whether declining is offered as plainly as accepting, whether it can be dismissed by clicking away.",
+      "surfaces": ["homepage", "signup"]
+    }
+  ]
+}

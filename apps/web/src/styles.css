@@ -2660,3 +2660,58 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .stop-panel, .brief { break-inside: avoid; }
   .stop-head { break-after: avoid; }
 }
+
+/* ── The eye test (D-196, docs/eye-test-spec.md §6) ───────────────────────────────────────────
+   Dashed, and nothing else in the document is — a reader learns the signal once. This is the one
+   surface that is an impression rather than an observation, and the border says so before the
+   label does. No state edges, no accent, no count of anything. */
+
+.eye-panel {
+  margin: 0 0 24px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: none;
+  padding: 16px 20px;
+}
+
+.eye-label {
+  margin: 0 0 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* The part a reader actually reads. Full size, prose. */
+.eye-read { margin: 0 0 14px; font-size: 14px; line-height: 1.65; color: var(--ink); max-width: 76ch; }
+.eye-why { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; color: var(--slate); max-width: 76ch; }
+
+.eye-list { list-style: none; margin: 0; padding: 0; }
+.eye-list li {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 2px 12px;
+  padding: 6px 0;
+}
+.eye-list li + li { border-top: 0.5px solid var(--line-soft); }
+
+.eye-v {
+  grid-row: span 2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--slate); padding-top: 3px;
+}
+.eye-list li[data-verdict='concern'] .eye-v { color: #A5620E; }
+
+.eye-q { font-size: 12.5px; color: var(--ink); }
+/* Only concern and cannot-tell rows have one, so the clear rows collapse to a single line. */
+.eye-saw { font-size: 12.5px; line-height: 1.6; color: var(--slate); }
+
+.eye-foot { margin: 12px 0 0; font-size: 11px; color: var(--slate); }
+
+.eye-captures { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
+.eye-captures li { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+.eye-surface { flex: 0 0 68px; color: var(--ink); }
+.eye-source { flex: 1 1 auto; font-size: 11px; color: var(--slate); }
+.eye-problem { flex: 0 0 auto; color: var(--slate); }
+
+@media print { .eye-panel { break-inside: avoid; } }
