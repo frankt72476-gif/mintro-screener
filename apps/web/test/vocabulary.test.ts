@@ -90,7 +90,7 @@ describe('no surface carries a retired word', () => {
     const labels = navCards(reportParts(load(name), 'agent')).map((l) => l.label);
 
     for (const retired of RETIRED) expect(labels.join(' ')).not.toContain(retired);
-    expect(labels).toEqual(['for your review', 'questions for you']);
+    expect(labels).toEqual(['not met', 'for your review', 'questions for you']);
   });
 
   it.each(RUNS)('%s: the stored verdict sentence', (name) => {
@@ -115,7 +115,6 @@ describe('no surface carries a retired word', () => {
     const review = reportParts(load(name), 'agent').find((p) => p.id === 'review');
     // Three bands now, one section (D-189). Every heading is a label, never a paraphrase of one.
     expect(review?.bands?.map((b) => b.heading)).toEqual([
-      STATE_LABEL.fail,
       STATE_LABEL.review,
       STATE_LABEL.not_evaluable,
     ]);

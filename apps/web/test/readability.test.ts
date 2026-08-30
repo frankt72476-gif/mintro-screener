@@ -86,9 +86,14 @@ describe('1 — stopping conditions list every rule', () => {
 });
 
 describe('2 — one order on every surface', () => {
-  it.each(['merchant', 'agent', 'iqwallet'] as const)('%s reads 1,2,3', (surface) => {
-    // Four sections became three when the review bands merged (D-189). One order still.
-    expect(reportParts(c268, surface).map((p) => p.id)).toEqual(['stopping', 'review', 'questions']);
+  it.each(['merchant', 'agent', 'iqwallet'] as const)('%s reads 1,2,3,4', (surface) => {
+    /*
+      Four sections became three when the review bands merged (D-189), and four again when *Not met*
+      left the review section for part one (D-202). One order throughout, on every surface.
+    */
+    expect(reportParts(c268, surface).map((p) => p.id)).toEqual([
+      'stopping', 'notmet', 'questions', 'review',
+    ]);
   });
 });
 
@@ -157,14 +162,17 @@ describe('6 — persistent navigation on screen only', () => {
     */
     const markup = render(c268, 'agent');
     /*
-      The header-lines block is gone (D-194). What remains is two nav cards and the sticky bar that
+      The header-lines block is gone (D-194). What remains is the nav cards and the sticky bar that
       repeats them, so each count appears once per surface rather than three times at the top.
+
+      Three cards since D-202: *Not met* is a section of its own in part one, so it has a
+      destination of its own.
     */
     const cards = markup.match(/class="navcard-n">(\d+)</g) ?? [];
     const bar = markup.match(/class="headline-n">(\d+)</g) ?? [];
 
-    expect(cards).toHaveLength(2);
-    expect(bar).toHaveLength(2);
+    expect(cards).toHaveLength(3);
+    expect(bar).toHaveLength(3);
     expect(cards.map((c) => c.replace('navcard-n', 'headline-n'))).toEqual(bar);
   });
 });

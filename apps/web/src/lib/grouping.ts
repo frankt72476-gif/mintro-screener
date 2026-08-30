@@ -24,7 +24,6 @@
  */
 
 import type { State } from '@mintro/ruleset';
-import { briefLine } from './format.js';
 import { invitesComment, STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER, type InvitedRef, type NotEvaluableKind, type ReportFinding, type ScreeningReport } from '@mintro/engine';
 
 /**
@@ -617,7 +616,7 @@ export function invitedFindings(report: ScreeningReport): readonly InvitedRef[] 
    ═════════════════════════════════════════════════════════════════════════════════════════════ */
 
 /** The four. Every item in the report belongs to exactly one. */
-export type SectionId = 'stopping' | 'questions' | 'review';
+export type SectionId = 'stopping' | 'notmet' | 'questions' | 'review';
 
 /**
  * Who is reading.
@@ -823,9 +822,31 @@ export interface ReportPart {
 
 const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
   stopping: 'Stopping conditions',
+  /*
+    Composed from the state label, never a literal (D-188's rule).
+
+    This section is the `fail` state given a section of its own, so its heading is that state's word.
+    A literal here would be a fifth place the word "Not met" is spelled, free to drift from the four
+    that read it from `STATE_LABEL`.
+  */
+  notmet: STATE_LABEL.fail,
   questions: 'Operational questions',
   review: 'For your review',
 };
+
+/**
+ * Which sections are part one (D-202).
+ *
+ * **Part one is what needs an answer; part two is the record.** The test is whether the package is
+ * incomplete until somebody replies: a stopping condition that fired, a standard not met, Mintro's
+ * own read of the storefront, a question no crawl can answer.
+ *
+ * *Unclear* is the borderline and it is in part two deliberately. Its rows invite a correction, but
+ * the work sits on **Mintro** — `tier: "review_only"` sends them to a human queue whatever the
+ * merchant says (D-009) — where a not-met finding and an unanswered question sit on the merchant.
+ * Part two still takes comments. It does not ask for them.
+ */
+export const PART_ONE: ReadonlySet<SectionId> = new Set<SectionId>(['stopping', 'notmet', 'questions']);
 
 /**
  * Reading order. **One, on every surface (D-186).**
@@ -845,9 +866,9 @@ const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
  * merchant's comment boxes, the agent's controls — and that is real. Ordering was not.
  */
 const SECTION_ORDER: Readonly<Record<Surface, readonly SectionId[]>> = {
-  merchant: ['stopping', 'review', 'questions'],
-  agent: ['stopping', 'review', 'questions'],
-  iqwallet: ['stopping', 'review', 'questions'],
+  merchant: ['stopping', 'notmet', 'questions', 'review'],
+  agent: ['stopping', 'notmet', 'questions', 'review'],
+  iqwallet: ['stopping', 'notmet', 'questions', 'review'],
 };
 
 /**
@@ -920,10 +941,10 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
       */
       groups.filter((group) => isStopping(group)),
     ),
+    notmet: notMetPart(groups.filter((group) => !isStopping(group) && group.state === 'fail')),
     questions: questionsPart(report),
     review: reviewPart(
       report,
-      groups.filter((group) => !isStopping(group) && group.state === 'fail'),
       groups.filter((group) => !isStopping(group) && group.state === 'review'),
       groups.filter((group) => !isStopping(group) && group.state === 'not_evaluable'),
       groups.filter((group) => !isStopping(group) && group.state === 'pass'),
@@ -1089,7 +1110,6 @@ function questionsPart(report: ScreeningReport): ReportPart {
  */
 function reviewPart(
   report: ScreeningReport,
-  failed: readonly FindingGroup[],
   unclear: readonly FindingGroup[],
   unevaluated: readonly FindingGroup[],
   passes: readonly FindingGroup[],
@@ -1112,15 +1132,14 @@ function reviewPart(
     };
   }).filter((block) => block.groups.length > 0);
 
+  /*
+    Two bands, not three (D-202).
+
+    The `fail` band is gone from here: those findings are a section of their own in part one, and a
+    finding that appeared as a brief item and again as a band was the duplication this pass exists to
+    remove. **The count drops with them** — this section's tally counts what is in it.
+  */
   const bands: ReviewBand[] = ([
-    {
-      key: 'band:fail',
-      heading: STATE_LABEL.fail,
-      gloss: 'observed, and short of the standard',
-      state: 'fail',
-      blocks: plain('fail', failed),
-      tally: tally(failed),
-    },
     {
       key: 'band:review',
       heading: STATE_LABEL.review,
@@ -1142,7 +1161,7 @@ function reviewPart(
     },
   ] as ReviewBand[]).filter((band) => band.tally.rules > 0);
 
-  const all = [...failed, ...unclear, ...unevaluated];
+  const all = [...unclear, ...unevaluated];
 
   return {
     id: 'review',
@@ -1154,6 +1173,39 @@ function reviewPart(
     bands,
     tally: tally(all),
     passes: { groups: passes, tally: tally(passes) },
+  };
+}
+
+/**
+ * Standards not met, as a section of its own (D-202).
+ *
+ * These were the brief's three items and a band inside *For your review* at the same time — a
+ * summary with no evidence four screens above the real thing. The brief is deleted and this is what
+ * replaces it: a full section in part one, rows carrying what a finding row carries anywhere else.
+ *
+ * One block, no bands. Every row here is the same state, so a band heading would name it twice.
+ */
+function notMetPart(failed: readonly FindingGroup[]): ReportPart {
+  return {
+    id: 'notmet',
+    heading: SECTION_HEADING.notmet,
+    /*
+      Says what was observed and stops (the old brief headline's rule, kept).
+
+      Never "three things to change". A section that opens the document is where a determination is
+      most likely to creep in, because brevity invites the shorter, stronger verb — and D-001 is not
+      relaxed by brevity (hard constraint 7).
+    */
+    lede:
+      failed.length === 0
+        ? 'No observation fell short of a standard.'
+        : failed.length === 1
+          ? 'One observation did not meet a standard. Tell us where we have it wrong.'
+          : `${spellOut(failed.length)} observations did not meet a standard. Tell us where we have it wrong.`,
+    blocks: [
+      { key: 'notmet', heading: null, lede: '', state: 'fail', groups: failed, tally: tally(failed) },
+    ],
+    tally: tally(failed),
   };
 }
 
@@ -1223,6 +1275,8 @@ export interface NavCard {
  */
 /** What each card is called. Sections, not states, so there is nothing to derive from. */
 const NAV_LABEL: Readonly<Record<SectionId, string>> = {
+  // Named from the state label, so the card and the section it lands on cannot come to disagree.
+  notmet: STATE_LABEL_LOWER.fail,
   review: 'for your review',
   questions: 'questions for you',
   stopping: '',
@@ -1230,121 +1284,6 @@ const NAV_LABEL: Readonly<Record<SectionId, string>> = {
 
 /** The DOM id a header line jumps to. One constant, so the line and the section cannot disagree. */
 export const sectionAnchor = (id: SectionId): string => `section-${id}`;
-
-/**
- * The brief — page one, and the first screen (D-190, spec §1).
- *
- * Self-contained: a reader may stop here. What it holds is a headline, up to three named items with
- * one line each, three counts and a coverage sentence.
- *
- * ## Priority-ordered, not fixed content
- *
- * A failed stopping condition leads wherever one exists, because a failed one means the package
- * does not proceed — and it is marked `stopping` so the surface can render it distinctly. Standards
- * not met fill that space otherwise. Where neither exists there are no items and the headline says
- * so, with the counts carrying the page.
- *
- * ## Nothing here instructs
- *
- * *"Three observations did not meet a standard"*, never *"three things to change"*. A summary is
- * where a determination is most likely to creep in, because brevity invites the shorter, stronger
- * verb — and D-001 is not relaxed by brevity (hard constraint 7).
- *
- * ## Three, and the rest counted
- *
- * The brief is a summary or it is a second list. Beyond three the remainder is stated as a number
- * and the section below carries them.
- */
-export interface BriefItem {
-  readonly ruleId: string;
-  readonly title: string;
-  /** The one-line summary, or `null` where none could be selected without rewriting one. */
-  readonly line: string | null;
-  /** True for a failed stopping condition, which the surface marks out. */
-  readonly stopping: boolean;
-}
-
-export interface BriefCount {
-  readonly label: string;
-  readonly count: number;
-  readonly href: string | null;
-}
-
-export interface Brief {
-  readonly headline: string;
-  readonly items: readonly BriefItem[];
-  /** How many more of the same kind are below, when more than `MAX_BRIEF_ITEMS` exist. */
-  readonly more: number;
-  readonly counts: readonly BriefCount[];
-  readonly coverage: string;
-}
-
-const MAX_BRIEF_ITEMS = 3;
-
-export function brief(report: ScreeningReport, parts: readonly ReportPart[]): Brief {
-  const groups = nestCascades(groupByRule(ungrouped(report)));
-  const stoppingIds = stoppingRuleIds(report);
-
-  const failedStopping = groups.filter((g) => stoppingIds.has(g.ruleId) && g.state === 'fail');
-  const failed = groups.filter((g) => !stoppingIds.has(g.ruleId) && g.state === 'fail');
-
-  /*
-    The brief renders its not-met items whether or not a stopping condition failed (D-194, §3).
-
-    D-190 had the failures displace them, because the brief was then the top of the document. It is
-    not: the panel is, and it carries the failure. The two do not compete — they are in different
-    surfaces and the panel is louder — and a brief that emptied itself of the ordinary findings
-    would lose them at exactly the moment there is most to read.
-  */
-  const shown = failed.slice(0, MAX_BRIEF_ITEMS);
-
-  const items: BriefItem[] = shown.map((group) => ({
-    ruleId: group.ruleId,
-    title: group.title,
-    line: briefLine(group.findings[0]?.note ?? '', group.title),
-    stopping: false,
-  }));
-
-  const part = (id: SectionId): ReportPart | undefined => parts.find((p) => p.id === id);
-  const review = part('review');
-  const anchor = (id: SectionId, n: number): string | null => (n === 0 ? null : `#${sectionAnchor(id)}`);
-
-  const questions = part('questions')?.tally.rules ?? 0;
-  const unclear = review?.tally.byState.review ?? 0;
-  const stoppingFailed = part('stopping')?.tally.rules ?? 0;
-
-  return {
-    headline: briefHeadline(failed.length),
-    items,
-    more: Math.max(0, failed.length - shown.length),
-    counts: [
-      { label: `question${questions === 1 ? '' : 's'} for you`, count: questions, href: anchor('questions', questions) },
-      { label: STATE_LABEL_LOWER.review, count: unclear, href: anchor('review', unclear) },
-      {
-        label: `stopping condition${stoppingFailed === 1 ? '' : 's'} failed`,
-        count: stoppingFailed,
-        href: anchor('stopping', stoppingFailed),
-      },
-    ],
-    coverage: `${sampleSentence(report)}${coverageSentence(report)}`,
-  };
-}
-
-/**
- * The headline, which states what was observed and stops.
- *
- * Each of these is a count and a fact. None of them tells anyone what to do about it, and none
- * characterises the merchant — *"observations did not meet a standard"* is about observations
- * against a standard, not about a storefront's intent.
- */
-function briefHeadline(failed: number): string {
-  // Says nothing about stopping conditions: the panel above is where those are stated, and two
-  // surfaces announcing the same failure is the duplication the visual spec removes (D-194).
-  if (failed === 0) return 'No observation fell short of a standard';
-  return failed === 1
-    ? 'One observation did not meet a standard'
-    : `${spellOut(failed)} observations did not meet a standard`;
-}
 
 /** How much of the catalogue was looked at, where the run recorded it (D-162). */
 function sampleSentence(report: ScreeningReport): string {
@@ -1372,7 +1311,7 @@ export const findingAnchor = (ruleId: string): string => `rule-${ruleId}`;
 export function navCards(parts: readonly ReportPart[]): readonly NavCard[] {
   const cards: NavCard[] = [];
 
-  for (const id of ['review', 'questions'] as const) {
+  for (const id of ['notmet', 'review', 'questions'] as const) {
     const part = parts.find((candidate) => candidate.id === id);
     if (part === undefined) continue;
     cards.push({

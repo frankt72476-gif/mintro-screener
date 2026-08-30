@@ -35,12 +35,11 @@ const render = (report: ScreeningReport, print: boolean) =>
   );
 
 describe('the section', () => {
-  it.each(RUNS)('%s: one heading, three bands', (name) => {
+  it.each(RUNS)('%s: one heading, two bands', (name) => {
     const review = reviewOf(load(name));
 
     expect(review?.heading).toBe('For your review');
     expect(review?.bands?.map((b) => b.heading)).toEqual([
-      STATE_LABEL.fail,
       STATE_LABEL.review,
       STATE_LABEL.not_evaluable,
     ]);
@@ -62,7 +61,7 @@ describe('the section', () => {
     expect(lede.toLowerCase()).not.toMatch(/\b(fix|correct your|update your|should|must)\b/);
   });
 
-  it.each(RUNS)('%s: the section tally is the three bands added up', (name) => {
+  it.each(RUNS)('%s: the section tally is the two bands added up', (name) => {
     // One derivation. A section that counted its rows separately from its bands would be a summary
     // able to disagree with what it summarises.
     const review = reviewOf(load(name));
@@ -131,22 +130,22 @@ describe('print', () => {
   it('renders the bands on paper as well as on screen', () => {
     const markup = render(load('run-c268f8d7'), true);
 
-    for (const heading of [STATE_LABEL.fail, STATE_LABEL.review, STATE_LABEL.not_evaluable]) {
+    for (const heading of [STATE_LABEL.review, STATE_LABEL.not_evaluable]) {
       expect(markup).toContain(`>${heading}<`);
     }
   });
 });
 
 describe('the navigation cards', () => {
-  it.each(RUNS)('%s: two destinations, and no stopping card', (name) => {
+  it.each(RUNS)('%s: three destinations, and no stopping card', (name) => {
     /*
       The panel above *is* the stopping conditions (D-194). A "0" card standing in for that list is
       the reduction the visual spec records as having been made three times during design.
     */
     const cards = navCards(reportParts(load(name), 'agent'));
 
-    expect(cards).toHaveLength(2);
-    expect(cards.map((c) => c.id)).toEqual(['review', 'questions']);
+    expect(cards).toHaveLength(3);
+    expect(cards.map((c) => c.id)).toEqual(['notmet', 'review', 'questions']);
   });
 
   it.each(RUNS)('%s: counts come from the sections own tallies', (name) => {

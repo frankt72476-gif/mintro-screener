@@ -13432,3 +13432,81 @@ prints its rose border as `#8A8598` and keeps the weight — so hue drops and ge
 here the geometry has nowhere to go and goes too.
 
 Structure, copy and type are untouched.
+## D-202 — The report in two parts, and one of everything
+
+**2026-08-30 · business owner · `docs/report-two-parts-spec.md`, `apps/web/src/lib/grouping.ts`, `apps/web/src/components/ReportView.tsx`, `apps/web/src/styles.css`**
+
+Two problems with one cause. **The three not-met findings appeared twice** — as the brief and again
+as a band inside *For your review* — neither instance complete: a one-line gloss with no evidence
+four screens above the real thing. And **every surface was styled on the day it was built**, so the
+document read as a list of things made at different times, because it was one.
+
+Full spec in `docs/report-two-parts-spec.md`.
+
+### Part one is what needs an answer
+
+| | Part one | Part two |
+|---|---|---|
+| | Stopping conditions · Not met · Eye test · Operational questions | For your review |
+| | bordered cards | flat, hairline-separated |
+
+The test is whether the package is incomplete until somebody replies. **Unclear is the borderline
+and sits in part two deliberately**: its rows invite a correction, but the work sits on *Mintro* —
+`tier: "review_only"` sends them to a human queue whatever the merchant says (D-009) — where a
+not-met finding and an unanswered question sit on the merchant. Part two still takes comments; it
+does not ask for them.
+
+Cards against flat rather than colour, because **the division must survive print** and colour is
+dropped there (D-201). A border survives greyscale and a printer low on one cartridge.
+
+### The brief is deleted
+
+Not summarised elsewhere. Its three items are a full section in part one carrying what a finding row
+carries anywhere else — title, observation, evidence, comment box — and *Not met* leaves the review
+section entirely. **The count drops with it: 33 becomes 30** on the live comopeptides run. One
+finding, one row, one place (D-166 applied to the document rather than the rule set).
+
+### The eye test takes one box, never nine
+
+One comment box for the whole read, under the read and above the verdicts. Nine boxes would ask a
+merchant to rebut a rubric line by line; the read is a paragraph and the useful answer is a paragraph
+back. The verdicts stay uncommentable — a box under each would imply a verdict is a finding, the one
+thing the eye test may never become (D-196).
+
+**No caller supplies that box yet, and that is deliberate.** `merchant_comments` keys on `rule_id`
+and the eye test has no rule. Where such a response is stored, and whether it travels to IQwallet as
+a merchant comment, is a business ruling; inventing a key would put a merchant's words in the
+document under a rule that does not exist. The prop and the surface exist; the storage is asked for
+rather than guessed.
+
+### The coherence pass, measured rather than read
+
+The cascade had hidden several of these in the source, so every figure below came from the rendered
+document. **`.part-name` rendered at 21px in one section and 20px in another, for the same heading**,
+because one inherited a later override. Nobody could have seen it; nobody did.
+
+Three heading sizes now — Document 24 / Section 17 / Band 11 mono — where eight treatments across
+three type families were in use. One row anatomy where four were. One spacing scale — 4·8·12·16·24·32·48
+— where 16, 18, 20, 22, 24, 30, 40 and 46 were.
+
+**Deleted:** the `Brief` component, `brief()`, `BriefItem`, `BriefCount`, `briefLine()` and its
+budget constant, **24 `.brief-*` CSS rules**, `apps/web/test/brief.test.ts`, the `fail` band in
+`reviewPart`, six heading declarations, and three row anatomies.
+
+**Conformed rather than deleted:** the stopping panel's two groups and icon, the not-observed
+five-way split (D-044) — the one place in the document where more structure is correct — and the
+evidence slip, which was the only surface designed before the rest and designed correctly.
+
+### Two things the pass itself broke and fixed
+
+**The shared row anatomy was applied to the wrong box.** `.att-mark` and `.att-text` are nested
+inside `.att-q` rather than being siblings of the meta line, so a grid on `.att-row` squeezed every
+question into an 82px column. Caught by rendering, not by tests — no test asserts a column width.
+
+**Deleting the `.brief-*` rules by pattern left a stray closing brace**, which silently dropped
+every rule after it. The stylesheet had 786 `{` against 787 `}`. Found by checking brace balance
+after a rule that should have applied did not; the page counts before and after the fix differ by
+two to three pages per run, so the earlier measurement was of a broken stylesheet.
+
+Copy, ordering within a section, the four states, the evidence contract and every sentence a finding
+renders are untouched.

@@ -52,7 +52,7 @@
   */
   --sec-stopping:  var(--violet-deep);
   --sec-eye:       var(--slate);
-  --sec-brief:     var(--violet);
+  --sec-notmet:    var(--violet);
   --sec-review:    var(--purple);
   --sec-questions: var(--violet-lift);
 
@@ -2110,48 +2110,19 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
    Page one, and the first screen. Hierarchy from type and space; the only mark is a rule down the
    left of each item, which is what a quoted observation looks like. No new colour. */
 
-.brief { margin: 0 0 34px; }
 
-.brief-head {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 25px; font-weight: 600; letter-spacing: -0.015em;
-  margin: 0 0 18px; max-width: 26ch; line-height: 1.25;
-}
 
-.brief-items { list-style: none; margin: 0 0 20px; padding: 0; }
 
-.brief-item {
-  border-left: 2px solid var(--line);
-  padding: 2px 0 2px 14px;
-  margin-bottom: 12px;
-}
 
 /* A failed stopping condition is not the same kind of news as a standard not met: it means the
    package does not proceed. One accent, used once (D-167). */
-.brief-item[data-stopping] { border-left-color: var(--rose); }
 
-.brief-title { display: block; font-size: 14.5px; font-weight: 500; color: var(--ink); text-decoration: none; }
-.brief-title:hover { text-decoration: underline; text-underline-offset: 3px; }
-.brief-line { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-mid); line-height: 1.5; }
 
-.brief-more { margin: -6px 0 18px 16px; font-size: 12px; color: var(--slate); }
 
-.brief-counts {
-  list-style: none; display: flex; flex-wrap: wrap; gap: 26px;
-  margin: 0 0 14px; padding: 14px 0 0;
-  border-top: 1px solid var(--line);
-  font-size: 12.5px; color: var(--ink-mid);
-}
-.brief-counts a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
-.brief-counts a:hover { border-bottom-color: var(--ink); }
-.brief-n { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; color: var(--ink); }
 
-.brief-coverage { margin: 0; font-size: 12px; line-height: 1.6; color: var(--slate); max-width: 76ch; }
 
 @media print {
   /* Page one, and nothing else on it. A reader who stops here has the whole summary. */
-  .brief { break-after: page; }
-  .brief-head { font-size: 22px; }
 }
 
 /* ---------- the three review bands (D-189, spec §3) ----------
@@ -2517,7 +2488,6 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .rhead h1                { font-size: 24px; font-weight: 500; letter-spacing: -0.015em; }
 .part-name               { font-size: 21px; font-weight: 500; }
 .stop-title,
-.brief-head              { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
 .find-title              { font-size: 15px; font-weight: 500; line-height: 1.45; }
 .find-note,
 .req-t                   { font-size: 13px; font-weight: 400; line-height: 1.6; }
@@ -2530,7 +2500,6 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
    no fills, no shadows. */
 
 .panel,
-.brief,
 .cat {
   border: 0.5px solid var(--line);
   border-radius: 12px;
@@ -2538,7 +2507,6 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   padding: 18px 20px;
 }
 
-.brief { margin-bottom: 20px; }
 
 /* Rows live inside the container and the container carries the corners, so a row has no radius of
    its own — a rounded row inside a rounded box is two frames around one thing. */
@@ -2627,12 +2595,6 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 /* ── The brief (§3) ───────────────────────────────────────────────────────────────────────────
    Title at full weight, the selected line following in secondary text on the same line. */
 
-.brief-items { margin-bottom: 0; }
-.brief-item { border-left: 0; padding-left: 0; margin-bottom: 7px; }
-.brief-title { display: inline; font-size: 14px; }
-.brief-line { display: inline; font-size: 13px; color: var(--slate); }
-.brief-line::before { content: ' — '; }
-.brief-counts, .brief-coverage { display: none; }
 
 /* ── Navigation (§4) ──────────────────────────────────────────────────────────────────────────
    Two cards. There is no stopping-conditions card: the panel above is the stopping conditions. */
@@ -2675,11 +2637,11 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 @media print {
   .navcards, .headbar, .headbar-sentinel, .find-caret { display: none; }
 
-  .panel, .brief, .cat { background: none; border-color: #C9C4DA; }
+  .panel, .cat { background: none; border-color: #C9C4DA; }
   .stop-panel.is-failed { border-color: #8A8598; border-left-width: 3px; }
   .stop-icon { background: none; border: 0.5px solid #8A8598; }
 
-  .stop-panel, .brief { break-inside: avoid; }
+  .stop-panel { break-inside: avoid; }
   .stop-head { break-after: avoid; }
 }
 
@@ -2777,7 +2739,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 
 .stop-panel,
 .eye-panel,
-.brief,
+.part[data-section='notmet'],
 .part[data-section='review'],
 .part[data-section='questions'] {
   position: relative;
@@ -2785,7 +2747,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 
 .stop-panel::before,
 .eye-panel::before,
-.brief::before,
+.part[data-section='notmet']::before,
 .part[data-section='review']::before,
 .part[data-section='questions']::before {
   content: '';
@@ -2802,7 +2764,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
    A rule under the heading marks a boundary; this marks a place. */
 .stop-panel::before                       { background: var(--sec-stopping); }
 .eye-panel::before                        { background: var(--sec-eye); }
-.brief::before                            { background: var(--sec-brief); }
+.part[data-section='notmet']::before      { background: var(--sec-notmet); }
 .part[data-section='review']::before      { background: var(--sec-review); }
 .part[data-section='questions']::before   { background: var(--sec-questions); }
 
@@ -2816,7 +2778,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   /* The gutter closes at narrow widths; the bar comes inside rather than off-screen. */
   .stop-panel::before,
   .eye-panel::before,
-  .brief::before,
+  .part[data-section='notmet']::before,
   .part[data-section='review']::before,
   .part[data-section='questions']::before { left: -8px; }
 }
@@ -2844,7 +2806,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   */
   .stop-panel::before,
   .eye-panel::before,
-  .brief::before,
+  .part[data-section='notmet']::before,
   .part[data-section='review']::before,
   .part[data-section='questions']::before {
     display: none;
@@ -2853,4 +2815,153 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   /* The one rule that is inside the content box, so it survives — as the neutral it always was. */
   .att { border-top-color: var(--ink-mid); }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   Two parts, and one of everything (D-202)
+
+   `docs/report-two-parts-spec.md`. Two problems with one cause: the not-met findings appeared twice,
+   and every surface was styled on the day it was built. Six heading treatments across three type
+   families, four row anatomies, eight spacing values with no scale between them.
+
+   Everything below was measured on the rendered document, not read out of this file — the cascade
+   had made several of the divergences invisible in the source. `.part-name` rendered at 21px in one
+   section and 20px in another, for the same heading, because one inherited a later override.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* One spacing scale. Was 16, 18, 20, 22, 24, 30, 40, 46 — five of them off any scale. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+}
+
+/* ── Part one: bordered cards ─────────────────────────────────────────────────────────────────
+   The division has to survive print, where colour is dropped (D-201), because the PDF is what
+   reaches an underwriter and "outstanding work" against "the record" is the first thing they need.
+   A border survives greyscale, photocopying and a printer low on one cartridge. */
+.part-one > .part,
+.part-one > .panel {
+  border: 0.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: var(--s4);
+  margin: 0 0 var(--s5);
+}
+
+/* ── Part two: flat, hairline-separated ──────────────────────────────────────────────────────── */
+.part-two > .part {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  margin: 0 0 var(--s5);
+}
+
+/* The one divider part two gets. No container, no radius, no fill. */
+.part-two > .part + .part {
+  margin-top: var(--s6);
+  padding-top: var(--s5);
+  border-top: 0.5px solid var(--line);
+}
+
+/* The seam between the parts, and the only place the scale's largest step is used. */
+.part-two { margin-top: var(--s7); }
+
+/* ── Three heading sizes, and no fourth ───────────────────────────────────────────────────────
+   Document 24 · Section 17 · Band 11 mono. Section headings are 17 in *both* parts: the parts are
+   told apart by the border, and two signals for one division is how a document grows a third state
+   nobody defined. */
+.rhead h1                 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; }
+
+.part-name,
+.stop-title,
+.att-top h2               { font-size: 17px; font-weight: 500; letter-spacing: -0.01em;
+                            font-family: 'Space Grotesk', sans-serif; }
+
+.band .block-head,
+.band-head,
+.block-head,
+.cat-name,
+.eye-label,
+.stop-grouphead           { font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+                            text-transform: uppercase;
+                            font-family: 'JetBrains Mono', monospace; }
+
+/* ── One row anatomy ──────────────────────────────────────────────────────────────────────────
+   [mark] [title] [rule id] / [observation] / [evidence]. The brief item, the eye-test verdict and
+   the attestation row were three separate inventions of the same thing. */
+.eye-list li,
+.att-q {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: var(--s1) var(--s3);
+  align-items: baseline;
+}
+
+/*
+  The attestation row carries the spacing; its inner `.att-q` carries the anatomy.
+
+  The mark and the question are nested inside `.att-q` rather than being siblings of the meta line,
+  so the grid goes on the element that actually holds the pair. Putting it on `.att-row` squeezed the
+  question into an 82px column — the shared anatomy applied to the wrong box.
+*/
+.att-row {
+  padding: var(--s2) 0;
+  display: block;
+}
+
+/* The meta line sits under the question, aligned to the same text column as the body. */
+.att-meta, .att-said, .att-gap, .att-prev { margin-left: calc(82px + var(--s3)); }
+
+.eye-v, .att-mark {
+  grid-row: span 2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--slate);
+}
+
+.eye-q, .att-text  { font-size: 13px; font-weight: 500; line-height: 1.45; color: var(--ink); }
+.eye-saw, .att-body, .att-declined {
+  font-size: 12.5px; line-height: 1.6; color: var(--ink-mid);
+}
+
+.eye-list li + li,
+.att-row + .att-row { border-top: 0.5px solid var(--line-soft); }
+
+/* ── Spacing, conformed ───────────────────────────────────────────────────────────────────────── */
+.stop-panel  { margin: 0 0 var(--s5); padding: var(--s4); }
+.eye-panel   { margin: 0 0 var(--s5); padding: var(--s4); }
+.att         { margin-top: var(--s5); padding-top: var(--s4); }
+.band        { margin-top: var(--s6); }
+.att-list    { gap: 0; margin-top: var(--s3); }
+
+/*
+  The band heading is the state word, not the sentence beside it.
+
+  `text-transform: uppercase` on the heading swept up the gloss with it — "OBSERVED, BUT THE CHECK
+  CANNOT DECIDE" set in mono caps, which is a sentence shouting. The Band treatment applies to the
+  word that names the band; the gloss stays a sentence.
+*/
+.band-gloss,
+.block-head .tally,
+.block-head .comment-count {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--slate);
+}
+
+@media print {
+  /* The border is the whole of the division on paper, so it must not be optimised away. */
+  .part-one > .part,
+  .part-one > .panel { border: 0.5px solid #B9B4C8; }
+  .part-two > .part  { border: 0; }
+  .part-two > .part + .part { border-top: 0.5px solid #D8D4E2; }
 }

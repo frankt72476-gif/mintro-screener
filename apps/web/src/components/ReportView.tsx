@@ -8,7 +8,7 @@
  * unchanged; the data's own name for it is `not_evaluable`.
  */
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
 import {
   REQUIREMENT_HEADINGS,
@@ -22,17 +22,16 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import {
-  brief,
   findingAnchor,
   describeGroup,
   inheritsEvidence,
   coverageSentence,
   navCards,
+  PART_ONE,
   stoppingSentence,
   reportParts,
   sectionAnchor,
   ordinalsFor,
-  type Brief as BriefModel,
   type FindingGroup,
   type ReportPart,
   type Surface,
@@ -112,6 +111,18 @@ interface Props {
   /** The merchant's own view supplies a box; nothing else does. */
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
   /**
+   * One box for the whole eye test, never one per verdict (D-202, §3).
+   *
+   * Separate from `commentBox` because that one keys on a `ReportFinding` and the eye test is not a
+   * finding and must never become one (D-196). Nine boxes would ask a merchant to rebut a rubric
+   * line by line; the read is a paragraph and the useful answer is a paragraph back.
+   *
+   * **No caller supplies this yet.** Where such a response is stored is a business ruling, not a
+   * technical one: `merchant_comments` keys on `rule_id`, and the eye test has no rule. Inventing a
+   * key would put a merchant's words in the document under a rule that does not exist.
+   */
+  readonly eyeCommentBox?: () => JSX.Element | null;
+  /**
    * What the merchant stated about requirements no crawl can observe (D-134).
    *
    * Rendered after the findings and never among them: these are statements, not observations, and
@@ -149,6 +160,7 @@ export function ReportView({
   participation,
   surface: surfaceProp,
   commentBox,
+  eyeCommentBox,
   attestations,
   eyeTest = null,
 }: Props): JSX.Element {
@@ -277,7 +289,14 @@ export function ReportView({
         and because it was rendered as a count card three times during design — each time the reader
         lost the thing that matters most. There is no "0" card standing in for the list.
       */}
-      {/* Between the stopping conditions and the brief (eye-test spec §6). */}
+      {/*
+        Part one opens here (D-202, §1).
+
+        The stopping conditions are inside it rather than above it: the panel is a section of part
+        one, not a preamble to the document, and a card floating outside both parts was one of the
+        things that made the report read as a list of surfaces.
+      */}
+      <div className="part-one">
       <StoppingPanel
         report={report}
         parts={parts}
@@ -287,8 +306,7 @@ export function ReportView({
         {...(commentaryOf === undefined ? {} : { commentaryOf })}
         {...(commentBox === undefined ? {} : { commentBox })}
       />
-      <EyeTestPanel record={eyeTest} />
-      <Brief brief={brief(report, parts)} />
+
       {print !== true && <NavCards parts={parts} />}
       <p className="top-coverage">{coverageSentence(report)}</p>
       {/*
@@ -332,8 +350,7 @@ export function ReportView({
         IQwallet PDF that section sorts last (1,3,4,2); on the merchant and agent surfaces it is
         second, ahead of anything observed, because it is the only part a merchant can act on.
       */}
-      <div>
-        {parts.map((part) => {
+        {parts.filter((part) => PART_ONE.has(part.id)).map((part) => {
           /*
             The stopping conditions are the panel at the top, not a section here (D-194, §1).
 
@@ -341,6 +358,71 @@ export function ReportView({
             tally, and one derivation is the point (D-186). It is simply not rendered a second time.
           */
           if (part.id === 'stopping') return null;
+
+          /*
+            The eye test sits between *Not met* and the questions (D-202, §3).
+
+            Rendered from inside the map rather than above it, because its position is a position in
+            the reading order and not a fixed place on the page. A section that is empty renders
+            nothing, and the eye test still lands where it belongs.
+          */
+          const eyePanel =
+            part.id === 'notmet' ? (
+              <EyeTestPanel
+                record={eyeTest}
+                {...(eyeCommentBox === undefined ? {} : { commentBox: eyeCommentBox })}
+              />
+            ) : null;
+
+          // An empty section is not rendered at all. `notmet` is built on every run so the nav and
+          // the tallies have something to read; a run where nothing fell short has no section.
+          if (part.tally.rules === 0 && part.id === 'notmet') return eyePanel;
+
+          const questions =
+            part.id === 'questions' && attestations !== undefined ? (
+              <AttestationSection
+                attestations={attestations}
+                {...(participation === undefined ? {} : { invited: participation.invited })}
+                print={print}
+              />
+            ) : null;
+
+          return (
+            <Fragment key={part.id}>
+            <ReportSectionView
+              part={part}
+              questions={questions}
+              {...(commentaryOf === undefined ? {} : { commentaryOf })}
+            >
+              {(block) =>
+                block.groups.map((group) => (
+                    <GroupCard
+                      key={`${group.ruleId}-${group.state}`}
+                      group={group}
+                      access={access}
+                      ordinals={ordinals}
+                      {...(print === true ? { print: true } : {})}
+                      {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                      {...(commentBox === undefined ? {} : { commentBox })}
+                    />
+                  ))
+              }
+            </ReportSectionView>
+            {eyePanel}
+            </Fragment>
+          );
+        })}
+      </div>
+
+      {/*
+        Part two: the record (D-202, §1).
+
+        Flat and hairline-separated, with no container of its own — the absence of a card is the
+        signal. Nothing here is outstanding: an unclear row invites a correction, but the work sits
+        on Mintro's review queue rather than on the merchant (D-009).
+      */}
+      <div className="part-two">
+        {parts.filter((part) => !PART_ONE.has(part.id)).map((part) => {
           const questions =
             part.id === 'questions' && attestations !== undefined ? (
               <AttestationSection
@@ -359,16 +441,16 @@ export function ReportView({
             >
               {(block) =>
                 block.groups.map((group) => (
-                    <GroupCard
-                      key={`${group.ruleId}-${group.state}`}
-                      group={group}
-                      access={access}
-                      ordinals={ordinals}
-                      {...(print === true ? { print: true } : {})}
-                      {...(commentaryOf === undefined ? {} : { commentaryOf })}
-                      {...(commentBox === undefined ? {} : { commentBox })}
-                    />
-                  ))
+                  <GroupCard
+                    key={`${group.ruleId}-${group.state}`}
+                    group={group}
+                    access={access}
+                    ordinals={ordinals}
+                    {...(print === true ? { print: true } : {})}
+                    {...(commentaryOf === undefined ? {} : { commentaryOf })}
+                    {...(commentBox === undefined ? {} : { commentBox })}
+                  />
+                ))
               }
             </ReportSectionView>
           );
@@ -487,46 +569,6 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
  * No new colour and no shadow — a hairline, the page's own background, and the numerals doing the
  * work, which is the treatment the lines already have (D-167).
  */
-/**
- * The brief — the first screen, and page one of the PDF (D-190, spec §1).
- *
- * Self-contained: a reader may stop here. Up to three named items with one line each, three counts,
- * and what the run covered.
- *
- * A failed stopping condition carries `data-stopping`, because a failed one means the package does
- * not proceed and that is not the same kind of news as a standard not met. Every item links to its
- * row.
- *
- * Nothing in it instructs (D-001, hard constraint 7). The headline states what was observed and
- * stops; the summary lines are sentences the findings already carry, selected rather than written.
- */
-function Brief({ brief: content }: { readonly brief: BriefModel }): JSX.Element {
-  return (
-    <section className="brief" aria-label="Summary">
-      <h2 className="brief-head">{content.headline}</h2>
-
-      {content.items.length > 0 && (
-        <ul className="brief-items">
-          {content.items.map((item) => (
-            <li key={item.ruleId} className="brief-item" data-stopping={item.stopping ? '' : undefined}>
-              <a className="brief-title" href={`#${findingAnchor(item.ruleId)}`}>
-                {item.title}
-              </a>
-              {/*
-                Omitted rather than truncated where no whole sentence fits (D-190). A clipped
-                observation can invert its own meaning, and the row is one click away.
-              */}
-              {item.line !== null && <span className="brief-line">{item.line}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {content.more > 0 && <p className="brief-more">{content.more} more of the same below.</p>}
-    </section>
-  );
-}
-
 /** `exactOptionalPropertyTypes`: an absent box is an absent prop, not a prop holding undefined. */
 const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Element } =>
   box === null || box === undefined ? {} : { commentBox: box };
@@ -745,7 +787,14 @@ function StoppingPanel({
  * a vendor outage from a run that had no captures to send. Same standard hard constraint 3 sets for
  * a `not_evaluable` finding.
  */
-function EyeTestPanel({ record }: { readonly record: EyeTestRecord | null }): JSX.Element | null {
+function EyeTestPanel({
+  record,
+  commentBox,
+}: {
+  readonly record: EyeTestRecord | null;
+  /** One box, under the read, because the read is what it answers (D-202, §3). */
+  readonly commentBox?: () => JSX.Element | null;
+}): JSX.Element | null {
   /*
     Nothing at all in two cases, and they are not the same case.
 
@@ -879,6 +928,15 @@ function EyeTestPanel({ record }: { readonly record: EyeTestRecord | null }): JS
 
       {/* The read is the part a reader actually reads (§3). Prose, at full size. */}
       <p className="eye-read">{test.read}</p>
+
+      {/*
+        One box, under the read and above the verdicts (D-202, §3).
+
+        The verdicts stay uncommentable: they are Mintro's impression and carry no evidence a
+        merchant could contest, and a box under each would imply a verdict is a finding — the one
+        thing the eye test may never become (D-196).
+      */}
+      {commentBox?.()}
 
       {/*
         No count of concerns anywhere on this panel (§3).

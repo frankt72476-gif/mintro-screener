@@ -55,21 +55,27 @@ describe.each(RUNS)('%s', (_label, report) => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(SURFACES)('renders all three sections on %s, even the empty ones', (surface) => {
-    // Four became three (D-189): not met, unclear and not observed are bands inside one section.
+  it.each(SURFACES)('renders all four sections on %s, even the empty ones', (surface) => {
+    /*
+      Four became three when the review bands merged (D-189), and four again when *Not met* left the
+      review section for part one (D-202). Every one is built on every run, empty or not, so the nav
+      and the tallies have something to read.
+    */
     expect(reportParts(report, surface).map((p) => p.id).sort()).toEqual([
+      'notmet',
       'questions',
       'review',
       'stopping',
     ]);
   });
 
-  it('orders 1,2,3 for the merchant and the agent', () => {
+  it('orders 1,2,3,4 for the merchant and the agent', () => {
     for (const surface of ['merchant', 'agent'] as const) {
       expect(reportParts(report, surface).map((p) => p.id)).toEqual([
         'stopping',
-        'review',
+        'notmet',
         'questions',
+        'review',
       ]);
     }
   });
@@ -85,8 +91,9 @@ describe.each(RUNS)('%s', (_label, report) => {
     */
     expect(reportParts(report, 'iqwallet').map((p) => p.id)).toEqual([
       'stopping',
-      'review',
+      'notmet',
       'questions',
+      'review',
     ]);
   });
 
@@ -100,10 +107,19 @@ describe.each(RUNS)('%s', (_label, report) => {
    * The surface parameter controls section order and nothing else now.
    */
   it.each(SURFACES)('bands the review section on %s', (surface) => {
+    /*
+      Two bands, not three (D-202).
+
+      *Not met* left for a section of its own in part one. It was here **and** in the brief at the
+      same time — a summary with no evidence four screens above the real thing — and this is the half
+      of that duplication that had to go, because part one is where a reader acts.
+    */
     const review = reportParts(report, surface).find((p) => p.id === 'review');
-    expect(review?.bands?.map((b) => b.heading)).toEqual(['Not met', 'Unclear', 'Not observed']);
-    // Not met first: what a reader acts on first, first. Same order as `STATE_ORDER` minus `pass`.
-    expect(review?.bands?.map((b) => b.state)).toEqual(['fail', 'review', 'not_evaluable']);
+    expect(review?.bands?.map((b) => b.heading)).toEqual(['Unclear', 'Not observed']);
+    expect(review?.bands?.map((b) => b.state)).toEqual(['review', 'not_evaluable']);
+
+    // And nothing failing is left in it at all.
+    expect(review?.tally.byState.fail ?? 0).toBe(0);
   });
 
   it('carries the same rows in the review section whoever is reading', () => {
@@ -219,7 +235,7 @@ describe('print carries both headers, which it did not', () => {
     expect(rows + clear).toBe(ungrouped(report).length);
   });
 
-  it.each(RUNS)('%s: all three section headings appear, in the one order (D-186, D-189)', (_label, report) => {
+  it.each(RUNS)('%s: all four section headings appear, in the one order (D-186, D-189)', (_label, report) => {
     const markup = renderToStaticMarkup(
       createElement(ReportView, { report, access, surface: 'iqwallet', print: true }),
     );
@@ -230,7 +246,7 @@ describe('print carries both headers, which it did not', () => {
       part still exists and is still the one derivation the panel, the brief and the cards read; it
       is simply not rendered a second time further down.
     */
-    expect(headings).toEqual(['For your review', 'Operational questions']);
+    expect(headings).toEqual(['Not met', 'Operational questions', 'For your review']);
   });
 
   it('keeps a heading with what it introduces, and repeats the section name down the page', () => {
