@@ -14186,3 +14186,57 @@ rule-set change and carries its own decision under D-025 — and two-letter toke
 rule need the false-positive argument made before they are added, not after. `packages/engine/test/codedProductSlugs.test.ts`
 pins both halves: the matcher does match `hcg` and `glow` when a merchant publishes them, and it
 matches nothing on `tz`, `rt` or `klow` today.
+
+---
+
+## D-215 — Evidence is cited to the request the finding rests on, and a digest means a stored body
+
+*2026-08-30.*
+
+GATE-002 on CoMo Peptides run `356ce753` read:
+
+> 1 of 3 path(s) served content directly with a status this rule treats as a violation:
+> `https://www.comopeptides.com/shop` returned 200.
+
+and its evidence slip was headed `https://www.comopeptides.com/collections/all`, with a SHA-256
+printed beside a capture pane reading *"not retained"* — and, in the same slip, `/collections/all →
+404` among the requests attempted. An underwriter checking the cited URL gets a 404 and has every
+reason to conclude the finding is wrong. It was not wrong. It was cited to the wrong request.
+
+**`sessionEvidence` bound to `results[0]`** — the first path the rule lists, whatever it returned.
+The caller now passes the result the finding actually rests on, because only the caller knows which
+that is:
+
+| branch | cited request |
+|---|---|
+| violation | the offending path, the one the sentence names first |
+| clean | the first path that answered without redirecting; failing that, one that redirected away |
+| nothing answered | the path that did not answer — that *is* the observation |
+| nothing probed | none |
+
+A 404 is an answer, so a clean result may legitimately cite one. What it may not do is cite a
+request that never happened.
+
+**A digest is emitted only where a body was retained.** `probePaths` hashes what it reads and stores
+nothing, so *every* `http_probe` finding carried a SHA-256 next to a capture pane saying the
+document was not retained. A hash proves the stored artifact is the one fetched (hard constraint 3);
+with no stored artifact it proves nothing and reads as though something is on file. Both fields now
+say `''` together, which is the convention `urlPattern.ts`, `payment.ts` and `signupForm.ts` already
+use.
+
+**Not fixed here, and it should be:** `http_probe` retains no body at all, so GATE-002 — `critical`,
+`auto_fail`, a stopping condition — is a documentary finding with no document. Constraint 3 asks for
+the artifact, and this pass makes the report stop claiming one exists. Actually retaining it is a
+new write path into evidence storage and belongs in its own change.
+
+**The matched payload names its field.** It rendered as a bare string in a box: `blend` under
+NAME-002, `200 https://…/shop` under GATE-002, each followed by an unlabelled list of URLs — while
+every other line in the same slip names itself (Source, Method, SHA-256, Requests attempted). The
+one line carrying what the rule actually matched did not. It now reads `Matched: …`, as a prefix on
+the string rather than a new row, so the slip's shape is untouched; `DeclineNotice` already wrote it
+this way.
+
+The URL list under it is filtered to what the observation has not already named. NAME-002's sentence
+enumerates both offending URLs and the slip listed the same two again underneath, unlabelled, which
+is what made them look like a second and different fact. Where a note does not name them, the list
+is the only place they appear and it stays.

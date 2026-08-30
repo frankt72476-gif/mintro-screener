@@ -21,6 +21,21 @@ interface Props {
   readonly access: EvidenceAccess;
 }
 
+/**
+ * The matched URLs the observation has not already named (D-215).
+ *
+ * NAME-002's sentence reads *"…matched a prohibited pattern: /shop/bpc-157-tb500-blend/ (matched
+ * 'blend'); /shop/cjc-1295-no-dac-ipamorelin-blend/ (matched 'blend')"* and the slip then listed
+ * those same two URLs underneath with no label. GATE-002 did the same with one. Printing a list a
+ * reader has just read, unlabelled, is what made it look like a second and different fact.
+ *
+ * Filtered rather than dropped: where the note does *not* name them — a rule that matched more URLs
+ * than its sentence enumerates — the list is the only place they appear and it stays.
+ */
+export function unlistedUrls(evidence: Evidence, note: string): readonly string[] {
+  return (evidence.matchedUrls ?? []).filter((url) => !note.includes(url));
+}
+
 export function EvidenceSlip({ finding, access }: Props): JSX.Element {
   // The richest evidence entry — the one carrying a matched value — is the one worth leading
   // with. Findings that observed nothing carry only the source reference.
@@ -108,14 +123,29 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
 
           {primary.matchedValue !== undefined && (
             <div className="capture">
-              <span className="matched">{primary.matchedValue}</span>
-              {primary.matchedUrls !== undefined && primary.matchedUrls.length > 0 && (
+              {/*
+                The payload says what it is (D-215).
+
+                It rendered as a bare string in a box: under NAME-002 the word `blend` on its own,
+                under GATE-002 `200 https://…/shop` followed by an unlabelled list of URLs. Every
+                other line in this slip names its field — Source, Method, SHA-256, Requests
+                attempted — and this one, the only one carrying what the rule actually matched, did
+                not. A reader who cannot tell whether `blend` is the matched value, the pattern, or
+                a fragment of the page cannot check the finding.
+
+                A prefix on the text, not a new row: the label is the string, so the slip's shape is
+                untouched. `DeclineNotice` already writes it this way.
+              */}
+              <span className="matched">Matched: {primary.matchedValue}</span>
+              {unlistedUrls(primary, finding.note).length > 0 && (
                 <ul className="matched-urls">
-                  {primary.matchedUrls.slice(0, 8).map((url) => (
-                    <li key={url}>{url}</li>
-                  ))}
-                  {primary.matchedUrls.length > 8 && (
-                    <li>…and {primary.matchedUrls.length - 8} more</li>
+                  {unlistedUrls(primary, finding.note)
+                    .slice(0, 8)
+                    .map((url) => (
+                      <li key={url}>{url}</li>
+                    ))}
+                  {unlistedUrls(primary, finding.note).length > 8 && (
+                    <li>…and {unlistedUrls(primary, finding.note).length - 8} more</li>
                   )}
                 </ul>
               )}
