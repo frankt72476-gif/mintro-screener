@@ -35,7 +35,7 @@ import type {
   SignupForm,
   SurfaceSpec,
 } from '@mintro/engine';
-import { located, NO_SIGNUP_FORM, unreachable } from '@mintro/engine';
+import { located, NO_SIGNUP_FORM, unreachable, withoutFragment } from '@mintro/engine';
 import { probeSurface } from './surfaceProbe.js';
 import { establishDocument } from './locate.js';
 import { PROBE_IDLE_MS, renderPage } from './render.js';
@@ -348,6 +348,17 @@ export function selectLinkedCandidates(
   linkHints: readonly string[],
   origin: string,
 ): { readonly followed: readonly string[]; readonly dropped: number; readonly matched: number } {
+  /*
+    Deduped on the URL a request would actually carry (D-219).
+
+    A fragment never leaves the browser, so `/about/#how-quickly` and `/about/` are one candidate.
+    Deduping on the raw href kept both — a second full page render of a page already rendered, and
+    a finding whose "requests attempted" listed a URL nothing ever asked for.
+
+    Matching still reads the href **with** its fragment, because a fragment is often where the link
+    text lives: `#shipping` on an anchor labelled "Delivery" is exactly the signal these hints look
+    for. What is stripped is what gets requested, not what gets matched.
+  */
   const distinct = [
     ...new Set(
       homepageLinks
@@ -355,7 +366,7 @@ export function selectLinkedCandidates(
           const haystack = `${link.href} ${link.text}`.toLowerCase();
           return linkHints.some((hint) => haystack.includes(hint));
         })
-        .map((link) => link.href),
+        .map((link) => withoutFragment(link.href)),
     ),
   ].filter((url) => url.startsWith(origin));
 

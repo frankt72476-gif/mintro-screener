@@ -33,7 +33,7 @@ import type {
   PageContext,
   Pacer,
 } from '@mintro/engine';
-import { extractPdfText, looksLikePdf } from '@mintro/engine';
+import { extractPdfText, looksLikePdf, withoutFragment } from '@mintro/engine';
 
 /**
  * What a certificate link looks like — read from COA-001, never held here (D-059).
@@ -223,8 +223,9 @@ export function certificateLinks(
       const named = vocabulary.some((hint) => href.includes(hint) || text.includes(hint));
       if (!named) continue;
 
-      if (href.endsWith('.pdf')) byHref.push(link.href);
-      else byText.push(link.href);
+      // The URL a request would carry, so two links to one certificate are one attempt (D-219).
+      if (href.endsWith('.pdf')) byHref.push(withoutFragment(link.href));
+      else byText.push(withoutFragment(link.href));
     }
   }
 

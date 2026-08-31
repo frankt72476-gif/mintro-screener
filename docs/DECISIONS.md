@@ -14432,3 +14432,30 @@ the flag, and it is a fact about the route, not a special case.
 **Only the invitation is conditional.** Every count, every heading and every observation renders
 either way. A section that dropped its finding along with its ask would be hiding an observation
 because nobody was asked about it, which is a worse fault than the one being fixed.
+
+---
+
+## D-219 — A fragment is not a path
+
+*2026-08-30.*
+
+FULF-001 on CoMo Peptides listed seven requests attempted, the first of them:
+
+> `https://www.comopeptides.com/aboutcomopeptides/#how-quickly → 200`
+
+A fragment never leaves the browser. What went out was `GET /aboutcomopeptides/`, and the record of
+what was tried named a URL nothing ever asked for. Where a homepage carries both spellings — the
+policy link and an anchor into the same page — the candidate list held both, so one page was
+rendered twice and one request was shown as two.
+
+`withoutFragment` strips it, and both link-derived candidate lists use it:
+`selectLinkedCandidates` for the terms, shipping-policy, FAQ and payment surfaces, and
+`certificateLinks` for the COA probes, where two anchors into one PDF were two fetches of it.
+
+**Stripped from what is requested, not from what is matched.** A fragment is often where a link
+names itself — `#shipping` under the text *"Delivery"* is exactly the signal the hints look for — so
+the match still reads the href entire.
+
+**An unparseable href is returned as written.** It still has to be recorded as an attempt; a
+normaliser that dropped it would hide a request, which is the failure hard constraint 3 exists to
+prevent.

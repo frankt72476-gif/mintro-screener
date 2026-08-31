@@ -146,6 +146,28 @@ export function pathNamesSurface(url: string, spec: SurfaceSpec): boolean {
   return spec.pathNames.some((name) => path.includes(name));
 }
 
+/**
+ * A URL with its fragment removed (D-219).
+ *
+ * **A fragment never reaches the server.** `/about/#how-quickly` and `/about/` are one request, and
+ * a candidate list that dedupes on the raw href holds both: the page is rendered twice, and the
+ * finding's own record of what was tried shows two attempts where one was made. FULF-001 on CoMo
+ * Peptides listed `https://www.comopeptides.com/aboutcomopeptides/#how-quickly → 200` among seven
+ * paths tried — a URL nothing ever asked for, since what went out was the same request without it.
+ *
+ * Returns the input unchanged when it cannot be parsed, so a malformed href is still recorded as
+ * written rather than silently dropped from the attempts.
+ */
+export function withoutFragment(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return url.split('#')[0] ?? url;
+  }
+}
+
 /** Path, lowercased, without leading or trailing slashes. */
 export function normalisePath(url: string): string {
   try {
