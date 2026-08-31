@@ -98,6 +98,10 @@ describe('the committed rule set and the committed corpus', () => {
     const mintro = ruleset.rules.filter((rule) => rule.source === 'mintro');
     expect(mintro.map((rule) => rule.id).sort()).toEqual([
       'CATG-007',
+      // CATG-008 is Mintro's, and being asked about it is the point of this pin. IQwallet has
+      // stated GLP-1 agonists block boarding; the standards do not name them, so quoting one under
+      // "Program requirement" would fabricate the authority rather than overstate it (D-138, D-220).
+      'CATG-008',
       'DISC-004',
       'PROD-011',
       'PROD-012',

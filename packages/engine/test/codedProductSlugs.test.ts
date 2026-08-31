@@ -155,22 +155,58 @@ describe('the catalogue this merchant actually publishes', () => {
     ]);
   });
 
-  it('matches none of the coded slugs against any layer 0 rule', async () => {
-    /*
-      `tz` and `rt` are how this merchant spells two GLP-1 agonists — CATG-003 gained `semaglutide`
-      and `tirzepatide` in v3.2.0 and neither reaches an initialism. `klow` is a blend sold under a
-      coined name that NAME-002's list does not carry.
-
-      Pinned as an observation, not a complaint: it is what the shipped rule set does with these
-      three URLs today. Changing it is a rule-set change and carries a decision number (D-025).
-    */
+  /**
+   * What the rule set now does with the three coded slugs — and it is no longer the same answer
+   * for all three (D-220).
+   *
+   * This block used to assert that none of them was matched by anything, and it was pinned with the
+   * note that changing it is a rule-set change carrying a decision number. That change has been
+   * made: `CATG-008` carries `tz` and `rt`, which are how this merchant spells tirzepatide and
+   * retatrutide.
+   *
+   * **The old assertion would still have passed, which is why it is gone rather than edited.** It
+   * read `not.toEqual(expect.arrayContaining([tz, rt, klow]))`, so it failed only if one rule
+   * matched *all three*. `CATG-008` matches two. The assertion would have held while the sentence
+   * above it — "matches none of the coded slugs" — had become false, and a test that passes while
+   * what it claims is untrue is worse than no test. Asserted per slug now, so each one is answered
+   * for on its own.
+   */
+  it('matches tz and rt to CATG-008, and klow to nothing', async () => {
     const crawl = await crawlOf(CATALOGUE);
-    const coded = ['/shop/tz/', '/shop/rt/', '/shop/klow/'].map((path) => `${ORIGIN}${path}`);
+    const matchedBy = (path: string): string[] =>
+      layer0Rules(ruleset)
+        .filter((layer0Rule) => matchedUrls(checkUrlPattern(layer0Rule, crawl)).includes(`${ORIGIN}${path}`))
+        .map((layer0Rule) => layer0Rule.id);
 
-    for (const layer0Rule of layer0Rules(ruleset)) {
-      expect(matchedUrls(checkUrlPattern(layer0Rule, crawl)), layer0Rule.id).not.toEqual(
-        expect.arrayContaining(coded),
-      );
-    }
+    expect(matchedBy('/shop/tz/')).toEqual(['CATG-008']);
+    expect(matchedBy('/shop/rt/')).toEqual(['CATG-008']);
+
+    /*
+      `klow` is still matched by nothing, and that is deliberate rather than pending.
+
+      The catalogues spell it out themselves — corepeptides and biotechpeptides both publish it as
+      "KLOW (BPC-157, KPV, TB-500, GHK-Cu) Blend" — so it is no GLP-1 and has no place on CATG-008.
+      It is a coined blend name, which is NAME-002's subject; that its list does not carry it is a
+      separate question about a separate rule, and not taken here.
+    */
+    expect(matchedBy('/shop/klow/')).toEqual([]);
+  });
+
+  it('still leaves CATG-003 passing over the 37 products, GLP-1 rule or not', async () => {
+    // The move of `semaglutide` and `tirzepatide` onto CATG-008 must not disturb the auto_fail
+    // rule they left. This merchant lists no HCG and no HGH, and still does.
+    const finding = checkUrlPattern(rule('CATG-003'), await crawlOf(CATALOGUE));
+    expect(finding.state).toBe('pass');
+  });
+
+  it('reports the GLP-1 slugs for review rather than failing the merchant', async () => {
+    // `review_only`, so the finding reads `review`. Hard constraint 4: abbreviation matching goes
+    // to a person whatever the confidence, and two-letter tokens are the case it was written for.
+    const finding = checkUrlPattern(rule('CATG-008'), await crawlOf(CATALOGUE));
+
+    expect(finding.state).toBe('review');
+    expect(matchedUrls(finding)).toEqual([`${ORIGIN}/shop/rt/`, `${ORIGIN}/shop/tz/`]);
+    // Mintro's own observation, so the copy must not call it prohibited (D-138).
+    expect(finding.note).not.toContain('prohibited');
   });
 });

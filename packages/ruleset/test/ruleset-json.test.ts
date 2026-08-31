@@ -49,9 +49,23 @@ describe('rules/ruleset.json', () => {
       clause were restated so neither reads as an observation. No rule was added or removed and no
       pattern, term or threshold moved, so `effective` does not move either.
     */
-    expect(ruleset.version).toBe('3.4.0');
+    /*
+      3.5.0 adds CATG-008 and moves two patterns onto it (D-220).
+
+      `semaglutide` and `tirzepatide` were CATG-003's from 3.2.0. They are now CATG-008's, so the
+      GLP-1 vocabulary sits in one rule that can move as IQwallet's position firms up without
+      touching CATG-003's `auto_fail` tier. Neither term matched a URL in any of the five stored
+      catalogues, so no stored run would read differently for the move — but a run under 3.5.0
+      attributes a GLP-1 match to a `review_only` Mintro rule where 3.4.0 would have auto-failed it
+      under a programme rule, and that is a real difference between two runs of one merchant.
+
+      Minor rather than major: no rule left the set and no rule that remains asks anything
+      different. `effective` does not move — the published standards do not name GLP-1 agonists,
+      which is why CATG-008 is `source: mintro`.
+    */
+    expect(ruleset.version).toBe('3.5.0');
     expect(ruleset.effective).toBe('2026-08-26');
-    expect(ruleset.rules).toHaveLength(59);
+    expect(ruleset.rules).toHaveLength(60);
     expect(ruleset.categories).toHaveLength(10);
   });
 

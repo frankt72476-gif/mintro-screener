@@ -94,6 +94,10 @@ describe('every rule states whose requirement it is', () => {
     const mintro = ruleset.rules.filter((r) => r.source === 'mintro').map((r) => r.id);
     expect([...mintro].sort()).toEqual([
       'CATG-007',
+      // CATG-008 (D-220). IQwallet has stated GLP-1 agonists block boarding and the published
+      // standards do not name them, so it claims no published authority and must not print under
+      // "Program requirement" (D-138).
+      'CATG-008',
       'DISC-004',
       'PROD-011',
       'PROD-012',
