@@ -30,7 +30,7 @@ const account = (over: Partial<StoppingAccount> = {}): StoppingAccount => ({
 
 describe('the live comopeptides shape', () => {
   it('asks about the unchecked ones and counts nothing', () => {
-    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
+    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }), true);
 
     expect(lines).toEqual(['Tell us if we have the two unchecked ones wrong.']);
   });
@@ -41,7 +41,7 @@ describe('the live comopeptides shape', () => {
       and there is nothing to invite a correction about — an empty paragraph under the heading
       would read as a sentence that failed to load.
     */
-    const lines = stoppingSentence(account({ passed: Array.from({ length: 9 }, (_, i) => `R-${i}`) }));
+    const lines = stoppingSentence(account({ passed: Array.from({ length: 9 }, (_, i) => `R-${i}`) }), true);
 
     expect(lines).toEqual([]);
   });
@@ -49,6 +49,7 @@ describe('the live comopeptides shape', () => {
   it('asks in the singular for one unchecked condition', () => {
     const lines = stoppingSentence(
       account({ failed: [{ ruleId: 'CATG-001' }] as never, notEvaluable: ['GATE-003'] }),
+      true,
     );
 
     expect(lines).toEqual(['Tell us if we have the unchecked one wrong.']);
@@ -57,7 +58,7 @@ describe('the live comopeptides shape', () => {
   it('asks about this document, never about the storefront', () => {
     // D-001: it invites a correction to what Mintro wrote. It never tells a merchant what to change
     // about their site, and a shortened sentence is where that slips.
-    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
+    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }), true);
 
     expect(lines.join(' ')).toContain('we have');
     expect(lines.join(' ')).not.toMatch(/you (should|must|need)/i);
@@ -65,7 +66,7 @@ describe('the live comopeptides shape', () => {
 
   it('renders nothing for a run predating the flag', () => {
     // D-161: absent is not "0 of 0". The lede says the run predates it and this adds no arithmetic.
-    expect(stoppingSentence(account({ declared: null }))).toEqual([]);
+    expect(stoppingSentence(account({ declared: null }), true)).toEqual([]);
   });
 });
 
@@ -85,27 +86,45 @@ describe('a stored report whose parts do not add up', () => {
       band states it, because the band reports what was found rather than what is missing from the
       accounting.
     */
-    const lines = stoppingSentence(account({ passed: ['PROD-006', 'PROD-007'], notEvaluable: ['GATE-003'] }));
+    const lines = stoppingSentence(account({ passed: ['PROD-006', 'PROD-007'], notEvaluable: ['GATE-003'] }), true);
 
     expect(lines.join(' ')).toContain('Six produced no finding on this run');
     expect(lines.join(' ')).toContain('did not check every condition it declares');
   });
 
   it('is silent when the parts do add up, which is every healthy run', () => {
-    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }));
+    const lines = stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }), true);
 
     // Only the ask. Nothing about the arithmetic, because it holds.
     expect(lines).toEqual(['Tell us if we have the two unchecked ones wrong.']);
   });
 });
 
+describe('nobody was asked', () => {
+  /*
+    The ask needs a link to answer through (D-218). Every call above passes `true` because this file
+    is about what the sentence says when there is one; without a link the sentence does not exist,
+    and the panel's own band still states what was checked and what was not.
+  */
+  it('says nothing at all', () => {
+    expect(stoppingSentence(account({ notEvaluable: ['GATE-003', 'NAME-001'] }))).toEqual([]);
+  });
+
+  it('still reports a count that does not add up, which is not an ask', () => {
+    const lines = stoppingSentence(account({ declared: 9, passed: ['A'], notEvaluable: [] }));
+
+    expect(lines.join(' ')).toContain('unaccounted for');
+  });
+});
+
 describe('grammar', () => {
   it('agrees the ask with the unchecked count', () => {
-    const one = stoppingSentence(account({ passed: ['PAY-001'], notEvaluable: ['A'] }));
+    const one = stoppingSentence(account({ passed: ['PAY-001'], notEvaluable: ['A'] }), true);
     expect(one[0]).toBe('Tell us if we have the unchecked one wrong.');
 
     const many = stoppingSentence(
       account({ passed: ['PAY-001'], notEvaluable: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] }),
+      true,
     );
     expect(many[0]).toBe('Tell us if we have the eight unchecked ones wrong.');
   });

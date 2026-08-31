@@ -27,7 +27,8 @@ const load = (n: string): ScreeningReport =>
 
 const RUNS = ['run-c268f8d7', 'run-5b29036d'] as const;
 const reviewOf = (report: ScreeningReport) =>
-  reportParts(report, 'agent').find((p) => p.id === 'review');
+  // `invited`, because this file is about the sentence a merchant with a link reads (D-218).
+  reportParts(report, 'agent', { invited: true }).find((p) => p.id === 'review');
 
 const render = (report: ScreeningReport, print: boolean) =>
   renderToStaticMarkup(

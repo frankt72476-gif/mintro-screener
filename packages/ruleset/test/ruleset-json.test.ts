@@ -43,7 +43,13 @@ describe('rules/ruleset.json', () => {
       report feeds. `effective` does not move — the standards did not change, only what Mintro
       screens against them.
     */
-    expect(ruleset.version).toBe('3.3.0');
+    /*
+      3.4.0 is minor and changes no matcher (D-217). GATE-007 gained `require_all_labels`, which
+      names its five stems in report copy and is read by nothing that matches; DISC-004's title and
+      clause were restated so neither reads as an observation. No rule was added or removed and no
+      pattern, term or threshold moved, so `effective` does not move either.
+    */
+    expect(ruleset.version).toBe('3.4.0');
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(59);
     expect(ruleset.categories).toHaveLength(10);

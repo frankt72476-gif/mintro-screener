@@ -210,6 +210,19 @@ export const textMatchParams = z
     exact: nonEmptyText.optional(),
     require: nonEmptyStrings.optional(),
     require_all: nonEmptyStrings.optional(),
+    /**
+     * How each `require_all` entry is named in a finding (D-217).
+     *
+     * The entries are match stems — `indemnif`, `diagnos` — chosen so one term reaches
+     * *indemnify*, *indemnifies* and *indemnification*. They are correct as matcher input and
+     * unreadable as report copy: GATE-007 told a merchant that `'indemnif'` was not observed in
+     * their terms.
+     *
+     * A map rather than a parallel array, so a stem cannot silently take another's label when the
+     * list is reordered. Optional: a rule whose stems read as words needs none, and an entry with
+     * no label is quoted as written, as it always was.
+     */
+    require_all_labels: z.record(z.string().min(1), z.string().min(1)).optional(),
     require_any: nonEmptyStrings.optional(),
     forbid: nonEmptyStrings.optional(),
     map: z.record(z.string().min(1), z.string().min(1)).optional(),

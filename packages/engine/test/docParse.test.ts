@@ -359,7 +359,16 @@ describe('COA-006 — the link serves something that can be read', () => {
     // review_only, so a violation lands in the human queue rather than auto-failing a merchant on
     // an asset-serving quirk.
     expect(finding.state).toBe('review');
-    expect(finding.note).toContain('is not a certificate');
+    /*
+      What the check measured, not what the response is (D-217).
+
+      This asserted the note said the link's payload *"is not a certificate"* — a conclusion the
+      method never reached. `looksLikePdf` read the first bytes; everything past that is inference,
+      and on CoMo Peptides it was wrong: the certificate content is on the page as HTML. The
+      observation is the magic number and the declared content type.
+    */
+    expect(finding.note).toContain('does not begin with %PDF');
+    expect(finding.note).not.toContain('is not a certificate');
     expect(finding.evidence[0]?.attempts?.length).toBe(1);
   });
 

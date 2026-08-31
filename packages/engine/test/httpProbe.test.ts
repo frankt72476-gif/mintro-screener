@@ -205,3 +205,102 @@ describe('a probe that observed nothing', () => {
     expect(finding.evidence[0]?.attempts?.some((a) => a.error === 'timed out')).toBe(true);
   });
 });
+
+/**
+ * The evidence cites the request the finding rests on (D-215).
+ *
+ * From CoMo Peptides run `356ce753`: three paths probed, `/collections/all` and `/products` both
+ * 404, `/shop` 200. The finding read *"1 of 3 path(s) served content directly … /shop returned
+ * 200"* and its evidence slip was headed `sourceUrl: …/collections/all`, with a SHA-256 printed
+ * beside a capture pane reading *"not retained"*. An underwriter checking that URL gets a 404.
+ */
+describe('evidence is cited to the decisive request', () => {
+  const THREE = [
+    probe('/collections/all', 404),
+    probe('/products', 404),
+    probe('/shop', 200),
+  ];
+
+  it('names the offending path, not the first path probed', () => {
+    const finding = checkHttpProbe(gate002, { results: THREE, session: NO_SESSION });
+    const [evidence] = finding.evidence;
+
+    expect(finding.state).toBe('fail');
+    expect(evidence?.sourceUrl).toBe('https://shop.example/shop');
+    expect(finding.note).toContain('https://shop.example/shop returned 200');
+  });
+
+  it('names a path that answered when the result is clean', () => {
+    /*
+      A 404 is an answer — the path served nothing, which is what a clean result rests on — so the
+      first path that answered without redirecting is what gets cited. There is no single decisive
+      request for a pass; what there must not be is a citation to a request that never happened.
+    */
+    const finding = checkHttpProbe(gate002, {
+      results: [probe('/collections/all', 404), probe('/shop', 404)],
+      session: NO_SESSION,
+    });
+
+    expect(finding.state).toBe('pass');
+    expect(finding.evidence[0]?.sourceUrl).toBe('https://shop.example/collections/all');
+  });
+
+  it('names the redirected path when nothing served directly', () => {
+    // The gate working is the observation, and the only request that carries it.
+    const finding = checkHttpProbe(gate002, {
+      results: [probe('/shop', 302, '/account/login')],
+      session: NO_SESSION,
+    });
+
+    expect(finding.state).toBe('pass');
+    expect(finding.evidence[0]?.sourceUrl).toBe('https://shop.example/shop');
+  });
+
+  it('names a path that did not answer when that is why nothing could be decided', () => {
+    const finding = checkHttpProbe(gate002, {
+      results: [probe('/collections/all', 404), { ...probe('/shop', 0), error: 'timeout' }],
+      session: NO_SESSION,
+    });
+
+    expect(finding.state).toBe('not_evaluable');
+    expect(finding.evidence[0]?.sourceUrl).toBe('https://shop.example/shop');
+  });
+
+  it('keeps every attempt in the slip, whichever one is cited', () => {
+    const finding = checkHttpProbe(gate002, { results: THREE, session: NO_SESSION });
+
+    expect(finding.evidence[0]?.attempts?.map((a) => `${a.url} ${a.status}`)).toEqual([
+      'https://shop.example/collections/all 404',
+      'https://shop.example/products 404',
+      'https://shop.example/shop 200',
+    ]);
+  });
+});
+
+describe('a digest is printed only where a body was retained', () => {
+  /*
+    `probePaths` hashes the body it read and stores nothing, so every one of these findings carried
+    a SHA-256 next to a capture pane reading "not retained" — a hash of a document no reader can
+    open. Hard constraint 3 wants the artifact, and the digest is what proves the artifact is the
+    one fetched; alone it proves nothing.
+  */
+  it('emits no sha for a probe whose body was not retained', () => {
+    const finding = checkHttpProbe(gate002, {
+      results: [{ ...probe('/shop', 200), sha256: 'a'.repeat(64) }],
+      session: NO_SESSION,
+    });
+
+    expect(finding.evidence[0]?.evidenceKey).toBe('');
+    expect(finding.evidence[0]?.sourceSha256).toBe('');
+  });
+
+  it('emits both where the body was retained', () => {
+    const finding = checkHttpProbe(gate002, {
+      results: [{ ...probe('/shop', 200), sha256: 'b'.repeat(64), evidenceKey: 'run/layer0/bbb' }],
+      session: NO_SESSION,
+    });
+
+    expect(finding.evidence[0]?.evidenceKey).toBe('run/layer0/bbb');
+    expect(finding.evidence[0]?.sourceSha256).toBe('b'.repeat(64));
+  });
+});

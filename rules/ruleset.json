@@ -1,5 +1,5 @@
 {
-  "version": "3.3.0",
+  "version": "3.4.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -353,7 +353,14 @@
           "diagnos",
           "indemnif",
           "qualified"
-        ]
+        ],
+        "require_all_labels": {
+          "research use only": "use is restricted to research",
+          "human consumption": "human consumption is forbidden",
+          "diagnos": "the products play no part in diagnosing, treating or preventing disease",
+          "indemnif": "the buyer indemnifies the seller",
+          "qualified": "the buyer confirms they are a qualified professional"
+        }
       }
     },
     {
@@ -1551,8 +1558,8 @@
       "sev": "major",
       "type": "text_match",
       "tier": "review_only",
-      "title": "FDA non-evaluation statement not observed",
-      "clause": "No statement was observed that the products are not evaluated by the FDA and are not intended to diagnose, treat, cure or prevent disease.",
+      "title": "FDA non-evaluation statement",
+      "clause": "The site states that the products have not been evaluated by the FDA and are not intended to diagnose, treat, cure or prevent any disease.",
       "subject": "the site states the products are not evaluated by the FDA",
       "source": "mintro",
       "params": {

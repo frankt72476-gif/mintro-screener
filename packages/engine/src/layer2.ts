@@ -234,9 +234,30 @@ function evaluate(rule: Rule, rendered: readonly SampledPage[], ruleset: Ruleset
 
     if (distinct.size === 1 && perPage.length > 1) {
       const first = perPage[0]!.finding;
+      /*
+        The reason carries the page count too, not only the note (D-216).
+
+        A `not_evaluable` finding is rendered from `notEvaluableReason`, not from `note`
+        (`notObservedSentence`), so the clause appended below never reached the page. PROD-002 and
+        PROD-004 collapsed across all five sampled pages and read as observations about one, beside
+        PROD-003 — the same check on the same sample — visibly reporting on five. The difference in
+        finding count is real and correct (the pages disagreed for PROD-003 and agreed for the other
+        two); the difference the reader saw was an artefact of which field the sentence is built
+        from.
+      */
+      const reason =
+        first.notEvaluableReason === undefined
+          ? {}
+          : {
+              notEvaluableReason:
+                `${first.notEvaluableReason} — the same on all ${perPage.length} ` +
+                `sampled product page(s)`,
+            };
+
       return [
         {
           ...first,
+          ...reason,
           note: `${first.note} Observed on all ${perPage.length} sampled product page(s).`,
           evidence: perPage.flatMap(({ finding }) => finding.evidence),
         },

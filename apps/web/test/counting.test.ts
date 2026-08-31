@@ -106,7 +106,16 @@ describe('the top band is gone, and the count it carried is stated once', () => 
       figure here is the same object the section counts from.
     */
     const n = review?.tally.rules ?? 0;
-    expect(rendered).toContain(`${n} observation`);
+    /*
+      The unit is named (D-216).
+
+      This asserted `${n} observation` while `n` is a **row** count, so the assertion passed on a
+      label that was wrong in exactly the way the count was: thirty rows announced as thirty
+      observations, above forty-two findings. What is pinned is unchanged — the figure is stated
+      once, from the part's own tally — and it now has to be stated in the noun it counts.
+    */
+    expect(rendered).toContain(`${n} rule${n === 1 ? '' : 's'}`);
+    expect(rendered).not.toContain(`${n} observation`);
 
     // Stated once. The surfaces that repeated it are gone.
     expect(rendered).not.toContain('for your review');

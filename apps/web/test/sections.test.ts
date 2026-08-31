@@ -186,7 +186,7 @@ describe('section 1 renders at zero', () => {
       figure the band states — and on this run there is nothing left for it to ask, because every
       condition was checked.
     */
-    expect(markup).toContain('Nothing here stops the application');
+    expect(markup).toContain('No stopping condition was observed failing');
     expect(markup).toContain('8 of 8 checked and clear');
     expect(markup).not.toContain('stopping conditions were checked and');
   });

@@ -12,7 +12,12 @@ import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext, PageRegion } from '../page.js';
 import { notEvaluable, satisfied, violation, type Finding } from '../findings.js';
 import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
-import { bestResemblance, splitStatements } from '../textSimilarity.js';
+import {
+  bestResemblance,
+  describeResemblance,
+  nearestResemblance,
+  splitStatements,
+} from '../textSimilarity.js';
 import { scopeTerms, termsAt } from '../claimScope.js';
 
 /** Surfaces this handler can locate on a rendered page. */
@@ -367,6 +372,16 @@ function mapFinding(
   return violation(rule, 'Observed ' + detail + '.', RENDERED, withMatch(page, missing.join(', ')));
 }
 
+/**
+ * The clause naming what a check read for, or nothing where the rule declares no subject.
+ *
+ * Runs recorded before rule sets carried `subject` still render: a rule without one gets the
+ * sentence it always had rather than a half-built one.
+ */
+function readFor(rule: RuleOfType<'text_match'>): string {
+  return rule.subject === undefined ? '' : `Read for whether ${rule.subject}. `;
+}
+
 function quote(values: readonly string[]): string {
   return Array.from(new Set(values)).slice(0, 5).map((v) => "'" + v + "'").join(', ');
 }
@@ -418,12 +433,38 @@ function exactFinding(
     );
   }
 
+  /*
+    What was found and how it scored, never "no comparable text" (D-217).
+
+    This branch is reached when no candidate cleared **both** thresholds, and it reported that as an
+    absence of comparable text. On CoMo Peptides the footer's closest line carried two thirds of the
+    required wording and failed on density alone — text was found, and it scored low. Saying the
+    footer held nothing comparable is a conclusion the method did not reach (D-076).
+  */
+  const near = nearestResemblance(footerCandidates(region), exact, (candidate) => candidate);
+
+  if (near !== null) {
+    return violation(
+      rule,
+      `The footer does not contain the required wording verbatim. The closest text in it is: ` +
+        `"${truncate(near.candidate)}" — ${describeResemblance(near.score)}, so it was not read as ` +
+        `a variant of the required sentence. Required: "${exact}"`,
+      RENDERED,
+      withMatch(page, near.candidate),
+    );
+  }
+
   return violation(
     rule,
-    `The footer does not contain the required wording, and no comparable text was observed. Required: "${exact}"`,
+    `The footer does not contain the required wording, and it carries no text to compare against. Required: "${exact}"`,
     RENDERED,
     pageEvidence(page),
   );
+}
+
+/** The candidate statements a footer offers, in the one form both disclosure rules read. */
+function footerCandidates(region: PageRegion): string[] {
+  return [...region.styledText.map((styled) => styled.text), ...splitStatements(region.text)];
 }
 
 function allOfFinding(
@@ -434,11 +475,25 @@ function allOfFinding(
 ): Finding {
   const missing = required.filter((term) => !haystack.includes(normalise(term)));
 
+  /*
+    A stem is matcher input, not report copy (D-217).
+
+    GATE-007's terms are `diagnos` and `indemnif` — deliberately truncated so one entry reaches
+    *diagnose*, *diagnosing* and *diagnostic* — and the finding quoted them at the merchant:
+    *"3 of 5 required phrases were not observed: 'research use only', 'indemnif', 'qualified'"*. The
+    stems stay; `require_all_labels` names them, from the rule set, so an entry with no label is
+    still quoted exactly as written.
+  */
+  const label = (term: string): string => {
+    const named = rule.params.require_all_labels?.[term];
+    return named === undefined ? `'${term}'` : named;
+  };
+
   return missing.length === 0
     ? satisfied(rule, `All ${required.length} required phrases were observed.`, RENDERED, pageEvidence(page))
     : violation(
         rule,
-        `${missing.length} of ${required.length} required phrases were not observed: ${missing.map((m) => `'${m}'`).join(', ')}.`,
+        `${missing.length} of ${required.length} required clauses were not observed: ${missing.map(label).join('; ')}.`,
         RENDERED,
         pageEvidence(page),
       );
@@ -519,7 +574,25 @@ function termsFinding(
         negated.length + attributed.length === 0
           ? ''
           : ` Not counted: ${[...negated, ...attributed].map((t) => `'${t}'`).join(', ')} appeared only in negated or quoted sentences.`;
-      return violation(rule, `Observed: ${quote(claims)}.${setAside}`, RENDERED, withMatch(page, claims.join(', ')));
+      /*
+        The sentence names what this check reads for (D-217).
+
+        Three rules read the same page for overlapping vocabularies and answer different questions:
+        PROD-008 asks whether the page makes a disease or benefit claim, PROD-011 whether body copy
+        promises an outcome, PROD-012 whether a word with an ordinary non-claim use appeared at all.
+        On `/shop/semax/` all three reported `Observed: 'recovery'.` — the same sentence, three
+        times, over three different questions, and a reader could only conclude one check had been
+        run three times and disagreed with itself.
+
+        The distinction comes from the rule's own `subject`, so no handler branches on a rule id
+        (hard constraint 1) and a rule added tomorrow reads correctly with no change here.
+      */
+      return violation(
+        rule,
+        `${readFor(rule)}Observed: ${quote(claims)}.${setAside}`,
+        RENDERED,
+        withMatch(page, claims.join(', ')),
+      );
     }
 
     if (attributed.length > 0) {
@@ -585,12 +658,7 @@ function closestVariant(region: PageRegion, wanted: string): string | null {
   // The same candidate set the legibility rule uses to locate its target. When DISC-002
   // measures a disclaimer, DISC-001 must be able to quote it — two rules reporting
   // contradictory things about one footer is worse than either being silent.
-  const candidates = [
-    ...region.styledText.map((styled) => styled.text),
-    ...splitStatements(region.text),
-  ];
-
-  return bestResemblance(candidates, wanted, (candidate) => candidate);
+  return bestResemblance(footerCandidates(region), wanted, (candidate) => candidate);
 }
 
 const truncate = (value: string, limit = 200): string =>

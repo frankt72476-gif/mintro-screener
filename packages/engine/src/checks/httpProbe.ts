@@ -47,7 +47,9 @@ export function checkHttpProbe(
   const { results, session } = input;
 
   if (results.length === 0) {
-    return notEvaluable(rule, 'no paths were probed', DOCUMENT, 'no_check_built', [sessionEvidence(session, results)]);
+    return notEvaluable(rule, 'no paths were probed', DOCUMENT, 'no_check_built', [
+      sessionEvidence(session, results, undefined),
+    ]);
   }
 
   /*
@@ -91,7 +93,8 @@ export function checkHttpProbe(
           `paths that did answer do not support a conclusion either way`,
       DOCUMENT,
       'not_retrieved',
-      [sessionEvidence(session, results)],
+      // Cited to a path that did not answer: that is the observation (D-215).
+      [sessionEvidence(session, results, unreachable[0])],
     );
   }
 
@@ -111,14 +114,23 @@ export function checkHttpProbe(
   const offending = served.filter((result) => failStatuses.has(result.status));
 
   if (offending.length === 0) {
+    /*
+      A clean result rests on the paths that answered, so it is cited to one of those (D-215).
+
+      There is no single decisive request here the way there is for a violation — the observation is
+      about all of them together — but a path that 404'd is not what the finding rests on, and it is
+      what `results[0]` kept naming. Served first, then a path that redirected away, since a
+      redirect is itself the observation that a gate is working.
+    */
     return satisfied(rule, describeClean(served, redirected, unreachable, session), DOCUMENT, [
-      sessionEvidence(session, results),
+      sessionEvidence(session, results, served[0] ?? redirected[0] ?? completed[0]),
     ]);
   }
 
   return violation(rule, describeViolation(offending, served, redirected, session), DOCUMENT, [
     {
-      ...sessionEvidence(session, results),
+      // The path the sentence names first is the path the slip cites (D-215).
+      ...sessionEvidence(session, results, offending[0]),
       matchedValue: offending.map((result) => `${result.status} ${result.url}`).join(', '),
       matchedUrls: offending.map((result) => result.url),
     },
@@ -191,20 +203,48 @@ function describeRedirects(redirected: readonly ProbeResult[]): string {
   return ` ${redirected.length} path(s) redirected away rather than serving content: ${list}${more}.`;
 }
 
-function sessionEvidence(session: SessionDescriptor, results: readonly ProbeResult[]): Evidence {
-  const first = results[0];
+/**
+ * The evidence, cited to the request the finding actually rests on (D-215).
+ *
+ * `decisive` was `results[0]` — the first path the rule happens to list, whatever it returned. On
+ * CoMo Peptides that produced a `fail` whose sentence reads *"/shop returned 200"* over an evidence
+ * slip headed `/collections/all`, with `/collections/all → 404` in the same slip's own list of
+ * requests attempted. Three paths were probed, the third decided the finding, and the citation
+ * pointed at the first.
+ *
+ * A reader checking that finding goes to the URL the evidence names, gets a 404, and has every
+ * reason to conclude the observation is wrong. It was not wrong; it was cited to the wrong request.
+ *
+ * The caller passes the result that carries the observation, because only the caller knows which
+ * that is — the offending path for a violation, a path that answered for a clean result, a path
+ * that did not answer for a `not_evaluable`.
+ *
+ * **A digest is emitted only where a body was retained.** `probePaths` hashes what it read and
+ * stores nothing, so every one of these carried a SHA-256 beside a capture pane reading *"not
+ * retained"*. A hash proves the stored artifact is the one fetched (hard constraint 3); with no
+ * stored artifact it proves nothing and reads as though something is on file. `''` is the
+ * established way to say a document was not retained — `urlPattern.ts`, `payment.ts` and
+ * `signupForm.ts` all use it.
+ */
+function sessionEvidence(
+  session: SessionDescriptor,
+  results: readonly ProbeResult[],
+  decisive: ProbeResult | undefined,
+): Evidence {
   const attempts: FetchAttempt[] = results.map((result) => ({
     url: result.url,
     status: result.status,
     ...(result.error === undefined ? {} : { error: result.error }),
   }));
 
+  const retained = decisive?.evidenceKey !== undefined && decisive.evidenceKey !== '';
+
   return {
     kind: DOCUMENT,
-    sourceUrl: first?.url ?? '',
-    sourceSha256: first?.sha256 ?? '',
-    evidenceKey: first?.evidenceKey ?? '',
-    capturedAt: first?.fetchedAt ?? new Date().toISOString(),
+    sourceUrl: decisive?.url ?? '',
+    sourceSha256: retained ? (decisive?.sha256 ?? '') : '',
+    evidenceKey: retained ? (decisive?.evidenceKey ?? '') : '',
+    capturedAt: decisive?.fetchedAt ?? new Date().toISOString(),
     attempts,
     session,
   };

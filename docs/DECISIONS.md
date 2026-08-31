@@ -14129,3 +14129,333 @@ Its own first version asserted `.not.toMatch(/\bpane\b/)` and passed over the ex
 to reject: the word boundaries reached the file as literal control characters, so the pattern
 matched nothing. Replaced with a plain string comparison. A guard that can be mistyped into silence
 is worth less than a plainer one that cannot.
+
+---
+
+## D-214 — The v3.1.0 → v3.3.0 matcher regression does not exist
+
+*2026-08-30. Investigation; no code or rule-set change.*
+
+A correctness pass opened on the premise that pattern matching regressed between rule set v3.1.0
+and v3.3.0: that `CATG-003` had matched `/shop/hcg/` and `NAME-002` had matched `/shop/glow/` on
+CoMo Peptides, and that both went quiet under v3.3.0 against a catalogue that had grown. Written up
+here because it did not reproduce, and the reason it did not is worth more than the fix would have
+been.
+
+**The matcher did not change.** `slug.ts`, `layer0.ts`, `layer1.ts`, `layer2.ts` and `suspicion.ts`
+are byte-identical between `78e86d5` (v3.1.0) and `40f32bb` (v3.3.0). The one edit to
+`checks/urlPattern.ts` in that range is D-184's: an unusable surface reports `not_retrieved` rather
+than `not_exposed`. It touches which party a shortfall belongs to, not what matches.
+
+**The rule set only widened.** Across the same range: five rules added (`DISC-004`, `PROD-011`
+through `PROD-014`), every rule gained a `subject` clause (D-194), `GATE-003` became blocking
+(D-178), and `CATG-003`'s patterns gained `semaglutide` and `tirzepatide` (D-177's bump). No pattern
+was removed from any rule. `hcg` and `glow` are both still listed. Both bumps do have decision
+records — D-177 for v3.2.0, D-178 for v3.3.0.
+
+**Neither run says what the premise says.** Run `5b29036d` (v3.1.0) and run `356ce753` (v3.3.0),
+same merchant, report *identical* states for all fifty-four rules present in both — nine
+`url_pattern` rules included. Both examined 37 URLs in scope `products`. Both failed `NAME-002` on
+the same two `blend` URLs. Both passed `CATG-003`. The catalogue did not grow from 36 to 37; it was
+37 in each.
+
+**The URLs are not the merchant's URLs.** `356ce753`'s stored `product-sitemap.xml` lists 38 `<loc>`
+entries. There is no `/shop/hcg/` — it is not in the catalogue. There is no `/shop/glow/` either;
+what is there is **`/shop/klow/`**, one letter away. `/shop/tz/` and `/shop/rt/` are there. A
+matcher cannot miss a URL that was never published, and `klow` is not `glow`.
+
+**What is real is a vocabulary gap, and it is the rule set's.** `tz` and `rt` are how this merchant
+spells two GLP-1 agonists. `CATG-003` gained `semaglutide` and `tirzepatide` as words; neither
+reaches an initialism. `klow` is a blend sold under a coined name `NAME-002` does not carry. All
+three are matched by nothing.
+
+**It explains the sampler too, and is not a second defect.** `suspicion.ts` reads its scoring
+vocabulary out of the rule set, so a slug no rule names scores zero. `/shop/tz/`, `/shop/rt/` and
+`/shop/klow/` each score **0** and the sample goes to the five that score above it — reproduced
+exactly: `bpc-157-tb500-blend` (12), `cjc-1295-no-dac-ipamorelin-blend` (12),
+`bacteriostatic-water` (5), `cagrilintide` (4), `semax` (4), which is the live run's sample. They
+were not passed over by the sampler; they were invisible to the vocabulary the sampler reads.
+
+**Blast radius: none.** No finding on any stored run changed state across the version range, and no
+other stored merchant publishes a product slug of three letters or fewer (`biotechpeptides` 287
+URLs, `sportstechnologylabs` 97, `swisschems` 182, none; `peptidesciences` served no sitemap at
+all). Nothing was suppressed, so nothing needs re-running — which D-002 would forbid anyway.
+
+**Not fixed here.** Teaching `CATG-003` to read `tz` and `rt`, or `NAME-002` to read `klow`, is a
+rule-set change and carries its own decision under D-025 — and two-letter tokens on an `auto_fail`
+rule need the false-positive argument made before they are added, not after. `packages/engine/test/codedProductSlugs.test.ts`
+pins both halves: the matcher does match `hcg` and `glow` when a merchant publishes them, and it
+matches nothing on `tz`, `rt` or `klow` today.
+
+---
+
+## D-215 — Evidence is cited to the request the finding rests on, and a digest means a stored body
+
+*2026-08-30.*
+
+GATE-002 on CoMo Peptides run `356ce753` read:
+
+> 1 of 3 path(s) served content directly with a status this rule treats as a violation:
+> `https://www.comopeptides.com/shop` returned 200.
+
+and its evidence slip was headed `https://www.comopeptides.com/collections/all`, with a SHA-256
+printed beside a capture pane reading *"not retained"* — and, in the same slip, `/collections/all →
+404` among the requests attempted. An underwriter checking the cited URL gets a 404 and has every
+reason to conclude the finding is wrong. It was not wrong. It was cited to the wrong request.
+
+**`sessionEvidence` bound to `results[0]`** — the first path the rule lists, whatever it returned.
+The caller now passes the result the finding actually rests on, because only the caller knows which
+that is:
+
+| branch | cited request |
+|---|---|
+| violation | the offending path, the one the sentence names first |
+| clean | the first path that answered without redirecting; failing that, one that redirected away |
+| nothing answered | the path that did not answer — that *is* the observation |
+| nothing probed | none |
+
+A 404 is an answer, so a clean result may legitimately cite one. What it may not do is cite a
+request that never happened.
+
+**A digest is emitted only where a body was retained.** `probePaths` hashes what it reads and stores
+nothing, so *every* `http_probe` finding carried a SHA-256 next to a capture pane saying the
+document was not retained. A hash proves the stored artifact is the one fetched (hard constraint 3);
+with no stored artifact it proves nothing and reads as though something is on file. Both fields now
+say `''` together, which is the convention `urlPattern.ts`, `payment.ts` and `signupForm.ts` already
+use.
+
+**Not fixed here, and it should be:** `http_probe` retains no body at all, so GATE-002 — `critical`,
+`auto_fail`, a stopping condition — is a documentary finding with no document. Constraint 3 asks for
+the artifact, and this pass makes the report stop claiming one exists. Actually retaining it is a
+new write path into evidence storage and belongs in its own change.
+
+**The matched payload names its field.** It rendered as a bare string in a box: `blend` under
+NAME-002, `200 https://…/shop` under GATE-002, each followed by an unlabelled list of URLs — while
+every other line in the same slip names itself (Source, Method, SHA-256, Requests attempted). The
+one line carrying what the rule actually matched did not. It now reads `Matched: …`, as a prefix on
+the string rather than a new row, so the slip's shape is untouched; `DeclineNotice` already wrote it
+this way.
+
+The URL list under it is filtered to what the observation has not already named. NAME-002's sentence
+enumerates both offending URLs and the slip listed the same two again underneath, unlabelled, which
+is what made them look like a second and different fact. Where a note does not name them, the list
+is the only place they appear and it stays.
+
+---
+
+## D-216 — One partition, and every count names what it counts
+
+*2026-08-30.*
+
+The report counted the same findings three ways and agreed with itself nowhere.
+
+- The coverage sentence read `report.coverage`: **findings, by kind, over the whole run**.
+- The section headings read `groupReport`: **rows, by worst outcome**, minus the stopping conditions
+  (which are part one) and minus anything nested by D-164.
+- Block headings counted every finding a row held, whatever kind it was.
+
+On CoMo Peptides `356ce753` that produced, four lines apart: *"14 were looked for and not found on
+the site"* above a block headed `7 rules · 11 findings`, and *"3 are checks Mintro has not built
+yet"* above **no block at all**. And the sentence rendered twice, word for word — once in part one
+under the stopping panel, once as the lede of the *not observed* band.
+
+### `censusOf` is the one partition
+
+Every finding, assigned to exactly one bucket, plus where each is rendered. The sentence, the band
+statistics and the block headings all read from it. `report.coverage` is still the run's own record
+and is never recalculated (D-002); `partition.test.ts` asserts the census reproduces it exactly on
+all five stored runs, so drift fails a test rather than reaching a reader.
+
+### A heading counts what it is a heading for
+
+`tally` takes a predicate. *Looked for, not found on the site* now says `7 rules · 9 findings`,
+which is nine findings of that kind — not nine plus the two passes PROD-003 also holds and states in
+its own line. Bands count their own state; blocks count their own bucket.
+
+### Where a finding is counted and where it is shown are different questions
+
+The document files whole **rules** by worst outcome (D-166) and counts **findings** by kind. Both are
+right and they do not line up:
+
+- NAME-003 needed review on two sampled pages and was unbuilt on three. It is one row under
+  *Unclear*, and its three findings are the entire `no_check_built` count.
+- COA-002/003/004 are `not_exposed` and render nested under COA-006, because one failed request
+  explains all four (D-164).
+- GATE-003 and NAME-001 are `not_exposed` and are stopping conditions, so they are rows in part one.
+
+Eight of the twenty-eight outstanding findings on this run are therefore counted under a heading they
+are not under. Rather than move the rows — which would reverse D-164 and D-166 — **the sentence says
+where they are**: *"8 of them are shown with the rule they belong to rather than in the blocks below:
+2 with the stopping conditions, 3 with NAME-003, under Unclear, and 3 with COA-006 above."* A reader
+who does the arithmetic now finds every finding the sentence counts.
+
+### The unit is named
+
+`bandStats` printed `${tally.rules} observations`, so *For your review* announced "30 observations"
+over thirty rows holding forty-two findings. It reads `30 rules · 42 findings` now, the same shape
+the block headings already used. The band count beside *Unclear* and *Not observed* names rules too.
+
+### A collapsed sample says how many pages it covered
+
+PROD-002 and PROD-004 collapsed across all five sampled pages (D-136) and read as observations about
+one, beside PROD-003 — the same check, same sample — visibly reporting on five. **The difference in
+finding count is real and correct**: PROD-003's pages disagreed and the other two agreed, which is
+exactly what D-136 says to do. What the reader saw was an artefact of which field the sentence is
+built from: the collapse appended its page-count clause to `note`, and a `not_evaluable` finding is
+rendered from `notEvaluableReason`. Both carry it now.
+
+### Not done: per-page cards that differ from their row's heading
+
+The brief asked that a mixed-outcome rule render no per-page card under a heading contradicting the
+card's own text — PROD-003's two `Met` cards under *Not observed*, PROD-001's two under *Unclear*.
+
+**It collides with D-042**, which requires the exported document to contain every finding the run
+produced, asserted in `sections.test.ts` as `rows + clear === ungrouped(report).length`. Suppressing
+those cards makes the PDF an underwriter reads hold less than the run found, and suppressing them on
+screen only would make the two surfaces differ, which this pass forbids.
+
+Left as it is, and raised rather than decided here. The row already states the split in its own line,
+and each card carries its own state. If the cards should go, D-042's invariant has to be relaxed
+first, deliberately.
+
+---
+
+## D-217 — A finding names its method and states what it measured
+
+*2026-08-30. Rule set 3.4.0.*
+
+Six sentences in one report claimed more than the check that produced them had established. The
+states were right, the evidence was right, and the sentence a person reads was a conclusion — which
+is the whole of D-076 and hard constraint 7.
+
+**DISC-001 and DISC-003.** *"No comparable text was observed"* and *"No text resembling the required
+disclaimer was observed in this page's footer."* Both false. The footer's closest text carried
+**67%** of the required wording against a 50% threshold and failed on **density** alone — 10%
+against 20% — because the disclaimer sentence sits inside a long block of navigation labels. The
+check found text that scored low and reported an absence of text. `nearestResemblance` returns the
+near miss whatever it scored, and both findings now quote it with both numbers and both thresholds.
+The absence sentence survives for the case that is genuinely an absence: a footer with no text at
+all.
+
+**COA-006.** *"What it serves is not a certificate, so nothing it would state can be read."*
+`looksLikePdf` reads four bytes. Whether the response is a certificate rendered as a web page, an
+error page, or anything else was never established — and on this merchant the certificate content
+**is** present, as HTML. The finding states the observation: the response does not begin with
+`%PDF`, this check reads the certificate as a PDF, and what was served was not parsed.
+
+*Suppression of COA-002/003/004 stays*, and its stated reason changes with it. Those three read a
+test date, a purity figure and a required-field list out of a parsed PDF; there was no parsed
+document, so they are `not_evaluable` on their own terms. What they may not say is that the link "is
+not a certificate", because a reader told that would be told something false about the site.
+Reading a certificate served as HTML is a capability Mintro does not have, and adding one is a
+build, not a wording fix.
+
+**PROD-008, PROD-011, PROD-012.** Three rules read one page for three different questions and all
+three printed `Observed: 'recovery'.` On `/shop/semax/` a reader met the same sentence three times
+and could only conclude one check had run three times and disagreed with itself. Each note now opens
+with the rule's own `subject` — *"Read for whether the pages make disease or benefit claims"*,
+*"…product body copy uses benefit vocabulary"* — taken from the rule set, so no handler branches on
+a rule id (hard constraint 1) and a rule added tomorrow reads correctly with no change to the
+engine.
+
+**DISC-004.** Title `FDA non-evaluation statement not observed`, rendered beside the state label as
+*"FDA non-evaluation statement not observed — Observed"*. A rule's title names its subject; the
+outcome is the state. Retitled `FDA non-evaluation statement`. Its clause had the same fault —
+*"No statement was observed that…"* is an observation, and a clause states the requirement — and is
+restated as one.
+
+**GATE-007.** *"3 of 5 required phrases were not observed: 'research use only', 'indemnif',
+'qualified'."* `indemnif` and `diagnos` are truncated deliberately, so one entry reaches
+*indemnify*, *indemnifies* and *indemnification*. They are correct as matcher input and unreadable
+as report copy — this went to a merchant. `require_all_labels` maps each stem to the clause it
+stands for; a map rather than a parallel array, so reordering cannot silently reassign a label, and
+optional, so an entry without one is quoted exactly as before.
+
+**The stopping panel.** *"Nothing here stops the application"*, in green, above two conditions this
+run could not check and three standards recorded as not met. Whether the application proceeds is
+IQwallet's determination; Mintro does not make it and does not report it. It reads *"No stopping
+condition was observed failing; 2 could not be checked"* — the count in the heading, because a
+heading that says only "none was observed failing" still reads as a clear result to somebody
+scanning.
+
+### The guard existed and did not run here
+
+`FINDING_TERMS` — `DIRECTIVE_TERMS` plus `DETERMINATION_TERMS` — is enforced on Documents Check
+findings and on nothing the Site Check produces. That is how all six shipped. The list gains the
+four phrasings that did, each as specific as `passes underwriting` and `confirms the merchant`
+already are, and `conclusionCopy.test.ts` runs the handlers over the inputs that produced them and
+audits what comes out.
+
+A term list catches the sentences it was taught. Auditing every Site Check finding at assembly, the
+way the Documents path does, is the general fix and is not attempted here.
+
+### Rule set 3.4.0
+
+Minor. No rule added or removed, no pattern, term or threshold moved, no matcher changed:
+`require_all_labels` is read only when a finding is written, and DISC-004's title and clause are
+copy. `effective` does not move — the published standards did not change.
+
+---
+
+## D-218 — Nothing asks the merchant for anything unless a link was sent
+
+*2026-08-30.*
+
+The report solicited a comment five times:
+
+> Tell us if we have the two unchecked ones wrong. · *your comment helps* · Tell us where we have it
+> wrong. · *comment where it helps* · Read each one and tell us where we have it wrong.
+
+Four screens above the first of them, its own participation record read:
+
+> **No comment link was transmitted for this run, so the merchant was not asked to respond.**
+
+Nobody could act on any of it. Worse, an underwriter reading both would reasonably conclude the
+merchant had been asked five times and answered none — which is a characterisation of the merchant
+built out of a defect in our own copy (D-143's class, on the report rather than in a message).
+
+**One flag, read at every call site.** `ReportView` derives it once and `reportParts` carries it onto
+each part as `solicits`, so a band heading cannot ask beside a body that does not. The PDF and the
+screen build their parts from the same call, so the two cannot disagree — which is the property that
+matters most here, since the PDF is the document that leaves.
+
+**Positive knowledge only.** `participation.invited` is true when a link was issued *and*
+transmitted. Where commentary was never read — the analyst's own `?print=1` path — nothing knows,
+and asking on a maybe is the defect.
+
+**The merchant's own page is invited by construction.** `CommentPane` passes no participation record
+(the record is *about* the merchant and is not shown to them) and that page is reachable only with a
+link token, so a render on it **is** the link. Gating on the record alone removed every invitation
+from the one page whose entire purpose is to invite; `surface === 'merchant'` is the second half of
+the flag, and it is a fact about the route, not a special case.
+
+**Only the invitation is conditional.** Every count, every heading and every observation renders
+either way. A section that dropped its finding along with its ask would be hiding an observation
+because nobody was asked about it, which is a worse fault than the one being fixed.
+
+---
+
+## D-219 — A fragment is not a path
+
+*2026-08-30.*
+
+FULF-001 on CoMo Peptides listed seven requests attempted, the first of them:
+
+> `https://www.comopeptides.com/aboutcomopeptides/#how-quickly → 200`
+
+A fragment never leaves the browser. What went out was `GET /aboutcomopeptides/`, and the record of
+what was tried named a URL nothing ever asked for. Where a homepage carries both spellings — the
+policy link and an anchor into the same page — the candidate list held both, so one page was
+rendered twice and one request was shown as two.
+
+`withoutFragment` strips it, and both link-derived candidate lists use it:
+`selectLinkedCandidates` for the terms, shipping-policy, FAQ and payment surfaces, and
+`certificateLinks` for the COA probes, where two anchors into one PDF were two fetches of it.
+
+**Stripped from what is requested, not from what is matched.** A fragment is often where a link
+names itself — `#shipping` under the text *"Delivery"* is exactly the signal the hints look for — so
+the match still reads the href entire.
+
+**An unparseable href is returned as written.** It still has to be recorded as an attempt; a
+normaliser that dropped it would hide a request, which is the failure hard constraint 3 exists to
+prevent.

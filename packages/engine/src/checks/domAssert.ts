@@ -10,7 +10,13 @@ import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import { notEvaluable, satisfied, unsettled, violation, type Evidence, type Finding } from '../findings.js';
 import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
-import { bestResemblance, splitStatements } from '../textSimilarity.js';
+import {
+  bestResemblance,
+  describeResemblance,
+  nearestResemblance,
+  splitStatements,
+  type Similarity,
+} from '../textSimilarity.js';
 
 /**
  * Evaluates one `dom_assert` rule against a rendered page.
@@ -155,6 +161,18 @@ function declaredSubjectFinding(
     .map((phrase) => bestResemblance(candidates, phrase, (candidate) => candidate))
     .find((found): found is string => found !== null);
 
+  /*
+    The closest text and how it scored, for the branch that finds no match (D-217).
+
+    Read against the first target phrase, which is the wording the rule set names; the others are
+    accepted variants of it, and quoting a near miss against a variant would make the number harder
+    to interpret rather than easier.
+  */
+  const near =
+    match === undefined && targetPhrases[0] !== undefined
+      ? nearestResemblance(candidates, targetPhrases[0], (candidate) => candidate)
+      : null;
+
   const present = match !== undefined;
   const violates = expect === 'present' ? !present : present;
 
@@ -163,7 +181,7 @@ function declaredSubjectFinding(
       rule,
       present
         ? `The footer carries text matching the required disclaimer: "${truncate(match)}"`
-        : 'No text matching the required disclaimer was observed in the footer.',
+        : nearText(near),
       RENDERED,
       present ? [{ ...pageEvidence(page)[0]!, matchedValue: match }] : pageEvidence(page),
     );
@@ -173,9 +191,28 @@ function declaredSubjectFinding(
     rule,
     present
       ? `The footer carries text matching the disclaimer: "${truncate(match)}"`
-      : 'No text resembling the required disclaimer was observed in this page\'s footer.',
+      : nearText(near),
     RENDERED,
     present ? [{ ...pageEvidence(page)[0]!, matchedValue: match }] : pageEvidence(page),
+  );
+}
+
+/**
+ * What this page's footer held instead, and how close it was (D-217).
+ *
+ * The line here was *"No text resembling the required disclaimer was observed in this page's
+ * footer"* — and on CoMo Peptides the footer's closest text carried two thirds of the required
+ * wording, failing only the density threshold. The check found text that scored below a threshold;
+ * it reported that there was no such text. A rule names its method and states what it measured, not
+ * a conclusion the measurement does not support (D-076).
+ */
+function nearText(near: { readonly candidate: string; readonly score: Similarity } | null): string {
+  if (near === null) {
+    return "This page's footer carries no text to compare against the required disclaimer.";
+  }
+  return (
+    `The closest text in this page's footer is: "${truncate(near.candidate)}" — ` +
+    `${describeResemblance(near.score)}, so it was not read as the disclaimer.`
   );
 }
 

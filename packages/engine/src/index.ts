@@ -265,6 +265,7 @@ export {
   endedAtWhatWasAsked,
   pathNamesSurface,
   normalisePath,
+  withoutFragment,
   type Located,
   type SurfaceSpec,
 } from './surface.js';

@@ -174,9 +174,21 @@ function describeFailure(
       return {
         kind: 'not_exposed',
         reason:
-          `a certificate link on the sampled product pages returned something that is not a PDF. ` +
-          `The link resolves and looks live to a customer; what it serves is not a certificate. ` +
-          `${tried} link(s) were requested, each listed with what it returned`,
+          /*
+            The reason three certificate-content rules are unevaluated (D-217).
+
+            They read a certificate's test date, purity and required fields out of a parsed PDF. The
+            link returned a response that does not begin with `%PDF`, so there was no parsed
+            document to read them from — that, and not "what it serves is not a certificate", is why
+            these could not be evaluated. The distinction matters here: on CoMo Peptides the
+            certificate content is present as HTML, so a reader told the link "is not a certificate"
+            would be told something false about the merchant's site.
+          */
+          `a certificate link on the sampled product pages resolved and returned a response that ` +
+          `does not begin with %PDF, and this check reads the certificate as a PDF, so there was ` +
+          `no parsed document to read this from. The link resolves and looks live to a customer. ` +
+          `${tried} link(s) were requested, each listed with what it returned and the content type ` +
+          `it declared`,
       };
 
     case 'not_retrieved':
@@ -248,10 +260,20 @@ export function checkCoaServed(rule: RuleOfType<'doc_parse'>, outcome: Certifica
   if (outcome.why === 'link_broken') {
     return violation(
       rule,
-      `A certificate link on the sampled product pages returned something that is not a PDF. The ` +
-        `link resolves and looks live to a customer; what it serves is not a certificate, so ` +
-        `nothing it would state can be read. ${outcome.attempts.length} link(s) were requested, ` +
-        `each listed with what it returned.`,
+      /*
+        The content type, not a verdict on what was served (D-217).
+
+        This read *"what it serves is not a certificate, so nothing it would state can be read"* —
+        two conclusions the method never reached. What it observed is that the bytes do not begin
+        with `%PDF`; whether the response is a certificate rendered as a web page, an error page, or
+        anything else was not established, and on this merchant the certificate content **is** there
+        as HTML. Naming the observation leaves that open, which is what a reader needs (D-076).
+      */
+      `A certificate link on the sampled product pages resolved and returned a response that does ` +
+        `not begin with %PDF. This check reads the certificate as a PDF, so it did not parse what ` +
+        `was served and nothing about the contents is established here. The link resolves and ` +
+        `looks live to a customer. ${outcome.attempts.length} link(s) were requested, each listed ` +
+        `with what it returned and the content type it declared.`,
       'document',
       attemptEvidence(outcome.attempts),
     );

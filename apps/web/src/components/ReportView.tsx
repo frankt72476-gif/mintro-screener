@@ -26,7 +26,6 @@ import {
   findingAnchor,
   describeGroup,
   inheritsEvidence,
-  coverageSentence,
   PART_ONE,
   stoppingSentence,
   reportParts,
@@ -201,7 +200,27 @@ export function ReportView({
   const surface: Surface = surfaceProp ?? (print ? 'iqwallet' : 'agent');
   // Derived once and read twice — by the header lines and by the sections themselves. Two calls
   // would be two derivations, which is the thing part 1 built the tally to prevent (spec §3).
-  const parts = useMemo(() => reportParts(report, surface), [report, surface]);
+  /*
+    Whether anyone was asked (D-218).
+
+    The report solicited a comment five times over a participation record reading *"No comment link
+    was transmitted for this run, so the merchant was not asked to respond."* One flag, derived
+    here and read by every section that asks — `reportParts` carries it onto each part, and the
+    stopping panel takes it directly.
+
+    Positive knowledge only: `participation` is absent when commentary was never read, and asking on
+    a maybe is the defect.
+
+    The merchant's own surface is the exception, and not a special case: that page is reachable only
+    with a link token, so a render on it *is* the link. It carries no participation record — the
+    record is about the merchant, and it is not for them — and gating on the record alone would have
+    removed every invitation from the one page whose entire purpose is to invite.
+  */
+  const invited = participation?.invited === true || surface === 'merchant';
+  const parts = useMemo(
+    () => reportParts(report, surface, { invited }),
+    [report, surface, invited],
+  );
   return (
     <div id="top">
       <div className="rhead">
@@ -357,7 +376,15 @@ export function ReportView({
         {...(commentBox === undefined ? {} : { commentBox })}
       />
 
-      <p className="top-coverage">{coverageSentence(report)}</p>
+      {/*
+        The coverage sentence is not here (D-216).
+
+        It rendered twice, word for word: once in part one under the stopping panel and again as the
+        lede of the *not observed* band. Two copies of one sentence, four screens apart, with
+        different section counts under each — the second is the one that stays, because it is the
+        band it explains (D-189) and a reader meets it while reading about what could not be seen
+        rather than before they know there is anything to explain.
+      */}
       {/*
         The nav cards and the sticky bar are gone (D-206).
 
@@ -722,6 +749,9 @@ function StoppingPanel({
   const account = part?.stopping;
   if (account === undefined) return null;
 
+  // From the part rather than a second prop, so the panel and its band cannot disagree (D-218).
+  const solicits = part?.solicits === true;
+
   if (account.declared === null) {
     // Predates the flag. Says so rather than reporting a clean sweep (D-044, D-161).
     return (
@@ -792,9 +822,24 @@ function StoppingPanel({
             of one word inside one panel, and nothing told a reader which was which. A condition
             applies or it does not; a row that was checked and clear says so in its own words.
           */}
+          {/*
+            An observation, not a determination (D-217).
+
+            *"Nothing here stops the application"* is a statement about what an underwriter will do
+            with the package, and it stood above two conditions this run could not check and three
+            standards it recorded as not met. Mintro does not make that call and does not report it
+            (hard constraint 7); what this panel observed is that no condition was seen failing, and
+            how many it could not see at all.
+
+            The unverified count is in the heading rather than only in the band, because a heading
+            that says "none was observed failing" and stops still reads as a clear result to
+            somebody scanning.
+          */}
           <h2 className="stop-title">
             {failed.length === 0
-              ? 'Nothing here stops the application'
+              ? unobserved.length === 0
+                ? 'No stopping condition was observed failing'
+                : `No stopping condition was observed failing; ${unobserved.length} could not be checked`
               : failed.length === 1
                 ? 'One stopping condition applies'
                 : `${failed.length} stopping conditions apply`}
@@ -805,8 +850,8 @@ function StoppingPanel({
             A run with every condition checked has no correction to invite, and an empty paragraph
             under the heading would read as a sentence that failed to load.
           */}
-          {stoppingSentence(account).length > 0 && (
-            <p className="stop-sub">{stoppingSentence(account).join(' ')}</p>
+          {stoppingSentence(account, solicits).length > 0 && (
+            <p className="stop-sub">{stoppingSentence(account, solicits).join(' ')}</p>
           )}
         </div>
       </div>
