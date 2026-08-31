@@ -16,7 +16,7 @@
  * thing that makes the secret unreadable to everyone who holds it.
  */
 
-import { seal } from '@mintro/engine';
+import { canonicalMerchantDomain, seal } from '@mintro/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface MerchantLogin {
@@ -85,16 +85,23 @@ export function createCredentialDeposit(
   };
 }
 
-/** `https://Shop.Example/path` → `shop.example`. The table's check constraint wants a bare host. */
+/**
+ * `https://WWW.Shop.Example/path` → `shop.example`. The table's check constraint wants a bare host.
+ *
+ * Delegates to `canonicalMerchantDomain`, which the worker's `vaultRefFor` also uses. It used to
+ * fold here and only here, and preserved a leading `www.` — so a credential deposited for
+ * `merchant.com` was invisible to a scan of `https://www.merchant.com`, whose lookup key carried
+ * the label. The vault answered "nothing stored", which the run reports in the words it uses for a
+ * merchant who supplied nothing at all.
+ *
+ * One function rather than a matching pair, for the reason `sealed.ts` is one function: what would
+ * diverge is which merchant a screening account belongs to.
+ *
+ * Every caller here is credential-scoped — the modal, the card, the state lookup and the deposit.
+ * `merchants.domain`, which keys `runs.merchant_id`, is written by the crawl and folded by D-150
+ * without stripping `www`; the package form folds its own. Neither routes through here, and
+ * neither changes.
+ */
 export function normaliseDomain(input: string): string | null {
-  const trimmed = input.trim().toLowerCase();
-  if (trimmed === '') return null;
-
-  const candidate = /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const { hostname } = new URL(candidate);
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(hostname) ? hostname : null;
-  } catch {
-    return null;
-  }
+  return canonicalMerchantDomain(input);
 }
