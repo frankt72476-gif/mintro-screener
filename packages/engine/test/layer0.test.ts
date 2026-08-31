@@ -57,6 +57,9 @@ describe('rule selection', () => {
       'CATG-003',
       'CATG-004',
       'CATG-007',
+      // CATG-008, the GLP-1 rule (D-220). Layer 0 and `url_pattern`, so it is selected by type
+      // like the rest — the point of this pin is that a new one shows up here and is noticed.
+      'CATG-008',
       'OFFS-001',
       'OFFS-006',
     ]);

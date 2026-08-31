@@ -170,7 +170,7 @@ describe('Site Check is one labelled programme set, not the only conceivable one
     expect(body).toContain(`v${RULESET.version}`);
     expect(body).toContain(RULESET.effective);
     expect(body).toContain(`${RULESET.rules.length} rules`);
-    expect(RULESET.rules).toHaveLength(59);
+    expect(RULESET.rules).toHaveLength(60);
   });
 
   it('shows every rule category and its count', () => {

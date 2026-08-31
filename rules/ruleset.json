@@ -1,5 +1,5 @@
 {
-  "version": "3.4.0",
+  "version": "3.5.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -830,13 +830,11 @@
           "hgh",
           "chorionic-gonadotropin",
           "somatropin",
-          "growth-hormone",
-          "semaglutide",
-          "tirzepatide"
+          "growth-hormone"
         ],
         "scope": "products",
         "expect": "absent",
-        "note": "Product URLs only. These terms appear routinely in research writing; matching editorial content would auto-fail a merchant for publishing, not selling. See D-010."
+        "note": "Product URLs only. These terms appear routinely in research writing; matching editorial content would auto-fail a merchant for publishing, not selling. See D-010. Prescription hormones only: semaglutide and tirzepatide were carried here from 3.2.0 and moved to CATG-008 at 3.5.0, so the GLP-1 vocabulary lives in one place and can move without touching this rule's auto_fail tier (D-220)."
       },
       "blocking": true,
       "blocking_source": {
@@ -978,6 +976,37 @@
         "scope": "products",
         "expect": "absent",
         "note": "Compound names and synonyms are taken from USADA’s published SARM guidance, which accompanies the WADA Prohibited List (S1.2, Other Anabolic Agents) — a specimen, not recollection (D-118). That source names eight SARMs and separately names five compounds \"also sometimes marketed as SARMs\": SR9009, SR9011, ibutamoren (MK-677), GW501516 (cardarine) and YK-11. Both groups are listed here because the rule reports non-peptide compounds, not SARMs; a rule titled for SARMs would misname four of the seven families seen in the first catalogue crawled. The source is authoritative for naming and for the SARM boundary. It is not a definition of the programme’s scope, because nothing published is — the programme document does not mention non-peptides at all."
+      }
+    },
+    {
+      "id": "CATG-008",
+      "cat": "catalog",
+      "layer": 0,
+      "sev": "major",
+      "type": "url_pattern",
+      "tier": "review_only",
+      "title": "GLP-1 receptor agonists in the catalogue",
+      "clause": "IQwallet has stated that GLP-1 receptor agonists are a boarding blocker for this programme. The published standards do not name them. This rule reports which of them the catalogue lists and names each one, matching both the chemical names and the coded slugs merchants use in their place.",
+      "subject": "the catalogue lists GLP-1 receptor agonists",
+      "source": "mintro",
+      "params": {
+        "patterns": [
+          "semaglutide",
+          "tirzepatide",
+          "retatrutide",
+          "liraglutide",
+          "dulaglutide",
+          "exenatide",
+          "survodutide",
+          "mazdutide",
+          "glp-1",
+          "glp1",
+          "tz",
+          "rt"
+        ],
+        "scope": "products",
+        "expect": "absent",
+        "note": "Two-letter patterns, and the argument for them (D-220). `tz` and `rt` are how comopeptides spells tirzepatide and retatrutide; both were pinned as matched by nothing in packages/engine/test/codedProductSlugs.test.ts before this rule existed. They are safe here and would not be safe in prose, because url_pattern matches whole tokens through tokenizePath and containsTokenSequence: `rt` reaches /shop/rt/ and /shop/rt-10mg/ and does not reach cartalax, cortagen, cartridge, l-carnitine or /cart/. Proven against the product slugs of every stored catalogue — comopeptides, biotechpeptides, corepeptides, swisschems, sportstechnologylabs — where the only matches are comopeptides' /shop/tz/ and /shop/rt/ and a naive substring matcher hits sixteen innocent slugs on three of the others. review_only regardless: hard constraint 4 puts abbreviation matching in front of a person whatever the confidence, and a two-letter token is the case it was written for. Deliberately excluded: `klow`, which the catalogues themselves spell out as a BPC-157 / KPV / TB-500 / GHK-Cu blend and is no GLP-1; and `cagrilintide`, an amylin analogue, GLP-1-adjacent only where a merchant co-formulates it. Both would name a merchant as listing something they do not list. `sema` and `tirz` stay in PROD-010 as page text (D-178)."
       }
     },
     {

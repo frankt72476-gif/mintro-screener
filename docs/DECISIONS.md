@@ -14459,3 +14459,157 @@ the match still reads the href entire.
 **An unparseable href is returned as written.** It still has to be recorded as an attempt; a
 normaliser that dropped it would hide a request, which is the failure hard constraint 3 exists to
 prevent.
+
+---
+
+## D-220 — GLP-1 gets its own rule, and two-letter patterns earn their place against five catalogues
+**2026-08-31 · Frank's ruling, on IQwallet's word · ruleset 3.4.0 → 3.5.0**
+
+IQwallet has said GLP-1 receptor agonists will block boarding. It is not in the written checklist
+yet. `CATG-008` is added ahead of it, and `semaglutide` and `tirzepatide` move onto it from
+`CATG-003`.
+
+### Its own rule, because the guidance is expected to move
+
+`CATG-003` is HCG and HGH — prescription hormones, `critical`, `auto_fail`, on IQwallet's written
+ruling of 28 August. GLP-1 sits differently on every one of those axes and is expected to move again
+as their position firms up. Carrying it inside `CATG-003` would mean every future adjustment either
+dragged the prescription-hormone auto-fail with it or forced the two apart later, under time
+pressure, with runs already recorded under the merged version.
+
+So the vocabulary lives in one rule and one rule only. `CATG-003` keeps five patterns and its tier,
+severity and blocking flag untouched; the two rules share no pattern, and a test asserts the
+intersection is empty so nothing is matched twice.
+
+**Neither moved term matched a URL in any stored catalogue**, so no stored run's `CATG-003` would
+read differently for the move. What does change is where a *future* match is attributed and at what
+tier — a GLP-1 slug that would have auto-failed under 3.4.0 goes to a person under 3.5.0. That is a
+real difference between two runs of one merchant and it is why the version moves.
+
+### `source: mintro`, and the reason is D-138's exactly
+
+The published standards do not name GLP-1 agonists. Printing this clause under **"Program
+requirement"** would fabricate the authority rather than overstate the method, and Frank's ruling at
+D-138 was that wording beneath a heading cannot fix the heading. So it renders under the
+Mintro-authored heading, and `url_pattern`'s violation copy already branches on `source` — the
+finding says the URLs *"matched this rule's patterns"*, never *"a prohibited pattern"*, because only
+the programme can prohibit and the programme has not spoken.
+
+The clause says so in its own first sentence: IQwallet has stated it, the standards do not name it.
+A reader is told whose requirement this is before they read what it asks.
+
+### `review_only` / `major`, and **not** `blocking`
+
+`review_only` is not a hedge about how much this matters. Hard constraint 4 puts abbreviation
+matching in front of a person whatever the confidence, and a two-letter token is the case that
+constraint was written for.
+
+**The `blocking` flag is deliberately not set, and that is the ruling most likely to be revisited.**
+All eight rules carrying it are `auto_fail`, and D-161 records that list as D-157's *after the three
+`review_only` rules left it* — setting it here would reverse that in passing. More decisively,
+`blocking_source` would have to name IQwallet with a `ruled_on` date, and the only date available is
+28 August, which is the day they ruled on eight other rules and not on this one. D-161 added
+`blocking_source` precisely to stop an authority nobody stated being attributed to whoever reads it
+next. Claiming it here would be that.
+
+**When IQwallet publishes this, promoting the rule to `blocking` — and deciding whether it becomes
+`auto_fail` — is a new decision with their date on it.** Recorded here so that is an overturning
+rather than a gap somebody fills quietly.
+
+### The terms, and the two that were proposed and refused
+
+Carried: `semaglutide`, `tirzepatide`, `retatrutide`, `liraglutide`, `dulaglutide`, `exenatide`,
+`survodutide`, `mazdutide`, `glp-1`, `glp1`, `tz`, `rt`.
+
+**`klow` is refused.** It was proposed as the coined blend name to catch, and the catalogues answer
+the question themselves: corepeptides and biotechpeptides both publish it as **"KLOW (BPC-157, KPV,
+TB-500, GHK-Cu) Blend"**. There is no GLP-1 in it. It is published by three of the five merchants
+here, so carrying it would have named each of them as listing a GLP-1 product they do not list — a
+false observation about a real merchant, from a rule whose whole purpose is to be believed. It is a
+coined name, which is `NAME-002`'s subject; that `NAME-002` does not carry it is a separate question
+about a separate rule and is not taken here.
+
+**`cagrilintide` is refused.** It is an amylin analogue, GLP-1-adjacent only where a merchant
+co-formulates it with one. Comopeptides lists it under its correct chemical name — which is the
+naming `PROD-010` exists to encourage — and matching it under a rule titled for GLP-1 receptor
+agonists would misname it in a document that reaches an underwriter.
+
+`sema` and `tirz` stay in `PROD-010` as page text at `review_only`, where D-178 put them.
+
+### The two-letter argument, made against real catalogues rather than asserted
+
+`tz` and `rt` are how comopeptides spells tirzepatide and retatrutide. They are safe on a
+`url_pattern` rule and would not be safe in prose, and the difference is the matcher: `findMatches`
+tokenises through `tokenizePath` — splitting on every non-alphanumeric *and* at letter/digit
+boundaries — and compares with `containsTokenSequence` on `inflectionKey`. `rt` is a token or it is
+nothing.
+
+Run against the product slugs of every catalogue this project has stored — **854 paths across five
+merchants**:
+
+    whole token   comopeptides  /shop/rt/, /shop/tz/                      2 hits, both correct
+                  biotechpeptides, corepeptides,
+                  swisschems, sportstechnologylabs                        0 hits
+
+    substring     corepeptides     cartalax, cortagen, cartilage, …       8
+                  swisschems       /cart/, cartalax, telmisartan, …       4
+                  biotechpeptides  adipotide, ahk-cu, frag-176-191, …     4
+                                                              16 innocent slugs
+
+The control was made to fail the way it exists to catch (D-026): a substring fallback added to
+`containsTokenSequence` fires `rt` on `/shop/cartridge/`, `/peptides/cartalax-20mg/`,
+`/peptides/cortagen/`, `/product/telmisartan-2400mg-40mg-capsule/` and all four innocent merchants,
+turning seven assertions red. Restored, `slug.ts` is byte-identical to HEAD.
+
+**`peptidesciences.com` is absent from the proof and its absence is the honest answer.** That
+merchant served `robots.txt` and answered three sitemap paths with `403`; there is no catalogue to
+match against because we were never served one. `corepeptides.com` was not on the list either and is
+included because the evidence holds it — it carries eight of the sixteen substring hits, so leaving
+it out would have weakened the argument.
+
+### A token, not a path segment
+
+`/shop/rt-10mg/` **is** a match, and that is the intended reading. The brief that prompted this rule
+asked for `/shop/rt-something/` to miss, which would make the path segment the unit rather than the
+token.
+
+Ruled the other way, for constraint 9. A subject located by one particular spelling is blind to
+every other, and in an `expect: absent` rule that blindness reads as absence — the merchant who
+appends a strength to their coded slug would go unreported. The token is the unit everywhere else in
+the set, and the false-positive risk it opens is the one measured above: zero, across 854 paths.
+
+### What this closes, and what it does not
+
+`url_pattern` is Layer 0, so a GLP-1 slug is caught from the sitemap whether or not the page is
+sampled or rendered. That closes the visibility gap for this blocker specifically — `tz` and `rt`
+were previously matched by nothing at any layer, pinned as such in
+`packages/engine/test/codedProductSlugs.test.ts` before this rule existed.
+
+**It does not address the general problem**, which is that a catalogue can carry any coded slug
+nobody has seen yet, and sampling five products may never render it. A denylist catches the coinages
+we have met. That is the sampling and vocabulary work, and it is not this.
+
+### The pin that would have passed while its own sentence became false
+
+`codedProductSlugs.test.ts` asserted that none of `tz`, `rt`, `klow` was matched by any Layer 0
+rule, written as `not.toEqual(expect.arrayContaining([tz, rt, klow]))` — which fails only if one
+rule matches **all three**. `CATG-008` matches two. The assertion would have stayed green while the
+sentence above it became untrue, and nothing would have said so.
+
+Rewritten to assert each slug separately. Worth recording because the shape is general and this
+project has paid for it before: **an assertion over a collection answers a weaker question than the
+sentence describing it**, and the gap only opens when the data moves — which is exactly when the
+test is the only thing looking.
+
+### Committed catalogues, because `evidence/` is not
+
+The proof reads `fixtures/catalogues/*.txt`, not `evidence/`, which is gitignored. `.gitignore`
+already carries a comment about this against `/reports/`: *a test whose inputs are gitignored passes
+on a clean checkout by having nothing to check.* A false-positive proof for a rule that reaches an
+underwriter cannot rest on files that are not in the repository. They are plain sorted paths, one
+per line, so a reviewer can read them and see what the matcher was run against (`CLAUDE.md`
+§ Conventions).
+
+Every path is kept, not only the products. It is stricter — a pattern firing on nothing in the whole
+surface certainly fires on nothing in the products subset — and filtering first would let a false
+positive hide behind a classifier decision instead of being seen.
