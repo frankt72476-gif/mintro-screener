@@ -799,9 +799,24 @@ function StoppingPanel({
             of one word inside one panel, and nothing told a reader which was which. A condition
             applies or it does not; a row that was checked and clear says so in its own words.
           */}
+          {/*
+            An observation, not a determination (D-217).
+
+            *"Nothing here stops the application"* is a statement about what an underwriter will do
+            with the package, and it stood above two conditions this run could not check and three
+            standards it recorded as not met. Mintro does not make that call and does not report it
+            (hard constraint 7); what this panel observed is that no condition was seen failing, and
+            how many it could not see at all.
+
+            The unverified count is in the heading rather than only in the band, because a heading
+            that says "none was observed failing" and stops still reads as a clear result to
+            somebody scanning.
+          */}
           <h2 className="stop-title">
             {failed.length === 0
-              ? 'Nothing here stops the application'
+              ? unobserved.length === 0
+                ? 'No stopping condition was observed failing'
+                : `No stopping condition was observed failing; ${unobserved.length} could not be checked`
               : failed.length === 1
                 ? 'One stopping condition applies'
                 : `${failed.length} stopping conditions apply`}

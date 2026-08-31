@@ -114,6 +114,60 @@ export function bestResemblance<T>(
 }
 
 /**
+ * The closest candidate whatever it scored, with its score (D-217).
+ *
+ * `bestResemblance` returns nothing when nothing clears both thresholds, and the two disclosure
+ * rules turned that into *"no comparable text was observed"* and *"no text resembling the required
+ * disclaimer was observed"*. On CoMo Peptides both were false: the footer's closest text carried
+ * two thirds of the required wording and failed only on density, being a short line inside a much
+ * longer block. The check found text that scored low; it reported an absence of text.
+ *
+ * That is a conclusion dressed as an observation — the rule's method is a similarity score against
+ * two thresholds, and what it observed is the score (D-076). So the near miss comes back and the
+ * finding states it, with the numbers, and a reader can see how near it was.
+ *
+ * Returns null only when there was nothing to compare at all.
+ */
+export function nearestResemblance<T>(
+  candidates: readonly T[],
+  reference: string,
+  textOf: (candidate: T) => string,
+): { readonly candidate: T; readonly score: Similarity } | null {
+  let best: { candidate: T; score: Similarity } | null = null;
+
+  for (const candidate of candidates) {
+    const text = textOf(candidate);
+    if (text.trim() === '') continue;
+    const score = similarity(text, reference);
+    if (
+      best === null ||
+      score.coverage > best.score.coverage ||
+      (score.coverage === best.score.coverage && score.density > best.score.density)
+    ) {
+      best = { candidate, score };
+    }
+  }
+
+  return best;
+}
+
+/**
+ * How a near miss reads in a finding.
+ *
+ * Both numbers and both thresholds, because the rule needs both and a reader cannot tell which one
+ * fell short from a single figure. Whole percentages: the underlying ratio is a count of shared
+ * words over a small set, and a decimal place would imply a precision it does not have.
+ */
+export function describeResemblance(score: Similarity): string {
+  const pc = (value: number): string => `${Math.round(value * 100)}%`;
+  return (
+    `it carries ${pc(score.coverage)} of the required wording (this check compares at ` +
+    `${pc(RESEMBLANCE.minCoverage)}) and the required wording is ${pc(score.density)} of it ` +
+    `(${pc(RESEMBLANCE.minDensity)})`
+  );
+}
+
+/**
  * Splits a block of text into candidate statements.
  *
  * Footers frequently have no sentence punctuation at all — they are navigation labels run

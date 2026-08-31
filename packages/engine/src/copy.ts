@@ -140,6 +140,24 @@ export const DETERMINATION_TERMS: readonly string[] = [
   'confirms the merchant',
   'proves',
   'proven',
+  /*
+    Phrasings that shipped, each a conclusion from a measurement that did not reach it (D-217).
+
+    Specific rather than general, in the same way `passes underwriting` and `confirms the merchant`
+    already are. A term list cannot catch the shape of this mistake — it catches the sentences it
+    was taught, and these were taught by a real report:
+
+      - `is not a certificate` — `looksLikePdf` read four bytes. What the response *is* was never
+        established, and on CoMo Peptides the certificate content is there as HTML.
+      - `nothing it would state` — the same inference, carried one step further.
+      - `no comparable text` — DISC-001's near miss scored 0.67 coverage against a 0.50 threshold
+        and failed on density alone. Text was found. It scored low.
+      - `stops the application` — Mintro does not make that determination and does not report it.
+  */
+  'is not a certificate',
+  'nothing it would state',
+  'no comparable text',
+  'stops the application',
 ];
 
 /**

@@ -14317,3 +14317,80 @@ screen only would make the two surfaces differ, which this pass forbids.
 Left as it is, and raised rather than decided here. The row already states the split in its own line,
 and each card carries its own state. If the cards should go, D-042's invariant has to be relaxed
 first, deliberately.
+
+---
+
+## D-217 — A finding names its method and states what it measured
+
+*2026-08-30. Rule set 3.4.0.*
+
+Six sentences in one report claimed more than the check that produced them had established. The
+states were right, the evidence was right, and the sentence a person reads was a conclusion — which
+is the whole of D-076 and hard constraint 7.
+
+**DISC-001 and DISC-003.** *"No comparable text was observed"* and *"No text resembling the required
+disclaimer was observed in this page's footer."* Both false. The footer's closest text carried
+**67%** of the required wording against a 50% threshold and failed on **density** alone — 10%
+against 20% — because the disclaimer sentence sits inside a long block of navigation labels. The
+check found text that scored low and reported an absence of text. `nearestResemblance` returns the
+near miss whatever it scored, and both findings now quote it with both numbers and both thresholds.
+The absence sentence survives for the case that is genuinely an absence: a footer with no text at
+all.
+
+**COA-006.** *"What it serves is not a certificate, so nothing it would state can be read."*
+`looksLikePdf` reads four bytes. Whether the response is a certificate rendered as a web page, an
+error page, or anything else was never established — and on this merchant the certificate content
+**is** present, as HTML. The finding states the observation: the response does not begin with
+`%PDF`, this check reads the certificate as a PDF, and what was served was not parsed.
+
+*Suppression of COA-002/003/004 stays*, and its stated reason changes with it. Those three read a
+test date, a purity figure and a required-field list out of a parsed PDF; there was no parsed
+document, so they are `not_evaluable` on their own terms. What they may not say is that the link "is
+not a certificate", because a reader told that would be told something false about the site.
+Reading a certificate served as HTML is a capability Mintro does not have, and adding one is a
+build, not a wording fix.
+
+**PROD-008, PROD-011, PROD-012.** Three rules read one page for three different questions and all
+three printed `Observed: 'recovery'.` On `/shop/semax/` a reader met the same sentence three times
+and could only conclude one check had run three times and disagreed with itself. Each note now opens
+with the rule's own `subject` — *"Read for whether the pages make disease or benefit claims"*,
+*"…product body copy uses benefit vocabulary"* — taken from the rule set, so no handler branches on
+a rule id (hard constraint 1) and a rule added tomorrow reads correctly with no change to the
+engine.
+
+**DISC-004.** Title `FDA non-evaluation statement not observed`, rendered beside the state label as
+*"FDA non-evaluation statement not observed — Observed"*. A rule's title names its subject; the
+outcome is the state. Retitled `FDA non-evaluation statement`. Its clause had the same fault —
+*"No statement was observed that…"* is an observation, and a clause states the requirement — and is
+restated as one.
+
+**GATE-007.** *"3 of 5 required phrases were not observed: 'research use only', 'indemnif',
+'qualified'."* `indemnif` and `diagnos` are truncated deliberately, so one entry reaches
+*indemnify*, *indemnifies* and *indemnification*. They are correct as matcher input and unreadable
+as report copy — this went to a merchant. `require_all_labels` maps each stem to the clause it
+stands for; a map rather than a parallel array, so reordering cannot silently reassign a label, and
+optional, so an entry without one is quoted exactly as before.
+
+**The stopping panel.** *"Nothing here stops the application"*, in green, above two conditions this
+run could not check and three standards recorded as not met. Whether the application proceeds is
+IQwallet's determination; Mintro does not make it and does not report it. It reads *"No stopping
+condition was observed failing; 2 could not be checked"* — the count in the heading, because a
+heading that says only "none was observed failing" still reads as a clear result to somebody
+scanning.
+
+### The guard existed and did not run here
+
+`FINDING_TERMS` — `DIRECTIVE_TERMS` plus `DETERMINATION_TERMS` — is enforced on Documents Check
+findings and on nothing the Site Check produces. That is how all six shipped. The list gains the
+four phrasings that did, each as specific as `passes underwriting` and `confirms the merchant`
+already are, and `conclusionCopy.test.ts` runs the handlers over the inputs that produced them and
+audits what comes out.
+
+A term list catches the sentences it was taught. Auditing every Site Check finding at assembly, the
+way the Documents path does, is the general fix and is not attempted here.
+
+### Rule set 3.4.0
+
+Minor. No rule added or removed, no pattern, term or threshold moved, no matcher changed:
+`require_all_labels` is read only when a finding is written, and DISC-004's title and clause are
+copy. `effective` does not move — the published standards did not change.
