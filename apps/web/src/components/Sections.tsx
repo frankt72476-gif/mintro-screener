@@ -95,7 +95,7 @@ function StoppingAccountLine({ part }: { readonly part: ReportPart }): JSX.Eleme
     <>
       <p className="sect-lede">{part.lede}</p>
       <p className={`stopping-account${clear ? ' clear' : ''}`}>
-        {stoppingSentence(account).map((line, i) => (
+        {stoppingSentence(account, part.solicits).map((line, i) => (
           <span key={line} className="stopping-line">
             {i > 0 && ' '}
             {line}

@@ -884,7 +884,10 @@ export interface StoppingAccount {
  * sentence claiming "seven of nine were checked" on a report where the ninth is simply missing,
  * which is the flattering direction and the one worth being loud about.
  */
-export function stoppingSentence(account: StoppingAccount): readonly string[] {
+export function stoppingSentence(
+  account: StoppingAccount,
+  invited = false,
+): readonly string[] {
   if (account.declared === null) return [];
 
   const applies = account.failed.length;
@@ -906,7 +909,7 @@ export function stoppingSentence(account: StoppingAccount): readonly string[] {
   */
   const lines: string[] = [];
 
-  if (unchecked > 0) {
+  if (unchecked > 0 && invited) {
     /*
       Names the unchecked ones rather than counting them again.
 
@@ -953,6 +956,13 @@ export interface ReportPart {
   readonly passes?: { readonly groups: readonly FindingGroup[]; readonly tally: SectionTally };
   /** "For your review" only: the three bands (D-189). */
   readonly bands?: readonly ReviewBand[];
+  /**
+   * Whether this part may ask the merchant for anything (D-218).
+   *
+   * On the part rather than passed alongside it, so a caller cannot render a heading that asks
+   * beside a body that does not — `bandStats` and the section ledes read the same field.
+   */
+  readonly solicits: boolean;
 }
 
 const SECTION_HEADING: Readonly<Record<SectionId, string>> = {
@@ -1055,7 +1065,33 @@ function declaredStoppingIds(report: ScreeningReport): ReadonlySet<string> {
  * else — it is not repeated under "What we observed", because a reader who has met it once has met
  * it, and repeating it would put the same row in two sections with two different weights.
  */
-export function reportParts(report: ScreeningReport, surface: Surface): readonly ReportPart[] {
+/**
+ * Whether this render may ask the merchant for anything (D-218).
+ *
+ * The report solicited a comment five times — *"Tell us if we have the two unchecked ones wrong"*,
+ * *"your comment helps"*, *"Tell us where we have it wrong"*, *"comment where it helps"*, *"Read
+ * each one and tell us where we have it wrong"* — in a document whose own participation record
+ * read **"No comment link was transmitted for this run, so the merchant was not asked to
+ * respond."** Nobody could act on any of them, and an underwriter reading both would reasonably
+ * conclude the merchant had been asked and ignored it.
+ *
+ * One flag, read at every call site, so the two surfaces cannot disagree about it: the PDF and the
+ * screen both build their parts from here.
+ *
+ * **Positive knowledge only.** A render where commentary was never read — the analyst's own
+ * `?print=1` path — does not know that a link exists, and asking on a maybe is the defect.
+ */
+export interface PartOptions {
+  /** True only where a comment link was issued *and* transmitted (`Participation.invited`). */
+  readonly invited?: boolean;
+}
+
+export function reportParts(
+  report: ScreeningReport,
+  surface: Surface,
+  options: PartOptions = {},
+): readonly ReportPart[] {
+  const invited = options.invited === true;
   const groups = nestCascades(groupByRule(ungrouped(report)));
   const stoppingIds = stoppingRuleIds(report);
   // Failed conditions are what section 1's account counts; the panel holds all of them (D-194).
@@ -1064,6 +1100,7 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
 
   const parts: Record<SectionId, ReportPart> = {
     stopping: stoppingPart(
+      invited,
       report,
       groups.filter((group) => stoppingIds.has(group.ruleId) && group.state === 'fail'),
       /*
@@ -1076,13 +1113,14 @@ export function reportParts(report: ScreeningReport, surface: Surface): readonly
       */
       groups.filter((group) => isStopping(group)),
     ),
-    notmet: notMetPart(groups.filter((group) => !isStopping(group) && group.state === 'fail')),
+    notmet: notMetPart(groups.filter((group) => !isStopping(group) && group.state === 'fail'), invited),
     questions: questionsPart(report),
     review: reviewPart(
       report,
       groups.filter((group) => !isStopping(group) && group.state === 'review'),
       groups.filter((group) => !isStopping(group) && group.state === 'not_evaluable'),
       groups.filter((group) => !isStopping(group) && group.state === 'pass'),
+      invited,
     ),
   };
 
@@ -1161,6 +1199,7 @@ function stoppingChecklist(
 }
 
 function stoppingPart(
+  invited: boolean,
   report: ScreeningReport,
   failed: readonly FindingGroup[],
   all: readonly FindingGroup[] = failed,
@@ -1168,6 +1207,7 @@ function stoppingPart(
   const blocking = report.blocking;
   return {
     id: 'stopping',
+    solicits: invited,
     heading: SECTION_HEADING.stopping,
     lede:
       blocking === undefined
@@ -1196,6 +1236,9 @@ function questionsPart(report: ScreeningReport): ReportPart {
   const asked = report.attestationQuestions?.length ?? 0;
   return {
     id: 'questions',
+    // The operational questions have their own form and their own invitation; this section never
+    // carried a comment solicitation, so there is nothing here to gate (D-218).
+    solicits: false,
     heading: SECTION_HEADING.questions,
     /*
       The lede names who answers, because this is the only section that asks anyone to do anything.
@@ -1248,6 +1291,7 @@ function reviewPart(
   unclear: readonly FindingGroup[],
   unevaluated: readonly FindingGroup[],
   passes: readonly FindingGroup[],
+  invited: boolean,
 ): ReportPart {
   /** One block, unsplit, for the two bands whose rows need no further separation. */
   const plain = (state: State, groups: readonly FindingGroup[]): SectionBlock[] => [
@@ -1302,8 +1346,9 @@ function reviewPart(
 
   return {
     id: 'review',
+    solicits: invited,
     heading: SECTION_HEADING.review,
-    lede: reviewLede(all.length),
+    lede: reviewLede(all.length, invited),
     // `blocks` stays populated and flattened so every existing reader — the print branch, the
     // comment count, the group renderer — keeps working off one shape (D-189).
     blocks: bands.flatMap((band) => band.blocks),
@@ -1322,9 +1367,18 @@ function reviewPart(
  *
  * One block, no bands. Every row here is the same state, so a band heading would name it twice.
  */
-function notMetPart(failed: readonly FindingGroup[]): ReportPart {
+function notMetPart(failed: readonly FindingGroup[], invited: boolean): ReportPart {
+  /*
+    The ask, only where there is a link to answer through (D-218).
+
+    What was observed is stated either way. Only the invitation is conditional — a sentence asking a
+    merchant to correct us, in a document no merchant was sent, is addressed to nobody.
+  */
+  const ask = invited ? ' Tell us where we have it wrong.' : '';
+
   return {
     id: 'notmet',
+    solicits: invited,
     heading: SECTION_HEADING.notmet,
     /*
       Says what was observed and stops (the old brief headline's rule, kept).
@@ -1337,8 +1391,8 @@ function notMetPart(failed: readonly FindingGroup[]): ReportPart {
       failed.length === 0
         ? 'No observation fell short of a standard.'
         : failed.length === 1
-          ? 'One observation did not meet a standard. Tell us where we have it wrong.'
-          : `${spellOut(failed.length)} observations did not meet a standard. Tell us where we have it wrong.`,
+          ? `One observation did not meet a standard.${ask}`
+          : `${spellOut(failed.length)} observations did not meet a standard.${ask}`,
     blocks: [
       { key: 'notmet', heading: null, lede: '', state: 'fail', groups: failed, tally: tally(failed) },
     ],
@@ -1353,9 +1407,10 @@ function notMetPart(failed: readonly FindingGroup[]): ReportPart {
  * instruction about the storefront — the distinction D-001 turns on. It asks about **this
  * document**, which Mintro authored, rather than about the merchant's site.
  */
-function reviewLede(count: number): string {
+function reviewLede(count: number, invited: boolean): string {
   const many = count === 1 ? 'One observation' : `${spellOut(count)} observations`;
-  return `${many}. Read each one and tell us where we have it wrong.`;
+  // The ask is the conditional half; the count is stated either way (D-218).
+  return invited ? `${many}. Read each one and tell us where we have it wrong.` : `${many}.`;
 }
 
 /** Small numbers read as words in a sentence; large ones as numerals. */
@@ -1470,15 +1525,21 @@ export function bandStats(part: ReportPart): string {
   const f = part.tally.findings;
   const rules = `${n} rule${n === 1 ? '' : 's'}${f === n ? '' : ` · ${f} findings`}`;
 
+  /*
+    The invitation half of the statistics, only where a link exists (D-218).
+
+    *"your comment helps"* and *"comment where it helps"* are asks, sitting in a band beside a count.
+    The count is what the band is for and is stated either way.
+  */
   if (part.id === 'notmet') {
-    return `${rules} · your comment helps`;
+    return part.solicits ? `${rules} · your comment helps` : rules;
   }
 
   if (part.id === 'questions') {
     return `${n} question${n === 1 ? '' : 's'}`;
   }
 
-  return `${rules} · comment where it helps`;
+  return part.solicits ? `${rules} · comment where it helps` : rules;
 }
 
 /**

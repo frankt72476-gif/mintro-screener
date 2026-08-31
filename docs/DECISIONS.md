@@ -14394,3 +14394,41 @@ way the Documents path does, is the general fix and is not attempted here.
 Minor. No rule added or removed, no pattern, term or threshold moved, no matcher changed:
 `require_all_labels` is read only when a finding is written, and DISC-004's title and clause are
 copy. `effective` does not move — the published standards did not change.
+
+---
+
+## D-218 — Nothing asks the merchant for anything unless a link was sent
+
+*2026-08-30.*
+
+The report solicited a comment five times:
+
+> Tell us if we have the two unchecked ones wrong. · *your comment helps* · Tell us where we have it
+> wrong. · *comment where it helps* · Read each one and tell us where we have it wrong.
+
+Four screens above the first of them, its own participation record read:
+
+> **No comment link was transmitted for this run, so the merchant was not asked to respond.**
+
+Nobody could act on any of it. Worse, an underwriter reading both would reasonably conclude the
+merchant had been asked five times and answered none — which is a characterisation of the merchant
+built out of a defect in our own copy (D-143's class, on the report rather than in a message).
+
+**One flag, read at every call site.** `ReportView` derives it once and `reportParts` carries it onto
+each part as `solicits`, so a band heading cannot ask beside a body that does not. The PDF and the
+screen build their parts from the same call, so the two cannot disagree — which is the property that
+matters most here, since the PDF is the document that leaves.
+
+**Positive knowledge only.** `participation.invited` is true when a link was issued *and*
+transmitted. Where commentary was never read — the analyst's own `?print=1` path — nothing knows,
+and asking on a maybe is the defect.
+
+**The merchant's own page is invited by construction.** `CommentPane` passes no participation record
+(the record is *about* the merchant and is not shown to them) and that page is reachable only with a
+link token, so a render on it **is** the link. Gating on the record alone removed every invitation
+from the one page whose entire purpose is to invite; `surface === 'merchant'` is the second half of
+the flag, and it is a fact about the route, not a special case.
+
+**Only the invitation is conditional.** Every count, every heading and every observation renders
+either way. A section that dropped its finding along with its ask would be hiding an observation
+because nobody was asked about it, which is a worse fault than the one being fixed.

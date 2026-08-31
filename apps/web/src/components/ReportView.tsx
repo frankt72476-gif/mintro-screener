@@ -200,7 +200,27 @@ export function ReportView({
   const surface: Surface = surfaceProp ?? (print ? 'iqwallet' : 'agent');
   // Derived once and read twice — by the header lines and by the sections themselves. Two calls
   // would be two derivations, which is the thing part 1 built the tally to prevent (spec §3).
-  const parts = useMemo(() => reportParts(report, surface), [report, surface]);
+  /*
+    Whether anyone was asked (D-218).
+
+    The report solicited a comment five times over a participation record reading *"No comment link
+    was transmitted for this run, so the merchant was not asked to respond."* One flag, derived
+    here and read by every section that asks — `reportParts` carries it onto each part, and the
+    stopping panel takes it directly.
+
+    Positive knowledge only: `participation` is absent when commentary was never read, and asking on
+    a maybe is the defect.
+
+    The merchant's own surface is the exception, and not a special case: that page is reachable only
+    with a link token, so a render on it *is* the link. It carries no participation record — the
+    record is about the merchant, and it is not for them — and gating on the record alone would have
+    removed every invitation from the one page whose entire purpose is to invite.
+  */
+  const invited = participation?.invited === true || surface === 'merchant';
+  const parts = useMemo(
+    () => reportParts(report, surface, { invited }),
+    [report, surface, invited],
+  );
   return (
     <div id="top">
       <div className="rhead">
@@ -729,6 +749,9 @@ function StoppingPanel({
   const account = part?.stopping;
   if (account === undefined) return null;
 
+  // From the part rather than a second prop, so the panel and its band cannot disagree (D-218).
+  const solicits = part?.solicits === true;
+
   if (account.declared === null) {
     // Predates the flag. Says so rather than reporting a clean sweep (D-044, D-161).
     return (
@@ -827,8 +850,8 @@ function StoppingPanel({
             A run with every condition checked has no correction to invite, and an empty paragraph
             under the heading would read as a sentence that failed to load.
           */}
-          {stoppingSentence(account).length > 0 && (
-            <p className="stop-sub">{stoppingSentence(account).join(' ')}</p>
+          {stoppingSentence(account, solicits).length > 0 && (
+            <p className="stop-sub">{stoppingSentence(account, solicits).join(' ')}</p>
           )}
         </div>
       </div>
