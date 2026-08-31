@@ -640,11 +640,145 @@ export interface SectionTally {
 
 const EMPTY_BY_STATE: Record<State, number> = { fail: 0, review: 0, pass: 0, not_evaluable: 0 };
 
-/** The one place a section's numbers are computed. */
-export function tally(groups: readonly FindingGroup[]): SectionTally {
+/**
+ * The one place a section's numbers are computed.
+ *
+ * `keep` decides which of a row's findings this heading is counting (D-216). A row holds every
+ * finding of its rule — that is what lets it say *"unclear on 3 of 5 sampled pages; met on 2"* —
+ * but a heading counts what it is a heading for. Without the filter, *Looked for, not found on the
+ * site* said `7 rules · 11 findings` over nine findings of that kind plus two passes belonging to a
+ * different sentence entirely, and no reader could reconcile it with anything.
+ *
+ * Nested consequences are not counted here either. They are rows of their own kind rendered inside
+ * their root (D-164), and `censusOf` is what accounts for them.
+ */
+export function tally(
+  groups: readonly FindingGroup[],
+  keep: (finding: ReportFinding, group: FindingGroup) => boolean = () => true,
+): SectionTally {
   const byState = { ...EMPTY_BY_STATE };
   for (const group of groups) byState[group.state] += 1;
-  return { rules: countRules(groups), findings: countFindings(groups), byState };
+
+  const findings = groups.reduce(
+    (total, group) => total + group.findings.filter((finding) => keep(finding, group)).length,
+    0,
+  );
+
+  return { rules: countRules(groups), findings, byState };
+}
+
+/** Counts only the findings a row's own heading is about: those in its state. */
+export const inOwnState = (finding: ReportFinding, group: FindingGroup): boolean =>
+  finding.state === group.state;
+
+/** Counts only the findings of one not-evaluable kind. */
+export const inBucket =
+  (bucket: Bucket) =>
+  (finding: ReportFinding): boolean =>
+    finding.state === 'not_evaluable' && bucketOf(finding) === bucket;
+
+/**
+ * A finding counted under one heading and shown under another (D-216).
+ *
+ * The document files whole **rules** by their worst outcome (D-166) and counts **findings** by
+ * kind. Both are right and they do not line up: NAME-003 needed review on two sampled pages and was
+ * unbuilt on three, so it is a row under *Unclear* holding three findings that the coverage sentence
+ * counts as *checks Mintro has not built yet* — which had no block at all, so the reader was told
+ * three existed and could find none of them anywhere.
+ *
+ * Rather than move the rows or drop the count, the sentence says where they are.
+ */
+export interface Displaced {
+  readonly ruleId: string;
+  readonly bucket: Bucket;
+  readonly count: number;
+  /** The heading the row is under, in the words the document uses for it. */
+  readonly shownUnder: string;
+}
+
+/**
+ * Every finding in the report, assigned to exactly one bucket, and where each is rendered.
+ *
+ * **The single partition** (D-216). The coverage sentence, the band statistics and the block
+ * headings all read from this, because computing them separately is how a document comes to
+ * disagree with itself: the sentence counted findings from `report.coverage`, the sections counted
+ * rows from `groupReport`, and the two populations were never the same one.
+ *
+ * `report.coverage` is still the run's own record and is not recomputed — a completed run says what
+ * it said (D-002). `censusOf` reproduces it from the findings, and `counting.test.ts` asserts the
+ * two agree, so drift fails a test rather than reaching a reader.
+ */
+export interface FindingCensus {
+  readonly total: number;
+  /** Findings of each not-evaluable kind, anywhere in the report. */
+  readonly byBucket: Readonly<Record<Bucket, number>>;
+  /** Findings that are not `not_evaluable`, by state. */
+  readonly byState: Readonly<Record<State, number>>;
+  /** Findings whose row is filed under a heading other than their own kind's. */
+  readonly displaced: readonly Displaced[];
+}
+
+const EMPTY_BUCKETS: Record<Bucket, number> = {
+  no_check_built: 0,
+  not_reachable: 0,
+  not_exposed: 0,
+  not_applicable: 0,
+  not_retrieved: 0,
+  unrecorded: 0,
+};
+
+export function censusOf(report: ScreeningReport): FindingCensus {
+  const byBucket = { ...EMPTY_BUCKETS };
+  const byState = { ...EMPTY_BY_STATE };
+
+  for (const finding of ungrouped(report)) {
+    byState[finding.state] += 1;
+    if (finding.state === 'not_evaluable') byBucket[bucketOf(finding)] += 1;
+  }
+
+  const stopping = declaredStoppingIds(report);
+  const groups = nestCascades(groupByRule(ungrouped(report)));
+  const displaced: Displaced[] = [];
+
+  const record = (group: FindingGroup, shownUnder: string, home: Bucket | null): void => {
+    const counts = new Map<Bucket, number>();
+    for (const finding of group.findings) {
+      if (finding.state !== 'not_evaluable') continue;
+      const bucket = bucketOf(finding);
+      if (bucket === home) continue;
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    }
+    for (const [bucket, count] of counts) {
+      displaced.push({ ruleId: group.ruleId, bucket, count, shownUnder });
+    }
+  };
+
+  for (const group of groups) {
+    // A stopping condition is a row in part one whatever its outcome, so its unevaluated findings
+    // are never in a bucket block.
+    if (stopping.has(group.ruleId)) {
+      record(group, 'the stopping conditions', null);
+      continue;
+    }
+
+    // A row of this kind: its own findings of that kind are at home, the rest are displaced.
+    const home = group.state === 'not_evaluable' ? bucketOfGroup(group) : null;
+    record(group, `${group.ruleId}, under ${headingFor(group)}`, home);
+
+    // Consequences are rendered inside this row rather than in their own kind's block (D-164).
+    for (const consequence of group.consequences) {
+      record(consequence, `${group.ruleId} above`, null);
+    }
+  }
+
+  return { total: ungrouped(report).length, byBucket, byState, displaced };
+}
+
+/** The heading a row sits under, in the document's own words. */
+function headingFor(group: FindingGroup): string {
+  if (group.state !== 'not_evaluable') return STATE_LABEL[group.state];
+  const bucket = bucketOfGroup(group);
+  return NOT_EVALUABLE_ORDER.find((entry) => entry.bucket === bucket)?.heading ?? STATE_LABEL.not_evaluable;
 }
 
 /** The same arithmetic over the whole report, for the header lines part 2 will add. */
@@ -1117,7 +1251,7 @@ function reviewPart(
 ): ReportPart {
   /** One block, unsplit, for the two bands whose rows need no further separation. */
   const plain = (state: State, groups: readonly FindingGroup[]): SectionBlock[] => [
-    { key: `review:${state}`, heading: null, lede: '', state, groups, tally: tally(groups) },
+    { key: `review:${state}`, heading: null, lede: '', state, groups, tally: tally(groups, inOwnState) },
   ];
 
   const notObservedBlocks: SectionBlock[] = NOT_EVALUABLE_ORDER.map(({ bucket, heading, lede }) => {
@@ -1129,7 +1263,9 @@ function reviewPart(
       state: 'not_evaluable' as const,
       bucket,
       groups: ofBucket,
-      tally: tally(ofBucket),
+      // The heading counts the findings it is a heading for (D-216). A row of this kind may hold
+      // findings of another; those are counted where they belong and named by the sentence above.
+      tally: tally(ofBucket, inBucket(bucket)),
     };
   }).filter((block) => block.groups.length > 0);
 
@@ -1147,7 +1283,7 @@ function reviewPart(
       gloss: 'observed, but the check cannot decide',
       state: 'review',
       blocks: plain('review', unclear),
-      tally: tally(unclear),
+      tally: tally(unclear, inOwnState),
     },
     {
       key: 'band:not_evaluable',
@@ -1158,7 +1294,7 @@ function reviewPart(
       lede: coverageSentence(report),
       state: 'not_evaluable',
       blocks: notObservedBlocks,
-      tally: tally(unevaluated),
+      tally: tally(unevaluated, inOwnState),
     },
   ] as ReviewBand[]).filter((band) => band.tally.rules > 0);
 
@@ -1319,15 +1455,30 @@ export function bandStats(part: ReportPart): string {
     return open === 0 ? clear : `${clear} · ${open} unverifiable`;
   }
 
+  /*
+    Rules, named as rules (D-216).
+
+    `n` is `tally.rules` and the word beside it was *observations*, so *For your review* announced
+    "30 observations" above thirty **rows** holding forty-odd findings — and the not-observed band
+    said "20" over blocks that add to something else again. A count whose noun is not what it
+    counted cannot be reconciled with anything, and a reader who tries concludes the arithmetic is
+    broken rather than the label.
+
+    `findings` is stated too wherever it differs, which is the same shape `TallyLine` already uses
+    on every block heading.
+  */
+  const f = part.tally.findings;
+  const rules = `${n} rule${n === 1 ? '' : 's'}${f === n ? '' : ` · ${f} findings`}`;
+
   if (part.id === 'notmet') {
-    return `${n} observation${n === 1 ? '' : 's'} · your comment helps`;
+    return `${rules} · your comment helps`;
   }
 
   if (part.id === 'questions') {
     return `${n} question${n === 1 ? '' : 's'}`;
   }
 
-  return `${n} observation${n === 1 ? '' : 's'} · comment where it helps`;
+  return `${rules} · comment where it helps`;
 }
 
 /**
@@ -1413,5 +1564,33 @@ export function coverageSentence(report: ScreeningReport): string {
       ? (parts[0] as string)
       : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1] as string}`;
 
-  return `${resolved} ${c.outstanding} were not: ${listed}.`;
+  return `${resolved} ${c.outstanding} were not: ${listed}.${whereDisplaced(report)}`;
+}
+
+/**
+ * Where the findings this sentence counts are shown, when it is not under their own heading (D-216).
+ *
+ * Without it the sentence and the blocks under it are two accounts of the same 28 findings that do
+ * not add up, and nothing on the page says why. On CoMo Peptides: three *not found on the site* sit
+ * with COA-006 because one failed request explains all four (D-164), two more are stopping
+ * conditions and belong in part one, and all three *not built yet* are pages of NAME-003, a rule
+ * whose worst outcome was review. Every one of them is rendered; none of them is where its count is.
+ */
+function whereDisplaced(report: ScreeningReport): string {
+  const grouped = new Map<string, number>();
+  for (const item of censusOf(report).displaced) {
+    grouped.set(item.shownUnder, (grouped.get(item.shownUnder) ?? 0) + item.count);
+  }
+  if (grouped.size === 0) return '';
+
+  const total = [...grouped.values()].reduce((sum, n) => sum + n, 0);
+  const places = [...grouped.entries()].map(([where, n]) => `${n} with ${where}`);
+  const listed =
+    places.length === 1
+      ? (places[0] as string)
+      : `${places.slice(0, -1).join(', ')} and ${places[places.length - 1] as string}`;
+
+  return ` ${total === 1 ? 'One of them is' : `${total} of them are`} shown with the rule ${
+    total === 1 ? 'it belongs' : 'they belong'
+  } to rather than in the blocks below: ${listed}.`;
 }

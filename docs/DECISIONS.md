@@ -14240,3 +14240,80 @@ The URL list under it is filtered to what the observation has not already named.
 enumerates both offending URLs and the slip listed the same two again underneath, unlabelled, which
 is what made them look like a second and different fact. Where a note does not name them, the list
 is the only place they appear and it stays.
+
+---
+
+## D-216 — One partition, and every count names what it counts
+
+*2026-08-30.*
+
+The report counted the same findings three ways and agreed with itself nowhere.
+
+- The coverage sentence read `report.coverage`: **findings, by kind, over the whole run**.
+- The section headings read `groupReport`: **rows, by worst outcome**, minus the stopping conditions
+  (which are part one) and minus anything nested by D-164.
+- Block headings counted every finding a row held, whatever kind it was.
+
+On CoMo Peptides `356ce753` that produced, four lines apart: *"14 were looked for and not found on
+the site"* above a block headed `7 rules · 11 findings`, and *"3 are checks Mintro has not built
+yet"* above **no block at all**. And the sentence rendered twice, word for word — once in part one
+under the stopping panel, once as the lede of the *not observed* band.
+
+### `censusOf` is the one partition
+
+Every finding, assigned to exactly one bucket, plus where each is rendered. The sentence, the band
+statistics and the block headings all read from it. `report.coverage` is still the run's own record
+and is never recalculated (D-002); `partition.test.ts` asserts the census reproduces it exactly on
+all five stored runs, so drift fails a test rather than reaching a reader.
+
+### A heading counts what it is a heading for
+
+`tally` takes a predicate. *Looked for, not found on the site* now says `7 rules · 9 findings`,
+which is nine findings of that kind — not nine plus the two passes PROD-003 also holds and states in
+its own line. Bands count their own state; blocks count their own bucket.
+
+### Where a finding is counted and where it is shown are different questions
+
+The document files whole **rules** by worst outcome (D-166) and counts **findings** by kind. Both are
+right and they do not line up:
+
+- NAME-003 needed review on two sampled pages and was unbuilt on three. It is one row under
+  *Unclear*, and its three findings are the entire `no_check_built` count.
+- COA-002/003/004 are `not_exposed` and render nested under COA-006, because one failed request
+  explains all four (D-164).
+- GATE-003 and NAME-001 are `not_exposed` and are stopping conditions, so they are rows in part one.
+
+Eight of the twenty-eight outstanding findings on this run are therefore counted under a heading they
+are not under. Rather than move the rows — which would reverse D-164 and D-166 — **the sentence says
+where they are**: *"8 of them are shown with the rule they belong to rather than in the blocks below:
+2 with the stopping conditions, 3 with NAME-003, under Unclear, and 3 with COA-006 above."* A reader
+who does the arithmetic now finds every finding the sentence counts.
+
+### The unit is named
+
+`bandStats` printed `${tally.rules} observations`, so *For your review* announced "30 observations"
+over thirty rows holding forty-two findings. It reads `30 rules · 42 findings` now, the same shape
+the block headings already used. The band count beside *Unclear* and *Not observed* names rules too.
+
+### A collapsed sample says how many pages it covered
+
+PROD-002 and PROD-004 collapsed across all five sampled pages (D-136) and read as observations about
+one, beside PROD-003 — the same check, same sample — visibly reporting on five. **The difference in
+finding count is real and correct**: PROD-003's pages disagreed and the other two agreed, which is
+exactly what D-136 says to do. What the reader saw was an artefact of which field the sentence is
+built from: the collapse appended its page-count clause to `note`, and a `not_evaluable` finding is
+rendered from `notEvaluableReason`. Both carry it now.
+
+### Not done: per-page cards that differ from their row's heading
+
+The brief asked that a mixed-outcome rule render no per-page card under a heading contradicting the
+card's own text — PROD-003's two `Met` cards under *Not observed*, PROD-001's two under *Unclear*.
+
+**It collides with D-042**, which requires the exported document to contain every finding the run
+produced, asserted in `sections.test.ts` as `rows + clear === ungrouped(report).length`. Suppressing
+those cards makes the PDF an underwriter reads hold less than the run found, and suppressing them on
+screen only would make the two surfaces differ, which this pass forbids.
+
+Left as it is, and raised rather than decided here. The row already states the split in its own line,
+and each card carries its own state. If the cards should go, D-042's invariant has to be relaxed
+first, deliberately.

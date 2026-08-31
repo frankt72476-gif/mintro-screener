@@ -298,7 +298,17 @@ export function ReportSectionView({
                 <span className={`band-name state ${band.state === 'not_evaluable' ? 'na' : band.state}`}>
                   {band.heading}
                 </span>
-                <span className="band-count">{band.tally.rules}</span>
+                {/*
+                  The band count says what it counts (D-216).
+
+                  A bare `10` beside *Unclear* and `20` beside *Not observed* read as findings, and
+                  they are rows: `Unclear 10` sat above ten rows holding thirteen observations,
+                  three of them nested under COA-006 and counted in neither number. The unit is the
+                  same one every block heading below already states.
+                */}
+                <span className="band-count">
+                  {band.tally.rules} rule{band.tally.rules === 1 ? '' : 's'}
+                </span>
                 <span className="band-gloss">{band.gloss}</span>
                 <CommentCount
                   groups={band.blocks.flatMap((b) => b.groups)}

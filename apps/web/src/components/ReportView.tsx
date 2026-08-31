@@ -26,7 +26,6 @@ import {
   findingAnchor,
   describeGroup,
   inheritsEvidence,
-  coverageSentence,
   PART_ONE,
   stoppingSentence,
   reportParts,
@@ -357,7 +356,15 @@ export function ReportView({
         {...(commentBox === undefined ? {} : { commentBox })}
       />
 
-      <p className="top-coverage">{coverageSentence(report)}</p>
+      {/*
+        The coverage sentence is not here (D-216).
+
+        It rendered twice, word for word: once in part one under the stopping panel and again as the
+        lede of the *not observed* band. Two copies of one sentence, four screens apart, with
+        different section counts under each — the second is the one that stays, because it is the
+        band it explains (D-189) and a reader meets it while reading about what could not be seen
+        rather than before they know there is anything to explain.
+      */}
       {/*
         The nav cards and the sticky bar are gone (D-206).
 
