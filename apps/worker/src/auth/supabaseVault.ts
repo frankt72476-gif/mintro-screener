@@ -11,7 +11,7 @@
  * person who entered it, by the database, and by anything short of the worker.
  */
 
-import { isSealedEnvelope, seal, unseal } from '@mintro/engine';
+import { canonicalMerchantDomain, isSealedEnvelope, seal, unseal } from '@mintro/engine';
 import type {
   AccessLogEntry,
   CredentialVault,
@@ -182,7 +182,23 @@ export function createSealedVault(
   };
 }
 
-/** The vault path for a merchant, derived from its domain. Lowercased so it cannot fork on case. */
+/**
+ * The vault path for a merchant, derived from its domain.
+ *
+ * **The single choke point.** Both writers and both readers of a merchant's vault entry build
+ * their key here — the deposit drain (`deposits.ts`) and the scan lookup (`bin/worker.ts`) — so
+ * folding here is what makes a deposit and a scan of one storefront reach one entry, rather than
+ * two call sites that have to remember to agree.
+ *
+ * `canonicalMerchantDomain` folds case, accepts a URL or a bare host, and strips a leading `www.`
+ * where what remains is still a domain. Before it, `www.merchant.com` and `merchant.com` keyed
+ * apart: a credential deposited under one was invisible to a scan of the other, and reported as
+ * one the merchant had never supplied.
+ *
+ * A domain that will not canonicalise keeps the old lowercased form rather than throwing. This
+ * function is total by design — every caller is on a path where the honest answer to a malformed
+ * domain is an empty vault entry, not an exception that fails a scan.
+ */
 export function vaultRefFor(merchantDomain: string): string {
-  return `merchants/${merchantDomain.trim().toLowerCase()}`;
+  return `merchants/${canonicalMerchantDomain(merchantDomain) ?? merchantDomain.trim().toLowerCase()}`;
 }

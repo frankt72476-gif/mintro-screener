@@ -231,8 +231,24 @@ describe('what the copy must say', () => {
     // "The domain above" is only checkable by a reader who can see the box. This names it.
     const markup = render(null);
 
-    expect(markup).toContain('www.comopeptides.com');
+    expect(markup).toContain('comopeptides.com');
     expect(markup).toContain('not against this scan');
+  });
+
+  /**
+   * The name it prints is the key the credential is actually stored under.
+   *
+   * It used to print `www.comopeptides.com` — the scan URL's host — while the vault keyed on
+   * whatever the modal folded. The card was naming a domain the credential was not attached to,
+   * which is the failure this sentence exists to prevent, in the one place an analyst would look
+   * to check. Both sides now fold through `canonicalMerchantDomain`, so the card and the crawl
+   * cannot disagree about which storefront a login belongs to.
+   */
+  it('prints the canonical key rather than the host the scan was typed with', () => {
+    const markup = render(null, 'https://www.comopeptides.com/');
+
+    expect(markup).toContain('>comopeptides.com<');
+    expect(markup).not.toContain('www.comopeptides.com');
   });
 
   it('says it is remembered for later scans', () => {

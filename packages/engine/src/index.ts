@@ -142,6 +142,9 @@ export {
   type SessionOrigin,
 } from './session.js';
 
+// One storefront, one vault key. Shared with the browser deposit path (see merchantDomain.ts).
+export { canonicalMerchantDomain } from './merchantDomain.js';
+
 export { checkHttpProbe, type HttpProbeInput, type ProbeResult } from './checks/httpProbe.js';
 export {
   checkFlowProbe,

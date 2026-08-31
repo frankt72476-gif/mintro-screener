@@ -14,6 +14,7 @@
  * trade the thing that matters for the thing that does not.
  */
 
+import { canonicalMerchantDomain } from '@mintro/engine';
 import type { WorkerSupabase } from '../store/supabase.js';
 
 /**
@@ -29,7 +30,7 @@ export async function recordCredentialStored(
   depositedBy: string | null,
 ): Promise<void> {
   await upsert(supabase, {
-    merchant_domain: merchantDomain.trim().toLowerCase(),
+    merchant_domain: fold(merchantDomain),
     updated_at: new Date().toISOString(),
     updated_by: depositedBy,
     last_login_ok: null,
@@ -49,7 +50,7 @@ export async function recordSignIn(
   merchantDomain: string,
   ok: boolean,
 ): Promise<void> {
-  const domain = merchantDomain.trim().toLowerCase();
+  const domain = fold(merchantDomain);
 
   try {
     const { error } = await supabase.client
@@ -89,3 +90,18 @@ async function upsert(
     );
   }
 }
+
+/**
+ * The domain this table is keyed by.
+ *
+ * The same fold the vault key uses (`vaultRefFor`), and it has to be: the credential card reads
+ * this table for the domain in the scan form, and the crawl opens the vault for the hostname in
+ * the queued URL. If the two folded differently the card would say a login is stored for a
+ * storefront the crawl reports has none — two surfaces disagreeing about one merchant, which is
+ * the confusion D-185 built this table to end.
+ *
+ * Falls back to the old lowercased form for anything that will not canonicalise, so a status row
+ * is still written rather than lost. This is a convenience record; nothing depends on it.
+ */
+const fold = (merchantDomain: string): string =>
+  canonicalMerchantDomain(merchantDomain) ?? merchantDomain.trim().toLowerCase();

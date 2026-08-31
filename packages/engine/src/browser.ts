@@ -178,6 +178,15 @@ export {
 
 export type { FormField, SignupForm } from './page.js';
 export type { SessionDescriptor, SessionMode, SessionOrigin } from './session.js';
+
+/*
+  One storefront, one vault key.
+
+  The browser folds a domain before sealing a deposit and the worker folds one before opening the
+  vault. Two implementations of that agree until they do not, and what would diverge is which
+  merchant a screening account belongs to — so both import this one.
+*/
+export { canonicalMerchantDomain } from './merchantDomain.js';
 export type { GateContext, PageContext, PageLink, PageRegion, StyledText } from './page.js';
 
 /**
