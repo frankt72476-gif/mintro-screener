@@ -69,9 +69,18 @@ describe('rules/ruleset.json', () => {
       which is now rendered ahead of the first. No pattern, tier, scope or clause moved, and no
       finding depends on it, so `effective` does not move either.
     */
-    expect(ruleset.version).toBe('3.6.0');
+    /*
+      3.7.0 moves PAY-002 out of the crawl set and into the questions (D-226). The requirement did
+      not change — its sentence is still in the published corpus, byte for byte, and the question
+      that replaced it carries the same sentence. What changed is how Mintro checks it: ask, do not
+      crawl, because a storefront does not show who processes its card payments.
+
+      One fewer rule, one more question. `effective` does not move: the standards did not change.
+    */
+    expect(ruleset.version).toBe('3.7.0');
     expect(ruleset.effective).toBe('2026-08-26');
-    expect(ruleset.rules).toHaveLength(60);
+    expect(ruleset.rules).toHaveLength(59);
+    expect(ruleset.attestations).toHaveLength(20);
     expect(ruleset.categories).toHaveLength(10);
   });
 
@@ -82,8 +91,9 @@ describe('rules/ruleset.json', () => {
    * kind of number that drifts unremarked — a rule quietly added back would restore them.
    */
   it('holds the category and manual-rule counts D-142 left', () => {
-    expect(ruleset.rules.filter((rule) => rule.cat === 'payment')).toHaveLength(3);
-    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(11);
+    // Two payment rules and ten manual ones since PAY-002 became a question (D-226): it was both.
+    expect(ruleset.rules.filter((rule) => rule.cat === 'payment')).toHaveLength(2);
+    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(10);
     expect(ruleset.rules.map((rule) => rule.id)).not.toContain('PAY-004');
   });
 
@@ -110,8 +120,17 @@ describe('rules/ruleset.json', () => {
     const clauseLines = corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'));
     const programme = ruleset.rules.filter((rule) => rule.source === 'programme');
 
+    /*
+      53 published requirements, still. 52 are crawled and one is asked (D-226) — PAY-002's clause
+      stayed in the corpus because the standard still carries it, and the question that replaced it
+      quotes the same sentence.
+    */
+    const asked = ruleset.attestations.filter((question) => 'clause' in question);
+
     expect(clauseLines).toHaveLength(53);
-    expect(programme).toHaveLength(53);
+    expect(programme).toHaveLength(52);
+    expect(asked).toHaveLength(1);
+    expect(programme.length + asked.length).toBe(clauseLines.length);
   });
 
   it('declares all four states', () => {

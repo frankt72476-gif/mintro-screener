@@ -1,5 +1,5 @@
 {
-  "version": "3.6.0",
+  "version": "3.7.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -166,6 +166,13 @@
       "question": "Do you accept payment through any channel other than card processing?",
       "authority": "network",
       "sev": "critical"
+    },
+    {
+      "id": "payment-processor-kyc",
+      "question": "Who processes your card payments, and did they run KYC on you when you were onboarded?",
+      "authority": "programme",
+      "sev": "major",
+      "clause": "Card payments must run through a legitimate merchant processor that performs proper KYC. How a seller collects money is read as evidence of how the business is run."
     },
     {
       "id": "related-storefronts",
@@ -1382,21 +1389,6 @@
       "blocking_source": {
         "authority": "IQwallet",
         "ruled_on": "2026-08-28"
-      }
-    },
-    {
-      "id": "PAY-002",
-      "cat": "payment",
-      "layer": null,
-      "sev": "major",
-      "type": "manual",
-      "tier": "review_only",
-      "title": "Card processing through a merchant account",
-      "clause": "Card payments must run through a legitimate merchant processor that performs proper KYC. How a seller collects money is read as evidence of how the business is run.",
-      "subject": "card payments run through a merchant account that performs KYC",
-      "source": "programme",
-      "params": {
-        "reason": "Identifying the processor requires reaching checkout, which a merchant who correctly gates it never shows an anonymous visitor. Payment marks in a footer name a card network, not the processor behind it. Requires merchant attestation."
       }
     },
     {

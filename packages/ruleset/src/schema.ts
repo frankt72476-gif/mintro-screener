@@ -221,6 +221,25 @@ export const attestationSchema = z
     authority: z.enum(['law', 'network', 'programme']),
     /** The same axis and the same three values `sev` carries on a rule. */
     sev: z.enum(SEVERITIES),
+    /**
+     * The standard's own sentence, where this question replaced a rule that could not observe it
+     * (D-226).
+     *
+     * Present on a question whose requirement is in the published corpus but which Mintro asks
+     * rather than crawls. It is the corpus text byte for byte, and `checkAgainstCorpus` validates
+     * it exactly as it validates a rule's — so a clause that left the rule set is still held to
+     * the standard it came from.
+     *
+     * **This is what keeps the corpus count exact.** The corpus carries one line per published
+     * requirement; the rule set carries one rule per requirement it can crawl. Where those differ,
+     * the difference is named here rather than absorbed, so the two files still fail loudly when
+     * they genuinely drift apart.
+     *
+     * Absent on the eighteen questions that never corresponded to a rule — Table 2 of the
+     * requirements document lists requirements a website says nothing about, and those were never
+     * in the corpus's clause section.
+     */
+    clause: z.string().min(1).optional(),
   })
   .strict();
 
