@@ -1302,6 +1302,33 @@ function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.
     sentences.push(
       `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages${surfaces}.`,
     );
+
+    /*
+      Which pages were left, in plain words (D-223, D-076).
+
+      "5 of 64" gave a reader a ratio and no way to judge it. These say what the rest were, and the
+      two kinds are kept apart because they are different facts: pages left because the rule set
+      recognised every part of their name are a defensible omission, and pages left because the run
+      ran out of room are Mintro's bound rather than the catalogue's. Declared either way — a page
+      nobody looked at is never quietly absent, and neither sentence asks the merchant to vouch for
+      anything.
+    */
+    const left = sample.notRendered;
+    if (left !== undefined && left.recognised > 0) {
+      sentences.push(
+        `The ${left.recognised} product ${plural(left.recognised, 'page')} not opened ` +
+          `${left.recognised === 1 ? 'names a compound' : 'name compounds'} the rule set recognises; ` +
+          `nothing on ${left.recognised === 1 ? 'it' : 'them'} was read.`,
+      );
+    }
+    if (left !== undefined && left.overCap > 0) {
+      // The cap's own number is not repeated here: it lives in the worker, and a second copy in
+      // the browser is a number free to drift from the one that actually bounded the run.
+      sentences.push(
+        `A further ${left.overCap} ${plural(left.overCap, 'page')} went unopened because this run ` +
+          `reached the most it will render in one pass — not because there was nothing to look at.`,
+      );
+    }
   }
 
   if (obstruction !== undefined && obstruction.unanswered > 0) {
