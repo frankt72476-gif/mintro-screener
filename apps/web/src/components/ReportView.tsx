@@ -44,7 +44,7 @@ import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
-import { notObservedSentence } from '@mintro/engine';
+import { boundarySentence, notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
@@ -1436,9 +1436,29 @@ function FindingRow({
                 'molecular weight' was observed"* — which is the mechanism and the old prefix, in the
                 one line a reader scans without opening anything.
               */}
+              {/*
+                The boundary first, then what was observed (D-001, D-076).
+
+                The line used to open with a measurement — *"2 of 37 URLs in scope 'products'
+                matched a prohibited pattern"* — and a reader had to open the requirement pair to
+                learn what it was measured against. `boundarySentence` states the standard's own
+                side in a noun phrase; the note states what was seen. Neither tells the merchant
+                what to do, and the gap between them is the reader's to draw.
+
+                Composed into this one span rather than given its own element: the ask was a
+                single leading line, and a second block would be the stacking this replaces.
+
+                Hidden once the row is open, for the reason the note is — the requirement pair a
+                few lines below carries the clause verbatim, which is the fuller statement of the
+                same boundary, and printing both is the same sentence twice.
+              */}
               {finding.state === 'not_evaluable'
                 ? rowSentence(notObservedSentence(finding))
-                : rowSentence(finding.note)}
+                : rowSentence(
+                    [boundarySentence(finding), finding.note]
+                      .filter((part): part is string => part !== null && part !== '')
+                      .join(' '),
+                  )}
             </span>
           )}
           <span className="find-ev">▸ {source === undefined ? '—' : shorten(source)}</span>
@@ -1467,6 +1487,22 @@ function FindingRow({
         */}
         {!print && <span className="find-caret" aria-hidden="true" />}
       </button>
+      {/*
+        Answering is a top-level action, not something behind the disclosure.
+
+        The box used to sit inside `.ev`, which is `display:none` until the row is opened — so a
+        merchant had to expand a finding before they could see there was anywhere to reply. The
+        whole conversation moved to email, and a reply affordance nobody can see without opening
+        something is part of why.
+
+        Outside the head rather than in it: the head is a `<button>`, and a textarea inside a
+        button is invalid markup whose every keystroke would toggle the row.
+
+        **The merchant's recorded words stay inside `.ev`, after the evidence.** That is D-063 and
+        it is untouched — the slip holds what Mintro captured, and a merchant's account placed in
+        it would read as evidence we gathered. This moves the empty box, not the answer.
+      */}
+      {commentBox !== undefined && <div className="find-comment">{commentBox}</div>}
       <div className="ev">
         {/* False where the group states it once above (D-208). */}
         {showRequirement && <Requirement finding={finding} />}
@@ -1494,7 +1530,6 @@ function FindingRow({
           they gave.
         */}
         {commentary !== undefined && <MerchantResponse commentary={commentary} />}
-        {commentBox}
       </div>
     </div>
   );

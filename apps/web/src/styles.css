@@ -312,6 +312,9 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 }
 
 .ev{display:none;padding:0 15px 12px 27px}
+/* The reply box is a top-level action and is never hidden by the disclosure (see FindingRow).
+   Indented to the same gutter as `.ev` so it still reads as belonging to the row above it. */
+.find-comment{padding:0 15px 4px 27px}
 .find.open .ev{display:block}
 
 /* signature: evidence slip */

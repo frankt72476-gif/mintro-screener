@@ -154,6 +154,13 @@ export {
 } from './checks/flowProbe.js';
 export {
   DIRECTIVE_TERMS,
+  // The full set a generated finding is audited against, and the remedy verbs D-001
+  // added to it. Exported because the finding copy is composed in the app, and an
+  // unexported constant imported anyway resolves to `undefined` — which `auditCopy`
+  // silently accepts, falling back to the weaker default and auditing less than the
+  // caller asked for.
+  FINDING_TERMS,
+  REMEDY_TERMS,
   INTERNAL_TERMS,
   CHARACTERISATION_TERMS,
   PARTICIPATION_TERMS,
@@ -281,6 +288,7 @@ export {
   pairSameObservation,
   describeVerdict,
   notObservedSentence,
+  boundarySentence,
   type AssembleInput,
   type ReportCategory,
   type ReportAccess,
