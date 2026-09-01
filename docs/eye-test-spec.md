@@ -50,6 +50,32 @@ answer.
 | 8 | Does checkout read consumer — discounts, bundles, subscriptions? | uncovered |
 | 9 | Does the entry gate read as a control or a formality? | GATE-001 checks it exists, not how it reads |
 
+### 2a — Five added at rubric 2.2.0
+
+The nine above are `2.1.0` and are unchanged. IQwallet reviewed a real screen and named
+judgment-level risks the set did not reach — not rule-shaped, which is what this layer is for.
+
+| # | Question | Why no rule covers it |
+|---|---|---|
+| 10 | Does the copy address the visitor as someone who will use the product, or as a researcher acquiring a material? | no rule reads who a sentence is spoken to |
+| 11 | Does the site host articles, a blog, or topic pages discussing what compounds do or are used for? | no rule reads the presence of editorial |
+| 12 | Does the site name, compare itself to, or link other sellers? | uncovered |
+| 13 | Is how-to or guidance content written for a lay reader rather than technically? | no rule reads register |
+| 14 | Do product groupings, category names and product names read as outcome-oriented or compound-oriented? | NAME-001 and NAME-002 match named terms, not how a catalogue is organised |
+
+**"Nine, not eleven" above still holds as written.** It refused padding to a round number; these
+five were not invented to reach one — each names a risk an underwriter pointed at on a real
+storefront, and each is answerable from the captures the crawl already takes.
+
+That last part is the binding limit. Only the homepage, the sampled product pages and the sign-up
+page are ever captured — there is no blog, category or policy capture — so 11, 12 and 13 are
+answered from what those pages show: navigation, footers, hero copy and linked titles. A site whose
+editorial or comparison surfaces are not reachable from them is a `cannot_tell`, not a `clear`, and
+the rubric's own note says so.
+
+Two of the three risks 11-13 name were visible in CoMo's homepage navigation alone — a *Research
+Applications* link and a *Competition Analyzer* link, both in the primary nav on every page.
+
 ### Nothing here re-answers a rule
 
 A report that says the same thing twice in different words is worse than saying it once, and the

@@ -50,7 +50,10 @@ describe('the rubric is data', () => {
     const rubric = loadEyeTestRubric();
 
     expect(rubric.version).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(rubric.items).toHaveLength(9);
+    // Nine at 2.1.0; fourteen at 2.2.0, after IQwallet's review of a real screen named five
+    // judgment-level risks the set did not reach. Pinned so a question arriving or leaving is a
+    // deliberate change — the count is what `rubric_version` exists to make traceable.
+    expect(rubric.items).toHaveLength(14);
   });
 
   it('gives every item an id, a question and something to look for', () => {
@@ -296,7 +299,9 @@ describe('what it accepts back', () => {
     });
 
     if (outcome.kind !== 'ran') throw new Error('expected a result');
-    expect(outcome.test.verdicts).toHaveLength(9);
+    // One verdict per rubric item, read from the rubric rather than a literal, so this keeps
+    // asserting the fill-in behaviour rather than the count of the day.
+    expect(outcome.test.verdicts).toHaveLength(loadEyeTestRubric().items.length);
     expect(outcome.test.verdicts.find((v) => v.id === 'EYE-01')?.verdict).toBe('concern');
     expect(outcome.test.verdicts.find((v) => v.id === 'EYE-02')?.verdict).toBe('cannot_tell');
     expect(outcome.test.verdicts.find((v) => v.id === 'EYE-02')?.saw).toContain('did not answer');
