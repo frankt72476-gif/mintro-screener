@@ -9,7 +9,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createSchema, type SchemaFixture } from './harness.js';
+import { OWNER_ID, createSchema, type SchemaFixture } from './harness.js';
 
 let db: SchemaFixture;
 
@@ -27,9 +27,9 @@ async function seedPackage(): Promise<string> {
     [`runs-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version)
-     values ($1, 'iqwallet', 'seed') returning id`,
-    [merchant!.id],
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
+     values ($1, 'iqwallet', 'seed', $2) returning id`,
+    [merchant!.id, OWNER_ID],
   );
   return pkg!.id;
 }

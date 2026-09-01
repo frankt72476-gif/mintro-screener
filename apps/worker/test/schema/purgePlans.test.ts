@@ -20,7 +20,7 @@ beforeAll(async () => {
   const [user] = await db.query<{ id: string }>(
     `insert into auth.users (email) values ('plans@example.com') returning id`,
   );
-  await db.query(`insert into public.analysts (id, email) values ($1, 'plans@example.com')`, [user!.id]);
+  await db.query(`insert into public.analysts (id, email, status) values ($1, 'plans@example.com', 'active')`, [user!.id]);
   analyst = user!.id;
   await db.actAs(analyst);
 
@@ -58,9 +58,9 @@ async function seedPackage(): Promise<string> {
     [`plan-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version)
-     values ($1, 'iqwallet', 'documents-1') returning id`,
-    [merchant!.id],
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
+     values ($1, 'iqwallet', 'documents-1', $2) returning id`,
+    [merchant!.id, analyst],
   );
   return pkg!.id;
 }
@@ -86,7 +86,7 @@ describe('an analyst may ask for a dry run', () => {
     const [other] = await db.query<{ id: string }>(
       `insert into auth.users (email) values ('other@example.com') returning id`,
     );
-    await db.query(`insert into public.analysts (id, email) values ($1, 'other@example.com')`, [other!.id]);
+    await db.query(`insert into public.analysts (id, email, status) values ($1, 'other@example.com', 'active')`, [other!.id]);
     const error = await asAnalyst(() => db.attempt(
       `insert into public.document_purge_plans (package_id, requested_by) values ($1, $2)`,
       [packageId, other!.id],

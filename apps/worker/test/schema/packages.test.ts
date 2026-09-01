@@ -8,7 +8,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createSchema, type SchemaFixture } from './harness.js';
+import { OWNER_ID, createSchema, type SchemaFixture } from './harness.js';
 
 let db: SchemaFixture;
 
@@ -36,9 +36,9 @@ async function seedPackage(label = 'northwind'): Promise<{ merchantId: string; p
     [`${label}-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version)
-     values ($1, 'iqwallet', 'seed-2026-08-24') returning id`,
-    [merchant!.id],
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
+     values ($1, 'iqwallet', 'seed-2026-08-24', $2) returning id`,
+    [merchant!.id, OWNER_ID],
   );
   return { merchantId: merchant!.id, packageId: pkg!.id };
 }
@@ -79,9 +79,9 @@ describe('packages key to an application attempt, not a merchant', () => {
   it('allows two packages under one merchant with different templates', async () => {
     const { merchantId } = await seedPackage();
     const error = await db.attempt(
-      `insert into public.packages (merchant_id, processor_key, template_version)
-       values ($1, 'second-processor', 'seed-2026-08-24')`,
-      [merchantId],
+      `insert into public.packages (merchant_id, processor_key, template_version, created_by)
+       values ($1, 'second-processor', 'seed-2026-08-24', $2)`,
+      [merchantId, OWNER_ID],
     );
     // A merchant declined by one processor and resubmitted to another is two packages, and
     // nothing about the first constrains the second.
