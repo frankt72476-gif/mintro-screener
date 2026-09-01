@@ -67,8 +67,19 @@ const API_VERSION = '2023-06-01';
  * round for a bound whose only job is to stop a hang.
  *
  * It is still a hang guard and not a budget. A call that reaches this has stopped answering.
+ *
+ * **Raised to 120s when the rubric went from nine questions to fourteen (rubric 2.2.0).** The 90
+ * above was sized against a 4000-token ceiling projecting to 55-60s. `MAX_ANSWER_TOKENS` is now
+ * 6000 for the same reason the question count moved, and the same projection carries it to roughly
+ * 85-90s — which 90 does not clear, it lands on. A bound derived from a count has to move when the
+ * count does, or the first concern-heavy storefront times out and records an absence for a run the
+ * model actually completed.
+ *
+ * Not a recalibration of what the eye test asks. D-198's argument is unchanged and is what makes
+ * this cheap: the eye test runs after the run completes, at the bottom of the queue, holding no
+ * browser, so nobody waits on it.
  */
-export const EYE_TEST_TIMEOUT_MS = 90_000;
+export const EYE_TEST_TIMEOUT_MS = 120_000;
 
 /**
  * How long an answer may be.
@@ -85,8 +96,17 @@ export const EYE_TEST_TIMEOUT_MS = 90_000;
  * Bounded rather than removed. The answer is JSON with a fixed number of items, so a response that
  * keeps going is a malfunction — and an unbounded ceiling would bill for it. Headroom is free:
  * output is charged on what is produced, not on what is permitted.
+ *
+ * **Raised to 6000 when the rubric went from nine questions to fourteen (rubric 2.2.0).** Every
+ * number above was measured against nine, and the worst structural case is one `saw` line per
+ * question: 14/9 of 4000 is about 6200, so 6000 keeps the same headroom over the same worst case.
+ *
+ * Left alone it would truncate exactly where it matters. A ceiling hit mid-JSON reaches the reader
+ * as *"the model answered in a shape the rubric does not allow"* — a length failure wearing a parse
+ * failure's clothes — and the answers most likely to hit it are the long ones, which are the
+ * concern-heavy storefronts these five questions were added to catch.
  */
-const MAX_ANSWER_TOKENS = 4000;
+const MAX_ANSWER_TOKENS = 6000;
 
 /**
  * A capture the eye test wants, named by the surface the rubric asks about.

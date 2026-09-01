@@ -1,9 +1,9 @@
 {
-  "version": "2.1.0",
-  "effective": "2026-08-30",
+  "version": "2.2.0",
+  "effective": "2026-08-31",
   "model": "claude-sonnet-5",
   "model_note": "Which model answers is a calibration decision, not a code change — it lives with the rubric so that a rubric version identifies both the questions and the model that answered them. A calibration log comparing reads across models cannot attribute anything if the model can move without the version moving.",
-  "note": "Nine questions, per docs/eye-test-spec.md §2. Nothing here re-answers a rule: a report that says the same thing twice in different words is worse than saying it once, and the second saying carries less authority than the first. Deliberately excluded — certificate depth (COA-001..006), disclaimer presence and legibility (DISC-002, DISC-003), testimonials (OFFS-002), sign-up form fields (GATE-004, GATE-005), product naming (NAME-002, NAME-003), and the off-site trail, which the captures cannot answer. Revising this file is a data change and must never require touching the engine.",
+  "note": "Fourteen questions. The first nine are docs/eye-test-spec.md §2 and are unchanged; EYE-10 to EYE-14 were added after IQwallet reviewed a real screen and named judgment-level risks the set did not reach. Nothing here re-answers a rule: a report that says the same thing twice in different words is worse than saying it once, and the second saying carries less authority than the first. Deliberately excluded — certificate depth (COA-001..006), disclaimer presence and legibility (DISC-002, DISC-003), testimonials (OFFS-002), sign-up form fields (GATE-004, GATE-005), product naming (NAME-002, NAME-003), and the off-site trail, which the captures cannot answer. The five added questions are answered from the homepage, product and sign-up captures only — no blog, category or policy page is captured — so a site whose editorial or comparison surfaces are not linked from those pages is a cannot_tell, not a clear. Revising this file is a data change and must never require touching the engine.",
   "read_instruction": "Write two to four sentences describing how this storefront presents itself. Say what it looks like, not whether it complies. This is the part a reader actually reads.",
   "verdicts": {
     "clear": "Looked at, and nothing of this kind was visible.",
@@ -98,6 +98,56 @@
       "surfaces": [
         "homepage",
         "signup"
+      ]
+    },
+    {
+      "id": "EYE-10",
+      "question": "Does the copy address the visitor as someone who will use the product, or as a researcher acquiring a material?",
+      "why_no_rule": "no rule reads who a sentence is spoken to",
+      "look_for": "Who the second person points at. Copy addressed to the reader's own training, recovery, dosing or results — we train like you, train harder, people like you. Against: the reader as a buyer of a material, described by what it is rather than what it will do for them. The risk is the reader being addressed as an end user, not the mention of a compound's studied context: noting a compound is studied in athletic-injury models is the ordinary case.",
+      "surfaces": [
+        "homepage",
+        "product"
+      ]
+    },
+    {
+      "id": "EYE-11",
+      "question": "Does the site host articles, a blog, or topic pages discussing what compounds do or are used for?",
+      "why_no_rule": "no rule reads the presence of editorial",
+      "look_for": "Presence, not quality. Navigation, footer or homepage links to a blog, journal, articles, guides, research or learn section, and any article titles naming a compound alongside what it is used for. Presence is what this asks about — a catalogue with no application-topic editorial is the ordinary case.",
+      "surfaces": [
+        "homepage",
+        "product"
+      ]
+    },
+    {
+      "id": "EYE-12",
+      "question": "Does the site name, compare itself to, or link other sellers?",
+      "why_no_rule": "uncovered",
+      "look_for": "Other vendors named in copy, comparison tables or why-choose-us sections set against named competitors, price-match or beat-their-price claims, and outbound links to other peptide sellers. A comparison against other sellers of these compounds is what this asks about.",
+      "surfaces": [
+        "homepage",
+        "product"
+      ]
+    },
+    {
+      "id": "EYE-13",
+      "question": "Is how-to or guidance content written for a lay reader rather than technically?",
+      "why_no_rule": "no rule reads register",
+      "look_for": "The register, not the topic. Handling, storage and reconstitution written as a consumer explainer — best way to store your peptides, simple steps, what you need to know — with plain-language framing, numbered walkthroughs or reassurance. Against: the same subjects stated as specifications, in the voice of a technical data sheet, which is the ordinary case.",
+      "surfaces": [
+        "homepage",
+        "product"
+      ]
+    },
+    {
+      "id": "EYE-14",
+      "question": "Do product groupings, category names and product names read as outcome-oriented or compound-oriented?",
+      "why_no_rule": "NAME-001 and NAME-002 match named terms, not how a catalogue is organised",
+      "look_for": "How the catalogue is divided and labelled, in navigation, collection headings and product titles. Groupings named for what a buyer wants — bulking, weight loss, recovery, longevity, healing — against groupings named for what the material is, by chemical name or formula. The organising principle, not any single word.",
+      "surfaces": [
+        "homepage",
+        "product"
       ]
     }
   ]
