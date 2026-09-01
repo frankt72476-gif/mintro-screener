@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Overlay-covered product</title>
+<!--
+  A simple product whose add control is covered by a fixed, viewport-filling element. Shape quoted
+  from comopeptides' age-affirmation lightbox: an Elementor `.dialog-widget` at z-index 9999
+  measured at 1280x720. The wording is deliberately not reproduced — detection is structural.
+-->
+<body style="margin:0">
+  <div class="product type-product product-type-simple">
+    <form class="cart" action="/shop/thing/">
+      <button type="submit" name="add-to-cart" value="1" class="single_add_to_cart_button button alt">Add to cart</button>
+    </form>
+  </div>
+  <div class="dialog-widget" style="position:fixed;inset:0;z-index:9999;background:#fff;display:flex"></div>
+</body>

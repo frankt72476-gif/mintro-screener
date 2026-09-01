@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
 import { cartHoldsProduct } from './cart.js';
+import { attributedToUs, inspectAddOutcome } from './addBlockers.js';
 import { establishCheckout } from './locate.js';
 import { withDeadline, withDeadlineOr } from './deadline.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
@@ -147,10 +148,62 @@ export async function runCheckoutFlow(
     }
 
     if (cart === 'empty') {
+      /*
+        An empty cart does not say whose failure it is, and it used to be filed as the merchant's
+        (D-181, narrowed here — see `addBlockers.ts`).
+
+        `clicked` means a click landed on an element. On a WooCommerce **variable** product the
+        element is disabled by class while remaining clickable to a driver: the click lands, the
+        store's own script refuses the add, and the cart is honestly empty. Nothing was refused by
+        the merchant, because nothing was asked of them. Reporting *"the cart remained empty"* as a
+        fact about the storefront is then a false statement about a real business, in a document
+        that reaches their underwriter.
+
+        So the page is asked what stood in the way, structurally, and the answer decides the
+        attribution rather than the wording deciding it (constraint 9, D-156).
+
+        **Nothing here drives the blocker.** Completing a variation form or dismissing an
+        interstitial is a change to what the probe can do, not to what it claims, and it is not
+        this pass.
+      */
+      const outcome = await inspectAddOutcome(page, add.selector ?? '', timeout);
+
+      if (attributedToUs(outcome)) {
+        steps.push('the cart was still empty and the add was not completed');
+        const because =
+          outcome.blockers.length > 0
+            ? `: ${outcome.blockers.join('; ')}`
+            : ', and the page could not be inspected to establish why';
+
+        return await observe(
+          'not_started',
+          // States the method and what it measured, and stops there (D-076). It does not say the
+          // cart refused the item, because that was never established.
+          `the crawl did not complete the add-to-cart flow, so the cart was empty and nothing was ` +
+            `observed about guest checkout${because}`,
+          true,
+        );
+      }
+
+      if (outcome.refusedToSignIn) {
+        // The store answered, and the answer is legible: it sent an anonymous add to sign-in.
+        // Reported as the storefront's, and deliberately *not* promoted to `redirected_to_login`
+        // — that is a verdict on an `auto_fail` rule and no stored specimen exercises it.
+        steps.push(`the add was refused and the flow was sent to ${new URL(page.url()).pathname}`);
+        return await observe(
+          'not_started',
+          'the add-to-cart control was clicked and the storefront sent the flow to a sign-in page ' +
+            'with the cart still empty',
+        );
+      }
+
+      // Read the page, found nothing in the way, and the cart is still empty: the add was made and
+      // did not take. This is the case D-181 described, and it keeps the attribution D-181 gave it.
       steps.push('the cart was still empty after adding');
       return await observe(
         'not_started',
-        'the add-to-cart control was clicked but the cart remained empty, so the flow never began',
+        'the add-to-cart control was clicked, nothing on the page was found preventing it, and ' +
+          'the cart remained empty, so the flow never began',
       );
     }
 
@@ -259,7 +312,7 @@ async function clickFirst(
   page: { locator: (selector: string) => { first: () => { count: () => Promise<number>; click: (options: { timeout: number }) => Promise<void> } } },
   selectors: readonly string[],
   timeout: number,
-): Promise<{ readonly clicked: boolean; readonly unanswered: number }> {
+): Promise<{ readonly clicked: boolean; readonly unanswered: number; readonly selector?: string }> {
   let unanswered = 0;
 
   for (const selector of selectors) {
@@ -276,7 +329,9 @@ async function clickFirst(
     if (count === 0) continue;
     try {
       await target.click({ timeout });
-      return { clicked: true, unanswered };
+      // Which control was clicked, so an empty cart afterwards can be asked about the same
+      // element rather than about a guess at which one it was (D-181).
+      return { clicked: true, unanswered, selector };
     } catch {
       // A control that exists but will not click is not a match; try the next candidate.
     }
