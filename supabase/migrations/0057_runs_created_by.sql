@@ -36,6 +36,18 @@
 -- attribute them to*. Zero — 0055 not applied, or applied to a database with no active analyst —
 -- and there is nothing to write. More than one, and the choice would be arbitrary. Either way the
 -- migration aborts before the column exists.
+--
+-- ## Unless there are no runs, in which case there is nothing to attribute
+--
+-- A database with zero runs is a fresh one: a developer's `db reset`, a CI schema fixture, a new
+-- environment. There are no analysts in it either, so demanding an owner there aborts the whole
+-- migration chain on every machine that has not restored production — which is not the guard doing
+-- its job, it is the guard firing where it protects nothing.
+--
+-- So the requirement is stated against what it actually protects: *runs that would otherwise end up
+-- unattributed*. No runs, no owner needed, and the column is added not-null with no default because
+-- there are no rows to violate it. One or more runs and no single owner, and the migration aborts
+-- exactly as before. The failing case is unchanged; only the vacuous one is.
 
 do $$
 declare
@@ -43,11 +55,16 @@ declare
   owners   bigint;
   affected bigint;
 begin
-  select count(*) into owners from public.analysts where role = 'owner';
+  select count(*) into affected from public.runs;
+  select count(*) into owners   from public.analysts where role = 'owner';
+
+  if affected = 0 then
+    -- Nothing to attribute. Not-null from the start, no default, no owner consulted.
+    alter table public.runs add column created_by uuid not null references public.analysts (id) on delete restrict;
+    return;
+  end if;
 
   if owners <> 1 then
-    select count(*) into affected from public.runs;
-
     raise exception
       'runs.created_by: % run(s) could not be attributed to an owner, so the migration was aborted.',
       affected

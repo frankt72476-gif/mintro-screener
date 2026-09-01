@@ -208,7 +208,14 @@ describe('only an approver approves', () => {
     const packageId = await seedPackage();
     const [ex] = await recordExport(packageId);
     await verify(ex!.record_package_export);
-    await db.query(`update public.analysts set active = false where id = $1`, [approver]);
+    // Deactivation is the owner's act, or the service role's. 0058 refuses it from an ordinary
+    // analyst's session, so this fixture step runs with no `auth.uid()` — which is what a
+    // service-role write looks like, and what actually deactivates people.
+    await db.actAs(null);
+    await db.query(
+      `update public.analysts set active = false, status = 'suspended' where id = $1`,
+      [approver],
+    );
     await db.actAs(approver);
     const error = await db.attempt(
       `select public.approve_package_purge($1, $2, $3)`,
@@ -217,7 +224,11 @@ describe('only an approver approves', () => {
     // `is_purge_approver()` requires `active` as well as the flag — revoking access has to revoke
     // this too, or a departed approver keeps the one capability that cannot be undone.
     expect(error).toMatch(/only a purge approver/);
-    await db.query(`update public.analysts set active = true where id = $1`, [approver]);
+    await db.actAs(null);
+    await db.query(
+      `update public.analysts set active = true, status = 'active' where id = $1`,
+      [approver],
+    );
     await db.actAs(analyst);
   });
 

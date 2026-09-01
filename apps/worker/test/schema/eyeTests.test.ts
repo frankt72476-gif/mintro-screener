@@ -15,7 +15,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createSchema, type SchemaFixture } from './harness.js';
+import { OWNER_ID, createSchema, type SchemaFixture } from './harness.js';
 
 let schema: SchemaFixture;
 let merchantId: string;
@@ -36,9 +36,9 @@ afterAll(async () => {
 /** A run in flight, the way `persistRun` inserts one before it finishes. */
 async function startRun(): Promise<string> {
   const rows = await schema.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status)
-     values ($1, 'public', '3.3.0', 'running') returning id`,
-    [merchantId],
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by)
+     values ($1, 'public', '3.3.0', 'running', $2) returning id`,
+    [merchantId, OWNER_ID],
   );
   return (rows[0] as { id: string }).id;
 }

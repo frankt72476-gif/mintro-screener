@@ -53,6 +53,16 @@ export interface PersistInput {
   /** Supplied so a re-persist of an existing run is a collision rather than a silent overwrite. */
   readonly runId: string;
   /**
+   * The analyst the run belongs to. `runs.created_by` is not null and carries no default (0057),
+   * so there is nothing for this to fall back to — which is the point. Scoping in Stage 1's
+   * policies is only as good as the attribution written here, and a service-role path that
+   * guessed an owner would attribute one admin's work to another silently.
+   *
+   * Required at the type level so a caller that has no owner in hand fails to compile rather
+   * than at 3am against a not-null constraint.
+   */
+  readonly createdBy: string;
+  /**
    * Every key the run captured, when that is known separately from `artifacts`.
    *
    * A resume has the key list — it can read the evidence directory — but deliberately carries no
@@ -70,6 +80,55 @@ export interface PersistResult {
   readonly evidenceAlreadyPresent: number;
   /** True when this filled in an existing incomplete run rather than creating a new one. */
   readonly resumed: boolean;
+}
+
+/**
+ * The account owner's analyst id.
+ *
+ * For the command-line entry points, which have no signed-in operator to attribute a run to. It
+ * resolves the owner explicitly and says so at the call site, rather than letting the database
+ * supply a default — 0057 dropped that default precisely so attribution is always a decision
+ * somebody made.
+ *
+ * Throws when there is not exactly one owner. Guessing between two, or inventing one where there
+ * are none, is how a run ends up belonging to the wrong person.
+ */
+export async function ownerAnalystId(supabase: WorkerSupabase): Promise<string> {
+  const { data, error } = await supabase.client
+    .from('analysts')
+    .select('id, email')
+    .eq('role', 'owner');
+
+  if (error !== null) {
+    throw new Error(`could not resolve the account owner: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as { id: string; email: string }[];
+  if (rows.length !== 1) {
+    throw new Error(
+      `could not resolve the account owner: ${rows.length} analyst row(s) carry role = 'owner', ` +
+        'and exactly one is required. Apply supabase/migrations/0055 and check the roster.',
+    );
+  }
+  return rows[0]!.id;
+}
+
+/** Who an existing run already belongs to. Used when resuming: the run's owner does not change. */
+export async function runOwner(supabase: WorkerSupabase, runId: string): Promise<string> {
+  const { data, error } = await supabase.client
+    .from('runs')
+    .select('created_by')
+    .eq('id', runId)
+    .maybeSingle();
+
+  if (error !== null) {
+    throw new Error(`could not read the owner of run ${runId}: ${error.message}`);
+  }
+  const row = data as { created_by: string } | null;
+  if (row === null) {
+    throw new Error(`run ${runId} does not exist, so it has no owner to preserve`);
+  }
+  return row.created_by;
 }
 
 export async function persistRun(
@@ -97,7 +156,16 @@ export async function persistRun(
   const resumed = before.exists;
 
   if (!resumed) {
-    await insertRun(supabase, runId, merchantId, report);
+    // Checked here rather than trusted from the type, because the type is only as good as the
+    // JavaScript that ignores it. An empty owner is refused before anything is written.
+    if (input.createdBy.trim() === '') {
+      throw new Error(
+        `refusing to open run ${runId}: no owner was supplied. runs.created_by is not null and ` +
+          'has no default, and picking one here would attribute this run to someone who did not ' +
+          'start it.',
+      );
+    }
+    await insertRun(supabase, runId, merchantId, report, input.createdBy);
   }
 
   try {
@@ -216,10 +284,12 @@ async function insertRun(
   runId: string,
   merchantId: string,
   report: ScreeningReport,
+  createdBy: string,
 ): Promise<void> {
   const { error } = await supabase.client.from('runs').insert({
     id: runId,
     merchant_id: merchantId,
+    created_by: createdBy,
     started_at: report.startedAt,
     mode: report.mode,
     ruleset_version: report.rulesetVersion,

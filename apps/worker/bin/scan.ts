@@ -21,7 +21,7 @@ import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
 import { tally, type EvidenceArtifact, type Finding } from '@mintro/engine';
 import { screenStorefront } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
-import { persistRun } from '../src/store/persist.js';
+import { ownerAnalystId, persistRun } from '../src/store/persist.js';
 import { assertBuildUnchanged, pinBuild, type BuildPin } from '../src/buildPin.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun, describeCompleteness } from '../src/store/completeness.js';
@@ -144,7 +144,12 @@ async function scan(
   }
 
   if (supabase !== undefined) {
-    const result = await persistRun(supabase, { report, artifacts, runId });
+    // A command-line scan has no signed-in operator, so the owner is resolved and named rather
+    // than defaulted. `runs.created_by` carries no default (0057); this is the decision that
+    // fills it, and it is printed so the attribution is visible in the log.
+    const createdBy = await ownerAnalystId(supabase);
+    console.log(`  attributed to the account owner (${createdBy})`);
+    const result = await persistRun(supabase, { report, artifacts, runId, createdBy });
     // Read back rather than reported from the writer's own return value. `persistRun` refuses to
     // close an incomplete run, and this confirms from the database that it did close one.
     const after = await assessRun(supabase, runId, { checkObjects: true });

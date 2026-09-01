@@ -85,7 +85,11 @@ describe('migrations', () => {
     for (const { file, sql } of files) {
       for (const table of tablesCreatedIn(sql)) {
         const taken = new Set<string>();
-        for (const m of sql.matchAll(/revoke\s+([\s\S]*?)\s+on\s+public\.(\w+)\s+from\s+([^;]*);/gi)) {
+        // Anchored at the start of a line. Unanchored, the leading `[\s\S]*?` will happily begin
+        // at the word "revoke" inside a preceding comment and swallow the prose between there and
+        // the real statement, so the privilege list parses as English and a correctly revoked table
+        // reports as unprotected. The anchor is what makes this read statements rather than text.
+        for (const m of sql.matchAll(/^[ 	]*revoke\s+([\s\S]*?)\s+on\s+public\.(\w+)\s+from\s+([^;]*);/gim)) {
           if (m[2] !== table || !/\bauthenticated\b/i.test(m[3]!)) continue;
           for (const priv of m[1]!.split(',')) taken.add(priv.trim().toLowerCase());
         }

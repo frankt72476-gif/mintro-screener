@@ -125,6 +125,8 @@ interface ScanRequest {
   readonly status: string;
   readonly claimed_at: string | null;
   readonly mode: string;
+  /** Who queued it. Becomes `runs.created_by`, which is what every Stage 1 policy scopes on. */
+  readonly requested_by: string;
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -458,7 +460,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
 
   const { data, error } = await supabase.client
     .from('scan_requests')
-    .select('id, url, status, claimed_at, mode')
+    .select('id, url, status, claimed_at, mode, requested_by')
     .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -482,7 +484,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
     .update({ status: 'running', claimed_at: new Date().toISOString(), progress: 'starting' })
     .eq('id', candidate.id)
     .eq('status', candidate.status)
-    .select('id, url, status, claimed_at, mode');
+    .select('id, url, status, claimed_at, mode, requested_by');
 
   if (claimError !== null) {
     throw new Error(`could not claim request ${candidate.id}: ${claimError.message}`);
@@ -606,7 +608,7 @@ async function handle(
 
     const { report, artifacts } = outcome.value;
 
-    await persistRun(supabase, { report, artifacts, runId });
+    await persistRun(supabase, { report, artifacts, runId, createdBy: request.requested_by });
 
     // What the run actually did, recorded against the request. `mode` stopped being a choice at
     // D-040; it is now an outcome, and this is where the outcome is written.

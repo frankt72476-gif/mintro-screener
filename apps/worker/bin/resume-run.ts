@@ -29,7 +29,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import type { ScreeningReport } from '@mintro/engine';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
-import { persistRun } from '../src/store/persist.js';
+import { persistRun, runOwner } from '../src/store/persist.js';
 import { assessRun, describeCompleteness } from '../src/store/completeness.js';
 import { preflight } from '../src/store/preflight.js';
 
@@ -98,7 +98,13 @@ async function main(argv: readonly string[]): Promise<number> {
 
   try {
     // No artifacts: nothing is uploaded. The keys make the check as strong as the writer's.
-    await persistRun(supabase, { report, artifacts: [], runId, artifactKeys });
+    //
+    // The run already exists, so nothing here inserts one and `createdBy` is never written. It is
+    // read from the run rather than resolved to the owner anyway: a resume must not be able to
+    // change who a run belongs to, and passing the owner would make that possible the day this
+    // path grows an insert.
+    const createdBy = await runOwner(supabase, runId);
+    await persistRun(supabase, { report, artifacts: [], runId, artifactKeys, createdBy });
   } catch (error) {
     console.error(`\n${error instanceof Error ? error.message : String(error)}`);
     console.error(

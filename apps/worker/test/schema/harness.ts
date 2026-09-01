@@ -121,6 +121,25 @@ export async function createSchema(): Promise<SchemaFixture> {
     }
   }
 
+  // The roster the tests act as.
+  //
+  // Migrations apply to an empty database, so 0055 promotes nobody and 0057 takes its no-runs
+  // path. Every run needs an owner from here on (`runs.created_by` is not null with no default),
+  // and Stage 1's policies need two distinct actors to be scoped *between* — one admin's run has
+  // to be invisible to another admin, and a fixture with a single analyst cannot show that.
+  await db.exec(`
+    insert into auth.users (id, email) values
+      ('${OWNER_ID}', 'owner@example.test'),
+      ('${ADMIN_A_ID}', 'admin-a@example.test'),
+      ('${ADMIN_B_ID}', 'admin-b@example.test');
+
+    insert into public.analysts (id, email, full_name, active, role, can_run_documents_check, status)
+    values
+      ('${OWNER_ID}',   'owner@example.test',   'Test Owner',   true, 'owner', true,  'active'),
+      ('${ADMIN_A_ID}', 'admin-a@example.test', 'Test Admin A', true, 'admin', false, 'active'),
+      ('${ADMIN_B_ID}', 'admin-b@example.test', 'Test Admin B', true, 'admin', false, 'active');
+  `);
+
   return {
     db,
 
@@ -150,10 +169,17 @@ export async function createSchema(): Promise<SchemaFixture> {
   };
 }
 
+/** The account owner. Every run belongs to this analyst unless a test says otherwise. */
+export const OWNER_ID = '00000000-0000-4000-8000-000000000001';
+/** Two ordinary admins, so a test can show one cannot see the other's work. */
+export const ADMIN_A_ID = '00000000-0000-4000-8000-00000000000a';
+export const ADMIN_B_ID = '00000000-0000-4000-8000-00000000000b';
+
 /** A merchant and an open run, for tests that need something to hang findings off. */
 export async function seedRun(
   fixture: SchemaFixture,
   domain = 'shop.example',
+  createdBy: string = OWNER_ID,
 ): Promise<{ merchantId: string; runId: string }> {
   const [merchant] = await fixture.query<{ id: string }>(
     `insert into public.merchants (domain) values ($1) returning id`,
@@ -161,9 +187,9 @@ export async function seedRun(
   );
 
   const [run] = await fixture.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status)
-     values ($1, 'public', '2.4.0', 'running') returning id`,
-    [merchant!.id],
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by)
+     values ($1, 'public', '2.4.0', 'running', $2) returning id`,
+    [merchant!.id, createdBy],
   );
 
   return { merchantId: merchant!.id, runId: run!.id };

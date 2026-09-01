@@ -30,10 +30,26 @@ describe.skipIf(!configured)('Supabase stack integration', () => {
   let service: SupabaseClient;
   let anon: SupabaseClient;
   let runId: string;
+  let analystId: string;
 
   beforeAll(async () => {
     service = createClient(url!, serviceKey!, { auth: { persistSession: false } });
     anon = createClient(url!, anonKey!, { auth: { persistSession: false } });
+
+    // `runs.created_by` is not null and carries no default (0057), so a run needs an analyst to
+    // belong to before it can exist at all. Created here rather than assumed present: a fresh
+    // `supabase start` has an empty roster.
+    const { data: created, error: userError } = await service.auth.admin.createUser({
+      email: `itest-${Date.now()}@example.test`,
+      email_confirm: true,
+    });
+    if (userError !== null) throw new Error(`could not create the test auth user: ${userError.message}`);
+    analystId = created.user.id;
+
+    const { error: analystError } = await service
+      .from('analysts')
+      .insert({ id: analystId, email: created.user.email, full_name: 'Integration Test', status: 'active' });
+    if (analystError !== null) throw new Error(`could not create the test analyst: ${analystError.message}`);
 
     const { data: merchant } = await service
       .from('merchants')
@@ -48,6 +64,7 @@ describe.skipIf(!configured)('Supabase stack integration', () => {
         mode: 'public',
         ruleset_version: '2.4.0',
         status: 'running',
+        created_by: analystId,
       })
       .select('id')
       .single();

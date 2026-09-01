@@ -13,7 +13,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createSchema, type SchemaFixture } from './harness.js';
+import { OWNER_ID, createSchema, type SchemaFixture } from './harness.js';
 
 let schema: SchemaFixture;
 let merchantId: string;
@@ -48,9 +48,9 @@ afterAll(async () => {
 
 async function makeRun(): Promise<string> {
   const [run] = await schema.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status, report)
-     values ($1, 'public', '3.3.0', 'running', $2::jsonb) returning id`,
-    [merchantId, JSON.stringify(REPORT)],
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, report, created_by)
+     values ($1, 'public', '3.3.0', 'running', $2::jsonb, $3) returning id`,
+    [merchantId, JSON.stringify(REPORT), OWNER_ID],
   );
   return run!.id;
 }
