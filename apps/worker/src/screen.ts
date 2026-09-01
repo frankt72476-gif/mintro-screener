@@ -65,8 +65,33 @@ import { coaLinkVocabulary, fetchCertificate } from './coa.js';
 import { probePaths } from './probe.js';
 import { runCheckoutFlow } from './flow.js';
 
-/** Product pages sampled per run. ARCHITECTURE.md budgets 3-5. */
+/**
+ * The floor: a catalogue with nothing to look at still gets looked at.
+ *
+ * ARCHITECTURE.md budgets 3-5, and that stands for a storefront where every product page is a
+ * compound the rule set recognises. It is a floor rather than the sample size, because the sample
+ * is now decided by what the scorer could not account for (D-223).
+ */
 export const SAMPLE_SIZE = 5;
+
+/**
+ * The most product pages one run will render.
+ *
+ * **A stability bound, not a budget.** D-223 made every unrecognised slug a candidate, and on the
+ * stored catalogues that is not a handful: swisschems scores 124 pages worth rendering, corepeptides
+ * 104. Rendering all of them is unbounded Playwright work decided by a merchant's catalogue size,
+ * which is the shape that has hung this worker before (D-152, D-153) — a run that never returns
+ * produces no findings at all, so an unbounded sample trades a thin report for no report.
+ *
+ * 25 rather than a smaller number because the cap should bind on catalogue size, not on ordinary
+ * suspicion: comopeptides scores 14 and never reaches it, so the merchant this was written for is
+ * sampled in full. Against the 30-minute deadline (`RUN_DEADLINE_MS`) 25 renders is affordable —
+ * it is roughly five times the previous render work, which is real and is why the cap exists at
+ * all rather than being left implicit.
+ *
+ * What it does not do is decide anything. Pages above the cap are declared, not dropped (D-076).
+ */
+export const RENDER_CAP = 25;
 
 /**
  * What happened when a walled crawl tried to escalate to a stored login (D-185).
@@ -183,7 +208,34 @@ export async function screenStorefront(
   // ---- Layer 2: sample product pages by suspicion score --------------------------------
   const productUrls = improved.urls.filter((url) => inScope(url, 'products'));
   const scored = scoreProductUrls(productUrls, ruleset);
-  const selected = selectSample(scored, SAMPLE_SIZE);
+
+  /*
+    Everything the scorer could not account for, bounded (D-223).
+
+    `scoreProductUrls` already orders suspicious above unrecognised above benign, so taking the
+    top N *is* the priority fill — nothing re-sorts here, and a second ordering computed alongside
+    the scorer's would be a second answer to the same question.
+
+    The floor keeps the old behaviour where it still applies: a catalogue whose every page is a
+    recognised compound scores nothing, and five of them are still rendered rather than none.
+  */
+  const worthRendering = scored.filter((entry) => entry.slugClass !== 'benign').length;
+  const sampleSize = Math.min(RENDER_CAP, Math.max(SAMPLE_SIZE, worthRendering));
+  const selected = selectSample(scored, sampleSize);
+  const unrendered = scored.slice(selected.length);
+
+  /*
+    What was left, and which kind (D-076). Declared, never silently omitted.
+
+    The two are different facts. A recognised compound left unrendered is a defensible omission —
+    the rule set positively accounted for every part of its slug. A page left for want of room is
+    not: nothing was established about it, and the reader has to be able to see that the bound was
+    ours rather than the catalogue's.
+  */
+  progress.notRenderedIs(
+    unrendered.filter((entry) => entry.slugClass === 'benign').length,
+    unrendered.filter((entry) => entry.slugClass !== 'benign').length,
+  );
 
   // The denominator the sample is drawn from, recorded once and read twice: by the count on every
   // page below, and by `sampleBasis()` when the report is assembled (D-162, D-173).

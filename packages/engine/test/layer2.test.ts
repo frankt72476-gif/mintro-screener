@@ -59,7 +59,13 @@ function productPage(overrides: Partial<PageContext> = {}): PageContext {
 
 const sample = (pages: PageContext[]): SampledPage[] =>
   pages.map((page, index) => ({
-    selection: { url: slug(new URL(page.finalUrl).pathname), score: 10 - index, reasons: [] },
+    selection: {
+      url: slug(new URL(page.finalUrl).pathname),
+      score: 10 - index,
+      // These fixtures are about Layer 2's handlers, not about why the page was picked.
+      slugClass: 'suspicious' as const,
+      reasons: [],
+    },
     page,
   }));
 
@@ -94,11 +100,31 @@ describe('suspicion scoring', () => {
   });
 
   it('takes its whole vocabulary from the rule set, not from this package', () => {
-    // Nothing scores when the rules contribute nothing — proof there is no built-in word list.
-    const empty: Ruleset = { ...ruleset, rules: ruleset.rules.filter((r) => r.type === 'manual') };
-    const scored = scoreProductUrls([slug('/product/lean-mass-stack')], empty);
+    /*
+      Strip the rules and the *matching* vocabulary goes with them — proof there is no built-in
+      word list. What remains is D-223's floor: a slug nothing recognises still scores, because
+      "we cannot classify this" is a reason to render rather than a reason to skip.
 
-    expect(scored[0]?.score).toBe(0);
+      Both vocabularies are data. Strip the benign list too and the same slug is still
+      unrecognised; strip only the rules and it is unrecognised rather than clean. Neither list
+      lives here.
+    */
+    const noRules: Ruleset = { ...ruleset, rules: ruleset.rules.filter((r) => r.type === 'manual') };
+    const scored = scoreProductUrls([slug('/product/lean-mass-stack')], noRules);
+
+    expect(scored[0]?.reasons.some((r) => r.ruleId !== '—')).toBe(false);
+    expect(scored[0]?.slugClass).toBe('unrecognised');
+  });
+
+  it('recognises an ordinary compound only because the rule set says so', () => {
+    // The benign list is data as much as the patterns are: remove it and the same slug stops
+    // being recognised. Nothing in this package knows what a peptide is called.
+    const known = scoreProductUrls([slug('/product/bpc-157')], ruleset);
+    expect(known[0]?.slugClass).toBe('benign');
+    expect(known[0]?.score).toBe(0);
+
+    const stripped = { ...ruleset, sampling: undefined } as unknown as Ruleset;
+    expect(scoreProductUrls([slug('/product/bpc-157')], stripped)[0]?.slugClass).toBe('unrecognised');
   });
 
   it('is deterministic: the same input always yields the same order', () => {

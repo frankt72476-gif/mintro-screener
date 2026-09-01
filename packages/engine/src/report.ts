@@ -359,6 +359,24 @@ export interface SampleBasis {
   readonly productsSampled: number;
   /** Surfaces this run read, named. Only ones actually reached. */
   readonly surfacesRead: readonly string[];
+  /**
+   * Product pages the run did not render, and why they were the ones left (D-223, D-076).
+   *
+   * **Declared, never silently omitted, and never attested.** The sampler has always rendered a
+   * subset; what it could not say before was *which* subset it left, so "5 of 64" gave a reader a
+   * ratio and no way to judge it. These two numbers are what makes the ratio readable: the pages
+   * left out are the ones the rule set positively recognises as ordinary compounds, and any that
+   * were left out for want of room are named separately, because those are a different fact.
+   *
+   * Absent on runs recorded before this existed, and the line then says what it always said
+   * (D-002).
+   */
+  readonly notRendered?: {
+    /** Left out because every part of the slug is a recognised compound. */
+    readonly recognised: number;
+    /** Left out because the run hit its render cap, whatever they were. */
+    readonly overCap: number;
+  };
 }
 
 export interface AssembleInput {

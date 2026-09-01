@@ -63,7 +63,13 @@ describe('rules/ruleset.json', () => {
       different. `effective` does not move — the published standards do not name GLP-1 agonists,
       which is why CATG-008 is `source: mintro`.
     */
-    expect(ruleset.version).toBe('3.5.0');
+    /*
+      3.6.0 adds `sampling.benign_compounds` and changes no rule (D-223). It is the vocabulary the
+      sampler reads to tell an ordinary compound from a slug it cannot classify — the second of
+      which is now rendered ahead of the first. No pattern, tier, scope or clause moved, and no
+      finding depends on it, so `effective` does not move either.
+    */
+    expect(ruleset.version).toBe('3.6.0');
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(60);
     expect(ruleset.categories).toHaveLength(10);

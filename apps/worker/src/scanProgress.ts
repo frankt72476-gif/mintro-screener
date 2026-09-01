@@ -45,6 +45,13 @@ export interface ScanProgress {
   readonly sampleIs: (served: number) => void;
   /** A Layer 3 surface that was actually read. Never called for one that was not. */
   readonly surfaceRead: (label: string) => void;
+  /**
+   * What the run left unrendered, and which kind (D-223).
+   *
+   * Recorded here with everything else the coverage line is built from, so the declaration and the
+   * ratio it qualifies come from one derivation rather than two.
+   */
+  readonly notRenderedIs: (recognised: number, overCap: number) => void;
   /** What D-162 stores, from the same facts the run page was shown. */
   readonly sampleBasis: () => SampleBasis;
 }
@@ -52,6 +59,7 @@ export interface ScanProgress {
 export function createScanProgress(emit: (event: ProgressEvent) => void): ScanProgress {
   let phase: ScanPhase = 'discovery';
   let productsInScope = 0;
+  let notRendered: { recognised: number; overCap: number } | undefined;
   let productsSampled = 0;
   const surfacesRead: string[] = [];
 
@@ -85,8 +93,19 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
     surfaceRead(label) {
       if (!surfacesRead.includes(label)) surfacesRead.push(label);
     },
+    notRenderedIs(recognised, overCap) {
+      notRendered = { recognised, overCap };
+    },
     sampleBasis() {
-      return { productsInScope, productsSampled, surfacesRead: [...surfacesRead] };
+      return {
+        productsInScope,
+        productsSampled,
+        surfacesRead: [...surfacesRead],
+        // Omitted rather than zeroed when nothing recorded it: a run that never declared what it
+        // left out is not a run that left nothing out, and the coverage line has to tell those
+        // apart (D-002, D-044's shape).
+        ...(notRendered === undefined ? {} : { notRendered }),
+      };
     },
   };
 }
