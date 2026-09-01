@@ -15204,3 +15204,127 @@ question. No fixture was rewritten.
 Ten `manual` rules remain, and each names something a crawl cannot reach. Whether any of them
 belongs in the questions for the same reason is a separate ruling and is not taken here — PAY-002
 was distinguished by its own stated reason pointing at a section that already existed.
+
+---
+
+## D-227 — The probe does what a shopper does, and GATE-003 answers
+**2026-09-01 · engineering · `apps/worker/src/driveAdd.ts`, `flow.ts`, `addBlockers.ts`**
+
+D-222 made an empty cart honest about whose failure it was. It stayed blind. `GATE-003` is a
+stopping condition, and on every WooCommerce variable-product merchant it returned `not_evaluable`
+— the right answer to the wrong question, because nobody had asked the store to add anything.
+
+Three things stood in the way, and each is now driven.
+
+### The five storefronts, before and after
+
+| | before | after |
+|---|---|---|
+| swisschems.is | **fail** | **fail** — payment field at `/checkout/` |
+| sportstechnologylabs.com | **pass** | **pass** — `/checkout` redirects to `/my-account/` |
+| comopeptides.com | not evaluable | **pass** — reached `/checkout`, no payment field |
+| corepeptides.com | not evaluable | **fail** — payment field at checkout |
+| biotechpeptides.com | not evaluable | **fail** — payment field at checkout |
+
+Two verdicts unchanged, three converted from *cannot say* to a real answer, and the set still
+discriminates in both directions — which is what makes it a verdict rather than a default.
+
+**Comopeptides passes.** The outcome Frank accepted the risk of was a fail; it reached a confirmed
+checkout page and no payment field appeared on it. Worth stating that this is a weaker signal than
+sportstechnologylabs' redirect to sign-in: the flow confirmed it was on checkout and observed no
+card field after the page went quiet, which is what was seen and no more.
+
+### Interstitial: a race removed, not won
+
+The probe was getting past comopeptides' age gate by clicking at ~1.7s, before an Elementor
+lightbox rendered. That is a coincidence, and it inverts the first time the page is slower — with
+the click still landing on something, so the failure is silent.
+
+Now: settle the page, then ask `elementFromPoint` what is actually over the control, walk up to the
+outermost positioned ancestor covering it, and press the first actionable thing inside it — by role
+and position, never by label. Where nothing is pressable the element is taken out of the layout.
+
+**Found in the building, and it is the lesson of the pass.** The first version dismissed
+immediately after `domcontentloaded`, found nothing covering the control because the lightbox had
+not arrived, and the click then hit the overlay that appeared in the meantime. The race was not
+removed — it was *moved one step later*, to the step that reports. There is now a settle before the
+sweep and a second sweep immediately before the click, and a fixture whose overlay arrives on a
+timer.
+
+### Variation form: detect in the page, act through the driver
+
+Located by `form.variations_form` and `[data-product_variations]` — never by the disabled class,
+which is a *consequence* of the form being unset, and locating a cause by its effect is the
+inversion constraint 9 is about. In-stock is read from the form's own published matrix.
+
+**The first version set `select.value` and dispatched `change` from inside `page.evaluate`, and it
+did not work.** It reported options selected and the control stayed disabled on both live
+variable-product merchants, because the platform's variation script does not treat an assignment as
+a choice. Playwright's `selectOption` does what a person does. The page is asked *what* to set;
+the driver does the setting.
+
+Only live storefronts caught that. Both fixtures and both unit tests were green.
+
+### A control disabled by class is not clickable
+
+No `disabled` attribute, so a driver reads it as enabled, clicks, and the platform's script refuses
+the add — which is exactly how *"we could not add"* became *"the cart stayed empty"*. Read after
+driving, because a completed form releases its control. Still disabled afterwards is an
+observation; `null` is *could not tell* and the cart decides.
+
+### A click that would not land is not a control that is not there
+
+`clickFirst` swallowed a click timeout, ran out of selectors and reported *"no add-to-cart control
+was found on the product page"* — a statement about a merchant's page derived from our click
+failing. Found on comopeptides and corepeptides during live validation. Three outcomes now, and
+only the first is about the storefront: none matched, one matched and would not click, a lookup did
+not answer.
+
+**This also settles the biotechpeptides mode D-222 left untraced.** It was that: the same
+swallowed failure, on a v2.9.0 run. The current selectors match all five of its stored product
+pages, so nothing was broken about detection — and it now drives to a verdict. No separate work.
+
+### The attribution moved with the driver, in both directions
+
+This is the interaction that mattered, and it is symmetrical. D-222 exists so Mintro does not blame
+a merchant for its own limits. This pass must not blame a merchant for the limits that remain, nor
+excuse one for a refusal the probe can finally observe.
+
+A variation form is still in the DOM after it is completed, so presence alone stopped meaning
+blocked the moment the driver could complete one. `attributedToUsAfterDriving` reads what was
+driven, not what is on the page:
+
+    driven blocker, nothing left undone          → the storefront's
+    a control this driver cannot set             → ours
+    an interstitial still intercepting           → ours
+    the page could not be read                   → ours
+    the store sent the flow to sign-in           → the storefront's
+
+The first line is what this pass buys. It was unreachable before: the probe could not do what a
+shopper does, so it could never tell a store that refuses an anonymous add from one it had simply
+failed to ask.
+
+### D-056 holds
+
+The verdict is still decided by a positive signal that the flow is on checkout — the path naming it,
+or the page collecting what checkout collects. Removing that signal makes the flow report `checkout`
+from a product-page URL, which on `fail_if: payment_step_reached` is a **false pass on a stopping
+condition**. Asserted by making it fail that way.
+
+### Unauthenticated, and the same footprint a shopper leaves
+
+No session, no credential, no login (D-039). Nothing is typed into a field and no form is submitted:
+selecting an option and dismissing an overlay are what a visitor does before a product can be added.
+No account is created and no order is placed. `driveAdd.ts` is handed a page and can act only on
+that page — it never sees a browser or a context — and a test asserts the source reaches for none
+of it.
+
+### Cost
+
+**+3 seconds per probe** on merchants with nothing to drive — measured against the pre-change code
+on the two unchanged storefronts: swisschems 7.4s → 10.4s, sportstechnologylabs 32.8s → 36.2s. That
+is a settle bounded at 8s and four DOM reads bounded at 10s each.
+
+On merchants that need driving it is **faster**: comopeptides 21.5s → 8.9s, because a 20-second
+click timeout against an overlay is no longer spent. `GATE-003` runs once per run, against a
+30-minute deadline.

@@ -35,6 +35,7 @@
 
 import type { Page } from 'playwright';
 import { withDeadlineOr } from './deadline.js';
+import type { Driven } from './driveAdd.js';
 
 /** Bound on the one DOM read here, for the reason every other `page.evaluate` carries one (D-153). */
 const EVALUATE_DEADLINE_MS = 10_000;
@@ -81,6 +82,48 @@ export interface AddOutcome {
 export function attributedToUs(outcome: AddOutcome): boolean {
   if (outcome.refusedToSignIn) return false;
   return outcome.blockers.length > 0 || !outcome.read;
+}
+
+/**
+ * The same question, once the probe can drive some of what used to stop it (D-227).
+ *
+ * **This has to move in lockstep with the driver, and getting it wrong is symmetrical.** Pass A
+ * exists so Mintro does not blame a merchant for its own limits. Pass B must not now blame a
+ * merchant for the limits that remain — nor excuse one for a refusal the probe is finally able to
+ * observe.
+ *
+ * A variation form is still in the DOM after it is completed, so presence alone can no longer mean
+ * blocked. What decides it is whether anything a shopper would have done was left undone:
+ *
+ *   - a control this driver does not understand, still unset   → ours
+ *   - the page could not be read                               → ours
+ *   - an interstitial still intercepting after a dismissal     → ours
+ *   - the store answered by sending the flow to sign-in        → the storefront's
+ *   - everything a shopper does was done, and the cart is empty → the storefront's
+ *
+ * The last is the one this pass buys. It was unreachable before: the probe could not do what a
+ * shopper does, so it could never distinguish a store that refuses an anonymous add from one it had
+ * simply failed to ask.
+ */
+export function attributedToUsAfterDriving(outcome: AddOutcome, driven: Driven): boolean {
+  if (outcome.refusedToSignIn) return false;
+  if (!outcome.read) return true;
+  if (driven.unhandled.length > 0) return true;
+
+  /*
+    Blockers the driver was supposed to clear stop counting once it cleared them.
+
+    Read from what was driven rather than from the page, because the page still shows a variation
+    form after it is filled in and an overlay's own markup often survives its dismissal. A detector
+    asked "is a form present?" would answer yes to a page a shopper has finished with.
+  */
+  const remaining = outcome.blockers.filter((blocker) => {
+    if (driven.variationsCompleted && blocker.includes('variation form')) return false;
+    if (driven.interstitialDismissed && blocker.includes('covered the add-to-cart control')) return false;
+    return true;
+  });
+
+  return remaining.length > 0;
 }
 
 /**

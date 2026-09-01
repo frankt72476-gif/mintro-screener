@@ -15,4 +15,21 @@
       <button type="submit" class="single_add_to_cart_button button alt disabled wc-variation-selection-needed">Add to cart</button>
     </form>
   </div>
+  <!--
+    The platform's own behaviour, reproduced in four lines.
+
+    WooCommerce's variation script releases the add control once every option is chosen, and that
+    release is the contract the driver depends on — so a fixture without it cannot test the thing
+    that matters. It is the behaviour that is reproduced, not the wording: nothing here is matched
+    on, and the driver never reads it.
+
+    That the real script behaves this way is proved live rather than here — comopeptides and
+    corepeptides both drive to a verdict, and neither did before (D-227).
+  -->
+  <script>
+    document.querySelector('select[name="attribute_size"]').addEventListener('change', function (event) {
+      var button = document.querySelector('.single_add_to_cart_button');
+      if (event.target.value !== '') button.className = 'single_add_to_cart_button button alt';
+    });
+  </script>
 </body>
