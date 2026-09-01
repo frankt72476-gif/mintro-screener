@@ -38,6 +38,14 @@ export interface SuspicionReason {
 export interface ScoredUrl {
   readonly url: SlugUrl;
   readonly score: number;
+  /**
+   * Which of the three the sampler put this in (D-223).
+   *
+   * Carried on the result rather than re-derived by the caller: the sampler declares what it did
+   * not render, and a second classification computed at the point of declaring would be a second
+   * answer to the same question.
+   */
+  readonly slugClass: SlugClass;
   readonly reasons: readonly SuspicionReason[];
 }
 
@@ -47,7 +55,7 @@ export interface ScoredUrl {
  * Relative, not absolute — they order a list, they do not decide anything. No finding depends on
  * a score, so a page scoring zero is not "clean", it is simply less likely to be sampled.
  */
-const WEIGHT = {
+export const WEIGHT = {
   /** The slug matches a prohibited URL pattern outright. */
   prohibitedSlug: 10,
   /** The slug contains a term a text rule prohibits on the page. */
@@ -58,7 +66,117 @@ const WEIGHT = {
   nearMiss: 4,
   /** The slug names several compounds, which is where combination products live. */
   multiCompound: 2,
+  /**
+   * The vocabulary could not classify the slug at all (D-223).
+   *
+   * **This is the durable half of the scorer.** Everything above scores a page because something
+   * recognised it; this scores one because nothing did. On comopeptides `/shop/tz/`, `/shop/rt/`
+   * and `/shop/klow/` matched no rule's vocabulary, scored zero, sank below a sample of five and
+   * were never rendered — so their page content went unexamined while the report read as a clean
+   * catalogue. A scorer that only elevates what it already knows is blind to exactly the merchant
+   * who invented a name for it.
+   *
+   * Below a real match and above a recognised compound, which is the whole ordering: something we
+   * know is wrong beats something we cannot classify, and something we cannot classify beats
+   * something we positively recognise as ordinary.
+   */
+  unrecognised: 3,
 } as const;
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   Recognising the ordinary (D-223)
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Tokens that carry no identity of their own and never make a slug unrecognisable.
+ *
+ * Strengths, units and the scope segment. `/product/bpc-157-5mg/` is the same product as
+ * `/shop/bpc-157/`, and a scorer that called the first unknown because of `5mg` would elevate half
+ * of every catalogue and drown the pages that are genuinely unclassifiable.
+ */
+const INCIDENTAL = new Set([
+  'shop', 'product', 'products', 'collections', 'collection', 'item', 'items',
+  'mg', 'mcg', 'ug', 'g', 'ml', 'iu', 'kit', 'vial', 'vials', 'pack', 'x',
+]);
+
+const isIncidental = (token: string): boolean => INCIDENTAL.has(token) || /^\d+$/.test(token);
+
+/**
+ * How the sampler classifies a product slug.
+ *
+ *     suspicious    something in the rule set's vocabulary matched it
+ *     unrecognised  nothing matched it, and nothing recognised it either
+ *     benign        every part of it is a compound the rule set positively recognises
+ *
+ * The middle one is the point. It used to be folded into `benign` by default — a slug nothing
+ * matched scored zero and sank — which made *unknown* and *ordinary* the same answer.
+ */
+export type SlugClass = 'suspicious' | 'unrecognised' | 'benign';
+
+/**
+ * Every benign compound the rule set names, as token sequences.
+ *
+ * Read from `sampling.benign_compounds`, never from a list here. An empty or absent section means
+ * nothing is recognised as ordinary, so every slug is `unrecognised` and every page is a candidate
+ * — the safe direction for a missing vocabulary.
+ */
+export function benignVocabulary(ruleset: Ruleset): readonly (readonly string[])[] {
+  const section = (ruleset as { readonly sampling?: { readonly benign_compounds?: { readonly from_ruleset?: readonly string[]; readonly from_catalogue?: readonly string[] } } }).sampling;
+  const entries = [
+    ...(section?.benign_compounds?.from_ruleset ?? []),
+    ...(section?.benign_compounds?.from_catalogue ?? []),
+  ];
+  return entries.map((entry) => tokenizePath(entry)).filter((tokens) => tokens.length > 0);
+}
+
+/**
+ * Whether every part of a slug is accounted for by a recognised compound.
+ *
+ * **All of it, not any of it.** A slug is only ordinary when nothing in it is unexplained: one
+ * unrecognised token is enough to make the page worth rendering, because that token is where an
+ * invented name would be. `bpc-157-tb500-blend` is not benign — `blend` is unaccounted for, and it
+ * is also a NAME-002 pattern, so the page scores on both counts.
+ *
+ * Greedy, longest-first, so `ghk-cu` is consumed as one compound rather than leaving `cu` stranded.
+ */
+export function classifySlug(
+  url: SlugUrl,
+  benign: readonly (readonly string[])[],
+  hasSignal: boolean,
+): SlugClass {
+  if (hasSignal) return 'suspicious';
+
+  const ordered = [...benign].sort((a, b) => b.length - a.length);
+  const tokens = url.tokens;
+  let i = 0;
+
+  while (i < tokens.length) {
+    /*
+      A compound is tried before a token is written off as incidental, and the order is the fix
+      for a real defect: `5-amino-1mq` begins with a digit, so skipping incidentals first consumed
+      the `5` and then failed on `amino`. A compound whose name starts with a number could never
+      be recognised, and the page it named was elevated as unknown — safe, but wrong about why.
+    */
+    const match = ordered.find((entry) =>
+      entry.every((part, offset) => tokens[i + offset] === part),
+    );
+    if (match !== undefined) {
+      i += match.length;
+      continue;
+    }
+
+    const token = tokens[i];
+    if (token !== undefined && isIncidental(token)) {
+      i += 1;
+      continue;
+    }
+
+    return 'unrecognised';
+  }
+
+  return 'benign';
+}
 
 /**
  * Scores every in-scope product URL for how likely it is to carry a violation.
@@ -68,6 +186,7 @@ const WEIGHT = {
  */
 export function scoreProductUrls(urls: readonly SlugUrl[], ruleset: Ruleset): ScoredUrl[] {
   const signals = collectSignals(ruleset);
+  const benign = benignVocabulary(ruleset);
 
   const scored = urls.map((url) => {
     const reasons: SuspicionReason[] = [];
@@ -136,9 +255,27 @@ export function scoreProductUrls(urls: readonly SlugUrl[], ruleset: Ruleset): Sc
       });
     }
 
+    /*
+      Nothing recognised it, so that is the reason (D-223).
+
+      Scored last and only when nothing else scored, because a slug the vocabulary matched is
+      already accounted for — adding "and we also do not recognise it" would double-count the same
+      page and reorder the list against pages that carry a real signal.
+    */
+    const slugClass = classifySlug(url, benign, reasons.length > 0);
+    if (slugClass === 'unrecognised') {
+      reasons.push({
+        ruleId: '—',
+        matched: url.path,
+        weight: WEIGHT.unrecognised,
+        explanation: 'the slug names nothing the rule set recognises, so the page is unread until it is rendered',
+      });
+    }
+
     return {
       url,
       score: reasons.reduce((sum, reason) => sum + reason.weight, 0),
+      slugClass,
       reasons,
     };
   });

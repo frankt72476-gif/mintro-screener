@@ -254,6 +254,31 @@ export const rulesetSchema = z
     rules: z.array(ruleSchema).min(1),
     attestations: z.array(attestationSchema).min(1),
     not_checked: z.array(notCheckedSchema).min(1),
+    /**
+     * Vocabulary the sampler reads, and nothing else does (D-223).
+     *
+     * Separate from `rules` because it decides nothing: no finding, no state, no verdict depends on
+     * it. It orders which product pages get rendered, and a slug it does not recognise is sampled
+     * *ahead* of one it does — so an incomplete list costs extra renders and never a blind spot.
+     *
+     * Here rather than in the engine for the reason every other vocabulary is here: adding a
+     * compound must be a data change with a decision number, not an edit to a scorer
+     * (hard constraint 1, D-025).
+     */
+    sampling: z
+      .object({
+        benign_compounds: z
+          .object({
+            note: z.string().min(1),
+            /** Grounded in the rule set's own non-prohibitive compound names. */
+            from_ruleset: z.array(z.string().min(1)),
+            /** Grounded in plain single-compound slugs observed in a stored catalogue. */
+            from_catalogue: z.array(z.string().min(1)),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

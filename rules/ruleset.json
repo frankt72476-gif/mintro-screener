@@ -1,5 +1,5 @@
 {
-  "version": "3.5.0",
+  "version": "3.6.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -1606,5 +1606,42 @@
         "note": "A required-presence check, so it drifts toward false decline: a disclaimer worded differently reads as missing. review_only for that reason alone (D-177). expect: present is satisfied by ANY term, not all, so several phrasings are listed to widen what counts as the statement being there. They are deliberately punctuation-free: this path is matched by containsTerm, not by termPattern, so it gets no separator or inflection flexibility, and a comma the page places differently would otherwise read as an absent disclaimer."
       }
     }
-  ]
+  ],
+  "sampling": {
+    "benign_compounds": {
+      "note": "Slugs positively recognised as ordinary research compounds, and the ONLY category the sampler is allowed to skip. Everything else — including anything this list does not recognise — is sampled ahead of these, because 'we do not know what this is' is itself a reason to look (D-223). An incomplete list therefore costs a few extra renders and never costs a blind spot, which is why it is short and why it is only ever extended from evidence. Two grounded sources, and no third: compound names the rule set itself already names without prohibiting (NAME-003's map, CATG-005's subject), and plain single-compound slugs observed in a stored catalogue. Nothing here is recalled from general knowledge of peptide names — an entry nobody can trace is a page that silently stops being looked at. GLP-1 terms are excluded by construction and a test asserts it: CATG-008's vocabulary is the opposite of benign, and tz, rt and klow are the coined slugs that started this.",
+      "from_ruleset": [
+        "bpc-157",
+        "tb-500",
+        "bacteriostatic-water"
+      ],
+      "from_catalogue": [
+        "5-amino-1mq",
+        "acetic-acid",
+        "aod-9604",
+        "ara-290",
+        "cjc-1295",
+        "dsip",
+        "epitalon",
+        "ghk-cu",
+        "ghrp2",
+        "glutathione",
+        "igf1-lr3",
+        "ipamorelin",
+        "kisspeptin",
+        "kpv",
+        "l-carnitine",
+        "melanotan",
+        "mots-c",
+        "nad",
+        "pt-141",
+        "selank",
+        "semax",
+        "sermorelin",
+        "ss-31",
+        "tesamorelin",
+        "thymosin-alpha-1"
+      ]
+    }
+  }
 }

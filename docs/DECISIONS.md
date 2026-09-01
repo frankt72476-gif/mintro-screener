@@ -14839,3 +14839,103 @@ verdicts. The downstream half is sound and discriminating, so making the cart fi
 
 `GATE-003` remains unauthenticated (D-039); nothing in this pass touches how the flow is driven, and
 a test pins that the observation carries no session.
+
+---
+
+## D-223 — A slug nothing recognises is sampled ahead of one that is recognised
+**2026-09-01 · engineering · `packages/engine/src/suspicion.ts`, ruleset 3.5.0 → 3.6.0**
+
+The suspicion scorer read its whole vocabulary from the rule set, which is right, and drew the
+wrong conclusion from a miss. A product slug no rule named scored **zero** — the same score as a
+page positively recognised as an ordinary compound — sank below a sample of five, and was never
+rendered. Its page content went unexamined while the report read as a clean catalogue.
+
+*Unknown* and *ordinary* were the same answer.
+
+### The set it is blind to is the set it exists to find
+
+On comopeptides that was `/shop/tz/`, `/shop/rt/` and `/shop/klow/`: a merchant's own shorthand.
+A vocabulary assembled from names we already know cannot contain a name somebody invented, so the
+pages most worth opening were the ones guaranteed not to be opened.
+
+`CATG-008` (D-220) now matches the GLP-1 pair at the pattern layer, and that closes the acute case.
+It does not close this one. The next merchant's coinage sinks exactly as these did, and nothing in
+the report would say so.
+
+### Three tiers, and the middle one is the change
+
+    suspicious    something in the rule set's vocabulary matched it        highest
+    unrecognised  nothing matched it, and nothing recognised it either     elevated
+    benign        every part of it is a compound the rule set recognises   lowest, skippable
+
+*"We cannot classify this"* is itself the reason to render it. The weight is deliberately below a
+real match and above a recognised compound: something we know is wrong beats something we cannot
+place, and something we cannot place beats something we positively recognise as ordinary.
+
+**Scored only when nothing else scored.** A slug the vocabulary already matched is accounted for;
+adding *"and we also do not recognise it"* would count one page twice and reorder it against pages
+carrying a real signal.
+
+### The only skip category is a positive recognition, and it is data
+
+`sampling.benign_compounds`, in the rule set, versioned and auditable — the same place the matching
+vocabulary lives, and for the same reason (hard constraint 1). Adding a compound is a data change
+with a decision number, never an edit to the scorer.
+
+**Two grounded sources and no third.** Compound names the rule set itself already names without
+prohibiting — `NAME-003`'s map, `CATG-005`'s subject — and plain single-compound slugs observed in
+a stored catalogue. Nothing is admitted from general knowledge of peptide names, and a test
+re-derives both sources and refuses anything outside them.
+
+That restraint is the whole safety argument, and the asymmetry is the reason:
+
+- **An incomplete list** means a few ordinary pages are rendered. That costs time.
+- **A padded list** means a page stops being looked at on the strength of a name somebody
+  remembered. That is the blind spot, restored through the fix.
+
+So the list is short, and everything it does not recognise is elevated. Twenty-eight entries
+against a thirty-six-slug catalogue, and six of comopeptides' slugs are elevated as unrecognised —
+including composites like `bpc-tb-ghk-cu` and `melanotan-i-mt1`, which the list deliberately does
+not reach into. Rendering those is the cheap error.
+
+**GLP-1 is excluded by construction**, asserted against `CATG-008`'s own patterns rather than by a
+list written twice. A GLP-1 term on the benign list would send the page it names to the bottom of
+the sample — this defect, restored, through the thing built to close it.
+
+### All of the slug, not any of it
+
+A slug is benign only when nothing in it is unexplained. One unaccounted token is enough to render
+the page, because that token is where an invented name would be. `bpc-157-tb500-blend` is not
+benign: `blend` is unaccounted for, and it is also a `NAME-002` pattern, so the page scores twice
+over.
+
+Strengths, units and the scope segment are incidental and never make a slug unknown —
+`/product/bpc-157-5mg/` is the same product as `/shop/bpc-157/`, and a scorer that called the
+strength unknown would elevate half of every catalogue and drown the real unknowns.
+
+**Compounds are matched before a token is written off as incidental**, and the order is a defect
+found in the building: `5-amino-1mq` begins with a digit, so skipping incidentals first consumed
+the `5` and then failed on `amino`. A compound whose name starts with a number could never be
+recognised. Safe — it was elevated as unknown — and wrong about why, which is the kind of wrong
+that survives because its output looks correct.
+
+### What this does not do
+
+It changes **scoring and sampling, nothing else**. No rule was added, removed or retiered; no
+`auto_fail` pattern gained a token. Short and coined tokens reach the sampler and never a verdict,
+which is D-025's line and the reason `tz` and `rt` earned a `review_only` rule rather than a
+prohibition when they earned one at all.
+
+No finding depends on a score, so a page scoring zero is still not *clean* — it is less likely to
+be sampled, and the report says how many pages were drawn from how many.
+
+### The proof, against the run that started it
+
+Reconstructed by subtracting the new tier from today's scorer and removing `CATG-008`, which
+postdates the run: `tz`, `rt` and `klow` scored **0**, and none of them appears in the first five
+of that ordering. Under the current scorer `tz` and `rt` score 10 and are sampled; `klow`, which
+nothing matches even now, scores 3 on being unknown alone and rises above all twenty-two pages the
+list recognises.
+
+`effective` does not move. The published standards did not change; what changed is which pages
+Mintro opens before reading them.
