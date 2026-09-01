@@ -46,8 +46,9 @@ const findingFor = (rule: (typeof ruleset.rules)[number], state: 'fail' | 'revie
 
 describe('the split, as the rule set actually stands', () => {
   it('is 33 with a declarable boundary and 27 without', () => {
+    // 26 without, since PAY-002 left the rule set for the questions (D-226).
     expect(WITH_POLARITY).toHaveLength(33);
-    expect(WITHOUT_POLARITY).toHaveLength(27);
+    expect(WITHOUT_POLARITY).toHaveLength(26);
     expect(WITH_POLARITY.length + WITHOUT_POLARITY.length).toBe(ruleset.rules.length);
   });
 });

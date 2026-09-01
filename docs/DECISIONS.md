@@ -15114,3 +15114,93 @@ Every lead in the report now reads in plain English. The **notes** are a separat
 not all there yet — *"which this rule treats as a violation"* still sits inside `flow_probe`'s copy,
 and there are others. Those are observational and honest; they are simply not yet in a person's
 register. Naming that here rather than implying the register work is finished.
+
+---
+
+## D-226 — PAY-002 is asked, not crawled. The requirement did not change
+**2026-09-01 · Frank's ruling · ruleset 3.6.0 → 3.7.0, migration none**
+
+**The published standard still requires card payments to run through a merchant processor that
+performs KYC.** Nothing about that has been softened, narrowed or dropped. Its sentence is still in
+`rules/sources/ruo-standards-v1.1.md`, byte for byte, and is still validated against the corpus on
+every build.
+
+What changed is how Mintro checks it. It was a rule that could not observe its own subject; it is
+now one of the questions the merchant answers.
+
+### A rule whose only output was "ask the merchant"
+
+You cannot see who processes a merchant's card payments from their storefront. A correctly gated
+checkout never shows an anonymous visitor one, and a footer's payment marks name a card network,
+not the processor behind it. So PAY-002 returned `not_evaluable` on every run in the corpus, with
+the reason *"Requires merchant attestation."*
+
+And the report already had an attestation section, sitting a few inches away, whose entire purpose
+is the half of the programme a crawler cannot reach (D-134). The rule was pointing at it.
+
+**A rule whose only answer is "ask the merchant" is a question wearing a rule's clothes.** Keeping
+it in both places would have counted one requirement twice and shown a reader a `not_evaluable`
+finding beside the question that answers it.
+
+### The question, and why it is a new one
+
+> Who processes your card payments, and did they run KYC on you when you were onboarded?
+
+Asked in the register the other nineteen use — what the merchant *does*, never whether they comply
+(D-067). It carries the severity the rule carried, `major`, because a requirement does not become
+more or less important by changing how it is checked.
+
+**Distinct from `payment-channels`, not an extension of it.** That question asks whether money
+arrives by any route other than card processing. This asks who the card processor is and whether
+KYC happened. A merchant can take card payments only — a clean answer to the first — and still be
+processed by somebody who ran no KYC. Folding them together would let one answer stand for both.
+
+### The corpus problem, and why it is not solved by relaxing anything
+
+`checkAgainstCorpus` enforced a bijection: one corpus clause line per programme rule, exact, in
+both directions. A rule leaving the set while its clause stayed broke it — correctly. The corpus is
+the published standards document, and deleting a line from it to make a count agree would be
+asserting the standard changed, which is the one thing this decision must not do.
+
+The counts still reconcile **exactly**, and the difference is named rather than absorbed. An
+attestation may carry the standard's own sentence:
+
+    53 published requirements  =  52 crawled  +  1 asked
+
+Held to the same discipline as a rule's: the question's `clause` must appear in the corpus byte for
+byte, or the build fails naming the question. Without that, *"the requirement did not change"* would
+be false within one edit — the sentence could drift the moment it stopped being a rule and nothing
+would notice.
+
+An inequality would have been easier and is what makes it wrong: it would let the two files drift
+by any amount as long as somebody called the difference an attestation.
+
+### Counts
+
+| | before | after |
+|---|---|---|
+| rules | 60 | 59 |
+| — `source: programme` | 53 | 52 |
+| — `type: manual` | 11 | 10 |
+| — `cat: payment` | 3 | 2 |
+| attestation questions | 19 | 20 |
+| corpus clause lines | 53 | **53** |
+
+Six count tripwires moved with it, each a deliberate "did you mean this" pin: the version and rule
+count, the payment-category and manual counts, the corpus-length pin, the attestation count, the
+snapshot count on an assembled report, `notReachable` in coverage, and the boundary/plain split
+D-225 pinned at 33/27 — now 33/26.
+
+`effective` does not move. The standards did not change.
+
+### Stored runs
+
+Untouched (D-002). A run recorded before today keeps PAY-002 as a `not_evaluable` finding with the
+rule set version it was produced under, and reads exactly as it did. Only fresh runs ask the
+question. No fixture was rewritten.
+
+### What this does not settle
+
+Ten `manual` rules remain, and each names something a crawl cannot reach. Whether any of them
+belongs in the questions for the same reason is a separate ruling and is not taken here — PAY-002
+was distinguished by its own stated reason pointing at a section that already existed.

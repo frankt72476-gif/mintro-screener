@@ -48,7 +48,20 @@ function corpusFor(clauses: readonly string[], eol = '\n', trailing = false): st
   ].join(eol);
 }
 
-const CLAUSES = programme.map((rule) => rule.clause);
+/*
+  Every clause the corpus is expected to carry — the programme rules', plus the ones a question
+  asks instead of a rule crawling them (D-226).
+
+  PAY-002 moved to `payment-processor-kyc` and its sentence stayed in the corpus, because the
+  standard still carries it. The corpus is one line per published requirement; the rule set is one
+  rule per requirement it can crawl. Where those differ the difference is named in the question, so
+  a synthetic corpus built here has to include it or it is not the shape the validator checks.
+*/
+const ASKED = ruleset.attestations
+  .map((question) => (question as { clause?: string }).clause)
+  .filter((clause): clause is string => clause !== undefined);
+
+const CLAUSES = [...programme.map((rule) => rule.clause), ...ASKED];
 const messages = (text: string): string => checkAgainstCorpus(ruleset, text, SOURCE).map((d) => d.message).join(' | ');
 
 describe('the committed rule set and the committed corpus', () => {
@@ -73,10 +86,20 @@ describe('the committed rule set and the committed corpus', () => {
     expect(corpusClauseLines(onDisk)).toEqual(corpusClauseLines(asLf));
   });
 
-  it('carries one corpus clause line per programme rule', () => {
-    // The number itself is pinned in `ruleset-json.test.ts`, beside the rule count. This is the
-    // relation, which is what the validator enforces.
-    expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(programme.length);
+  it('carries one corpus clause line per published requirement', () => {
+    /*
+      One line per requirement the standards publish, which is programme rules plus the ones a
+      question asks instead (D-226). It was one-per-rule until PAY-002 moved: the requirement did
+      not leave the standard, only the crawl set, so the line stayed and the question now carries
+      the sentence.
+
+      Still exact rather than relaxed — an inequality here would let the two files drift by any
+      amount as long as somebody called the difference an attestation. The numbers themselves are
+      pinned in `ruleset-json.test.ts`.
+    */
+    expect(corpusClauseLines(readFileSync(CORPUS_PATH, 'utf8'))).toHaveLength(
+      programme.length + ASKED.length,
+    );
   });
 
   /**
@@ -175,13 +198,20 @@ describe('a corpus that says nothing cannot satisfy every clause', () => {
 
 describe('a corpus that is the wrong length', () => {
   it('one line short fails on the count and names the missing clause', () => {
-    const defects = checkAgainstCorpus(ruleset, corpusFor(CLAUSES.slice(0, -1)), SOURCE);
+    // A *rule's* clause specifically, so the by-rule-id assertion below still tests what it says.
+    // Dropping the last of CLAUSES would now drop the question's clause instead (D-226).
+    const dropped = programme[programme.length - 1]!;
+    const defects = checkAgainstCorpus(
+      ruleset,
+      corpusFor(CLAUSES.filter((clause) => clause !== dropped.clause)),
+      SOURCE,
+    );
     const text = defects.map((d) => d.message).join(' | ');
 
-    expect(text).toContain(`the corpus carries ${programme.length - 1} clause line(s)`);
+    expect(text).toContain(`the corpus carries ${CLAUSES.length - 1} clause line(s)`);
     expect(text).toContain('the two files have moved apart');
     // And the clause that went with it, by rule id.
-    expect(defects.some((d) => d.ruleId === programme[programme.length - 1]?.id)).toBe(true);
+    expect(defects.some((defect) => defect.ruleId === dropped.id)).toBe(true);
   });
 
   it('one line long fails the same way', () => {

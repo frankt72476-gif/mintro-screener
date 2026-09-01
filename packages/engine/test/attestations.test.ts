@@ -222,8 +222,9 @@ describe('the questions as data', () => {
     }
   });
 
-  it('covers all nineteen of Table 2', () => {
-    expect(ruleset.attestations).toHaveLength(19);
-    expect(new Set(ruleset.attestations.map((a) => a.id)).size).toBe(19);
+  it('covers all nineteen of Table 2, plus the one that moved here from a rule', () => {
+    // Nineteen from Table 2 (D-134); the twentieth is PAY-002, asked rather than crawled (D-226).
+    expect(ruleset.attestations).toHaveLength(20);
+    expect(new Set(ruleset.attestations.map((a) => a.id)).size).toBe(20);
   });
 });

@@ -68,7 +68,7 @@ describe('the report snapshots what the rule set said at the time', () => {
 
   it('carries them as values rather than a reference a later edit could move', () => {
     const report = build([]);
-    expect(report.attestationQuestions?.length).toBe(19);
+    expect(report.attestationQuestions?.length).toBe(20);
     expect(report.notChecked?.[0]?.subject).toBe('Social media accounts');
   });
 });
@@ -148,7 +148,8 @@ describe('every finding is accounted for', () => {
     // them — neither is observable from a public surface without transacting or being let past a
     // gate the program requires — and eleven since PAY-004 left the rule set entirely (D-142).
     expect(coverage.notReachable).toBe(ruleset.rules.filter((r) => r.type === 'manual').length);
-    expect(coverage.notReachable).toBe(11);
+    // Ten since PAY-002 stopped being a manual rule and became a question (D-226).
+    expect(coverage.notReachable).toBe(10);
     // Nothing is left in the pre-D-044 bucket for a report assembled now.
     expect(coverage.kindNotRecorded).toBe(0);
   });

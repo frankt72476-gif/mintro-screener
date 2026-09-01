@@ -108,6 +108,20 @@ export function checkAgainstCorpus(ruleset: Ruleset, corpusText: string, source:
   const clauseLines = corpusClauseLines(corpusText);
   const programme = ruleset.rules.filter((rule) => rule.source === 'programme');
   const mintro = ruleset.rules.filter((rule) => rule.source === 'mintro');
+  /*
+    Published requirements Mintro asks instead of crawling (D-226).
+
+    A requirement a website says nothing about does not stop being in the standard because no rule
+    can observe it. PAY-002's clause is in the corpus, byte for byte, and the question that replaced
+    it carries the same sentence — so the clause is still accounted for, still validated against the
+    corpus below, and still fails loudly if the two files drift.
+
+    Counted here rather than exempted, because an exemption would let the corpus and the rule set
+    move apart by any amount as long as somebody called it an attestation.
+  */
+  const asked = (ruleset.attestations ?? []).filter(
+    (question): question is typeof question & { clause: string } => typeof question.clause === 'string',
+  );
 
   if (clauseLines.length === 0) {
     defects.push(
@@ -127,12 +141,12 @@ export function checkAgainstCorpus(ruleset: Ruleset, corpusText: string, source:
     cannot see is both being shortened in step — that is pinned in `ruleset-json.test.ts`, for the
     hard-constraint-1 reason given at the top of this file.
   */
-  if (programme.length !== clauseLines.length) {
+  if (programme.length + asked.length !== clauseLines.length) {
     defects.push(
       defect(
         source,
-        `${programme.length} rule(s) declare source 'programme' but the corpus carries ${clauseLines.length} clause line(s) — ` +
-          'the two files have moved apart',
+        `${programme.length} rule(s) declare source 'programme' and ${asked.length} question(s) carry a clause, ` +
+          `but the corpus carries ${clauseLines.length} clause line(s) — the two files have moved apart`,
       ),
     );
   }
@@ -191,7 +205,25 @@ export function checkAgainstCorpus(ruleset: Ruleset, corpusText: string, source:
     or one the rule set never adopted. Without this the corpus could accumulate text indefinitely and
     every check above would still pass.
   */
-  const claimed = new Set(programme.map((rule) => rule.clause));
+  /*
+    A question's clause is held to the corpus exactly as a rule's is (D-226).
+
+    The point of moving a requirement to a question is that the requirement did not change. If its
+    sentence could drift from the standard's the moment it stopped being a rule, that claim would be
+    false within one edit.
+  */
+  for (const question of asked) {
+    if (!corpusText.includes(question.clause)) {
+      defects.push(
+        defect(
+          source,
+          `question '${question.id}' quotes a clause that is not in the corpus: ${JSON.stringify(truncate(question.clause))}`,
+        ),
+      );
+    }
+  }
+
+  const claimed = new Set([...programme.map((rule) => rule.clause), ...asked.map((question) => question.clause)]);
   for (const line of new Set(clauseLines)) {
     if (!claimed.has(line)) {
       defects.push(
