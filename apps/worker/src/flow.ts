@@ -13,7 +13,8 @@
 import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
 import { cartHoldsProduct } from './cart.js';
-import { attributedToUs, inspectAddOutcome } from './addBlockers.js';
+import { attributedToUsAfterDriving, inspectAddOutcome } from './addBlockers.js';
+import { addControlUsable, dismissInterstitial, driveToAddable, NOTHING_DRIVEN, type Driven } from './driveAdd.js';
 import { establishCheckout } from './locate.js';
 import { withDeadline, withDeadlineOr } from './deadline.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
@@ -105,10 +106,94 @@ export async function runCheckoutFlow(
     await page.goto(options.productUrl, { waitUntil: 'domcontentloaded', timeout });
     steps.push(`opened ${new URL(options.productUrl).pathname}`);
 
+    /*
+      Do what a shopper does before clicking (D-227).
+
+      An interstitial covering the control and an unset variation form are the two things that made
+      `GATE-003` unanswerable on every WooCommerce variable-product merchant. Driving them here —
+      structurally, submitting nothing — is what lets the rule reach a verdict instead of reporting
+      that it could not look.
+
+      Before `clickFirst`, and that ordering removes a race rather than winning one. The probe was
+      getting past comopeptides' age gate by clicking at ~1.7s, before the lightbox rendered; that
+      is a coincidence that inverts the first time the page is slower, and silently.
+    */
+    /*
+      Let the page finish arriving before looking for what is in the way (D-227).
+
+      Found by driving five live storefronts: without this the dismissal ran at ~1.7s, before
+      comopeptides' lightbox rendered, found nothing covering the control, and the click then hit
+      the overlay that had appeared in the meantime. The race was not removed — it was moved one
+      step later, which is worse, because the step that now loses is the one that reports.
+
+      Bounded and non-fatal: a page that never goes quiet is driven anyway, and the cart decides.
+    */
+    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
+
+    let driven: Driven = NOTHING_DRIVEN;
+    try {
+      driven = await driveToAddable(page, timeout);
+      for (const step of driven.steps) steps.push(step);
+    } catch {
+      // A driver that threw has driven nothing, which `NOTHING_DRIVEN` already says. The flow
+      // continues and the attribution stays ours, which is the honest reading.
+    }
+
+    /*
+      A control the page has disabled is not a control a click can work (D-227).
+
+      Disabled by class, with no `disabled` attribute, so a driver reads it as enabled, clicks it,
+      and the platform's own script refuses the add. That is exactly how "we could not add" became
+      "the cart stayed empty" — the click landed and nothing happened. Asked after driving, because
+      a completed form un-disables its control.
+
+      `null` is "could not tell", and it is not `false`: the flow proceeds and the cart decides.
+    */
+    const usable = await addControlUsable(page, timeout);
+    if (usable === false) {
+      steps.push('the add-to-cart control was still not usable after the product options were set');
+      return await observe(
+        'not_started',
+        driven.unhandled.length > 0
+          ? `the crawl could not complete the add-to-cart flow: ${driven.unhandled.join('; ')}`
+          : 'the product options were set and the add-to-cart control remained unusable, so nothing could be added',
+        driven.unhandled.length > 0,
+      );
+    }
+
+    /*
+      And once more, immediately before the click.
+
+      An interstitial that arrives on a timer, or re-arms after a variation changes, is past the
+      first sweep. This is the cheap half of not depending on timing: one DOM read against a page
+      already in hand.
+    */
+    if (await dismissInterstitial(page, timeout)) {
+      steps.push('dismissed a late element covering the add-to-cart control');
+      driven = { ...driven, interstitialDismissed: true };
+    }
+
     const add = await clickFirst(page, ADD_TO_CART, timeout);
     if (!add.clicked) {
       // A lookup that did not answer is not a control that is not there (D-156). Only the first
       // of these is a fact about the storefront.
+      /*
+        A control that would not click is not a control that is not there (D-156, D-227).
+
+        Found on comopeptides and corepeptides: the click timed out against an overlay, `clickFirst`
+        swallowed it, ran out of selectors, and the flow reported *"no add-to-cart control was found
+        on the product page"* — a statement about the merchant's page derived from our click
+        failing. Three outcomes now, and only the first is a fact about the storefront.
+      */
+      if (add.blocked > 0) {
+        return await observe(
+          'not_started',
+          `the add-to-cart control was found but ${add.blocked} attempt(s) to click it did not land, ` +
+            `so nothing could be added and nothing was observed about guest checkout`,
+          true,
+        );
+      }
+
       return add.unanswered === 0
         ? await observe('not_started', 'no add-to-cart control was found on the product page')
         : await observe(
@@ -168,7 +253,7 @@ export async function runCheckoutFlow(
       */
       const outcome = await inspectAddOutcome(page, add.selector ?? '', timeout);
 
-      if (attributedToUs(outcome)) {
+      if (attributedToUsAfterDriving(outcome, driven)) {
         steps.push('the cart was still empty and the add was not completed');
         const because =
           outcome.blockers.length > 0
@@ -312,8 +397,15 @@ async function clickFirst(
   page: { locator: (selector: string) => { first: () => { count: () => Promise<number>; click: (options: { timeout: number }) => Promise<void> } } },
   selectors: readonly string[],
   timeout: number,
-): Promise<{ readonly clicked: boolean; readonly unanswered: number; readonly selector?: string }> {
+): Promise<{
+  readonly clicked: boolean;
+  readonly unanswered: number;
+  /** Controls that matched but refused to click — ours, and not the same as none matching. */
+  readonly blocked: number;
+  readonly selector?: string;
+}> {
   let unanswered = 0;
+  let blocked = 0;
 
   for (const selector of selectors) {
     const target = page.locator(selector).first();
@@ -331,12 +423,14 @@ async function clickFirst(
       await target.click({ timeout });
       // Which control was clicked, so an empty cart afterwards can be asked about the same
       // element rather than about a guess at which one it was (D-181).
-      return { clicked: true, unanswered, selector };
+      return { clicked: true, unanswered, blocked, selector };
     } catch {
-      // A control that exists but will not click is not a match; try the next candidate.
+      // A control that exists but will not click is counted rather than forgotten: the caller has
+      // to be able to tell it from no control at all (D-156).
+      blocked += 1;
     }
   }
-  return { clicked: false, unanswered };
+  return { clicked: false, unanswered, blocked };
 }
 
 /** The first line of an error message, which is the part that names what went wrong. */

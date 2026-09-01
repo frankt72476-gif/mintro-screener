@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Product with a late interstitial</title>
+<!--
+  The case that broke the probe before Pass B: the overlay is not in the initial markup and
+  arrives on a timer, so a dismissal that ran immediately after `domcontentloaded` found nothing
+  covering the control and the click then hit the overlay that had appeared in the meantime.
+
+  1200ms because comopeptides' Elementor lightbox was measured rendering after the probe's ~1.7s
+  click. The point is that the driver must not depend on being faster than it.
+-->
+<body style="margin:0">
+  <div class="product type-product product-type-simple">
+    <form class="cart" action="/shop/thing/">
+      <button type="submit" name="add-to-cart" value="1" class="single_add_to_cart_button button alt">Add to cart</button>
+    </form>
+  </div>
+  <script>
+    setTimeout(function () {
+      var gate = document.createElement('div');
+      gate.className = 'dialog-widget';
+      gate.setAttribute('style', 'position:fixed;inset:0;z-index:9999;background:#fff;display:flex');
+      gate.innerHTML = '<button type="button" id="enter">Enter</button>';
+      gate.querySelector('#enter').addEventListener('click', function () { gate.remove(); });
+      document.body.appendChild(gate);
+    }, 1200);
+  </script>
+</body>
