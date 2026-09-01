@@ -181,7 +181,7 @@ function declaredSubjectFinding(
       rule,
       present
         ? `The footer carries text matching the required disclaimer: "${truncate(match)}"`
-        : nearText(near),
+        : nearText(near, targetPhrases[0]),
       RENDERED,
       present ? [{ ...pageEvidence(page)[0]!, matchedValue: match }] : pageEvidence(page),
     );
@@ -191,7 +191,7 @@ function declaredSubjectFinding(
     rule,
     present
       ? `The footer carries text matching the disclaimer: "${truncate(match)}"`
-      : nearText(near),
+      : nearText(near, targetPhrases[0]),
     RENDERED,
     present ? [{ ...pageEvidence(page)[0]!, matchedValue: match }] : pageEvidence(page),
   );
@@ -206,13 +206,29 @@ function declaredSubjectFinding(
  * it reported that there was no such text. A rule names its method and states what it measured, not
  * a conclusion the measurement does not support (D-076).
  */
-function nearText(near: { readonly candidate: string; readonly score: Similarity } | null): string {
+function nearText(
+  near: { readonly candidate: string; readonly score: Similarity } | null,
+  required?: string,
+): string {
+  /*
+    The wording itself, not "the required disclaimer" (D-076).
+
+    An agent reading a real report asked three times what the scanner expects here — *"what's the
+    full verbiage?"* — and the sentence named a requirement without ever stating it. D-217 fixed
+    what this check *measured*; the target it measured against was still only referred to.
+
+    Taken from `targetPhrases`, which the runner resolves from the rule the subject is declared by
+    (`target_phrases_from`, D-015). Never a string in this file: a rule that changes its wording,
+    or a second rule that declares a different subject, must read correctly with no edit here.
+  */
+  const target = required === undefined ? '' : ` The required wording is: "${truncate(required)}"`;
+
   if (near === null) {
-    return "This page's footer carries no text to compare against the required disclaimer.";
+    return `This page's footer carries no text to compare against the required disclaimer.${target}`;
   }
   return (
     `The closest text in this page's footer is: "${truncate(near.candidate)}" — ` +
-    `${describeResemblance(near.score)}, so it was not read as the disclaimer.`
+    `${describeResemblance(near.score)}, so it was not read as the disclaimer.${target}`
   );
 }
 
