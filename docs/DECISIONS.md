@@ -14713,3 +14713,129 @@ the round trip is what a wrong key actually breaks. Against the unfixed code fou
 assertions fail; the two that pass are the bounds that stop the fold merging storefronts, and they
 must keep passing. `apps/worker/test/schema/credentialDomain.test.ts` runs `0054` against real
 Postgres, and six of its nine fail with the migration removed (D-026).
+
+---
+
+## D-222 — An empty cart is not self-attributing, and D-181's reading of it is narrowed
+**2026-08-31 · engineering · `apps/worker/src/addBlockers.ts`, `flow.ts`, commit `67f5418`**
+
+D-181 surveyed the guest-checkout branch and ruled two `GATE-003` findings correctly kinded, on
+the strength of what they said:
+
+> **Both findings were correctly kinded.** Their reasons are *"no add-to-cart control was found on
+> the product page"* and *"the add-to-cart control was clicked but the cart remained empty"*, which
+> are observations about the storefront.
+
+The second of those is not an observation about the storefront on every merchant, and this narrows
+it. The first is a different branch and is untouched.
+
+### What the sentence could not distinguish
+
+`cartHoldsProduct` answering `empty` is certain about one thing — nothing is in the cart — and
+silent about why. Two candidates, belonging to two parties:
+
+- the store was asked to add the item and refused, which on a rule asking whether guest checkout
+  works is close to the point of the rule;
+- the probe never completed the asking, which is ours.
+
+On a WooCommerce **variable** product the second is what happens. The add control is disabled by a
+class while remaining clickable to a driver: our click lands, `clicked` is true, the store's own
+script refuses the add, and the cart is honestly empty. Nothing was refused by the merchant because
+nothing was asked of them. Driving the flow by hand on comopeptides settles it — select a size,
+click, and the item goes into an anonymous cart. An interstitial covering the control produces the
+same shape by a different route.
+
+So the sentence printed *the merchant did not present this* about a storefront that presents it
+perfectly well, in a document forwarded to an underwriter under Mintro's name.
+
+### D-181 was not wrong; it was undecidable, and the record shows why
+
+Its two runs are `63514a3b` — biotechpeptides, whose reason is *"no add-to-cart control was found"*,
+a different branch this pass does not touch and which remains untraced — and `e3e80bd3`,
+corepeptides, which is the empty-cart sentence.
+
+**Corepeptides publishes both kinds of product.** That run's Layer 1 captures hold four with an
+ordinary `name="add-to-cart"` control and one, `bpc-157-tb-500-10mg-blend`, carrying a variations
+form on `attribute_pa_size` with no name or value on its button — the failing signature exactly.
+Which of them that flow started from is not recorded, so **whether that finding belongs to the
+merchant or to us is not established here, and could not have been established by D-181 either.**
+The sentence is the same in both cases. That is the whole argument: an attribution resting on
+wording rests on something that cannot tell the two apart, which is hard constraint 9 one layer out
+from where D-181 applied it.
+
+### The narrowing
+
+Attribution now turns on a signal, not on a sentence. `addBlockers.ts` asks the page one question —
+*was there a blocker the probe did not drive?* — and the answer decides:
+
+| what the page says | whose |
+|---|---|
+| a blocker was found | ours — `obstructed`, `not_retrieved` |
+| the page could not be read | ours, deliberately |
+| read, nothing in the way | the storefront's, unchanged |
+| the store sent the flow to sign-in | the storefront's |
+
+Detection is structural throughout (constraint 9, D-014): a variation form by `.variations_form`
+and `data-product_variations`, a disabled control by the class the platform sets, an interception by
+asking the document what is actually on top of the control. No merchant copy is read, and a test
+asserts that against the detector's own source — a text-matching regression passes every
+behavioural test, and would find only the merchants who word it the way we guessed.
+
+The note states the method and stops there (D-076): *"the crawl did not complete the add-to-cart
+flow, so the cart was empty and nothing was observed about guest checkout"*, naming the blocker it
+found. It no longer says the cart remained empty, because that phrasing carries an implication the
+method never reached.
+
+### The unreadable page is ours, and the asymmetry is the reason
+
+Two mistakes are available and they do not cost the same. Claiming a merchant's cart refused an item
+it never saw is a false statement about a real business in their underwriter's document. Claiming we
+could not check something we in fact could costs coverage on one rule of one run, and the coverage
+line already reports it. D-036's rule points the same way — *"I could not tell" is not "there is
+nothing there"* — and hard constraint 2 settles the tie.
+
+### What D-181 keeps, and the test that stops it drifting
+
+**The merchant-fact case D-181 described keeps its attribution.** A cart read, with nothing on the
+page standing in the way, and still empty is the storefront's, and says so. A fix that reclassified
+every empty cart as ours would trade one false statement for a different one and lose a real signal
+on a `critical` rule — so it is pinned, not left to care.
+
+`flowAcquisition.test.ts` carried an assertion for that case naming comopeptides as its example.
+That is the merchant now known to be the other kind, so the test was asserting the defect while
+appearing to guard against it. It now supplies the "nothing in the way" signal explicitly, and its
+comment records which example was wrong.
+
+Made to fail first (D-026): with the pre-narrowing branch restored verbatim, four assertions fail —
+a blocker-present page reports no obstruction, filed to the merchant. Three DOM fixtures carry the
+structures observed on real storefronts, and the third of them — an ordinary product with nothing in
+the way, taken from the two merchants the probe drives today — is what stops the detector being a
+rubber stamp.
+
+### A sign-in redirect is not promoted to a pass
+
+A store that answers an anonymous add by sending the flow to sign-in is the storefront's, reported
+with honest wording, and **not** turned into `redirected_to_login`.
+
+That would be a verdict on a rule that is `critical`, `auto_fail` and a stopping condition (D-161).
+No stored run exercises it, so the promotion would ship untested against the one shape it exists
+for; and a wrong pass here is the cost D-056 was written about, where GATE-003 passed a merchant
+whose guest checkout reaches a card field roughly nine runs in ten. Recorded as a deliberate stop so
+that adding it later is a decision rather than a gap.
+
+### Scope: this changed what the probe claims, not what it can drive
+
+Nothing here selects a variation, dismisses an interstitial or re-clicks. The only browser work
+added is one bounded, read-only DOM read after the cart verdict.
+
+**The probe-driving work is pending and is a separate pass**: completing the variation form,
+dismissing a covering interstitial, treating a class-disabled control as unclickable, and
+biotechpeptides' untraced *"no add-to-cart control was found"* mode. What that pass is worth was
+measured rather than assumed — driven to checkout on the two merchants whose carts already fill for
+an anonymous guest, `GATE-003` reaches `pass` on sportstechnologylabs, redirected to `/my-account/`,
+and `fail` on swisschems.is, which serves a card field at `/checkout/`. Both reproduce their stored
+verdicts. The downstream half is sound and discriminating, so making the cart fill converts a
+`not_evaluable` on a stopping condition into a real answer rather than into a different unknown.
+
+`GATE-003` remains unauthenticated (D-039); nothing in this pass touches how the flow is driven, and
+a test pins that the observation carries no session.
