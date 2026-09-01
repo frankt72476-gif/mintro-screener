@@ -14613,3 +14613,103 @@ per line, so a reviewer can read them and see what the matcher was run against (
 Every path is kept, not only the products. It is stricter — a pattern firing on nothing in the whole
 surface certainly fires on nothing in the products subset — and filtering first would let a false
 positive hide behind a classifier decision instead of being seen.
+
+---
+
+## D-221 — A storefront's credential has one key, and one function decides what it is
+**2026-08-31 · engineering, recorded after the fact · `packages/engine/src/merchantDomain.ts`, migration `0054`, commit `281bfae`**
+
+`www.merchant.com` and `merchant.com` are one shop and were two vault keys. Shipped in the
+credential-availability pass against existing rulings; it earned a number of its own and did not
+get one at the time. Recorded now.
+
+### Two paths derived the same key and neither could tell they disagreed
+
+The deposit side folded whatever an analyst typed into the credential modal — a field D-185 made
+editable, so it need not be the URL in the scan form. The lookup side folded
+`new URL(request.url).hostname`. Both folded correctly. They were folding **different strings**.
+
+So a credential deposited for `comopeptides.com` was invisible to a scan of
+`https://www.comopeptides.com`, whose key carried the label. `vault.open` answered nothing, and
+nothing is what the vault also answers when a merchant has supplied nothing — the run reported
+`no_credential`, which is D-185's wording for *"no screening account is stored for this merchant"*.
+
+**It fails in the direction that makes a false statement about a merchant.** Whoever holds the
+relationship is sent to ask them again for something they already gave us. That is D-036's shape in
+a new place: a control that cannot tell *"there is nothing here"* from *"I looked in the wrong
+place"*, answering with the first.
+
+### One function, for the reason `sealed.ts` is one function
+
+`canonicalMerchantDomain` lives in `packages/engine` and is exported from the browser entry as well
+as the Node one, so the browser that seals a deposit and the worker that opens the vault fold
+through the same code rather than through two implementations that agree until they do not. This
+project has already paid for that once (D-034), and what would diverge here is **which merchant a
+screening account belongs to**.
+
+It is applied at `vaultRefFor`, which is the choke point every vault path already passes — the
+deposit drain and the scan lookup both build their key there. Folding at the choke point is what
+makes the two agree by construction, rather than asking two call sites to remember to.
+`credential_state` folds identically, because the credential card reads that table for the domain
+in the scan form while the crawl opens the vault for the hostname in the queued URL; if those
+folded differently the card would say a login is stored for a storefront the crawl reports has
+none, which is the confusion D-185 built the table to end.
+
+Only the `www` label folds, and only where what remains is still a domain. `shop.merchant.com`
+keeps its label and `www.com` keeps its name, because merging two storefronts would be worse than
+the defect being fixed: it would offer one merchant's screening account to another merchant's
+crawl.
+
+### The binding rule
+
+**No second host-normalisation path for credential keys.** Any future code deriving a vault key
+calls `canonicalMerchantDomain` and never re-implements the fold. Two independent foldings drifting
+apart is precisely the defect this closes, and the second one would be written by someone who had
+no reason to know the first existed.
+
+Written down because the failure is silent at every step. Nothing throws, nothing logs, and the
+report reads as a complete sentence about a merchant.
+
+### `merchants.domain` is a different identity and does not route through it
+
+`merchants.domain` is the crawl's identity for a merchant. It is written as `new URL(url).host`,
+folded by D-150 without stripping `www`, and it keys `runs.merchant_id` — repointing runs at a
+different merchant is a write to a run and would need a ruling of its own (D-002).
+
+Checked at every call site rather than assumed. `canonicalMerchantDomain` has four production
+callers, all of them credential-scoped: the deposit, `normaliseDomain` behind the modal and the
+card, `credentialState`, and `vaultRefFor`. The package form folds its own for `ensure_merchant`,
+and `persistRun` writes the crawl's host. Neither goes near this function. **This record is about
+credential vault keys and nothing else.**
+
+### The stored rows, and why the collision rule destroys nothing
+
+Migration `0054` moves existing entries to the canonical key. Without it the code change would have
+been a regression rather than a fix — a credential at `merchants/www.merchant.com/credentials`
+becomes unreachable the moment the crawl asks for the canonical one.
+
+**It was a no-op in production.** Surveyed before deploy: zero rows. The migration exists for the
+rows that were not there, which is the right way round — writing it after finding some would have
+meant a live storefront reported as having supplied nothing in the meantime.
+
+Where a domain held both forms, **both are left intact**. The canonical row is what the crawl reads;
+the labelled one is orphaned and untouched. Deleting it would be tidier and is not available: there
+is no recovery for a credential (D-038), the private key is the only reader, nothing in this
+application can compare the two values, and *"I cannot tell which of these is current"* is not
+grounds for destroying one of them. An orphaned row costs storage; the other mistake costs an email
+to a merchant and cannot be undone.
+
+`credential_access` is untouched. It is the audit trail, append-only by trigger, and rewriting
+history to match a new key would destroy the record of what happened under the old one. Neither
+`vault_entries` nor `credential_state` is append-only and both say so in their own migrations, so
+D-002 and hard constraints 5 and 8 are not in play: no run row is touched and no `runs.merchant_id`
+is repointed. Same reasoning D-150 recorded for folding `merchants.domain` in place.
+
+### Proven against the defect, not against the fix
+
+`apps/worker/test/credentialDomainForm.test.ts` deposits under one host form and reads under the
+other, in both directions, through a real vault round trip rather than on the key strings alone —
+the round trip is what a wrong key actually breaks. Against the unfixed code four of its six
+assertions fail; the two that pass are the bounds that stop the fold merging storefronts, and they
+must keep passing. `apps/worker/test/schema/credentialDomain.test.ts` runs `0054` against real
+Postgres, and six of its nine fail with the migration removed (D-026).
