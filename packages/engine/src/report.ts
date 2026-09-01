@@ -35,6 +35,24 @@ export interface ReportFinding extends Finding {
    */
   readonly subject?: string;
   /**
+   * Which side of the standard the rule's subject sits on.
+   *
+   * `absent` — the standard does not permit the subject. `present` — it requires it. Snapshotted
+   * from the rule's own params, like `subject` and `clause`, so a run reopened later reads the
+   * boundary it was produced under (D-002).
+   *
+   * **Without it a boundary sentence cannot be written safely.** `subject` is documented as a
+   * neutral clause completing *"Could not verify whether ___"* — deliberately never an assertion
+   * of the compliant state — so nothing about it says whether a failure means the subject was
+   * observed or was missing. Inferring that from `checkType` would be reading a polarity off a
+   * shape, which is the mistake D-181 catalogued four times, and getting it wrong prints the
+   * opposite of what happened in a document that reaches an underwriter.
+   *
+   * Absent on the 27 rules whose check types carry no `expect`, and on every run recorded before
+   * this existed. `boundarySentence` returns null for those rather than guessing.
+   */
+  readonly expect?: 'absent' | 'present';
+  /**
    * Whose statement `clause` is (D-138).
    *
    * Snapshotted onto the finding like `title` and `clause`, so a run reopened later renders the
@@ -395,6 +413,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         title: rule.title,
         clause: rule.clause,
         subject: rule.subject,
+        ...expectOf(rule),
         source: rule.source,
         severity: rule.sev,
         tier: rule.tier,
@@ -418,6 +437,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
       title: rule.title,
       clause: rule.clause,
       subject: rule.subject,
+      ...expectOf(rule),
       // The unrun path carries `source` too. It was missed when the field was added and only the
       // evaluated path got it, which left twelve findings on a live run with no attribution — see
       // D-138. Invisible today, because every unrun rule happens to be a program rule and the
@@ -892,6 +912,61 @@ function sortFindings(findings: readonly ReportFinding[]): ReportFinding[] {
  * Returns the original reason unchanged when the finding carries no subject, which is every run
  * recorded before this existed. Runs are immutable (D-002): an old finding says what it said.
  */
+/**
+ * The rule's own side of the standard, read from its params.
+ *
+ * Spread rather than assigned, so a rule whose check type carries no `expect` leaves the field
+ * absent rather than setting it to `undefined` — the same shape the other optional snapshots use.
+ */
+function expectOf(rule: Rule): { readonly expect?: 'absent' | 'present' } {
+  const value = (rule.params as { readonly expect?: unknown }).expect;
+  return value === 'absent' || value === 'present' ? { expect: value } : {};
+}
+
+/**
+ * The boundary the observation ran into, in the standard's own terms (D-001, D-076).
+ *
+ * The report read as an audit artifact: every finding opened with a measurement — *"2 of 37 URLs
+ * in scope 'products' matched a prohibited pattern"* — and a reader had to open the requirement
+ * pair to learn what the measurement was measured against. This states the boundary on the line
+ * itself, so the gap between what the standards allow and what was observed is legible without
+ * opening anything.
+ *
+ * ## It names the boundary and asserts nothing about the merchant
+ *
+ * Two frames, chosen by `expect`, and both are noun phrases:
+ *
+ *     absent   What the standards do not permit: the catalogue offers needles or syringes.
+ *     present  What the standards require: the footer carries the required disclaimer wording.
+ *
+ * **Neither says what was observed** — the finding's own note does that, immediately after — and
+ * neither addresses the merchant or names a remedy. That is the distinction D-001 turns on and the
+ * same reasoning `REQUIREMENT_HEADINGS` was written under: *"Observed"* and *"Program requirement"*
+ * are nouns, and *"Required action"* would turn identical text into an instruction without a word
+ * of the content changing. A reader draws the action; the report does not draw it for them.
+ *
+ * The colon frame is not stylistic. `subject` is written to complete *"Could not verify whether
+ * ___"*, so its grammar varies — *"product names use marketing terms"*, *"the catalogue offers
+ * needles"* — and any frame that inflected it would produce broken sentences on some rules and
+ * would need a per-rule exception, which hard constraint 1 forbids.
+ *
+ * Returns null where the rule carries no `subject` or no `expect`, and for `pass` and
+ * `not_evaluable`. A satisfied rule quoted back at the reader is noise (D-041), and a rule nothing
+ * could be observed about already opens with the question it could not answer
+ * (`notObservedSentence`).
+ */
+export function boundarySentence(finding: ReportFinding): string | null {
+  if (finding.state !== 'fail' && finding.state !== 'review') return null;
+  if (finding.subject === undefined || finding.expect === undefined) return null;
+
+  const subject = finding.subject.trim().replace(/\.$/, '');
+  if (subject === '') return null;
+
+  return finding.expect === 'absent'
+    ? `What the standards do not permit: ${subject}.`
+    : `What the standards require: ${subject}.`;
+}
+
 export function notObservedSentence(finding: ReportFinding): string {
   const reason = finding.notEvaluableReason ?? finding.note;
   if (finding.state !== 'not_evaluable' || finding.subject === undefined) return reason;

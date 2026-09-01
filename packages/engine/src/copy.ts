@@ -213,8 +213,43 @@ export const PARTICIPATION_TERMS: readonly string[] = [
   ...CHARACTERISATION_TERMS,
 ];
 
+/**
+ * Phrasings that tell a merchant what to do about a finding.
+ *
+ * `DIRECTIVE_TERMS` catches the recommending register — *should*, *recommend*, *advise*. It does
+ * not catch the imperative one, because nothing Mintro generated had ever been written that way.
+ *
+ * Collapsing a finding to a single plain line is exactly the change that invites it. A sentence
+ * with room for one clause about a boundary has room for one clause about a remedy, and *"remove
+ * the dosing instructions"* is shorter and more helpful-sounding than *"what the standards do not
+ * permit: the page carries dosing guidance"*. That is the pressure D-001 exists against: the
+ * moment a finding names the fix, Mintro is a party to the determination and has created reliance.
+ *
+ * Bare verbs, so they match wherever they sit in a sentence. `` bounding in `auditCopy` keeps
+ * `remove` off `removed` and `change` off `unchanged` — the past tense is how an observation
+ * legitimately describes what a merchant already did.
+ */
+export const REMEDY_TERMS: readonly string[] = [
+  'remove',
+  'delete',
+  'add a',
+  'update the',
+  'correct the',
+  'fix',
+  'ensure',
+  'you should',
+  'you must',
+  'you need to',
+  'needs to be',
+  'change x',
+];
+
 /** Everything a generated finding is audited against. */
-export const FINDING_TERMS: readonly string[] = [...DIRECTIVE_TERMS, ...DETERMINATION_TERMS];
+export const FINDING_TERMS: readonly string[] = [
+  ...DIRECTIVE_TERMS,
+  ...DETERMINATION_TERMS,
+  ...REMEDY_TERMS,
+];
 
 /** Finds directive language in a piece of text. */
 export function auditCopy(text: string, terms: readonly string[] = DIRECTIVE_TERMS): CopyAudit {
