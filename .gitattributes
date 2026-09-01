@@ -18,3 +18,24 @@
 # Files git detects as binary are unaffected — `apps/worker/test/rasterize.test.ts` embeds a real
 # `Exif\0\0` header, and a NUL byte is how git decides a file is not text.
 * text=auto
+
+# ---------------------------------------------------------------------------------------------
+# Test data whose *bytes* are compared, pinned to LF in the working tree as well as in the object
+# database.
+# ---------------------------------------------------------------------------------------------
+#
+# `text=auto` above is right for everything a person edits: stored LF, checked out however the
+# platform likes. It is wrong for a fixture a test reads line by line and compares as strings,
+# because the checkout is then part of the test input.
+#
+# `fixtures/catalogues/*.txt` is one path per line, and it went green on the machine that wrote
+# the files and red on the very next checkout of the same commit: stored LF, checked out CRLF,
+# so every path arrived as `/shop/rt/\r`. Three assertions failed comparing paths, and the
+# failure pointed at the GLP-1 rule — which was matching perfectly. The byte that caused it
+# appears in no diff, no error message and no editor.
+#
+# `eol=lf` fixes the checkout. It is not the whole fix and is not trusted as one: `readCatalogue`
+# in `packages/engine/test/glp1Patterns.test.ts` trims every line, so a fixture arriving CRLF
+# through some other path still cannot decide whether a suite passes. Two independent guards,
+# because this one lives in a file nobody reads until it has already gone wrong.
+fixtures/catalogues/*.txt eol=lf

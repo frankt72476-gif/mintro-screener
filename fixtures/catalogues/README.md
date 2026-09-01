@@ -46,6 +46,24 @@ It also matters for the contrast. The slugs a naive substring `rt` hits — `car
 `cartilage`, `migration`, `/cart/`, `telmisartan` — are mostly editorial and utility URLs, so a
 products-only fixture would understate by half what whole-token matching is buying.
 
+## Line endings are LF, and pinned twice
+
+`.gitattributes` carries `fixtures/catalogues/*.txt eol=lf`, which is an exception to the
+repo-wide `* text=auto` (D-152). That rule is right for anything a person edits — stored LF,
+checked out however the platform wants — and wrong for a file a test reads line by line and
+compares as strings, because then the checkout is part of the test input.
+
+It is an exception with a receipt. These files went green on the machine that wrote them and red
+on the very next checkout of the same commit: stored LF, checked out CRLF under `core.autocrlf`,
+so every path arrived as `/shop/rt/\r`. Three assertions failed comparing paths and the reported
+failure pointed at the GLP-1 rule, which was matching perfectly.
+
+`eol=lf` fixes the checkout and is not trusted to be the whole fix. `readCatalogue` in
+`packages/engine/test/glp1Patterns.test.ts` trims every line, so a file arriving with CRLF through
+some other route — an editor, a patch, a later edit to `.gitattributes` — still cannot decide
+whether the suite passes. Two independent guards, because this one lives in a file nobody reads
+until it has already gone wrong.
+
 ## Regenerating
 
 These are extracted from `evidence/*/layer0/*` by decompressing each stored document and reading

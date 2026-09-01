@@ -41,6 +41,30 @@ const ruleset: Ruleset = loadRulesetFile(RULESET_PATH);
 
 const CATALOGUES = resolve(REPO_ROOT, 'fixtures/catalogues');
 
+/**
+ * One catalogue file, as paths.
+ *
+ * **Trims every line, and that is the load-bearing part.** These files are checked out CRLF on
+ * Windows — `.gitattributes` says `* text=auto` and `core.autocrlf` is true, which is settled repo
+ * policy (D-152) — so a naive `split('\n')` yields `/shop/rt/\r`. Every assertion here compares
+ * path strings, and a trailing carriage return breaks all of them while the matcher it is meant to
+ * be testing is working perfectly. That is the invisible-character class of defect this project has
+ * paid for before: the failure names the wrong culprit, and the byte that caused it does not appear
+ * in the diff, the error message, or the file when you open it.
+ *
+ * `.gitattributes` now also pins these files to `eol=lf`, so the checkout should be LF. This trim
+ * is the half that does not depend on that being true — a fixture arriving with CRLF through any
+ * other path (an editor, a patch, a future `.gitattributes` edit) must not be able to turn a green
+ * suite red or, worse, a red one green. A path never legitimately carries surrounding whitespace,
+ * so there is nothing for the trim to destroy.
+ */
+export function readCatalogue(contents: string): string[] {
+  return contents
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
 /** Every stored catalogue, as `host -> paths`. Read from the repository, never from `evidence/`. */
 const catalogues: ReadonlyMap<string, readonly string[]> = new Map(
   readdirSync(CATALOGUES)
@@ -48,7 +72,7 @@ const catalogues: ReadonlyMap<string, readonly string[]> = new Map(
     .sort()
     .map((file) => [
       file.replace(/\.txt$/, ''),
-      readFileSync(join(CATALOGUES, file), 'utf8').split('\n').filter((line) => line !== ''),
+      readCatalogue(readFileSync(join(CATALOGUES, file), 'utf8')),
     ]),
 );
 
@@ -79,6 +103,42 @@ function sweep(match: (path: string, pattern: string) => boolean): Map<string, s
   }
   return hits;
 }
+
+/**
+ * The reader, fed the bytes that actually broke it.
+ *
+ * This suite went green on the machine that wrote the fixtures and red on the next checkout of the
+ * same commit, because the files are stored LF and were checked out CRLF. Nothing about the rule,
+ * the patterns or the matcher was involved — three assertions failed comparing `/shop/rt/\r` to
+ * `/shop/rt/`, and the reported failure pointed at the rule.
+ *
+ * Made to fail the way it exists to catch (D-026): drop the `.trim()` in `readCatalogue` and the
+ * first assertion below returns `/shop/rt/\r`.
+ */
+describe('the catalogue reader survives whatever the checkout does to line endings', () => {
+  it('reads CRLF exactly as it reads LF', () => {
+    const paths = ['/shop/rt/', '/shop/tz/', '/shop/bpc-157/'];
+
+    expect(readCatalogue(paths.join('\r\n') + '\r\n')).toEqual(paths);
+    expect(readCatalogue(paths.join('\n') + '\n')).toEqual(paths);
+    // A file saved without a final newline is still a catalogue.
+    expect(readCatalogue(paths.join('\r\n'))).toEqual(paths);
+  });
+
+  it('leaves no carriage return anywhere in what the assertions compare', () => {
+    // The specific byte, named. `\r` in a path is what made the matcher look broken.
+    for (const paths of catalogues.values()) {
+      for (const path of paths) {
+        expect(path, `${JSON.stringify(path)} carries whitespace`).toBe(path.trim());
+        expect(path).not.toContain('\r');
+      }
+    }
+  });
+
+  it('drops blank and whitespace-only lines rather than reading them as paths', () => {
+    expect(readCatalogue('/shop/rt/\r\n\r\n   \r\n/shop/tz/\r\n')).toEqual(['/shop/rt/', '/shop/tz/']);
+  });
+});
 
 describe('the fixture the proof rests on', () => {
   it('holds the five stored catalogues', () => {
