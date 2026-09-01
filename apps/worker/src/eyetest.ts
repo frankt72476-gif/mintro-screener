@@ -40,6 +40,8 @@ import {
   type EyeTestOutcome,
   type EyeTestRubric,
   type EyeTestVerdict,
+  EYE_TEST_TERMS,
+  auditCopy,
 } from '@mintro/engine';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -273,6 +275,8 @@ export async function runEyeTest(
       kind: 'ran',
       test: {
         read: parsed.read,
+        // Carried, not dropped: withholding a read that nothing records is a read that vanished.
+        ...(parsed.readWithheld === undefined ? {} : { readWithheld: parsed.readWithheld }),
         rubricVersion: rubric.version,
         model,
         ranAt: new Date().toISOString(),
@@ -356,7 +360,7 @@ function content(
 function parseAnswer(
   payload: unknown,
   rubric: EyeTestRubric,
-): { read: string; verdicts: EyeTestVerdict[] } | null {
+): { read: string; readWithheld?: readonly string[]; verdicts: EyeTestVerdict[] } | null {
   const blocks = (payload as { content?: { type?: string; text?: string }[] } | null)?.content;
   const text = blocks?.find((block) => block.type === 'text')?.text;
   if (typeof text !== 'string') return null;
@@ -404,16 +408,47 @@ function parseAnswer(
     const line =
       saw !== '' ? saw : answer === undefined ? 'The model did not answer this item.' : '';
 
+    // Audited per line, so one line that judges does not withhold the rest (D-224).
+    const audit = auditCopy(line, EYE_TEST_TERMS);
+
     return {
       id: item.id,
       question: item.question,
       verdict,
-      ...(explains && line !== '' ? { saw: line } : {}),
+      ...(explains && line !== ''
+        ? audit.clean
+          ? { saw: line }
+          : { sawWithheld: audit.flagged }
+        : {}),
       looked_at: item.surfaces,
     };
   });
 
-  return { read: typeof doc.read === 'string' ? doc.read.trim() : '', verdicts };
+  /*
+    The read, audited before it becomes report copy (D-224, D-001).
+
+    This is the only copy in the report a language model writes, and it went through no guard at
+    all. A model asked to describe a storefront can drift into judging one, and a determination in
+    Mintro's document is the thing D-001 exists to prevent — the guard cannot be allowed to pass
+    one through silently, and it cannot be allowed to drop the read silently either.
+
+    So: withheld, with the terms recorded. Not reworded — a Mintro template can be rewritten to say
+    the same thing acceptably, and a model's sentence cannot be edited into one it did not write.
+    Not dropped — the report says the read was withheld and what did it.
+
+    Audited here, at the one point the answer becomes the stored structure, rather than at render:
+    a stored read is immutable (D-002), so a guard that ran at render would re-judge old reads
+    under terms they were never written against, and would have to be re-run by every surface.
+  */
+  const read = typeof doc.read === 'string' ? doc.read.trim() : '';
+  const readAudit = auditCopy(read, EYE_TEST_TERMS);
+
+  return {
+    ...(read !== '' && !readAudit.clean
+      ? { read: '', readWithheld: readAudit.flagged }
+      : { read }),
+    verdicts,
+  };
 }
 
 const base = (request: CaptureRequest): Omit<EyeTestCapture, 'sent'> => ({

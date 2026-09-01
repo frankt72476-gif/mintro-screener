@@ -1168,7 +1168,23 @@ function EyeTestPanel({
       {label}
 
       {/* The read is the part a reader actually reads (§3). Prose, at full size. */}
-      <p className="eye-read">{test.read}</p>
+      {/*
+        The read, or the fact that it was withheld (D-224).
+
+        Never silently absent. The eye test is the only report copy a language model writes, and a
+        read that judged the merchant rather than describing them is withheld rather than printed
+        or quietly dropped — and the terms that did it are named, so a reader can see what happened
+        rather than wondering why a paragraph is missing.
+      */}
+      {test.readWithheld === undefined ? (
+        <p className="eye-read">{test.read}</p>
+      ) : (
+        <p className="eye-read">
+          The model&rsquo;s description of this storefront is not shown: it used language that
+          states a conclusion about the merchant rather than describing what the pages look like
+          ({test.readWithheld.join(', ')}). The observations below are unaffected.
+        </p>
+      )}
 
       {/*
         One box, under the read and above the verdicts (D-202, §3).
@@ -1228,6 +1244,14 @@ function EyeTestPanel({
             <span className="eye-q">{verdict.question}</span>
             {/* A clear row is the question and the word, nothing more. */}
             {verdict.saw !== undefined && <span className="eye-saw">{verdict.saw}</span>}
+            {/* Withheld for the same reason as the read, and per line, so one judged line does
+                not cost the others (D-224). The verdict itself stands: it is a closed enum. */}
+            {verdict.sawWithheld !== undefined && (
+              <span className="eye-saw">
+                Reason not shown: it stated a conclusion rather than what was visible (
+                {verdict.sawWithheld.join(', ')}).
+              </span>
+            )}
           </li>
         ))}
       </ul>

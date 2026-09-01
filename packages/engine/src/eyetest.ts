@@ -110,6 +110,14 @@ export interface EyeTestVerdict {
    * paragraph, and it should grow only where there is something to say.
    */
   readonly saw?: string;
+  /**
+   * Terms that withheld this line, when the guard tripped (D-224).
+   *
+   * Present instead of `saw`, never alongside it: a line that was withheld is not a line that was
+   * shown. The verdict itself stands — the model's classification is a closed enum the rubric
+   * validates, and only its prose is in question.
+   */
+  readonly sawWithheld?: readonly string[];
   /** Which captures it read for this item, by evidence key. */
   readonly looked_at: readonly string[];
 }
@@ -134,6 +142,20 @@ export interface EyeTest {
    * The part a reader actually reads. It says what the site looks like, never whether it complies.
    */
   readonly read: string;
+  /**
+   * Terms that withheld the read, when the guard tripped (D-224).
+   *
+   * `read` is empty when this is present. The eye test is the only report copy a language model
+   * writes, and a model asked to describe a storefront can drift into judging one — *"this merchant
+   * is clearly operating as a consumer storefront and should not be approved"* is a determination
+   * in Mintro's document, and D-001 is that Mintro does not make one.
+   *
+   * Withheld rather than reworded, because there is nothing to reword *to*: a Mintro template can
+   * be rewritten to say the same thing acceptably, and a model's sentence cannot be edited into
+   * one it did not write without putting words in its mouth. Withheld rather than dropped, because
+   * the reader is told it happened and which terms did it.
+   */
+  readonly readWithheld?: readonly string[];
   /** The rubric that produced these, stored beside `rulesetVersion` (D-196). */
   readonly rubricVersion: string;
   readonly model: string;

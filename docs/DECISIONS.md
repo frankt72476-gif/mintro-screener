@@ -14939,3 +14939,98 @@ list recognises.
 
 `effective` does not move. The published standards did not change; what changed is which pages
 Mintro opens before reading them.
+
+---
+
+## D-224 — The one surface a model writes is the one nothing was guarding
+**2026-09-01 · engineering · `packages/engine/src/copy.ts`, `apps/worker/src/eyetest.ts`**
+
+Every sentence in the report comes from a Mintro template except two, and those two went through no
+guard at all. `auditCopy` and `FINDING_TERMS` appeared nowhere in the eye-test path — not in the
+handler, the job, the engine module or the store.
+
+The two are the eye test's free-text `read` paragraph and each verdict's `saw` line. Both are
+written by a vision model. Everything else on a verdict is rubric-derived — `id`, `question`,
+`looked_at` — or a closed enum `isEyeVerdict` refuses outside the set.
+
+### What was in the way of a determination reaching an underwriter
+
+Nothing. A model asked to describe a storefront can drift into judging one, and *"this merchant is
+clearly operating as a consumer storefront and should not be approved"* is a determination in
+Mintro's document, forwarded under Mintro's name, with no guard between the model and the page.
+D-001 is that Mintro does not make one; the layer most able to produce one was the layer least
+protected from it.
+
+### The guard has to do two things at once
+
+Catch a determination, and **not** catch an impression. The eye test's entire job is impression —
+*"reads as a consumer storefront"*, *"the palette suggests a clinic"* — and a guard that ate that
+language would push the layer toward vaguer copy to stay clean, which is worse than no guard at all.
+
+**Measured before scoping.** Against `FINDING_TERMS`, three of ten realistic impression sentences
+flagged, and the third decides it:
+
+    the palette and typography suggest a clinic          suggest
+    the layout suggests a retail catalogue               suggests
+    the product page recommends a dosing protocol        recommends
+
+The third is not a near miss. *"The product page recommends a dosing protocol"* is an **observation
+about the merchant** — exactly the sentence this layer exists to produce — and it flagged because
+`recommend` is directive when *Mintro* is the speaker. The difference is who is talking, and a term
+list cannot see that.
+
+### Narrowed, not weakened
+
+The eye test is audited against `EYE_TEST_TERMS`: the existing lists, composed. Determinations and
+remedies apply to it exactly as to a finding — a conclusion is a conclusion whoever wrote it. What
+differs is the directive half, where `IMPRESSION_VERBS` — `should`, `suggest*`, `recommend*`,
+`advise*` — are excluded, and only from the eye test. Every Mintro-authored surface keeps them.
+
+What the exclusions cost is bought back as **phrases rather than words**, the discipline D-217 set:
+`should be declined`, `recommend declining`, `merchant fails`, `site fails`. Multi-word because the
+general shape of a verdict cannot be caught by a word that also appears in an honest sentence —
+`merchant fails` and never bare `fails`, since *"the gate fails to stop a visitor who clicks outside
+it"* is an observation this layer exists to make.
+
+**Three drafted additions were removed for doing nothing.** `should be approved`, `should not be
+approved` and `should be rejected` are already caught by `approved` and `rejected`. A test asserts
+every remaining term catches something no other term does — an addition that changes nothing cannot
+be justified to the next reader, and it makes a list look better tested than it is. That test is
+what found them.
+
+Result: twelve determinations trip, eleven impression sentences survive, and nothing that flagged
+before stops flagging.
+
+### Withheld, not reworded, and not dropped
+
+A tripped read is replaced by a statement that it was withheld and which terms did it. The verdicts
+are untouched.
+
+**Not reworded**, because there is nothing to reword *to*. A Mintro template can be rewritten to say
+the same thing acceptably — that is what every previous copy fix did. A model's sentence cannot be
+edited into one it did not write without putting words in its mouth, and a paraphrase presented as
+the model's read would be a second fabrication on top of the first.
+
+**Not dropped**, because a paragraph that silently vanishes is indistinguishable from a run where
+the model wrote nothing. The reader is told it happened and what did it.
+
+**Per line, not per report.** Each `saw` is audited on its own, so one sentence that judges does not
+cost the other thirteen. The verdict itself always stands: it is a closed enum, and only the prose
+was ever in question.
+
+### Audited where the answer becomes the record, not where it renders
+
+At `parseAnswer`, the one point model output becomes the stored structure. A guard at render would
+re-judge stored reads under terms they were never written against — runs are immutable (D-002) — and
+would have to be re-run by every surface that displays one.
+
+So this guards **new** reads. Nothing stored is re-audited or rewritten.
+
+### The failure this could still have
+
+A term list catches the sentences it was taught. `EYE_TEST_TERMS` catches twelve phrasings a model
+plausibly writes; it will not catch a thirteenth nobody has seen, and the next one will arrive as
+prose that reads reasonable. That is the same limit every list in `copy.ts` has, stated here because
+this one guards output nobody at Mintro wrote and nobody reviews before it renders.
+
+What it buys is that the obvious drift is caught, loudly, and the record says so.
