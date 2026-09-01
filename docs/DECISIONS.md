@@ -15034,3 +15034,83 @@ prose that reads reasonable. That is the same limit every list in `copy.ts` has,
 this one guards output nobody at Mintro wrote and nobody reviews before it renders.
 
 What it buys is that the obvious drift is caught, loudly, and the record says so.
+
+---
+
+## D-225 — The 27 rules that cannot name a boundary lead with what they look at
+**2026-09-01 · engineering · `packages/engine/src/report.ts`, `copy.ts`, `checks/urlPattern.ts`**
+
+D-222's boundary line reaches 33 of the 60 rules. The other 27 kept a measurement for a lead —
+*"1 of 5 required phrases were not observed: 'research use only'"* — with nothing on the line
+saying what the rule was looking at.
+
+They were excluded for a good reason and it has not changed: a boundary needs a polarity, and their
+check types declare none. Asserting one would be reading a direction off a shape, which is D-181's
+mistake catalogued four times.
+
+### A lead that needs no polarity
+
+So they state the rule and the observation side by side, and assert no direction between them:
+
+    boundary   What the standards do not permit: the catalogue offers needles or syringes.
+    plain      What this rule looks at: the terms cover all five required clauses.
+
+*Looks at* claims nothing. It does not say the terms must cover the clauses, nor that failing to is
+permitted — it says what was examined, and the note says what was seen. The reader draws the
+relationship, which is the same division of labour the boundary line already runs on (D-001).
+
+Composed from `subject`, like the boundary, so a rule added later reads correctly with no engine
+change. Same colon frame, for the same reason: `subject` is written to complete *"Could not verify
+whether ___"*, its grammar varies, and any frame that inflected it would break on some rules and
+need a per-rule exception (hard constraint 1).
+
+**`leadSentence` is one call.** A renderer choosing between two functions is a renderer that can
+pick the wrong one or forget the second.
+
+### What already read plainly, and was left alone
+
+All 27 have a `not_evaluable` path, and `notObservedSentence` has opened those with the question
+they could not answer since D-194 — *"Could not verify whether the research field is stored with
+each order. Order records are server-side."* That is already the plain observation-against-rule
+lead this decision is about, and eleven of the 27 are `manual` rules that produce nothing else.
+
+So the change reaches `fail` and `review` findings only. Everything else was already there.
+
+### A duplication D-222 shipped, found here
+
+`looksFor` appended the rule's `subject` to every `url_pattern` violation. `boundarySentence` now
+opens the same finding with the same field, and **all ten** `url_pattern` rules declare
+`expect: absent` — so the boundary always fires and the subject printed twice in one finding:
+
+> What the standards do not permit: product names use marketing terms. 1 of 1 URLs in scope
+> 'products' matched a prohibited pattern: … **What this rule looks for: product names use
+> marketing terms.**
+
+Removed. The lead states what the rule is about; the note states what was observed. One each. The
+tests that pinned `looksFor` now pin the same property — the reason is read from the rule, never
+from its id — in its new place.
+
+### Two gaps in the guard, found by the control rather than by imagination
+
+A lead written as a remedy passes every structural assertion: it has a subject, it is one sentence,
+it names the rule. Only the guard can catch it, and two phrasings got through:
+
+    what this rule looks at: the terms must include research use only
+    add the missing clauses to the terms
+
+`must include`, `must carry`, `must state` and `add the` are added to `REMEDY_TERMS`. Each was
+checked against every clause and subject in the rule set and against the eye-test rubric's prose
+before being admitted: none appears.
+
+**`must be` was considered and refused.** It appears verbatim in four clauses — GATE-001, GATE-003,
+GATE-006, COA-003 — because that is how the programme document writes a requirement, and a term
+that flags the standard's own words is unusable. It is the same reason bare `must` was excluded
+when `DIRECTIVE_TERMS` was written, and it is worth recording that the reason was re-derived rather
+than remembered: the check was run, and it is what stopped the addition.
+
+### What is not claimed
+
+Every lead in the report now reads in plain English. The **notes** are a separate question and are
+not all there yet — *"which this rule treats as a violation"* still sits inside `flow_probe`'s copy,
+and there are others. Those are observational and honest; they are simply not yet in a person's
+register. Naming that here rather than implying the register work is finished.

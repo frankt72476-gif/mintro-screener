@@ -985,6 +985,48 @@ export function boundarySentence(finding: ReportFinding): string | null {
     : `What the standards require: ${subject}.`;
 }
 
+/**
+ * What a rule is about, for the rules that cannot say which side of it they sit on (D-225).
+ *
+ * `boundarySentence` needs `expect`, and 27 of the 60 rules do not declare one — their check types
+ * carry no polarity, or they are attestation-shaped and have no observable boundary at all. Those
+ * findings led with a measurement and nothing else: *"1 of 5 required phrases were not observed"*,
+ * with no statement anywhere on the line of what the rule was looking at.
+ *
+ * So they get the observation and the rule side by side, and the reader sees the gap. What they do
+ * **not** get is a direction. *"What the standards require"* on a rule that never declared it would
+ * be a polarity inferred from a check type, which is D-181's mistake and the reason these 27 were
+ * left out of the boundary line in the first place.
+ *
+ *     boundary   What the standards do not permit: the catalogue offers needles or syringes.
+ *     plain      What this rule looks at: the terms cover all five required clauses.
+ *
+ * *Looks at* asserts nothing. It does not say the terms must cover them, or that failing to is
+ * permitted — it says what was examined, and the note says what was seen.
+ *
+ * Same colon frame as the boundary, for the same reason: `subject` is written to complete *"Could
+ * not verify whether ___"*, so its grammar varies and any frame that inflected it would break on
+ * some rules and need a per-rule exception (hard constraint 1).
+ */
+export function subjectLead(finding: ReportFinding): string | null {
+  if (finding.state !== 'fail' && finding.state !== 'review') return null;
+  if (finding.subject === undefined || finding.expect !== undefined) return null;
+
+  const subject = finding.subject.trim().replace(/\.$/, '');
+  return subject === '' ? null : `What this rule looks at: ${subject}.`;
+}
+
+/**
+ * The line a finding leads with, whichever kind it is.
+ *
+ * One call site, so a renderer cannot pick the wrong one or forget the second. A `pass` and a
+ * not-observed finding get neither: the first is noise quoted back at the reader (D-041), and the
+ * second already opens with the question it could not answer (`notObservedSentence`).
+ */
+export function leadSentence(finding: ReportFinding): string | null {
+  return boundarySentence(finding) ?? subjectLead(finding);
+}
+
 export function notObservedSentence(finding: ReportFinding): string {
   const reason = finding.notEvaluableReason ?? finding.note;
   if (finding.state !== 'not_evaluable' || finding.subject === undefined) return reason;
