@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Variable product</title>
+<!--
+  A WooCommerce variable product. The add control is present and clickable to a driver, and the
+  page has already decided it will do nothing: `disabled` is a class, not an attribute.
+  Structure quoted from www.comopeptides.com/shop/bpc-157-tb500-blend/.
+-->
+<body style="margin:0">
+  <div class="product type-product product-type-variable">
+    <form class="variations_form cart" action="/shop/thing/" data-product_variations="[]">
+      <table class="variations">
+        <tr><td><select name="attribute_size"><option value="">Choose an option</option><option value="a">A</option></select></td></tr>
+      </table>
+      <button type="submit" class="single_add_to_cart_button button alt disabled wc-variation-selection-needed">Add to cart</button>
+    </form>
+  </div>
+</body>

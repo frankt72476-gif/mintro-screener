@@ -121,18 +121,29 @@ describe('the cart could not be read at all', () => {
   });
 
   /**
-   * The control, and the reason this cannot simply be "any failure is ours". A cart that was read
-   * and was genuinely empty is a fact about the storefront — the comopeptides case D-156 was
-   * written for. It must keep saying so.
+   * The control, and the reason this cannot simply be "any failure is ours". A cart that was read,
+   * with nothing on the page standing in the way, and still empty is a fact about the storefront.
+   * It must keep saying so.
+   *
+   * **The example this used to name was the wrong one.** It cited comopeptides as the merchant
+   * fact D-156 was written for, and comopeptides turns out to be the other case: a variable
+   * product whose add control the page disables by class, where our click lands and the add is
+   * never made. Driving that flow by hand puts the item in an anonymous cart, so nothing was
+   * refused by the merchant. The empty cart there is ours (see `emptyCartAttribution.test.ts`).
+   *
+   * `evaluateResult: []` is what now makes this the case it claims to be: the page was inspected
+   * and nothing was found in the way. Without it the stub answers `null` — *could not tell* —
+   * which is attributed to us, deliberately.
    */
-  it('is not obstructed when the cart was read and was empty', async () => {
+  it('is not obstructed when the cart was read, was empty, and nothing was in the way', async () => {
     const observation = await run({
       selectors: CLICKABLE,
       api: { '/cart.js': { item_count: 0 } },
+      evaluateResult: [],
     });
 
     expect(observation.reached).toBe('not_started');
-    expect(observation.error).toContain('the cart remained empty');
+    expect(observation.error).toContain('nothing on the page was found preventing it');
     expect(observation.obstructed).toBeUndefined();
   });
 });
