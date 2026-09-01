@@ -244,6 +244,72 @@ export const REMEDY_TERMS: readonly string[] = [
   'change x',
 ];
 
+/**
+ * Directive verbs that are also ordinary impression vocabulary.
+ *
+ * Excluded from what the **eye test** is audited against, and from nothing else. The eye test's
+ * whole job is to say how a storefront presents itself, and these words do that work honestly:
+ *
+ *     the palette and typography suggest a clinic rather than a laboratory supplier
+ *     the product page recommends a dosing protocol in its own copy
+ *     nothing on the sampled pages advises the reader on administration
+ *
+ * Measured before excluding: against `FINDING_TERMS`, three of ten realistic impression sentences
+ * flagged, and the third is the one that decides it — *"the product page recommends a dosing
+ * protocol"* is an **observation about the merchant**, not Mintro recommending anything. A guard
+ * that ate that sentence would push the eye test toward vaguer copy to stay clean, which is the
+ * opposite of what it is for.
+ *
+ * They stay in `DIRECTIVE_TERMS` for every Mintro-authored surface, where Mintro is the speaker
+ * and *"we suggest"* means what it says. The difference is who is talking.
+ */
+export const IMPRESSION_VERBS: readonly string[] = [
+  'should',
+  'suggest',
+  'suggests',
+  'suggested',
+  'recommend',
+  'recommends',
+  'recommended',
+  'recommending',
+  'advise',
+  'advised',
+  'advising',
+];
+
+/**
+ * Verdicts on a merchant, as whole phrases.
+ *
+ * What excluding `IMPRESSION_VERBS` costs, bought back without the cost. *"The storefront should
+ * be declined"* and *"we recommend declining this application"* are determinations, and dropping
+ * the bare verbs would let both through — so the phrases are named instead of the words.
+ *
+ * Multi-word for the reason `passes underwriting` and `confirms the merchant` already are (D-217):
+ * a term list catches the sentences it was taught, and the general shape of a verdict cannot be
+ * caught by a word that also appears in an honest sentence. `merchant fails` and `site fails`
+ * rather than `fails`, because *"the gate fails to stop a visitor who clicks outside it"* is an
+ * observation this layer exists to make.
+ *
+ * Each is a sentence a vision model could plausibly write when asked to describe a storefront and
+ * drifting into judging one, which is the failure this guard exists for.
+ */
+export const VERDICT_TERMS: readonly string[] = [
+  /*
+    Three more were drafted and removed: `should be approved`, `should not be approved` and
+    `should be rejected` are already caught by `approved` and `rejected` in `DETERMINATION_TERMS`.
+    A test asserts each term here catches something no other term does — an addition that changes
+    nothing is one nobody can justify to the next reader, and it makes the list look better tested
+    than it is.
+  */
+  'should be declined',
+  'recommend declining',
+  'recommend approving',
+  'recommend rejecting',
+  'merchant fails',
+  'merchant passes',
+  'site fails',
+];
+
 /** Everything a generated finding is audited against. */
 export const FINDING_TERMS: readonly string[] = [
   ...DIRECTIVE_TERMS,
@@ -460,3 +526,25 @@ export function quotedFromEvidence(
     ...(entry.attempts ?? []).map((attempt) => attempt.url),
   ]);
 }
+
+/**
+ * What the eye test's **model-authored** copy is audited against.
+ *
+ * The eye test is the only surface in the report written by a language model rather than by a
+ * Mintro template, and it routed through no guard at all — so a read that drifted from describing
+ * a storefront to judging one would reach an underwriter with nothing in the way.
+ *
+ * Composed from the existing lists rather than written fresh: determinations and remedies apply to
+ * it exactly as they apply to a finding. What differs is the directive half, where the impression
+ * verbs are excluded and `VERDICT_TERMS` replaces the coverage they carried — see both for the
+ * measurements.
+ *
+ * **Narrowed, not weakened.** Every determination the unnarrowed list caught is still caught, and
+ * three impression sentences it wrongly caught now survive.
+ */
+export const EYE_TEST_TERMS: readonly string[] = [
+  ...DIRECTIVE_TERMS.filter((term) => !IMPRESSION_VERBS.includes(term)),
+  ...DETERMINATION_TERMS,
+  ...REMEDY_TERMS,
+  ...VERDICT_TERMS,
+];

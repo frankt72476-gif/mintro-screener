@@ -18,7 +18,11 @@ export {
   // silently accepts, falling back to the weaker default and auditing less than the
   // caller asked for.
   FINDING_TERMS,
+  EYE_TEST_TERMS,
+  VERDICT_TERMS,
+  IMPRESSION_VERBS,
   REMEDY_TERMS,
+  DETERMINATION_TERMS,
   INTERNAL_TERMS,
   CHARACTERISATION_TERMS,
   PARTICIPATION_TERMS,
