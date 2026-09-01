@@ -293,6 +293,8 @@ export {
   describeVerdict,
   notObservedSentence,
   boundarySentence,
+  subjectLead,
+  leadSentence,
   type AssembleInput,
   type ReportCategory,
   type ReportAccess,

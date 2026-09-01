@@ -101,7 +101,7 @@ export type {
   reader must get this number from one implementation. Two would drift, and the drift would show as
   a card headed "54 rules" beside a PDF headed "62".
 */
-export { boundarySentence, distinctRuleCount, notObservedSentence } from './report.js';
+export { boundarySentence, subjectLead, leadSentence, distinctRuleCount, notObservedSentence } from './report.js';
 
 export {
   invitesComment,

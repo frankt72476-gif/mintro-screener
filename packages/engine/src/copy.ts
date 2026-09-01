@@ -242,6 +242,26 @@ export const REMEDY_TERMS: readonly string[] = [
   'you need to',
   'needs to be',
   'change x',
+  /*
+    Prescriptive phrasings a *lead* can take that the verbs above miss (D-225).
+
+    Found by the control rather than by imagination: a lead reading "what this rule looks at: the
+    terms must include research use only" passes every structural assertion — it has a subject, it
+    is one sentence, it names the rule — and only the guard can catch it. It was not caught.
+
+    **`must be` is deliberately absent and must stay absent.** It appears verbatim in four rule
+    clauses (GATE-001, GATE-003, GATE-006, COA-003), because that is how the programme document
+    writes a requirement, and a term that flags the standard's own words is unusable. That is the
+    same reason bare `must` was excluded when `DIRECTIVE_TERMS` was written.
+
+    These four were checked against every clause and subject in the rule set and against the
+    eye-test rubric's prose: none appears. They catch Mintro writing an instruction, never the
+    programme being quoted.
+  */
+  'must include',
+  'must carry',
+  'must state',
+  'add the',
 ];
 
 /**

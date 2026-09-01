@@ -44,7 +44,7 @@ import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
 import { MerchantResponse } from './MerchantResponse.js';
-import { boundarySentence, notObservedSentence } from '@mintro/engine';
+import { leadSentence, notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
@@ -1488,7 +1488,12 @@ function FindingRow({
                 one line a reader scans without opening anything.
               */}
               {/*
-                The boundary first, then what was observed (D-001, D-076).
+                The rule first, then what was observed (D-001, D-076, D-225).
+
+                Two shapes, one call. Where a rule declares which side of the standard its subject
+                sits on, the line names the boundary. Where it does not — 27 of 60 — it names what
+                the rule looks at and asserts no direction, because a direction inferred from a
+                check type is D-181's mistake.
 
                 The line used to open with a measurement — *"2 of 37 URLs in scope 'products'
                 matched a prohibited pattern"* — and a reader had to open the requirement pair to
@@ -1506,7 +1511,7 @@ function FindingRow({
               {finding.state === 'not_evaluable'
                 ? rowSentence(notObservedSentence(finding))
                 : rowSentence(
-                    [boundarySentence(finding), finding.note]
+                    [leadSentence(finding), finding.note]
                       .filter((part): part is string => part !== null && part !== '')
                       .join(' '),
                   )}

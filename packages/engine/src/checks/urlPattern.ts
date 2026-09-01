@@ -185,32 +185,25 @@ function describeViolation(
     programme can prohibit, so a rule whose clause is not the programme's is not a prohibition.
   */
   if (rule.source !== 'programme') {
-    return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched this rule's patterns: ${list}${remainder}.${looksFor(rule)}`;
+    return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched this rule's patterns: ${list}${remainder}.`;
   }
 
-  return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched a prohibited pattern: ${list}${remainder}.${looksFor(rule)}`;
+  return `${matches.length} of ${examined} URLs in scope '${rule.params.scope}' matched a prohibited pattern: ${list}${remainder}.`;
 }
 
-/**
- * What the rule was looking for, in the rule's own words.
- *
- * An agent reading a real report asked why `blend` was prohibited. The finding named the pattern
- * that matched and the URL it matched in, and nothing said what the pattern *is* — so a reader had
- * to infer the category from a single token. NAME-002's clause lists examples (`Lean Stack`,
- * `Mass`, `PCT`) and `blend` is not among them, which is exactly when the inference fails.
- *
- * **Read from `subject`, never from the rule id.** `subject` is the rule's own statement of what it
- * is about — *"product names use marketing terms"* — and a per-rule string here would be a second
- * copy of it that drifts, and would leave every rule added later reading as it does today
- * (hard constraint 1). It states the method's subject and stops there, which is what separates it
- * from a conclusion the match does not support (D-076).
- *
- * `notObservedSentence` builds copy from the same field for the same reason.
- */
-const looksFor = (rule: RuleOfType<'url_pattern'>): string =>
-  rule.subject === undefined || rule.subject.trim() === ''
-    ? ''
-    : ` What this rule looks for: ${rule.subject}.`;
+/*
+  `looksFor` lived here and was removed (D-225).
+
+  It appended the rule's `subject` to every violation — and `boundarySentence` now opens the same
+  finding with the same field. Every one of the ten `url_pattern` rules declares `expect: absent`,
+  so the boundary line always fires, and the note said the subject a second time:
+
+    What the standards do not permit: product names use marketing terms. 1 of 1 URLs in scope
+    'products' matched a prohibited pattern: … What this rule looks for: product names use
+    marketing terms.
+
+  The lead states what the rule is about; the note states what was observed. One each.
+*/
 
 function describeSatisfied(
   rule: RuleOfType<'url_pattern'>,

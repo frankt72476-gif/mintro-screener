@@ -22,6 +22,7 @@ import { loadRulesetFile, type Rule, type RuleOfType } from '@mintro/ruleset';
 import { FINDING_TERMS, auditCopy } from '../src/copy.js';
 import { checkDomAssert } from '../src/checks/domAssert.js';
 import { checkUrlPattern } from '../src/checks/urlPattern.js';
+import { leadSentence } from '../src/report.js';
 import { createStubFetcher, discoverLayer0 } from '../src/index.js';
 import { RULESET_PATH } from './paths.js';
 import type { PageContext } from '../src/page.js';
@@ -126,16 +127,33 @@ const crawlOf = async (paths: readonly string[]) => {
   );
 };
 
+/**
+ * The reason a match matters moved from the note to the lead (D-225).
+ *
+ * This block asserted `looksFor`, which appended the rule's `subject` to every `url_pattern`
+ * violation. `boundarySentence` now opens the same finding with the same field, and every one of
+ * the ten `url_pattern` rules declares `expect: absent` — so the subject printed twice in one
+ * finding. `looksFor` is gone and these assert the property it carried, in its new place.
+ *
+ * The property is unchanged and is the one that matters: the reason is read from the rule, never
+ * from its id.
+ */
 describe('a pattern finding names what the rule is looking for', () => {
-  it('NAME-002 says the match is about marketing terms, not just that it matched', async () => {
+  it('NAME-002 leads with what the standards do not permit, and says it once', async () => {
     const crawl = await crawlOf(['/products/bpc-157-tb500-blend/', '/products/selank/']);
-    const finding = checkUrlPattern(ruleOf('NAME-002', 'url_pattern'), crawl);
+    const rule = ruleOf('NAME-002', 'url_pattern');
+    const finding = { ...checkUrlPattern(rule, crawl), subject: rule.subject, expect: 'absent' as const };
 
     expect(finding.state).toBe('fail');
     expect(finding.note).toContain("matched 'blend'");
 
-    // The agent's question — "why is 'blend' prohibited?" — answered from the rule's own subject.
-    expect(finding.note).toContain('What this rule looks for: product names use marketing terms.');
+    // The agent's question — "why is 'blend' prohibited?" — answered on the lead.
+    expect(leadSentence(finding as never)).toBe(
+      'What the standards do not permit: product names use marketing terms.',
+    );
+
+    // And once. The note no longer repeats the subject.
+    expect(finding.note).not.toContain(rule.subject);
     expect(auditCopy(finding.note, FINDING_TERMS).clean).toBe(true);
   });
 
@@ -143,39 +161,35 @@ describe('a pattern finding names what the rule is looking for', () => {
    * The assertion that stops this becoming a lookup table.
    *
    * A rule id this engine has never seen, with a subject nothing hardcoded could know, must read
-   * correctly. `NAME-002`'s own patterns are reused so only the subject differs — if the sentence
-   * came from a rule-id branch, this returns NAME-002's subject or nothing at all.
+   * correctly. If the sentence came from a rule-id branch, this returns NAME-002's subject or
+   * nothing at all.
    */
-  it('reads the reason from the rule, so a rule added later needs no engine change', async () => {
+  it('reads the reason from the rule, so a rule added later needs no engine change', () => {
     const invented = {
-      ...ruleOf('NAME-002', 'url_pattern'),
-      id: 'ZZZZ-999',
+      ruleId: 'ZZZZ-999',
+      state: 'fail' as const,
       subject: 'listings carry names this programme has not seen before',
-    } as RuleOfType<'url_pattern'>;
+      expect: 'absent' as const,
+    };
 
-    const crawl = await crawlOf(['/products/bpc-157-tb500-blend/']);
-    const finding = checkUrlPattern(invented, crawl);
-
-    expect(finding.note).toContain(
-      'What this rule looks for: listings carry names this programme has not seen before.',
+    expect(leadSentence(invented as never)).toBe(
+      'What the standards do not permit: listings carry names this programme has not seen before.',
     );
-    expect(finding.note).not.toContain('marketing terms');
+    expect(leadSentence(invented as never)).not.toContain('marketing terms');
   });
 
-  it('says nothing extra when a rule carries no subject', async () => {
+  it('leads with nothing when a rule carries no subject', () => {
     // Runs and rules recorded before `subject` existed must read as they did (D-002).
-    const bare = { ...ruleOf('NAME-002', 'url_pattern'), subject: undefined } as unknown as RuleOfType<'url_pattern'>;
-    const crawl = await crawlOf(['/products/bpc-157-tb500-blend/']);
-
-    expect(checkUrlPattern(bare, crawl).note).not.toContain('What this rule looks for');
+    expect(leadSentence({ ruleId: 'X', state: 'fail', expect: 'absent' } as never)).toBeNull();
   });
 
-  it('adds nothing to a satisfied finding', async () => {
+  it('leads with nothing on a satisfied finding', async () => {
     // A rule that matched nothing has no match to explain, and D-041 keeps a clean finding quiet.
     const crawl = await crawlOf(['/products/selank/', '/products/semax/']);
-    const finding = checkUrlPattern(ruleOf('NAME-002', 'url_pattern'), crawl);
+    const rule = ruleOf('NAME-002', 'url_pattern');
+    const finding = { ...checkUrlPattern(rule, crawl), subject: rule.subject, expect: 'absent' as const };
 
     expect(finding.state).toBe('pass');
-    expect(finding.note).not.toContain('What this rule looks for');
+    expect(leadSentence(finding as never)).toBeNull();
   });
 });
