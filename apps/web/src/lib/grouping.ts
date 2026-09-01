@@ -574,6 +574,73 @@ export function ordinalsFor(report: ScreeningReport): ReadonlyMap<ReportFinding,
 }
 
 /**
+ * The reference a reader points at, for one finding.
+ *
+ * An agent reading a real report asked for this: *"the scanner does not itemize the list with
+ * numbers, so it's hard to reference a particular one — you have to identify the descriptor, and
+ * some are very similar."* Five findings reading `CAS number listed` are five separate
+ * examinations of five sampled pages, and nothing on the page told them apart.
+ *
+ * **It is the anchor a comment already uses, made visible** — `ruleId` plus the ordinal from
+ * `ordinalOf`, which is what `merchant_comments.rule_id` and `merchant_comments.ordinal` store
+ * (D-063). Not a sequential position in the rendered list: that would be a **second identity** for
+ * a finding that already has one, it would key differently from the comment filed against it, and
+ * it would shift the moment grouping or sample size changed. A reader pointing at "finding 12"
+ * and a comment row saying `COA-002 / 2` would be two names for one thing, which is the shape
+ * D-063 was written to prevent.
+ *
+ * The position shown is **one-based** where the stored ordinal is zero-based, because "3 of 5"
+ * is what a person writes and `2` is not. The conversion happens here and nowhere else, and
+ * `referencesFor` is asserted against `ordinalsFor` so the two cannot drift.
+ *
+ * A rule with one finding shows its id alone. It needs no discriminator, and giving it one would
+ * imply a set it is not part of.
+ */
+export function findingReference(ruleId: string, ordinal: number | undefined, count: number): string {
+  return ordinal === undefined ? ruleId : `${ruleId} · ${ordinal + 1} of ${count}`;
+}
+
+/**
+ * Every finding's reference, decided once for the whole report.
+ *
+ * Built from `groupReport` for the reason `ordinalsFor` is (D-063, D-216): the reading view walks
+ * display groups and the print view walks the same groups, and a reference taken from a position
+ * in either traversal would be a second ordering computed alongside the one partition. One map,
+ * looked up by both, so a finding's reference on screen, in the PDF and in a comment is the same
+ * string.
+ *
+ * Keyed by the finding object, like `ordinalsFor`, because within one render every view holds the
+ * same `report` and identity is what survives two traversals of it.
+ */
+export function referencesFor(report: ScreeningReport): ReadonlyMap<ReportFinding, string> {
+  const references = new Map<ReportFinding, string>();
+
+  /*
+    Consequence children are walked too, and forgetting them is how this went wrong first (D-164).
+
+    `nestCascades` moves a `not_evaluable` group under the root whose retrieval failure explains
+    it, so those groups are no longer in `section.groups` — they hang off `consequences`. A
+    traversal that stopped at the top level left every nested finding unnamed, which
+    `ungrouped(report)` catches immediately: the record holds them, so the reference map must too
+    (D-042).
+  */
+  for (const section of groupReport(report)) {
+    for (const group of section.groups) {
+      for (const each of [group, ...(group.consequences ?? [])]) {
+        each.findings.forEach((finding, index) => {
+          references.set(
+            finding,
+            findingReference(finding.ruleId, ordinalOf(each, index), each.findings.length),
+          );
+        });
+      }
+    }
+  }
+
+  return references;
+}
+
+/**
  * Every finding that carries a comment box, keyed the way its comment is keyed (D-063).
  *
  * Walks the same `groupReport` output the page renders, so the list an underwriter is counted

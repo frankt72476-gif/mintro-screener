@@ -32,6 +32,7 @@ import {
   bandStats,
   sectionAnchor,
   ordinalsFor,
+  referencesFor,
   type FindingGroup,
   type ReportPart,
   type SectionBlock,
@@ -195,6 +196,14 @@ export function ReportView({
 }: Props): JSX.Element {
   // Both branches read from this, so a comment keys the same way whichever view is rendering.
   const ordinals = useMemo(() => ordinalsFor(report), [report]);
+  /*
+    The reference a reader points at, decided once for the whole report (D-063's pattern).
+
+    Threaded beside `ordinals` rather than derived where it is rendered: the reading view and the
+    print view walk the report separately, and a reference computed locally in either would be a
+    second ordering alongside the one partition (D-216). One map, looked up by both.
+  */
+  const references = useMemo(() => referencesFor(report), [report]);
   // The default is the document each path actually produces today; a caller that knows better says
   // so. One parameter decides order and section 3's grouping, and nothing else (spec §1).
   const surface: Surface = surfaceProp ?? (print ? 'iqwallet' : 'agent');
@@ -372,6 +381,7 @@ export function ReportView({
         print={print === true}
         access={access}
         ordinals={ordinals}
+        references={references}
         {...(commentaryOf === undefined ? {} : { commentaryOf })}
         {...(commentBox === undefined ? {} : { commentBox })}
       />
@@ -495,6 +505,7 @@ export function ReportView({
                       group={group}
                       access={access}
                       ordinals={ordinals}
+                      references={references}
                       {...(blockHasNoEvidence(block) ? { hideEmptyEvidence: true } : {})}
                       {...(print === true ? { print: true } : {})}
                       {...(commentaryOf === undefined ? {} : { commentaryOf })}
@@ -558,6 +569,7 @@ export function ReportView({
                       group={group}
                       access={access}
                       ordinals={ordinals}
+                      references={references}
                       {...(blockHasNoEvidence(block) ? { hideEmptyEvidence: true } : {})}
                       {...(print === true ? { print: true } : {})}
                       {...(commentaryOf === undefined ? {} : { commentaryOf })}
@@ -588,6 +600,7 @@ export function ReportView({
               tally={review.passes.tally}
               access={access}
               ordinals={ordinals}
+              references={references}
               print={print}
               {...(commentaryOf === undefined ? {} : { commentaryOf })}
               {...(commentBox === undefined ? {} : { commentBox })}
@@ -736,6 +749,7 @@ function StoppingPanel({
   commentaryOf,
   commentBox,
   ordinals,
+  references,
 }: {
   readonly report: ScreeningReport;
   readonly parts: readonly ReportPart[];
@@ -744,6 +758,7 @@ function StoppingPanel({
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element | null;
   readonly ordinals?: ReadonlyMap<ReportFinding, number>;
+  readonly references?: ReadonlyMap<ReportFinding, string>;
 }): JSX.Element | null {
   const part = parts.find((candidate) => candidate.id === 'stopping');
   const account = part?.stopping;
@@ -791,6 +806,7 @@ function StoppingPanel({
                 <FindingRow
                   key={`${row.ruleId}-${i}`}
                   finding={finding}
+                  {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
                   access={access}
                   {...(print ? { print: true } : {})}
                   {...(commentaryOf === undefined
@@ -873,6 +889,7 @@ function StoppingPanel({
                       <FindingRow
                         key={`${row.ruleId}-${i}`}
                         finding={finding}
+                        {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
                         access={access}
                         {...(print ? { print: true } : {})}
                         {...(commentaryOf === undefined
@@ -1335,8 +1352,18 @@ function FindingRow({
   commentBox,
   print = false,
   evidenceFrom,
+  reference,
 }: {
   readonly finding: ReportFinding;
+  /**
+   * What a reader points at to name this finding — `ruleId`, plus its position where the rule
+   * produced more than one.
+   *
+   * Passed in rather than computed here: it is the comment's own anchor (D-063) and is decided
+   * once for the whole report, so screen and PDF cannot show different names for one finding.
+   * Falls back to the bare rule id, which is what the row showed before.
+   */
+  readonly reference?: string;
   /**
    * False where the group prints its published standard once above the instances (D-208).
    *
@@ -1379,7 +1406,7 @@ function FindingRow({
         <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
         <span className="find-main">
           <span className="find-title">
-            {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{finding.ruleId}</span>
+            {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{reference ?? finding.ruleId}</span>
           </span>
           {/*
             The row's summary line, shown only while the row is closed (D-047).
@@ -1556,6 +1583,7 @@ function PassDisclosure({
   tally,
   access,
   ordinals,
+  references,
   print,
   commentaryOf,
   commentBox,
@@ -1564,6 +1592,7 @@ function PassDisclosure({
   readonly tally: { readonly rules: number; readonly findings: number };
   readonly access: EvidenceAccess;
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  readonly references: ReadonlyMap<ReportFinding, string>;
   readonly print?: boolean;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
@@ -1587,6 +1616,7 @@ function PassDisclosure({
             group={group}
             access={access}
             ordinals={ordinals}
+            references={references}
             {...(print === true ? { print: true } : {})}
             {...(commentaryOf === undefined ? {} : { commentaryOf })}
             {...(commentBox === undefined ? {} : { commentBox })}
@@ -1608,11 +1638,13 @@ function GroupCard({
   group,
   access,
   ordinals,
+  references,
   commentaryOf,
   commentBox,
   print,
 }: {
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  readonly references: ReadonlyMap<ReportFinding, string>;
   readonly group: FindingGroup;
   /** True where the block above states, once, that none of these carries a capture (D-208). */
   readonly hideEmptyEvidence?: boolean;
@@ -1689,6 +1721,7 @@ function GroupCard({
             <FindingRow
               key={`${finding.ruleId}-${i}`}
               finding={finding}
+              {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
               {...(group.findings.length > 1 ? { showRequirement: false } : {})}
               access={access}
               {...(print === true ? { print: true } : {})}
@@ -1701,6 +1734,7 @@ function GroupCard({
             group={group}
             access={access}
             ordinals={ordinals}
+            references={references}
             {...(print === true ? { print: true } : {})}
             {...(commentaryOf === undefined ? {} : { commentaryOf })}
             {...(commentBox === undefined ? {} : { commentBox })}
@@ -1727,6 +1761,7 @@ function GroupCard({
           <FindingRow
             key={`${finding.ruleId}-${i}`}
             finding={finding}
+            {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
             access={access}
             {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
             {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
@@ -1736,6 +1771,7 @@ function GroupCard({
           group={group}
           access={access}
           ordinals={ordinals}
+          references={references}
           {...(commentaryOf === undefined ? {} : { commentaryOf })}
           {...(commentBox === undefined ? {} : { commentBox })}
         />
@@ -1756,6 +1792,7 @@ function Consequences({
   group,
   access,
   ordinals,
+  references,
   commentaryOf,
   commentBox,
   print,
@@ -1763,6 +1800,7 @@ function Consequences({
   readonly group: FindingGroup;
   readonly access: EvidenceAccess;
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
+  readonly references: ReadonlyMap<ReportFinding, string>;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
   readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
   readonly print?: boolean;
@@ -1782,6 +1820,7 @@ function Consequences({
             <FindingRow
               key={`${child.ruleId}-${i}`}
               finding={finding}
+              {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
               access={access}
               {...(inheritsEvidence(group, child) ? { evidenceFrom: group.ruleId } : {})}
               {...(print === true ? { print: true } : {})}
