@@ -286,9 +286,12 @@ function AttestationRow({
       {question.recordedByOperator === true && (
         <p className="att-recorded">
           {/* Mintro, never a person (0061). The framing is unchanged; the address is gone. */}
+          {/* `recordedAt` where known (0062) — see MerchantResponse for why not `submittedAt`. */}
           Recorded by Mintro on the merchant’s behalf
-          {question.submittedAt === undefined ? '' : `, ${formatStamp(question.submittedAt)}`}. Not
-          the merchant’s own statement.
+          {(question.recordedAt ?? question.submittedAt) === undefined
+            ? ''
+            : `, ${formatStamp((question.recordedAt ?? question.submittedAt) as string)}`}. Not the
+          merchant’s own statement.
         </p>
       )}
       {question.inherited !== undefined && (

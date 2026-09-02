@@ -157,7 +157,10 @@ export function MerchantResponse({
               carries, so the record loses nothing but the name.
             */}
             {comment.recordedByOperator === true
-              ? `Recorded by Mintro on the merchant’s behalf, ${formatStamp(comment.submittedAt)}`
+              ? // `recordedAt`, not `submittedAt` (0062): on a carried-forward row the latter is
+                // when this run copied the answer, and dating it that way would say the operator
+                // took it down on a day they did not.
+                `Recorded by Mintro on the merchant’s behalf, ${formatStamp(comment.recordedAt ?? comment.submittedAt)}`
               : `Identified themselves as ${comment.identifiedAs}, ${formatStamp(comment.submittedAt)}`}
             {index > 0 && ' — added after an earlier response'}
           </cite>

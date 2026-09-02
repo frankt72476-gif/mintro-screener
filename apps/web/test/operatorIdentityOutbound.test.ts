@@ -123,8 +123,11 @@ const COMMENTS: readonly MerchantComment[] = [
     ruleId: 'PAY-001',
     identifiedAs: '',
     body: 'The merchant told us by phone that Amex is no longer accepted.',
-    submittedAt: '2026-08-28T11:00:00.000Z',
+    // `submittedAt` is when this run carried it forward; `recordedAt` is when it was taken down.
+    // Deliberately different instants, so the rendered date proves which one is used.
+    submittedAt: '2026-09-01T08:00:00.000Z',
     recordedByOperator: true,
+    recordedAt: '2026-08-28T11:00:00.000Z',
   },
 ];
 
@@ -186,6 +189,13 @@ describe('an operator name never reaches the IQwallet PDF', () => {
     // rendered "Identified themselves as , <date>".
     expect(document).not.toMatch(/Identified themselves as\s*,/);
     expect(document).not.toMatch(/Recorded by\s*(on|,)/);
+  });
+
+  it('dates the operator response from when it was recorded, not from this run', () => {
+    // 2026-08-28 is `recordedAt`; 2026-09-01 is `submittedAt`. Dating it from the latter would say
+    // the operator took the answer down on a day they did not. `formatStamp` renders ET.
+    expect(document).toContain('Recorded by Mintro on the merchant’s behalf, 2026-08-28');
+    expect(document).not.toContain('Recorded by Mintro on the merchant’s behalf, 2026-09-01');
   });
 
   it('still names the merchant respondent, who belongs on the record', () => {

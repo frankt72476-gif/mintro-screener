@@ -131,6 +131,17 @@ describe('the anonymous merchant payload', () => {
     }
   });
 
+  it('carries when it was recorded, which identifies nobody', async () => {
+    const { parsed } = await payload();
+    const comments = parsed['comments'] as { ruleId: string; recordedAt?: string | null }[];
+    const operator = comments.find((c) => c.ruleId === 'PAY-001');
+    // A timestamp is a fact about the record. 0061 removed it along with the address and the
+    // renderers fell back to `submitted_at`, which is a different moment on a carried-forward row.
+    expect(typeof operator?.recordedAt).toBe('string');
+    const merchant = comments.find((c) => c.ruleId === 'CATG-007');
+    expect(merchant?.recordedAt ?? null).toBeNull();
+  });
+
   it('still carries the merchant address, which belongs on the page', async () => {
     const { json } = await payload();
     expect(json).toContain(MERCHANT_EMAIL);

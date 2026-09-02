@@ -248,8 +248,9 @@ export async function readRunCommentary(
               },
             }),
         ...(row.commented_on === null ? {} : { commentedOn: row.commented_on }),
-        // The fact, not the person. See `recordedByOperator` in commentary.ts.
+        // The fact and the moment, never the person. See `recordedByOperator` in commentary.ts.
         ...(row.recorded_by_email === null ? {} : { recordedByOperator: true }),
+        ...(row.recorded_at === null ? {} : { recordedAt: row.recorded_at }),
         body: row.body,
         identifiedAs: row.identified_as ?? '',
         submittedAt: row.submitted_at,

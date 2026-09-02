@@ -70,6 +70,15 @@ export interface MerchantComment {
    * was never handed. The date a reader needs is `submittedAt`, which every row carries.
    */
   readonly recordedByOperator?: boolean;
+  /**
+   * When it was recorded, on an operator row (0062).
+   *
+   * A bare timestamp and nothing else — it says *when* an answer was taken down on the merchant's
+   * behalf, never by whom. Separate from `submittedAt` on purpose: they are the same instant on a
+   * fresh operator row and diverge on an inherited one, where `submittedAt` is when this run
+   * copied the answer forward.
+   */
+  readonly recordedAt?: string;
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * The observation this was written about, as it read then (D-204, §3).

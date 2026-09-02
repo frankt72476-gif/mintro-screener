@@ -47,6 +47,8 @@ export interface StoredAttestation {
    */
   /** True where an operator recorded it. A boolean, never a name — see commentary.ts. */
   readonly recordedByOperator?: boolean;
+  /** When it was recorded. A timestamp, never a recorder — see commentary.ts. */
+  readonly recordedAt?: string;
   readonly submittedAt: string;
   /**
    * Where this answer was first given, when it was carried forward (D-204).
@@ -95,6 +97,8 @@ export interface ResolvedAttestation {
    */
   /** True where an operator recorded it. A boolean, never a name — see commentary.ts. */
   readonly recordedByOperator?: boolean;
+  /** When it was recorded. A timestamp, never a recorder — see commentary.ts. */
+  readonly recordedAt?: string;
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * Earlier answers to the same question, newest first, when the merchant revised.
@@ -244,6 +248,7 @@ export function resolveAttestations(
       submittedAt: current.submittedAt,
       ...(current.inherited === undefined ? {} : { inherited: current.inherited }),
       ...(current.recordedByOperator === true ? { recordedByOperator: true } : {}),
+      ...(current.recordedAt === undefined ? {} : { recordedAt: current.recordedAt }),
       ...(older.length === 0 ? {} : { superseded: older }),
     };
   });
@@ -338,8 +343,9 @@ export async function readRunAttestations(
         outcome,
         ...(body === undefined ? {} : { body }),
         identifiedAs: typeof row.identified_as === 'string' ? row.identified_as : '',
-        // The fact, not the person.
+        // The fact and the moment, never the person.
         ...(typeof row.recorded_by_email === 'string' ? { recordedByOperator: true } : {}),
+        ...(typeof row.recorded_at === 'string' ? { recordedAt: row.recorded_at } : {}),
         submittedAt: String(row.submitted_at),
         ...(typeof row.inherited_from_run === 'string' && typeof row.originally_answered_at === 'string'
           ? {
