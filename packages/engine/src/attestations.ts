@@ -45,7 +45,8 @@ export interface StoredAttestation {
    * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
    * address.
    */
-  readonly recordedBy?: { readonly email: string; readonly at: string };
+  /** True where an operator recorded it. A boolean, never a name — see commentary.ts. */
+  readonly recordedByOperator?: boolean;
   readonly submittedAt: string;
   /**
    * Where this answer was first given, when it was carried forward (D-204).
@@ -92,7 +93,8 @@ export interface ResolvedAttestation {
    * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
    * address.
    */
-  readonly recordedBy?: { readonly email: string; readonly at: string };
+  /** True where an operator recorded it. A boolean, never a name — see commentary.ts. */
+  readonly recordedByOperator?: boolean;
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * Earlier answers to the same question, newest first, when the merchant revised.
@@ -241,7 +243,7 @@ export function resolveAttestations(
       identifiedAs: current.identifiedAs,
       submittedAt: current.submittedAt,
       ...(current.inherited === undefined ? {} : { inherited: current.inherited }),
-      ...(current.recordedBy === undefined ? {} : { recordedBy: current.recordedBy }),
+      ...(current.recordedByOperator === true ? { recordedByOperator: true } : {}),
       ...(older.length === 0 ? {} : { superseded: older }),
     };
   });
@@ -262,18 +264,18 @@ export function resolveAttestations(
     */
     counts: {
       answered: questions.filter(
-        (q) => q.outcome === 'answered' && q.inherited === undefined && q.recordedBy === undefined,
+        (q) => q.outcome === 'answered' && q.inherited === undefined && q.recordedByOperator !== true,
       ).length,
       declined: questions.filter(
-        (q) => q.outcome === 'declined' && q.inherited === undefined && q.recordedBy === undefined,
+        (q) => q.outcome === 'declined' && q.inherited === undefined && q.recordedByOperator !== true,
       ).length,
       unanswered: questions.filter((q) => q.outcome === 'unanswered').length,
       inherited: questions.filter(
-        (q) => q.outcome !== 'unanswered' && q.inherited !== undefined && q.recordedBy === undefined,
+        (q) => q.outcome !== 'unanswered' && q.inherited !== undefined && q.recordedByOperator !== true,
       ).length,
       // An operator answer carried forward counts here, not under `inherited`: whose words they are
       // outranks which run they were written on.
-      recorded: questions.filter((q) => q.outcome !== 'unanswered' && q.recordedBy !== undefined).length,
+      recorded: questions.filter((q) => q.outcome !== 'unanswered' && q.recordedByOperator === true).length,
       total: questions.length,
     },
   };
@@ -336,9 +338,8 @@ export async function readRunAttestations(
         outcome,
         ...(body === undefined ? {} : { body }),
         identifiedAs: typeof row.identified_as === 'string' ? row.identified_as : '',
-        ...(typeof row.recorded_by_email === 'string' && typeof row.recorded_at === 'string'
-          ? { recordedBy: { email: row.recorded_by_email, at: row.recorded_at } }
-          : {}),
+        // The fact, not the person.
+        ...(typeof row.recorded_by_email === 'string' ? { recordedByOperator: true } : {}),
         submittedAt: String(row.submitted_at),
         ...(typeof row.inherited_from_run === 'string' && typeof row.originally_answered_at === 'string'
           ? {

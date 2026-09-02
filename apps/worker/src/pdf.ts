@@ -120,6 +120,11 @@ export async function renderReportPdf(browser: Browser, options: PdfOptions): Pr
     // `printBackground` is not cosmetic here. The four-state colour system — the tick strip, the
     // state badges, the left borders on findings — is background colour, and a PDF without it
     // would lose the distinction between a fail and a pass at a glance.
+    // No author, creator or title is set here, deliberately (0061). `page.pdf()` exposes no such
+    // option, and nothing should reach for one: PDF metadata is where an operator name hides from
+    // everyone who only ever looks at the page. `/Title` comes from the print route's document
+    // title — the product name — and `/Creator` and `/Producer` are Chromium's own. Verified
+    // against generated reports: Creator (Chromium), Producer (Skia/PDF), no /Author at all.
     const bytes = await page.pdf({
       format: 'A4',
       printBackground: true,

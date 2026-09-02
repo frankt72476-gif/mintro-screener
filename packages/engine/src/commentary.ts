@@ -56,7 +56,20 @@ export interface MerchantComment {
    * these rows, so a renderer that ignored this prints an obvious gap instead of a plausible
    * address.
    */
-  readonly recordedBy?: { readonly email: string; readonly at: string };
+  /**
+   * True where an operator recorded this on the merchant's behalf, rather than the merchant
+   * writing it (D-212).
+   *
+   * **A boolean, never the recorder's address.** The email and timestamp live in
+   * `merchant_comments.recorded_by_email` / `recorded_at` and stay there: the fact that Mintro
+   * recorded an answer belongs in a document an underwriter reads, and which member of staff
+   * typed it does not. Carrying the address this far meant every renderer downstream *could*
+   * print it, and one of them did — into the PDF that goes to IQwallet.
+   *
+   * Fixed here rather than in the renderers so that a future component cannot print a name it
+   * was never handed. The date a reader needs is `submittedAt`, which every row carries.
+   */
+  readonly recordedByOperator?: boolean;
   readonly inherited?: { readonly fromRunId: string; readonly originallyAt: string };
   /**
    * The observation this was written about, as it read then (D-204, §3).

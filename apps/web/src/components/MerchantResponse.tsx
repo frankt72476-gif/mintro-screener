@@ -123,7 +123,7 @@ export function MerchantResponse({
       <span className="mr-head">Merchant response</span>
       {commentary.comments.map((comment, index) => (
         <blockquote
-          className={`mr-body${comment.recordedBy === undefined ? '' : ' mr-recorded'}`}
+          className={`mr-body${comment.recordedByOperator === true ? ' mr-recorded' : ''}`}
           key={`${comment.submittedAt}-${index}`}
         >
           {/*
@@ -147,9 +147,18 @@ export function MerchantResponse({
               an analyst wrote down what a merchant told them elsewhere. It is useful and it is in
               the document, and it is not the merchant's own statement.
             */}
-            {comment.recordedBy === undefined
-              ? `Identified themselves as ${comment.identifiedAs}, ${formatStamp(comment.submittedAt)}`
-              : `Recorded by ${comment.recordedBy.email} on the merchant’s behalf, ${formatStamp(comment.recordedBy.at)}`}
+            {/*
+              Mintro, never a person (0061).
+
+              This printed the recording analyst's email address, in a document that goes to
+              IQwallet. That an answer was taken down by Mintro rather than written by the
+              merchant is what a reader needs; which member of staff typed it is not, and it is
+              not the underwriter's business. The date comes from `submittedAt`, which every row
+              carries, so the record loses nothing but the name.
+            */}
+            {comment.recordedByOperator === true
+              ? `Recorded by Mintro on the merchant’s behalf, ${formatStamp(comment.submittedAt)}`
+              : `Identified themselves as ${comment.identifiedAs}, ${formatStamp(comment.submittedAt)}`}
             {index > 0 && ' — added after an earlier response'}
           </cite>
           {provenance(comment)}

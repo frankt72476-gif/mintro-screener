@@ -26,6 +26,17 @@ import type { AddressStanding, ResponseRound } from '@mintro/engine';
 import type { ResponseRoundActions } from '../lib/responseRound.js';
 import { formatStamp } from '../lib/format.js';
 
+/*
+  OPERATOR-FACING ONLY (0061).
+
+  This panel renders `markedByEmail` — an analyst's address. It is imported by `App.tsx` and by
+  nothing else, and it must stay that way: no merchant-, agent- or IQwallet-facing surface may
+  render an operator's name or address, in body, header, footer or metadata.
+
+  If this panel is ever reused on a partner-facing or merchant-facing screen, `markedByEmail` has
+  to become a boolean first, the way `recordedByOperator` did — the fact that Mintro marked a
+  non-response belongs in an outbound document; which person did is not the reader's business.
+*/
 export function ResponseRoundPanel({
   runId,
   round,

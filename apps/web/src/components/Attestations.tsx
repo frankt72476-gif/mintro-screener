@@ -249,7 +249,7 @@ function AttestationRow({
           */}
           {question.outcome === 'unanswered'
             ? UNANSWERED_MARK[asking]
-            : question.recordedBy !== undefined
+            : question.recordedByOperator === true
               ? /*
                    Never "Answered": the merchant did not answer it (D-212).
 
@@ -283,10 +283,12 @@ function AttestationRow({
         Above the inheritance line, because whose words they are matters more than which run they
         were written on — and an operator answer that carried forward is still the operator's.
       */}
-      {question.recordedBy !== undefined && (
+      {question.recordedByOperator === true && (
         <p className="att-recorded">
-          Recorded by {question.recordedBy.email} on the merchant’s behalf,{' '}
-          {formatStamp(question.recordedBy.at)}. Not the merchant’s own statement.
+          {/* Mintro, never a person (0061). The framing is unchanged; the address is gone. */}
+          Recorded by Mintro on the merchant’s behalf
+          {question.submittedAt === undefined ? '' : `, ${formatStamp(question.submittedAt)}`}. Not
+          the merchant’s own statement.
         </p>
       )}
       {question.inherited !== undefined && (
@@ -307,7 +309,7 @@ function AttestationRow({
               "declined to answer, which may indicate…". The reader draws the conclusion (D-001).
             */
             <p className="att-declined">
-              {question.recordedBy === undefined
+              {question.recordedByOperator !== true
                 ? 'The merchant declined to answer this question.'
                 : // Recorded, so the refusal is what the operator was told — not a refusal made here.
                   'Recorded as not answered.'}
@@ -323,7 +325,7 @@ function AttestationRow({
             2026-08-30"*, a sentence with a hole where a person should be. The recorder line above
             says who wrote it; this one has nothing left to say.
           */}
-          {question.recordedBy === undefined && (
+          {question.recordedByOperator !== true && (
             <p className="att-attrib">
               {/*
                 "Identified themselves as", never "from" — the address is self-declared and Mintro
@@ -522,8 +524,14 @@ function AttestationField({
     readonly writtenAt?: string;
     /** Set where it came from an earlier screening of this domain (D-204). */
     readonly carriedForwardFrom?: string;
-    /** Set where an operator recorded it on the merchant's behalf (D-212). */
-    readonly recordedByEmail?: string;
+    /**
+     * Set where an operator recorded it on the merchant's behalf (D-212).
+     *
+     * A boolean since 0061. It was the recorder's email address, shown to the merchant on a page
+     * reached by a forwardable link — which published a member of staff's address to whoever the
+     * link was passed to.
+     */
+    readonly recordedByOperator?: boolean;
   };
   readonly identified: boolean;
   readonly onAnswer: (
@@ -551,7 +559,7 @@ function AttestationField({
 
       {sent !== undefined && (
         <>
-          {sent.recordedByEmail !== undefined && (
+          {sent.recordedByOperator === true && (
             /*
               What the merchant sees for a question the operator already answered (D-212).
 
@@ -561,8 +569,8 @@ function AttestationField({
               an underwriter should see rather than something the page quietly resolves.
             */
             <p className="att-recorded">
-              Recorded by {sent.recordedByEmail} on your behalf. If that is wrong, answer below —
-              your answer is added beside it rather than replacing it.
+              Recorded by Mintro on your behalf. If that is wrong, answer below — your answer is
+              added beside it rather than replacing it.
             </p>
           )}
           <p className="att-sent">
@@ -574,12 +582,12 @@ function AttestationField({
               would be a false statement in the one place they act on it.
             */}
             {sent.outcome === 'declined'
-              ? sent.carriedForwardFrom === undefined && sent.recordedByEmail === undefined
+              ? sent.carriedForwardFrom === undefined && sent.recordedByOperator !== true
                 ? 'Recorded: you chose not to answer this one.'
                 : 'Recorded: not answered.'
               : `Recorded: "${sent.body ?? ''}"`}
           </p>
-          {sent.recordedByEmail === undefined && sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
+          {sent.recordedByOperator !== true && sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
             /*
               Who wrote it and when, in the form and not only on the report (D-205).
 

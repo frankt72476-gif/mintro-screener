@@ -162,6 +162,9 @@ export async function readRunCommentary(
   const comments = await rows<CommentRow>(
     db,
     'merchant_comments',
+    // `recorded_by_email` is read and deliberately not carried forward: the mapping below turns it
+    // into a boolean. Selected rather than dropped from the query so the distinction between "no
+    // operator recorded this" and "the column was never fetched" stays visible here.
     'rule_id, ordinal, body, identified_as, submitted_at, subject, inherited_from_run, originally_answered_at, commented_on, recorded_by_email, recorded_at',
     runId,
     'submitted_at',
@@ -245,9 +248,8 @@ export async function readRunCommentary(
               },
             }),
         ...(row.commented_on === null ? {} : { commentedOn: row.commented_on }),
-        ...(row.recorded_by_email === null || row.recorded_at === null
-          ? {}
-          : { recordedBy: { email: row.recorded_by_email, at: row.recorded_at } }),
+        // The fact, not the person. See `recordedByOperator` in commentary.ts.
+        ...(row.recorded_by_email === null ? {} : { recordedByOperator: true }),
         body: row.body,
         identifiedAs: row.identified_as ?? '',
         submittedAt: row.submitted_at,
