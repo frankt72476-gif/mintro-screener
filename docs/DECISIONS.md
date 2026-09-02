@@ -15480,3 +15480,41 @@ Policy text is not access (D-234). Re-derive the FK graph rather than trusting a
 and remember that objects reached by storage key (evidence, documents bucket) and
 content-addressed tables anchored on a hash (`extractions`) are part of the graph and leak
 without announcing themselves.
+
+---
+
+## D-239 — The access log records security-relevant attempts, not only changes
+**2026-09-02 · business owner · `supabase/migrations/0066_bind_refused_is_logged.sql`**
+
+`admin_access_log` recorded access *changes* from 0056 onward: invited, activated, granted,
+revoked, suspended, reinstated, rerouted. Every value named something that had happened to
+somebody's access.
+
+A bind refused under a mismatched address changes nothing — refusing is the whole of what it
+does — so on that reading it would not be written. It is written anyway, because the two states it
+sits between are indistinguishable from the owner's side. A forwarded invitation completed under
+the wrong address and an invitation nobody ever opened both leave a row that stays `invited` and a
+person who never appears. One is somebody failing to get in; the other is a link that went astray.
+The owner cannot act on either without being able to tell them apart, and the log is the only place
+that difference could be visible.
+
+So the log's scope widens by one: it records security-relevant **attempts** as well as changes.
+`bind_refused` is the first such entry and should stay the only kind of one — an attempt is worth a
+line when it is an attempt on somebody's access and the refusal would otherwise be invisible. A log
+that recorded every rejected read would be a different artifact with a different purpose.
+
+**The scoped-to address is logged; the forwarded-to address never is.** The entry names the address
+the invitation was issued to — which the owner chose, typed, and already holds on the roster row —
+together with the fact and the time. It does not name the address that actually opened the link.
+That address belongs to a third party: whoever the invitation was forwarded to, or whichever
+account a browser happened to be signed in to. They are not party to this system, and the owner
+reads this log. Recording it would turn a refusal into a collection — handing the owner an address
+they were never given and have no business holding — and the refusal has already done its work.
+
+The consequence is that the log says *an invitation to this address was refused*, never *this
+person tried to use it*. That is the more useful line in any case: the owner's next act is to
+re-issue or withdraw an invitation, and both are addressed to the person they invited.
+
+Enforced in `bind_invited_analyst()`, where the session's address is read, compared and discarded
+without reaching a column, and asserted by a test that scans the whole log row rather than one
+field — a narrower check would pass a future change that put the address somewhere else.

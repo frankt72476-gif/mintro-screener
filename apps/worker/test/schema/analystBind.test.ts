@@ -110,11 +110,60 @@ describe('binding an invited analyst', () => {
     expect(String(result['reason'])).toMatch(/issued to a different address/);
     expect(result['bound']).toBe(false);
 
-    // Nothing moved: not the status, not the timestamp, not the log.
+    // Nothing bound: not the status, not the timestamp, and no activation.
     const after = await rosterRow(id);
     expect(after.status).toBe('invited');
     expect(after.activated_at).toBeNull();
-    expect(await logLines(id)).toEqual([]);
+    // The refusal is recorded, and it is the only thing recorded (D-239).
+    expect(await logLines(id)).toEqual(['bind_refused']);
+  });
+
+  it('records the refusal against the address it was SCOPED to', async () => {
+    const id = await invite('scoped-two@example.test', { authEmail: 'wrong-two@example.test' });
+    await schema.actAs(id);
+    await bind();
+
+    const [entry] = await schema.query<{ action: string; value_after: Record<string, unknown> }>(
+      `select action, value_after from public.admin_access_log where subject_id = $1`,
+      [id],
+    );
+    expect(entry!.action).toBe('bind_refused');
+    expect(entry!.value_after['scopedTo']).toBe('scoped-two@example.test');
+  });
+
+  it('never writes the address that wrongly opened the link', async () => {
+    /*
+      The point of D-239, and the half that is an absence.
+
+      The address on the session belongs to a third party — whoever the invitation was forwarded
+      to, or whichever account the browser happened to be signed in to. It is compared and
+      discarded. The scan is over the whole row rendered as text, not over `value_after` alone: a
+      future change that put it in `subject_id`'s place, or in a new column, would pass a narrower
+      check.
+    */
+    const forwarded = 'third-party@elsewhere.test';
+    const id = await invite('scoped-three@example.test', { authEmail: forwarded });
+    await schema.actAs(id);
+    await bind();
+
+    const [row] = await schema.query<{ whole: string }>(
+      `select l::text as whole from public.admin_access_log l where l.subject_id = $1`,
+      [id],
+    );
+    expect(row!.whole).toContain('bind_refused');
+    expect(row!.whole).toContain('scoped-three@example.test');
+    expect(row!.whole).not.toContain(forwarded);
+    expect(row!.whole).not.toContain('elsewhere.test');
+  });
+
+  it('writes nothing at all for a second sign-in that is already bound', async () => {
+    const id = await invite('quiet@example.test');
+    await schema.actAs(id);
+    await bind();
+    await bind();
+    await bind();
+    // One activation, no bind_refused, nothing per sign-in.
+    expect(await logLines(id)).toEqual(['activated']);
   });
 
   it('folds case, because an address is identity and not a string', async () => {
