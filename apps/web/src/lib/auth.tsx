@@ -25,6 +25,16 @@ export interface Analyst {
   readonly id: string;
   readonly email: string;
   readonly fullName: string | null;
+  /**
+   * Owner or admin, and the organisation (D-228, D-229).
+   *
+   * Read here because the route guards need it before any screen renders. It is a convenience for
+   * the UI and never the enforcement: People and the access log are owner-only in the database too
+   * — `admin_access_log_select` and the 0067 functions each ask `current_admin_is_owner()`, so a
+   * partner who got past a guard would still read and write nothing.
+   */
+  readonly role: 'owner' | 'admin';
+  readonly orgId: string;
 }
 
 export type AuthState =
@@ -104,7 +114,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
 
       const { data, error } = await client
         .from('analysts')
-        .select('id, email, full_name')
+        .select('id, email, full_name, role, org_id')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -115,10 +125,22 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
         return;
       }
 
-      const row = data as { id: string; email: string; full_name: string | null };
+      const row = data as {
+        id: string;
+        email: string;
+        full_name: string | null;
+        role: string;
+        org_id: string;
+      };
       setState({
         status: 'signed_in',
-        analyst: { id: row.id, email: row.email, fullName: row.full_name },
+        analyst: {
+          id: row.id,
+          email: row.email,
+          fullName: row.full_name,
+          role: row.role === 'owner' ? 'owner' : 'admin',
+          orgId: row.org_id,
+        },
         client,
       });
     };

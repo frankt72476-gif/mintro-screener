@@ -3208,3 +3208,53 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   color: var(--fail, #9b2c2c);
   margin: 0 0 0.5rem;
 }
+
+/* ── People and the access log (Stage 3, owner-only) ───────────────────────────────────────────
+   Plain table shapes reusing the app's existing tokens. The report's layout is untouched.
+*/
+.people-pane, .log-pane { padding: 1.5rem 2rem; }
+.people-head h1, .log-head h1 { font-size: 1.25rem; margin: 0 0 0.35rem; }
+.people-scope, .log-scope { color: var(--muted, #6d6788); margin: 0 0 1.25rem; max-width: 46rem; }
+.people-error { color: var(--fail, #9b2c2c); margin: 0.75rem 0; }
+.people, .log { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.people th, .log th { text-align: left; font-size: 0.78rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted, #6d6788); padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line, #d7d4e4); }
+.people td, .log td { padding: 0.6rem; border-bottom: 1px solid var(--line, #ece9f5);
+  vertical-align: top; }
+.people-name { display: block; font-weight: 600; }
+.people-email { display: block; font-size: 0.85rem; color: var(--muted, #6d6788); }
+.people-tag { display: inline-block; margin-top: 0.25rem; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, #6d6788); }
+/* Suspended: greyed, and the run count stays put (D-232). */
+.people-suspended { opacity: 0.55; }
+.people-still { display: block; font-size: 0.78rem; color: var(--muted, #6d6788); margin-top: 0.2rem; }
+.people-always { font-size: 0.85rem; color: var(--muted, #6d6788); }
+.people-menu { position: relative; }
+.people-menu-list { position: absolute; right: 0; z-index: 5; background: #fff;
+  border: 1px solid var(--line, #d7d4e4); border-radius: 4px; min-width: 11rem; padding: 0.25rem; }
+.people-menu-list button { display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem;
+  background: none; border: 0; font: inherit; cursor: pointer; }
+.people-menu-list button:hover { background: var(--tint, #f4f2fb); }
+.log-detail { font-size: 0.85rem; color: var(--muted, #6d6788); }
+.log-empty { color: var(--muted, #6d6788); }
+.log-recent { margin-top: 2rem; }
+.log-recent-head { font-size: 0.95rem; margin: 0 0 0.5rem; }
+
+.invite { display: flex; flex-direction: column; gap: 0.75rem; max-width: 32rem;
+  margin: 1rem 0 1.5rem; padding: 1rem; border: 1px solid var(--line, #d7d4e4); border-radius: 6px; }
+/* The highest-consequence control, and it is sized like one. */
+.invite-kind { border: 0; padding: 0; margin: 0; }
+.invite-kind legend { font-weight: 600; margin-bottom: 0.4rem; }
+.invite-kind label { display: grid; grid-template-columns: auto 1fr; gap: 0 0.5rem;
+  align-items: start; padding: 0.5rem; border: 1px solid var(--line, #ece9f5); border-radius: 4px;
+  margin-bottom: 0.4rem; cursor: pointer; }
+.invite-kind-name { font-weight: 600; }
+.invite-kind-what { grid-column: 2; font-size: 0.85rem; color: var(--muted, #6d6788); }
+.invite-label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
+.invite-input { padding: 0.45rem 0.55rem; border: 1px solid var(--line, #d7d4e4);
+  border-radius: 4px; font: inherit; font-weight: 400; }
+.invite-fixed { font-size: 0.9rem; color: var(--muted, #6d6788); margin: 0; }
+.invite-caps { border: 0; padding: 0; margin: 0; }
+.invite-caps legend { font-weight: 600; margin-bottom: 0.3rem; }
+.invite-caps label { display: block; font-size: 0.9rem; }

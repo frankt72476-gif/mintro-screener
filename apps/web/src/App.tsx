@@ -14,6 +14,7 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
+import { AccessLogPane, NotAvailable, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
 import {
@@ -305,6 +306,40 @@ function AnalystWorkspace(): JSX.Element {
   }
 
   if (state.status !== 'signed_in') return <SignIn />;
+
+  /*
+    The owner's routes, and the guard on them (D-229).
+
+    Checked after sign-in because both need a session to decide anything, and before `Screener`
+    because they are whole screens rather than panes inside it.
+
+    Administration is the owner's, not the host organisation's. A host member sees every
+    organisation's work and none of these controls, so the guard asks `ownsTheAccount` rather than
+    `current_admin_is_host`. It is a convenience: `admin_access_log_select` is owner-only and every
+    function in 0067 asks the same question before it acts, so a partner who reached these
+    components anyway would read an empty log and be refused every write.
+  */
+  const path = window.location.pathname.replace(/\/+$/, '');
+
+  if (path === '/people') {
+    return ownsTheAccount(state.analyst) ? (
+      <PeoplePane
+        client={state.client}
+        analyst={state.analyst}
+        onViewFullLog={() => window.location.assign('/access-log')}
+      />
+    ) : (
+      <NotAvailable />
+    );
+  }
+
+  if (path === '/access-log') {
+    return ownsTheAccount(state.analyst) ? (
+      <AccessLogPane client={state.client} analyst={state.analyst} />
+    ) : (
+      <NotAvailable />
+    );
+  }
 
   return <Screener client={state.client} analyst={state.analyst} />;
 }
