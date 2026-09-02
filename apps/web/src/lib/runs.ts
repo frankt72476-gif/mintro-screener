@@ -15,6 +15,7 @@
 
 import type { ScreeningReport } from '@mintro/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { runCreators } from './internalIdentity.js';
 
 export interface RunSummary {
   readonly runId: string;
@@ -31,6 +32,18 @@ export interface RunSummary {
    * the verification script cannot disagree about which runs they are.
    */
   readonly quarantine: string | null;
+  /**
+   * Who started the run, by name, for the owner and host "Run by" column (D-228, D-233).
+   *
+   * Absent where the name did not resolve, which is the boundary rather than a failure:
+   * `analysts_select` gives a partner their own organisation's people and nobody else's, so a
+   * run made by another organisation has no name to show. Rendered as unattributed, never as an
+   * error and never as the uuid — a uuid in this column looks like information and is not.
+   *
+   * Resolved through `internalIdentity`, the authenticated assembly. It is not on the report and
+   * never reaches the print payload; see that module and D-233.
+   */
+  readonly runBy?: string;
   /**
    * Whether this run carries any merchant response (D-211).
    *
@@ -87,7 +100,9 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
       const { data, error } = await client
         .from('runs')
         .select(
-          'id, finished_at, report, merchants ( domain ), run_quarantine ( reason ), ' +
+          // `created_by` for the Run by column. The name is resolved separately by
+          // `internalIdentity`, which is gated by `analysts_select` (D-233).
+          'id, finished_at, report, created_by, merchants ( domain ), run_quarantine ( reason ), ' +
             /*
               Named relationship, not a bare table name (D-213).
 
@@ -114,7 +129,18 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
       if (data === null) return { ok: false, error: 'the run list came back empty-handed' };
 
       let unreadable = 0;
-      const runs = (data as unknown as RunRow[]).flatMap((row) => {
+      const rows = data as unknown as RunRow[];
+
+      /*
+        Names, in one round trip rather than one per row.
+
+        Read after the runs rather than embedded in the same query: an embed would tie the run
+        list's shape to the roster's, and `analysts_select` returning nothing for another
+        organisation's analyst would be indistinguishable from a broken join.
+      */
+      const creators = await runCreators(client, rows);
+
+      const runs = rows.flatMap((row) => {
         const report = row.report;
         if (report === null) {
           // Counted, not dropped. A short list that says nothing about why is the same defect one
@@ -130,6 +156,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             counts: { fail: report.counts.fail, review: report.counts.review },
             quarantine: quarantineReason(row.run_quarantine),
             responded: commentCount(row.merchant_comments) > 0,
+            ...(creators.has(row.id) ? { runBy: creators.get(row.id)!.name } : {}),
           },
         ];
       });
@@ -172,6 +199,8 @@ interface RunRow {
   readonly merchant_comments?: unknown;
   id: string;
   finished_at: string | null;
+  /** Not null since 0057. Optional here only because a local-file run carries none. */
+  created_by?: string | null;
   report: ScreeningReport | null;
   run_quarantine: QuarantineEmbed;
 }

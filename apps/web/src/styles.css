@@ -3156,3 +3156,55 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   /* A box is a control, and a printed control is a promise the page cannot keep. */
   .recbox { display: none; }
 }
+
+/* ── /auth/set-password ────────────────────────────────────────────────────────────────────────
+   Completing an invitation (D-228). A page somebody reaches from an email, once, before they have
+   an account — so it carries the brand and nothing else: no nav, no run list, no operator name
+   (D-233). Narrow measure, because every state on it is one short sentence.
+*/
+.sp {
+  max-width: 30rem;
+  margin: 4rem auto;
+  padding: 2rem;
+}
+.sp-brand {
+  display: block;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 1.5rem;
+}
+.sp-head {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 0 0 0.75rem;
+}
+.sp-body {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+.sp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+.sp-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.sp-input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line, #d7d4e4);
+  border-radius: 4px;
+  font: inherit;
+}
+.sp-hint {
+  font-size: 0.8rem;
+  color: var(--muted, #6d6788);
+  margin: 0 0 0.75rem;
+}
+.sp-error {
+  font-size: 0.85rem;
+  color: var(--fail, #9b2c2c);
+  margin: 0 0 0.5rem;
+}

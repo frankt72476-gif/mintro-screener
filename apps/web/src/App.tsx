@@ -12,6 +12,8 @@ import type { ScreeningReport } from '@mintro/engine';
 import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
+import { SetPassword } from './components/SetPassword.js';
+import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
 import {
@@ -215,6 +217,21 @@ export function App(): JSX.Element {
   const documentsPrint = useMemo(() => injectedDocumentsPrint(), []);
   const token = useMemo(() => commentToken(), []);
 
+  /*
+    Completing an invitation (D-228).
+
+    Checked with the other pre-auth routes and before `AnalystApp`, because the person arriving
+    here has a session on the URL fragment and no roster row yet — `AnalystApp` would resolve them
+    to `not_invited` and show a sign-in screen over the top of a perfectly good invitation.
+
+    A path rather than a query parameter, because it is Supabase's `redirectTo` and has to be a URL
+    somebody can be forwarded to.
+  */
+  const setPassword = useMemo(
+    () => matchesSetPasswordRoute(window.location.pathname),
+    [],
+  );
+
   // The Documents Check print path. Checked before the Site Check one only because they are
   // mutually exclusive and this keeps the two branches side by side rather than nested.
   if (documentsPrint !== null) return <DocumentsPrintOnly injected={documentsPrint} />;
@@ -230,6 +247,8 @@ export function App(): JSX.Element {
     two database functions it can call are the whole of what it reaches.
   */
   if (token !== null) return <MerchantRoute token={token} />;
+
+  if (setPassword) return <SetPassword />;
 
   return <AnalystApp />;
 }
