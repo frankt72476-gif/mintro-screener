@@ -11,6 +11,14 @@
  * observed against the shape it exists to catch, and the matching insert observed succeeding, so
  * the guard is not simply refusing everything.
  *
+ * ## Both tables, asserted separately
+ *
+ * `merchant_attestations` carries the same two columns and got the same trigger (0063). The
+ * function is table-agnostic, which is exactly why the second table is tested rather than assumed:
+ * "the same function is attached" is a claim about the wiring, and the wiring is the part that can
+ * be wrong. Each table has its own whole-row check — `comment_recorder_is_whole` and
+ * `attestation_recorder_is_whole` — and the deferral has to land on the right one.
+ *
  * ## Why the inherited case is here too
  *
  * `inherit_responses_for_link` copies `recorded_by`, `recorded_by_email` and `recorded_at` to the
@@ -63,6 +71,21 @@ afterAll(async () => {
   await schema?.close();
 });
 
+/**
+ * Asserts an insert was refused, and says so plainly when it was not.
+ *
+ * `attempt` returns null on success, so a bare `.toMatch()` against a silent acceptance fails with
+ * "expects to receive a string, but got object" — which is true and tells the reader nothing about
+ * what went wrong. The whole point of these tests is the case where the insert *succeeds*, so that
+ * is the case whose message has to be legible.
+ */
+function refused(error: string | null, what: string): string {
+  if (error === null) {
+    throw new Error(`${what} was ACCEPTED — the recorder pin is not attached or not firing`);
+  }
+  return error;
+}
+
 const record = (ruleId: string, recordedBy: string, email: string): Promise<string | null> =>
   schema.attempt(
     `insert into public.merchant_comments
@@ -77,12 +100,12 @@ describe('recorded_by_email is the recorder', () => {
   });
 
   it('refuses a row recorded under a colleague’s address', async () => {
-    const error = await record('PAY-002', analystId, COLLEAGUE);
+    const error = refused(await record('PAY-002', analystId, COLLEAGUE), 'a comment under a colleague’s address');
     expect(error).toMatch(/recorded_by_email must be the address of the analyst recording it/);
   });
 
   it('refuses an address belonging to nobody', async () => {
-    const error = await record('PAY-003', analystId, 'not-a-real-analyst@example.test');
+    const error = refused(await record('PAY-003', analystId, 'not-a-real-analyst@example.test'), 'a comment under an unknown address');
     expect(error).toMatch(/recorded_by_email must be the address of the analyst recording it/);
   });
 
@@ -141,5 +164,64 @@ describe('recorded_by_email is the recorder', () => {
       [laterRun, analystId, runId],
     );
     expect(error).toBeNull();
+  });
+});
+
+describe('recorded_by_email is the recorder, on attestations too', () => {
+  const attest = (questionId: string, recordedBy: string, email: string): Promise<string | null> =>
+    schema.attempt(
+      `insert into public.merchant_attestations
+         (run_id, question_id, outcome, body, recorded_by, recorded_by_email, recorded_at)
+       values ($1, $2, 'answered', 'Told to us by phone.', $3, $4, now())`,
+      [runId, questionId, recordedBy, email],
+    );
+
+  it('accepts a row whose address is the recording analyst’s', async () => {
+    expect(await attest('payment-methods', analystId, RECORDER)).toBeNull();
+  });
+
+  it('refuses a row recorded under a colleague’s address', async () => {
+    const error = refused(await attest('refund-policy', analystId, COLLEAGUE), 'an attestation under a colleague’s address');
+    expect(error).toMatch(/recorded_by_email must be the address of the analyst recording it/);
+  });
+
+  it('defers a missing address to attestation_recorder_is_whole, not to this trigger', async () => {
+    // The layering, asserted for this table rather than inherited from the comments one: a BEFORE
+    // INSERT trigger runs ahead of the check constraints, and the error a reader gets must name
+    // the thing that is actually wrong — an incomplete row, not a misattributed one.
+    const error = await schema.attempt(
+      `insert into public.merchant_attestations (run_id, question_id, outcome, body, recorded_by)
+       values ($1, 'shipping-terms', 'answered', 'Nameless.', $2)`,
+      [runId, analystId],
+    );
+    expect(error).toMatch(/attestation_recorder_is_whole/);
+    expect(error).not.toMatch(/must be the address of the analyst/);
+  });
+
+  it('lets a carried-forward row keep the address it was written under', async () => {
+    const { runId: laterRun } = await seedRun(schema, 'attest-later.example');
+    const error = await schema.attempt(
+      `insert into public.merchant_attestations
+         (run_id, question_id, outcome, body, recorded_by, recorded_by_email, recorded_at,
+          inherited_from_run, originally_answered_at)
+       values ($1, 'payment-methods', 'answered', 'Told to us by phone.', $2,
+               'an-old-address@gomintro.test', now(), $3, now())`,
+      [laterRun, analystId, runId],
+    );
+    expect(error).toBeNull();
+  });
+
+  it('is attached to both tables, by name', async () => {
+    // The claim this file exists to check twice: one function, two triggers, actually wired.
+    const rows = await schema.query<{ tgname: string }>(
+      `select tgname from pg_trigger
+        where tgname in ('merchant_comments_recorder_is_pinned',
+                         'merchant_attestations_recorder_is_pinned')
+        order by tgname`,
+    );
+    expect(rows.map((r) => r.tgname)).toEqual([
+      'merchant_attestations_recorder_is_pinned',
+      'merchant_comments_recorder_is_pinned',
+    ]);
   });
 });
