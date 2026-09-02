@@ -27,7 +27,7 @@ import type { ResponseRoundActions } from '../lib/responseRound.js';
 import { formatStamp } from '../lib/format.js';
 
 /*
-  OPERATOR-FACING ONLY (0061).
+  OPERATOR-FACING ONLY (D-233).
 
   This panel renders `markedByEmail` — an analyst's address. It is imported by `App.tsx` and by
   nothing else, and it must stay that way: no merchant-, agent- or IQwallet-facing surface may

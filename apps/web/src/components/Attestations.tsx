@@ -285,8 +285,8 @@ function AttestationRow({
       */}
       {question.recordedByOperator === true && (
         <p className="att-recorded">
-          {/* Mintro, never a person (0061). The framing is unchanged; the address is gone. */}
-          {/* `recordedAt` where known (0062) — see MerchantResponse for why not `submittedAt`. */}
+          {/* Mintro, never a person (D-233). The framing is unchanged; the address is gone. */}
+          {/* `recordedAt` where known (D-233) — see MerchantResponse for why not `submittedAt`. */}
           Recorded by Mintro on the merchant’s behalf
           {(question.recordedAt ?? question.submittedAt) === undefined
             ? ''
@@ -530,7 +530,7 @@ function AttestationField({
     /**
      * Set where an operator recorded it on the merchant's behalf (D-212).
      *
-     * A boolean since 0061. It was the recorder's email address, shown to the merchant on a page
+     * A boolean since D-233. It was the recorder's email address, shown to the merchant on a page
      * reached by a forwardable link — which published a member of staff's address to whoever the
      * link was passed to.
      */

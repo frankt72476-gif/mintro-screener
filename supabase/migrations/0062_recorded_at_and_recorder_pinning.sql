@@ -92,7 +92,7 @@ begin
             'subject', c.subject,
             'body', c.body,
             'identifiedAs', c.identified_as,
-            -- The fact that Mintro recorded it, never who did (0061). `recorded_by_email` is not
+            -- The fact that Mintro recorded it, never who did (D-233). `recorded_by_email` is not
             -- in this payload and must not be added to it: this object is handed to an
             -- unauthenticated merchant page over a forwardable link.
             'recordedByOperator', c.recorded_by is not null,

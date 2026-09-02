@@ -1,5 +1,5 @@
 /**
- * An operator records under their own address or not at all (0062).
+ * An operator records under their own address or not at all (D-233).
  *
  * 0053 pinned `recorded_by = auth.uid()` in the insert policy and said why: an operator who could
  * write another analyst's id *"could put words in a colleague's mouth in a document that reaches
@@ -13,7 +13,7 @@
  *
  * ## Both tables, asserted separately
  *
- * `merchant_attestations` carries the same two columns and got the same trigger (0063). The
+ * `merchant_attestations` carries the same two columns and got the same trigger (D-233). The
  * function is table-agnostic, which is exactly why the second table is tested rather than assumed:
  * "the same function is attached" is a claim about the wiring, and the wiring is the part that can
  * be wrong. Each table has its own whole-row check — `comment_recorder_is_whole` and
@@ -227,7 +227,7 @@ describe('recorded_by_email is the recorder, on attestations too', () => {
 });
 
 /*
-  The UPDATE path (0064).
+  The UPDATE path (D-233).
 
   Two things are true at once and both need saying. On the schema as it stands **every UPDATE to
   these tables is refused outright** by `..._is_append_only` (0016, 0044), which runs

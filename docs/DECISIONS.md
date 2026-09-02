@@ -15328,3 +15328,155 @@ is a settle bounded at 8s and four DOM reads bounded at 10s each.
 On merchants that need driving it is **faster**: comopeptides 21.5s → 8.9s, because a 20-second
 click timeout against an overlay is no longer spent. `GATE-003` runs once per run, against a
 30-minute deadline.
+
+---
+
+## D-228 — Organization is the access boundary; created_by is attribution, not the predicate
+**2026-09-02 · business owner · `supabase/migrations/0060_organizations.sql`**
+
+The screener is used by more than one organization. Mintro is the host; the others are
+partner agencies with a relationship to Mintro and none to each other. Access is scoped by
+**organization**, not by person: colleagues at one agency see each other's work; nothing
+crosses between agencies; host-org members see everything.
+
+`runs.created_by` and `packages.created_by` are retained as **attribution** — who did the
+work — and are not the read predicate. The read predicate is org membership. Attribution is
+still needed by the access log, the review path (`submitted_on_behalf_of`), and any audit.
+
+`org_id` is denormalized onto `runs` and `packages` rather than resolved through
+`created_by → analysts.org_id`. A run's organization is a fact about the run at the time it
+was made; resolving through the analyst means re-orging a person silently rewrites the
+ownership of everything they ever ran. Superseded the creator-scoped predicates built in the
+first pass (Stages 1 and 1b).
+
+---
+
+## D-229 — Host and partner organizations; visibility and administration are separate axes
+**2026-09-02 · business owner · `supabase/migrations/0060_organizations.sql`**
+
+Two organization types: exactly one `host` (Mintro), enforced by a partial unique index; the
+rest `partner`. Two distinct axes, deliberately not merged:
+
+- **Visibility** is org-derived. A host-org member sees all work across every org. A partner
+  member sees only their own org's.
+- **Administration** — inviting, granting capabilities, suspending, reinstating, reading the
+  access log — is **owner-only**, not host-member. A second Mintro person has the owner's
+  view of the work and none of the owner's controls.
+
+A merchant relationship never crosses an org boundary — no cross-org reassignment. The cost
+of a single owner (nobody can invite or grant while the owner is unavailable) is accepted at
+this size; the remedy if it ever bites is a host-org administrative role, not a workaround.
+
+---
+
+## D-230 — Two operator capabilities, four gates each, off by default
+**2026-09-02 · business owner · `supabase/migrations/0060_organizations.sql`**
+
+Two named booleans on `analysts`: `can_run_documents_check` and `can_submit_to_iqwallet`.
+Both default false, both granted only by the owner. Named columns, not a capabilities table
+or role matrix — clearer at two; a third is where that stops being true and is its own
+decision.
+
+Each capability is enforced at four layers, which are not redundant: (1) nav/action hidden —
+cosmetic, never the gate; (2) route guard — covers a typed or bookmarked URL; (3) **API
+rejects the request — the gate of record**; (4) worker re-reads the flag at job start,
+because a job can sit in the queue across a revocation.
+
+Absent, not locked: a member without a capability sees no control for it — no greyed item,
+no lock, no request-access prompt. A visible-but-disabled control teaches someone a feature
+exists and that they are excluded from it.
+
+---
+
+## D-231 — Documents Check anchors on the package, not the run
+**2026-09-02 · engineering · `supabase/migrations/0059_package_scoped_rls.sql`**
+
+Document artifacts hang off `packages → merchants`, never off runs. The first spec draft
+said runs; that was wrong on the schema. `packages` carries its own `created_by` and `org_id`
+and is scoped by `can_read_package`, mirroring `can_read_run`. The two object graphs (runs and
+packages) are genuinely separate and scoped in parallel. Packages are private to creator-or-org
+on the same terms as runs; there is no package hand-off.
+
+---
+
+## D-232 — Revocation is forward-only; suspension removes access and retains all work
+**2026-09-02 · business owner · `supabase/migrations/0055_analysts_are_the_admin_roster.sql`**
+
+Revoking a capability stops future actions and does not hide completed work already produced
+and read (D-002: runs are immutable; hiding part of a report someone already holds makes the
+record inconsistent with itself). Reading is scoped by object ownership, not by the capability
+flag, which is what makes this true in the database and not only in the UI.
+
+Suspension removes all access — a suspended member's session goes empty — while their work
+stays visible to the owner and nothing is deleted (D-097). Suspension is the only exit;
+there is no delete of a person, because it would orphan their runs.
+
+---
+
+## D-233 — Operator identity is not outbound; fix at the payload, not the renderer
+**2026-09-02 · business owner · `supabase/migrations/0061_operator_identity_is_not_outbound.sql`, `0062`, `0063`, `0064`, `packages/engine/src/commentaryStore.ts`**
+
+No operator email or name reaches any merchant-, agent-, or IQwallet-facing surface. That an
+answer was operator-recorded may be shown, attributed to "Mintro" — never to a person. The
+recorded *time* may be shown (it identifies nobody); the recorder's identity may not.
+
+The fix lives at the **payload**, not the renderer: the outbound assembly carries a boolean
+(`recordedByOperator`) and a bare timestamp (`recordedAt`), never an email. A renderer that is
+handed an email is one interpolation away from leaking it, and the next person does not know the
+rule; a payload that never carries the email cannot leak it. The internal, analyst/host-facing
+read path that *does* show the recorder's name is a separate assembly, gated by RLS
+(`analysts_select`), and is never merged into the print payload — a single assembly with a
+print flag is one forgotten flag away from the leak. `recorded_by_email` on `merchant_comments`
+and `merchant_attestations` is pinned by trigger to the recording analyst's own address (the
+attribution analogue of 0053 pinning `recorded_by = auth.uid()`), on insert and update, with
+inherited rows skipped per D-002.
+
+---
+
+## D-234 — Replace policies, never add alongside
+**2026-09-02 · engineering · `supabase/migrations/0058_run_scoped_rls.sql`**
+
+Policy text is not access. Multiple permissive policies OR together, so an
+added policy grants *more* access and the new one is decorative.
+
+---
+
+## D-235 — Take the last definition
+**2026-09-02 · engineering · `supabase/migrations/0059_package_scoped_rls.sql`**
+
+Policy text is not access (D-234). For any `create or replace`, the current definition is not
+necessarily in the migration that introduced the name. List every migration defining it and
+take the newest. (Bit us on D-040/0053 policy text and the D-084 retention clock.)
+
+Tests that assert policy and trigger text are load-bearing and must not be softened; they are
+what makes the two failure modes above survivable.
+
+---
+
+## D-236 — Grant and revoke are as load-bearing as the policy
+**2026-09-02 · engineering · `supabase/migrations/0060_organizations.sql`**
+
+Policy text is not access (D-234). A policy with no `grant` underneath is
+dead text — permission is denied before RLS is consulted. An over-broad `revoke` makes a
+correct-looking policy fail closed. Policy text describes intended access; it does not create
+it.
+
+---
+
+## D-237 — Verify by reading the live catalog
+**2026-09-02 · engineering · `apps/worker/test/schema/recorderPinning.test.ts`**
+
+Policy text is not access (D-234). Verify by reading the live catalog (`pg_policies`, `pg_trigger`),
+not the migration source that was supposed to produce it. When behaviour is masked by a
+higher-precedence control and cannot be observed through normal paths, assert the structure
+directly.
+
+---
+
+## D-238 — Re-derive the FK graph
+**2026-09-02 · engineering · `supabase/migrations/0059_package_scoped_rls.sql`**
+
+Policy text is not access (D-234). Re-derive the FK graph rather than trusting a prior enumeration,
+and remember that objects reached by storage key (evidence, documents bucket) and
+content-addressed tables anchored on a hash (`extractions`) are part of the graph and leak
+without announcing themselves.

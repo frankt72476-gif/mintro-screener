@@ -264,7 +264,7 @@ selection and both capability checkboxes.
 full access log page; the owner home changes. No reassignment surface — dropped with the host-org
 visibility ruling.
 
-**Stage 3 dependency — the internal read path that names the recorder.** 0061 made the outbound
+**Stage 3 dependency — the internal read path that names the recorder.** D-233 made the outbound
 payload boolean-only: `commentaryStore` and `open_report_for_comment` carry `recordedByOperator`
 and `recordedAt`, and no operator email or id at all. That is the print-safe assembly and it stays
 that way — the PDF goes to IQwallet, and the comment page is reached over a forwardable link.
@@ -277,14 +277,14 @@ nothing resolves it. Both are the same missing piece: **a second, internal assem
 Two constraints on it, and they are the whole reason this is written down rather than rediscovered:
 
 - **It is never merged into the print payload.** The print path takes the boolean assembly. A
-  single assembly with a `print` flag is one forgotten flag away from the leak 0061 closed, and the
+  single assembly with a `print` flag is one forgotten flag away from the leak D-233 closed, and the
   absence tests (`operatorIdentityOutbound`, `operatorIdentityPayload`) are what would catch it —
   keep them pointed at the print path.
 - **It is gated by RLS, not by the caller.** `analysts_select` already resolves it: own row, own
   org, host, or owner. A partner member reading a report their org produced sees their own
   colleague's name and no one else's, which is the same boundary the rest of Stage 1c draws.
 
-`recorded_by` and `recorded_by_email` remain on the table for exactly this, and 0062 pins the email
+`recorded_by` and `recorded_by_email` remain on the table for exactly this, and D-233 pins the email
 to the analyst it names so the internal surface is worth trusting when it is built.
 
 **Stage 4 — member screens.** Partner home, host-member home, empty state, not-available page, the

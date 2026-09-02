@@ -140,6 +140,22 @@ Documents Check is a later phase. Leave the nav item and route stubbed. Do not b
   for, and it stays. **Where the artifact is opaque, the generator is the reviewable thing and it is
   what gets committed**, and it must be deterministic: a fixture whose bytes change per run cannot
   test anything content-addressed. See D-106.
+- **Constraints added over existing rows are validated against a production copy.** A constraint
+  added over existing data is invisible to any test tier that migrates empty tables (PGlite here).
+  The empty tier has no row to violate it. The owner-implies-both-capabilities check passed every
+  empty-migrate test and would have failed on production, where the existing owner row had the new
+  capability defaulting false. Any constraint added over existing rows is validated against a
+  restored production copy, not only the empty tier — and the migration carries whatever `UPDATE`
+  makes existing rows satisfy it before the constraint is added.
+- **Heredocs corrupt multi-line content in this environment; use the Write tool.** Heredocs mangled
+  files four times in one session (two Python patches, a fixture truncation, a seed). Multi-line
+  content that matters — SQL, seeds, patches — is written with the Write tool, which does not go
+  through the shell's paste/buffer path. Heredocs are acceptable only for trivial one-or-two-line
+  content where a corruption would be obvious on sight.
+
+  Related, same theme: a regex over SQL text does not respect statement boundaries. The check is
+  "is every match inside the statement I meant," never "did it compile." Bit us three times —
+  D-040/0053, the retention clock, the fixture-truncation leak across a `comment_links` insert.
 
 ## When you are unsure
 

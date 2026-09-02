@@ -71,7 +71,7 @@ export interface MerchantComment {
    */
   readonly recordedByOperator?: boolean;
   /**
-   * When it was recorded, on an operator row (0062).
+   * When it was recorded, on an operator row (D-233).
    *
    * A bare timestamp and nothing else — it says *when* an answer was taken down on the merchant's
    * behalf, never by whom. Separate from `submittedAt` on purpose: they are the same instant on a

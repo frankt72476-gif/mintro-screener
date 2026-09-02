@@ -148,7 +148,7 @@ export function MerchantResponse({
               the document, and it is not the merchant's own statement.
             */}
             {/*
-              Mintro, never a person (0061).
+              Mintro, never a person (D-233).
 
               This printed the recording analyst's email address, in a document that goes to
               IQwallet. That an answer was taken down by Mintro rather than written by the
@@ -157,7 +157,7 @@ export function MerchantResponse({
               carries, so the record loses nothing but the name.
             */}
             {comment.recordedByOperator === true
-              ? // `recordedAt`, not `submittedAt` (0062): on a carried-forward row the latter is
+              ? // `recordedAt`, not `submittedAt` (D-233): on a carried-forward row the latter is
                 // when this run copied the answer, and dating it that way would say the operator
                 // took it down on a day they did not.
                 `Recorded by Mintro on the merchant’s behalf, ${formatStamp(comment.recordedAt ?? comment.submittedAt)}`
