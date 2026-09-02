@@ -56,6 +56,8 @@ interface Props {
   /** A partner: the disclosure line under the list, and the empty state when there is none. */
   readonly showsDisclosure?: boolean;
   readonly onNewScreen?: () => void;
+  /** What a run awaiting Mintro review is called for this reader (0070). See `DomainGroups`. */
+  readonly reviewLabel?: string;
 }
 
 export function PastReports({
@@ -71,6 +73,7 @@ export function PastReports({
   suspendedOrgIds = [],
   showsDisclosure = false,
   onNewScreen,
+  reviewLabel,
 }: Props): JSX.Element {
   /*
     A failed read is shown as one, never as an empty list (D-213).
@@ -113,6 +116,23 @@ export function PastReports({
   const chips = showsFilter ? orgChips(listing.runs, suspendedOrgIds) : [];
   const groups = groupByDomain(visible, inFlight, responded);
 
+  /*
+    A partner with nothing yet (D-229), and the empty state is the whole page.
+
+    It used to render *inside* this one, under "Library / Past reports" and the sentence about
+    re-scanning stacking runs up under a merchant's name — so the first thing a newly bound partner
+    read was a library heading, a caption about a list that was not there, their own empty state,
+    and then an empty card beneath it. The headline names the space rather than the absence, and it
+    cannot do that with a different headline above it saying the same thing worse.
+
+    `inFlight` is in the condition, not just `runs`. A partner whose first screening is running has
+    something to look at, and an empty state that hid it would be the surface reporting their work
+    as absent while it was happening.
+  */
+  if (showsDisclosure && listing.runs.length === 0 && inFlight.length === 0) {
+    return <PartnerEmptyState {...(onNewScreen === undefined ? {} : { onNewScreen })} />;
+  }
+
   return (
     <div>
       <div className="eyebrow">Library</div>
@@ -121,13 +141,6 @@ export function PastReports({
         Every merchant this account can read, most recently active first. Re-scanning adds a run; it
         never replaces one, so a merchant's runs stack up under its name.
       </p>
-      {/*
-        A partner with nothing yet (D-229). The headline names the space rather than the absence,
-        and the disclosure line is repeated there because there is no list for it to caption.
-      */}
-      {showsDisclosure && listing.runs.length === 0 && (
-        <PartnerEmptyState {...(onNewScreen === undefined ? {} : { onNewScreen })} />
-      )}
 
       {showsFilter && onFilter !== undefined && (
         <RunFilterRow chips={chips} filter={filter} onChange={onFilter} />
@@ -138,6 +151,7 @@ export function PastReports({
           onOpen={onOpen}
           source={source}
           {...(onRescan === undefined ? {} : { onRescan })}
+          {...(reviewLabel === undefined ? {} : { reviewLabel })}
         />
         {/*
           Rows that came back and could not be turned into a summary. Stated rather than dropped:
@@ -153,9 +167,11 @@ export function PastReports({
 
       {/*
         Stated once, under the list, and never repeated on this page (D-229). The empty state
-        carries it instead when there is no list — the two are mutually exclusive by the condition.
+        carries it instead when there is no list — and the two are now mutually exclusive by
+        construction rather than by matching conditions: the early return above means this branch is
+        only ever reached when there IS a list to caption.
       */}
-      {showsDisclosure && listing.runs.length > 0 && <Disclosure />}
+      {showsDisclosure && <Disclosure />}
     </div>
   );
 }

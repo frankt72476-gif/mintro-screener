@@ -22,6 +22,15 @@ interface Props {
   readonly startOpen?: boolean;
   /** Where the rows came from, said once at the foot. */
   readonly source?: string;
+  /**
+   * What a run awaiting Mintro review is called for this reader (0070).
+   *
+   * Threaded through rather than resolved here: *With Mintro* and *Ready for review* are the same
+   * fact seen from two sides, and which side you are on is `homeShape`'s decision, made once.
+   * Absent draws no badge, which is what the local development source and any caller without a
+   * viewer should get.
+   */
+  readonly reviewLabel?: string;
 }
 
 export function DomainGroups({
@@ -30,6 +39,7 @@ export function DomainGroups({
   onRescan,
   startOpen = true,
   source,
+  reviewLabel,
 }: Props): JSX.Element {
   return (
     <div className="dgroups">
@@ -40,6 +50,7 @@ export function DomainGroups({
           onOpen={onOpen}
           startOpen={startOpen}
           {...(onRescan === undefined ? {} : { onRescan })}
+          {...(reviewLabel === undefined ? {} : { reviewLabel })}
         />
       ))}
       {groups.length === 0 && <p className="dgroups-empty">Nothing screened yet.</p>}
@@ -53,11 +64,14 @@ function DomainRow({
   onOpen,
   onRescan,
   startOpen,
+  reviewLabel,
 }: {
   readonly group: DomainGroup;
   readonly onOpen: (runId: string) => void;
   readonly onRescan?: (domain: string) => void;
   readonly startOpen: boolean;
+  /** What a run awaiting Mintro review is called for this reader. Absent draws no badge. */
+  readonly reviewLabel?: string;
 }): JSX.Element {
   const [open, setOpen] = useState(startOpen);
   const screenings = group.runs.length;
@@ -123,6 +137,18 @@ function DomainRow({
                 authenticated assembly and never by the print path.
               */}
               {run.runBy !== undefined && <span className="drun-by">{run.runBy}</span>}
+              {/*
+                Marked ready for Mintro review, and not yet sent (0070).
+
+                The wording comes down from the caller because the same fact reads differently
+                depending on who is looking — *With Mintro* to the partner who handed it over,
+                *Ready for review* to the host member it is now waiting on. Resolving that here
+                would need this component to know which viewer it is drawing for, which is the
+                thing `homeShape` exists to keep in one place.
+              */}
+              {run.awaitingReview && reviewLabel !== undefined && (
+                <span className="drun-review">{reviewLabel}</span>
+              )}
               {run.quarantine !== null && <span className="drun-flag">evidence incomplete</span>}
               <button className="btn btn-ghost drun-open" onClick={() => onOpen(run.runId)}>
                 Open

@@ -53,7 +53,44 @@ import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOW
  * What an operator can do with a report. Never available on the merchant route (D-066).
  */
 export interface ReportActions {
-  readonly onSend: () => void;
+  /**
+   * Send to IQwallet. **Optional, and its absence is the capability gate's visible half** (D-230).
+   *
+   * Omitted for a member without `can_submit_to_iqwallet`, on exactly the terms `onInvite` is
+   * omitted on the merchant route: there is nothing to pass, so there is nothing to get wrong. A
+   * button rendered against a no-op handler is what put *Send to IQwallet* on an anonymous page
+   * once already, and a button rendered against a real handler for somebody the database will
+   * refuse is the same mistake pointing the other way.
+   *
+   * Absent, not disabled. A greyed Send teaches a partner that submission exists and that they are
+   * excluded from it; `onMarkReadyForReview` is what they get instead, and it is a thing they can
+   * actually do.
+   */
+  readonly onSend?: () => void;
+  /**
+   * Hand a finished run to Mintro (0070).
+   *
+   * Present exactly when `onSend` is not and the run has not already been marked or sent. The
+   * complement is decided by the caller from `homeShape`, in one place, because a reader who saw
+   * both would be offered two ways to finish and one who saw neither would have nowhere to put a
+   * finished report.
+   */
+  readonly onMarkReadyForReview?: () => void;
+  /** True while the mark is in flight. The button says so rather than appearing inert. */
+  readonly marking?: boolean;
+  /**
+   * Where this run stands, in the words this reader should see it in.
+   *
+   * A composed string rather than a state plus a lookup, because what a run marked ready is *called*
+   * differs by viewer (`reviewStateLabel`) and this component has no business knowing which viewer
+   * it is drawing for. Absent when there is nothing to say — an ordinary complete run, or a read
+   * that failed.
+   *
+   * Rendered inside the actions block, which means it is **never in the print payload**. That is
+   * deliberate and not incidental: the PDF goes to IQwallet, and where a report sits in Mintro's
+   * internal handover is not IQwallet's business (D-233).
+   */
+  readonly reviewLine?: string;
   readonly onDownload: () => void;
   /** Opens the merchant-invitation dialog (D-063). */
   readonly onInvite?: () => void;
@@ -303,9 +340,32 @@ export function ReportView({
               own account of the attempt, so an analyst is never shown "Sent" for a message a
               provider refused.
             */}
-            <button className="btn btn-primary" onClick={actions.onSend}>
-              Send to IQwallet
-            </button>
+            {actions.onSend !== undefined && (
+              <button className="btn btn-primary" onClick={actions.onSend}>
+                Send to IQwallet
+              </button>
+            )}
+            {/*
+              The review path, in place of Send (0070).
+
+              A partner who cannot submit finishes a report and needs somewhere to put it. Primary
+              rather than ghost: for this reader it is the thing they came to do, which is what
+              Send is for everybody else.
+            */}
+            {actions.onMarkReadyForReview !== undefined && (
+              <button
+                className="btn btn-primary"
+                onClick={actions.onMarkReadyForReview}
+                disabled={actions.marking === true}
+              >
+                {actions.marking === true ? 'Marking…' : 'Mark ready for Mintro review'}
+              </button>
+            )}
+            {actions.reviewLine !== undefined && (
+              <p className="review-line" role="status">
+                {actions.reviewLine}
+              </p>
+            )}
           </div>
         )}
       </div>

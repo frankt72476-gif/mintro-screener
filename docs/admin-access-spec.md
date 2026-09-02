@@ -1,6 +1,6 @@
 ---
 purpose: Build spec for organization-scoped access, the two operator capabilities, and the Mintro review path. Supersedes the 2026-09-01 v1 in full. Read before writing any code.
-status: v2, revised 2026-09-01 after the segregation ruling. Stages 0, 1 and 1b are built; the predicates from 1 and 1b are reworked by this revision.
+status: v2, revised 2026-09-01 after the segregation ruling. All stages built as of 2026-09-02; the predicates from 1 and 1b were reworked by this revision. See the Stages section for what each one settled.
 ---
 
 # Organization access, capabilities, and the Mintro review path
@@ -296,8 +296,31 @@ atomic only if the empty organisations become noise on the People screen.
 **Stage 4 — member screens.** Partner home, host-member home, empty state, not-available page, the
 disclosure line.
 
-**Stage 5 — capability gates and the review path.** All four gates for both capabilities, the
-ready-for-review state, `submitted_on_behalf_of` logging.
+**Stage 5 — capability gates and the review path.** Built. All four gates for both capabilities
+(0069), the ready-for-review state (0070), `submitted_on_behalf_of` logging, and the UI capability
+re-read. Four rulings came out of it and are binding:
+
+- **The review state is a row about the run, never a column on it (D-240).** A finished run is
+  frozen against every writer including `service_role` (0004, D-002), so `runs.review_state` was
+  never available. `run_review_requests` appends; the state is derived from mark-and-no-send; a send
+  supersedes a mark by existing.
+- **`refused` is a fourth terminal status and is not `failed` (D-241).** Nothing broke — the work
+  was not permitted, and an owner reading the queue must be able to tell an access decision that
+  worked from a fault they have to fix.
+- **What `can_run_documents_check` gates today (D-242).** Nothing creates a `document_run` yet, so
+  the gate attaches to the writes that exist in that pane: `create_document_package`,
+  `set_slot_state`, and the `document_uploads` and `document_send_requests` inserts. When the run
+  gains a creating path, `current_admin_can_run_documents_check()` is the predicate it takes.
+- **Marking is not a capability (D-243).** Open to anyone who can read the run; the UI decides who
+  is offered it, as the exact complement of Send.
+
+Two things this stage did NOT build, deliberately, and neither is a gap in the spec:
+
+- **No dedicated ready-for-review queue screen.** The state surfaces to host-org members as a badge
+  on the run list they already read, and on the report. A queue page is a screen, not a gate, and
+  the spec asks that the state surface rather than that it get a home of its own.
+- **No withdrawal of a mark.** Not in the spec, and adding one would mean either a mutable row or a
+  second state to keep in step. If a partner needs to pull work back, that is a ruling to make.
 
 One commit per stage, held for review. Every stage reports the full test suite result — file and
 test counts — and is not approved without it.
@@ -334,6 +357,20 @@ organizations and at least two members in one of them:
 
 Delete the branch afterwards and re-link to production. Never read from a credential store — if
 blocked on access, stop and say what is needed.
+
+**A preview branch is not a copy of production's schema.** Observed on the Stage 5 branch: it came
+up with seven tables and a recorded migration history ending at 0007, because a branch provisions
+from `supabase_migrations.schema_migrations` and this project's migrations from 0008 on were applied
+out of band. The fix is to apply `supabase/migrations/0008` onward to the branch by hand after
+creating it (and to insert the private `evidence` and `documents` buckets first, which 0008 checks
+for). Stated as one branch's behaviour, which is what was measured — whether every branch does this
+was not established, only that this one did and why it plausibly would.
+
+The consequence for **constraints added over existing rows**: a branch created `with_data: false`
+has no production rows to validate against, so that requirement is not met by a branch alone.
+Where the constraint's satisfaction can be *proved* from the shape of the change — a new nullable
+column with no default means every pre-existing row reads NULL — say so and show the proof rather
+than implying a production copy was restored.
 
 ---
 

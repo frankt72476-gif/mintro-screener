@@ -16,6 +16,7 @@
  */
 
 import { ingestDocument, type HeicConverter, type IngestStore } from './ingest.js';
+import { refuseIfRevoked } from './capabilityGate.js';
 import type { PageImager, VisionClient } from '@mintro/extraction';
 import type { WorkerSupabase } from './store/supabase.js';
 import { DOCUMENTS_BUCKET } from './store/ingestStore.js';
@@ -29,10 +30,12 @@ export interface UploadRequest {
   readonly original_filename: string;
   readonly status: string;
   readonly claimed_at: string | null;
+  /** Whose capability the job runs under. Read so it can be re-read at claim time (D-230). */
+  readonly requested_by: string;
 }
 
 const SELECT =
-  'id, package_id, slot_id, replaces_document_id, staging_key, original_filename, status, claimed_at';
+  'id, package_id, slot_id, replaces_document_id, staging_key, original_filename, status, claimed_at, requested_by';
 
 /**
  * Claim the oldest queued upload, or reclaim one whose worker died.
@@ -79,6 +82,19 @@ export async function claimNextUpload(
   if (candidate.status === 'running') {
     console.log(`reclaimed upload ${row.id} — its previous claim was stale`);
   }
+
+  /*
+    The fourth gate (D-230). After the claim, so the row is this worker's to close out, and before
+    the job is handed back, so no caller can reach `runUpload` without it having happened.
+
+    The value read is the current one. An upload queued while the capability was held, and picked up
+    after it was revoked, is refused here — which is the entire case this layer exists for and the
+    one the other three gates cannot see.
+  */
+  if (await refuseIfRevoked(supabase.client, 'document_uploads', { id: row.id, requestedBy: row.requested_by }, 'can_run_documents_check')) {
+    return null;
+  }
+
   return row;
 }
 

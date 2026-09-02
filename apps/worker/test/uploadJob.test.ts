@@ -7,7 +7,7 @@
  * error, and an operator who cannot see that a scan failed to read will not re-request it.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { claimNextUpload, runUpload, type UploadRequest } from '../src/uploadJob.js';
 import type { IngestStore, NewVersion, SlotRow, SlotState, StoredVersion } from '../src/ingest.js';
@@ -39,12 +39,41 @@ function fakeSupabase(options: {
   queued?: UploadRequest[];
   claimWins?: boolean;
   staged?: Uint8Array | null;
+  /**
+   * The roster row the claim re-reads (D-230, 0069).
+   *
+   * Defaults to an active analyst holding the capability, because that is what every test here
+   * other than the gate's own is about. `null` stands for a person whose row could not be found at
+   * all, which the gate treats as not holding it.
+   */
+  requester?: { can_run_documents_check: boolean; status: string; active: boolean } | null;
 }): { supabase: WorkerSupabase; writes: Recorded[] } {
   const writes: Recorded[] = [];
   const queued = options.queued ?? [];
   const claimWins = options.claimWins ?? true;
+  const requester =
+    options.requester === undefined
+      ? { can_run_documents_check: true, status: 'active', active: true }
+      : options.requester;
 
   const from = (table: string): Record<string, unknown> => {
+    /*
+      The roster read the capability gate makes.
+
+      Its own branch rather than another case in the chain below: the queue builder answers
+      `.limit()` and a bare await with queue rows, and threading a second shape through it would make
+      both harder to read than the two are apart. Still minimal — one select, one eq, one
+      maybeSingle, which is exactly what `holdsCapability` issues.
+    */
+    if (table === 'analysts') {
+      const roster = {
+        select: () => roster,
+        eq: () => roster,
+        maybeSingle: async () => ({ data: requester, error: null }),
+      };
+      return roster as unknown as Record<string, unknown>;
+    }
+
     const builder: Record<string, unknown> = {};
     let pendingPatch: Record<string, unknown> | null = null;
     const eq: Record<string, unknown> = {};
@@ -127,6 +156,7 @@ const REQUEST: UploadRequest = {
   original_filename: 'ein-letter.pdf',
   status: 'queued',
   claimed_at: null,
+  requested_by: 'analyst-1',
 };
 
 function fakeStore(overrides: Partial<IngestStore> = {}): IngestStore {
@@ -176,6 +206,51 @@ describe('claiming', () => {
     // The claim is a compare-and-swap: if the status moved since the read, the update matches
     // nothing and this worker moves on rather than doing the work twice.
     expect(await claimNextUpload(supabase, 60_000)).toBeNull();
+  });
+
+  /*
+    The fourth gate, end to end on the claim (D-230, 0069).
+
+    The job was queued while its requester held Documents Check — `document_uploads_insert` said so
+    at the time, correctly. The owner then revoked it. Nothing in the first three gates can see
+    this: the nav item and the route guard decided at a different moment, and the insert policy has
+    already run. The worker re-reads at claim, and this is that.
+  */
+  it('ABANDONS a queued job whose requester lost the capability, and records why', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { supabase, writes } = fakeSupabase({
+      queued: [REQUEST],
+      requester: { can_run_documents_check: false, status: 'active', active: true },
+    });
+
+    const claimed = await claimNextUpload(supabase, 60_000);
+    log.mockRestore();
+
+    // No job comes back, so nothing downstream can run it — `runUpload` is unreachable for this row.
+    expect(claimed).toBeNull();
+
+    /*
+      And the row is terminal with a reason on it, rather than left `running` for the stale reclaim
+      to pick up again in five minutes. A revocation that produced a job retrying forever would be a
+      gate that generated work instead of stopping it.
+    */
+    const refusal = writes.find((w) => w.patch['status'] === 'refused');
+    expect(refusal, 'the refused row was never written').toBeDefined();
+    expect(refusal!.table).toBe('document_uploads');
+    expect(refusal!.eq['id']).toBe('up-1');
+    expect(refusal!.patch['error']).toMatch(/no longer has Documents Check/);
+    expect(refusal!.patch['finished_at']).toEqual(expect.any(String));
+  });
+
+  it('claims normally when the capability is still held, so the test above is a denial', async () => {
+    // The other half of the pair. Without it, "returns null" would be satisfied by a claim that
+    // never worked at all.
+    const { supabase, writes } = fakeSupabase({
+      queued: [REQUEST],
+      requester: { can_run_documents_check: true, status: 'active', active: true },
+    });
+    expect((await claimNextUpload(supabase, 60_000))?.id).toBe('up-1');
+    expect(writes.find((w) => w.patch['status'] === 'refused')).toBeUndefined();
   });
 });
 

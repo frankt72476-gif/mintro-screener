@@ -21,8 +21,20 @@ beforeAll(async () => {
   const [user] = await db.query<{ id: string }>(
     `insert into auth.users (email) values ('facts@example.com') returning id`,
   );
+  /*
+    Active, and holding Documents Check.
+
+    Both are now load-bearing (0069): `create_document_package` and `set_slot_state` ask
+    `current_admin_can_run_documents_check()`, which is the capability AND `current_admin_is_active()`.
+    The row used to take the column defaults — `status = 'invited'`, capability false — and every
+    test below passed anyway, because the only guard was `is_analyst()`. What this fixture describes
+    is an operator doing Documents Check work, and an operator doing Documents Check work is active
+    and holds the capability.
+  */
   const [analyst] = await db.query<{ id: string }>(
-    `insert into public.analysts (id, email, org_id) values ($1, 'facts@example.com', (select id from public.organizations where type = 'host')) returning id`,
+    `insert into public.analysts (id, email, org_id, status, can_run_documents_check)
+     values ($1, 'facts@example.com', (select id from public.organizations where type = 'host'), 'active', true)
+     returning id`,
     [user!.id],
   );
   analystId = analyst!.id;

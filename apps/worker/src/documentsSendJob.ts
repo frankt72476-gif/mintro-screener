@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadDocumentsRules } from '@mintro/ruleset';
 import { documents } from '@mintro/engine';
 import { createDocumentRunStore } from './store/documentRunStore.js';
+import { refuseIfRevoked } from './capabilityGate.js';
 import { renderDocumentsReportPdf } from './documentsPdf.js';
 import { documentsMailerFor, sendDocumentsReport } from './documentsSend.js';
 import { assertRunIsCurrent, packageDigest, StaleRunError, type DigestInput } from './documentsReportGate.js';
@@ -55,13 +56,28 @@ export async function claimNextSend(client: SupabaseClient): Promise<ClaimedSend
     .maybeSingle();
   if (claimed === null) return null;
 
-  return {
+  const job = {
     id: String(claimed['id']),
     packageId: String(claimed['package_id']),
     runId: String(claimed['run_id']),
     toEmail: String(claimed['to_email']),
     requestedBy: String(claimed['requested_by']),
   };
+
+  /*
+    The fourth gate (D-230). Sending a Documents Check report is Documents Check work, and this
+    queue is the one that can outlive a revocation by longest — a render plus a transmission behind
+    however many jobs are ahead of it.
+
+    Before the render, not after: the point of refusing is that nothing is produced and nothing is
+    transmitted, and a check that ran after the PDF existed would only be deciding whether to
+    mention it.
+  */
+  if (await refuseIfRevoked(client, 'document_send_requests', job, 'can_run_documents_check')) {
+    return null;
+  }
+
+  return job;
 }
 
 /** The package as it stands now, for the gate to compare the run against. */

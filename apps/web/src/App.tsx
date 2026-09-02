@@ -6,7 +6,7 @@
  * Documents stay stubbed — `CLAUDE.md` says leave it, do not build it.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseRuleset, type Ruleset } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
 import rulesetJson from '../../../rules/ruleset.json';
@@ -67,7 +67,8 @@ import { CommentPane, commentToken } from './components/CommentPane.js';
 import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
 import { EVERYONE, type RunFilter } from './lib/runFilter.js';
-import { homeShape } from './lib/homeShape.js';
+import { MARK_READY_NOTE, homeShape, reviewStateLabel } from './lib/homeShape.js';
+import { createReviewPath, type ReviewState } from './lib/reviewPath.js';
 import { Disclosure, PartnerEmptyState } from './components/PartnerNotes.js';
 import { NotAvailable } from './components/NotAvailable.js';
 import { AttestationForm } from './components/Attestations.js';
@@ -416,6 +417,8 @@ function Screener({
   readonly client: import('@supabase/supabase-js').SupabaseClient;
   readonly analyst: import('./lib/auth.js').Analyst;
 }): JSX.Element {
+  // Re-read this account's own row on navigation (D-230). See the rail's `onPane`.
+  const { refreshAnalyst } = useAuth();
   /*
     Whose runs (D-229).
 
@@ -505,6 +508,17 @@ function Screener({
   const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
   const [pdfBusy, setPdfBusy] = useState(false);
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
+  const review = useMemo(() => createReviewPath(client), [client]);
+  /*
+    Where the open run stands in the Mintro review path (0070).
+
+    `'unknown'` while it has not been read and when the read failed — the same value for both,
+    because both mean the same thing to the screen: it cannot say where this run is, so it offers
+    neither control. Offering *Mark ready* against an unread state would put the button on a run
+    already with Mintro (D-213's rule, applied to one run instead of a list).
+  */
+  const [reviewState, setReviewState] = useState<ReviewState>('unknown');
+  const [marking, setMarking] = useState(false);
   const invites = useMemo(() => createInviteQueue(client, analyst.id), [client, analyst.id]);
   const [inviting, setInviting] = useState(false);
 
@@ -562,8 +576,15 @@ function Screener({
     }
   }, []);
 
-  useEffect(() => {
-    void runs
+  /**
+   * Re-reads the run list.
+   *
+   * Named rather than inlined because two things now ask for it — the mount effect and marking a
+   * run ready — and a second copy is how the throw handler ends up on only one of them, which is
+   * the difference between a failed read that says so and one that empties the list (D-213).
+   */
+  const refreshRuns = useCallback((): Promise<void> => {
+    return runs
       .list()
       .then(setListing)
       // A throw is a failed read like any other, and says so rather than emptying the list.
@@ -571,6 +592,10 @@ function Screener({
         setListing({ ok: false, error: cause instanceof Error ? cause.message : String(cause) }),
       );
   }, [runs]);
+
+  useEffect(() => {
+    void refreshRuns();
+  }, [refreshRuns]);
 
   /*
     The run link from an operator notification (D-143).
@@ -743,6 +768,32 @@ function Screener({
     });
   };
 
+  /**
+   * Hand a finished run to Mintro (0070).
+   *
+   * The refusal is shown as what it was. `mark_run_ready_for_review` answers a run that is not
+   * finished, or already sent, with a reason rather than a failure — and a toast saying "could not
+   * be marked" over "this run has already been sent" would send the partner looking for a fault
+   * that is not there.
+   *
+   * The state is re-read rather than assumed from the call succeeding. An idempotent second mark
+   * returns `ok` with nothing changed, and a screen that set the state from the return value would
+   * be right for the wrong reason.
+   */
+  async function markReady(runId: string): Promise<void> {
+    setMarking(true);
+    const result = await review.mark(runId);
+    setMarking(false);
+
+    if (!result.ok) {
+      setToast(result.reason);
+      return;
+    }
+
+    setReviewState(await review.stateOf(runId));
+    void refreshRuns();
+  }
+
   async function load(runId: string): Promise<void> {
     setStage('running');
     setError(null);
@@ -756,6 +807,17 @@ function Screener({
       setReport(loaded.report);
       setQuarantine(loaded.quarantine);
       setStage('report');
+
+      /*
+        Where this run stands in the review path (0070).
+
+        Reset before the read, not after: leaving the previous run's state in place while this one
+        loads would show *With Mintro* on a report that is nothing of the sort, for as long as the
+        read takes. Read after the report is on screen, like every other secondary read here — the
+        findings do not wait on it.
+      */
+      setReviewState('unknown');
+      setReviewState(await review.stateOf(runId));
 
       // Read after the report is on screen rather than gating it. A commentary read that is slow
       // or fails should not withhold the findings; the commentary section says which it was.
@@ -1017,6 +1079,17 @@ function Screener({
         pane={pane}
         onPane={(next) => {
           setPane(next);
+          /*
+            Re-read this account's capabilities on navigation (D-230).
+
+            Capabilities were read once at sign-in, so a revocation left the Documents Check tab and
+            the Send button on screen until somebody reloaded. Not a security boundary — the API
+            refuses the revoked caller either way (0069) — but a control that outlives its
+            permission tells the owner the revocation did not take, and tells the person it did not
+            happen. `AuthProvider` also re-reads on focus and on a slow interval; this covers the
+            reader who never leaves the tab.
+          */
+          void refreshAnalyst();
           // The bug Frank hit: the rail changed pane while the scan pane was still showing a
           // report, so "Site check" appeared to do nothing. Navigating to a pane means going to
           // that pane, not to whatever it was last showing.
@@ -1057,6 +1130,7 @@ function Screener({
               inFlight={inFlight}
               responded={responded}
               onRescan={rescan}
+              reviewLabel={reviewStateLabel(shape)}
               {...(seesEveryOrg
                 ? {
                     viewer: { id: analyst.id, seesEveryOrg: true },
@@ -1127,7 +1201,33 @@ function Screener({
               report={report}
               access={access}
                 actions={{
-                  onSend: () => setSending(true),
+                  /*
+                    Send, or hand it to Mintro — never both, and never neither (D-230, 0070).
+
+                    Decided here from `homeShape` rather than inside `ReportView`, because it is the
+                    same decision the rail makes about the Documents Check tab and it belongs beside
+                    it. `showsMarkReadyAction` is written as the complement of `showsSubmitAction`,
+                    so the two cannot both be true; the state check is what stops the mark being
+                    offered on a run that has already been marked or sent.
+
+                    Absent, not disabled. A partner without the capability never sees Send.
+                  */
+                  ...(shape.showsSubmitAction ? { onSend: () => setSending(true) } : {}),
+                  ...(shape.showsMarkReadyAction && reviewState === 'complete'
+                    ? { onMarkReadyForReview: () => void markReady(report.runId), marking }
+                    : {}),
+                  ...(reviewState === 'ready_for_review'
+                    ? {
+                        /*
+                          What the state is called depends on who is reading (`reviewStateLabel`).
+                          The partner is told what happens next as well; a host member is not,
+                          because for them the next thing is their own work.
+                        */
+                        reviewLine: shape.seesEveryOrg
+                          ? reviewStateLabel(shape)
+                          : `${reviewStateLabel(shape)}. ${MARK_READY_NOTE}`,
+                      }
+                    : {}),
                   onDownload: () => void downloadPdf(report),
                   onInvite: () => setInviting(true),
                   /*
@@ -1257,8 +1357,14 @@ function Screener({
           */}
           {/*
             The same answer as the missing nav item, for somebody who reached the pane another way
-            — a bookmark, a stale tab, a typed URL (D-230). Two of the four layers; the API
-            rejection that is the gate of record is Stage 5.
+            — a bookmark, a stale tab, a typed URL (D-230). The second of the four layers.
+
+            The third and fourth are behind it and are the ones that hold: `create_document_package`
+            and `set_slot_state` refuse the caller, and `document_uploads_insert` and
+            `document_send_requests_insert` refuse the row (0069); the worker re-reads the flag when
+            it claims an upload or a send, because a job can sit in the queue across a revocation.
+            Removing this guard would let somebody reach a pane whose every action then failed,
+            which is a worse way to say no than not opening it.
           */}
           {shape.showsDocumentsTab ? (
             <DocumentsPane client={client} analystId={analyst.id} packageId={openPackageId} />

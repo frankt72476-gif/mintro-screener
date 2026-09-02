@@ -17,9 +17,76 @@
  * not an invited analyst sees exactly what a logged-out one sees: nothing.
  */
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { readConfig, supabase as makeClient } from './supabase.js';
+
+/**
+ * How often a foreground tab re-reads its own capabilities.
+ *
+ * Exported so a test can state the number rather than restate the intent — a poll interval nobody
+ * can see is a poll interval that quietly becomes an hour.
+ */
+export const CAPABILITY_POLL_MS = 60_000;
+
+const ANALYST_COLUMNS =
+  'id, email, full_name, role, org_id, can_run_documents_check, can_submit_to_iqwallet, organizations ( type )';
+
+/**
+ * One roster read, used by both the sign-in resolve and the refresh.
+ *
+ * Two copies of this select is how a refresh ends up reading one fewer column than sign-in does,
+ * and the symptom would be a capability that only ever updates on reload — the exact defect the
+ * refresh exists to remove.
+ *
+ * Null means "could not be resolved to an analyst", which the two callers read differently and
+ * correctly: at sign-in it is `not_invited`; on a refresh it is left alone.
+ */
+export async function readAnalyst(client: SupabaseClient, userId: string): Promise<Analyst | null> {
+  const { data, error } = await client
+    .from('analysts')
+    .select(ANALYST_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle();
+  if (error !== null || data === null) return null;
+
+  const row = data as {
+    id: string;
+    email: string;
+    full_name: string | null;
+    role: string;
+    org_id: string;
+    can_run_documents_check: boolean;
+    can_submit_to_iqwallet: boolean;
+    organizations: { type: string } | { type: string }[] | null;
+  };
+  const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    role: row.role === 'owner' ? 'owner' : 'admin',
+    orgId: row.org_id,
+    isHost: org?.type === 'host',
+    canRunDocumentsCheck: row.can_run_documents_check,
+    canSubmitToIqwallet: row.can_submit_to_iqwallet,
+  };
+}
+
+/** Field by field, so a re-read that found nothing new causes no render. */
+export function sameAnalyst(a: Analyst, b: Analyst): boolean {
+  return (
+    a.id === b.id &&
+    a.email === b.email &&
+    a.fullName === b.fullName &&
+    a.role === b.role &&
+    a.orgId === b.orgId &&
+    a.isHost === b.isHost &&
+    a.canRunDocumentsCheck === b.canRunDocumentsCheck &&
+    a.canSubmitToIqwallet === b.canSubmitToIqwallet
+  );
+}
 
 export interface Analyst {
   readonly id: string;
@@ -47,10 +114,21 @@ export interface Analyst {
   /**
    * Whether the Documents Check nav item is drawn (D-230).
    *
-   * Presence only. The gate of record is the API and the worker re-read at job start — Stage 5 —
-   * and a nav item has never been a gate. Read here so the rail can omit it rather than grey it.
+   * Presence only. The gate of record is the API (0069) and the worker re-read at job start, and a
+   * nav item has never been a gate. Read here so the rail can omit it rather than grey it.
    */
   readonly canRunDocumentsCheck: boolean;
+  /**
+   * Whether the Send to IQwallet action is drawn (D-230).
+   *
+   * Presence only, exactly as above. The gate of record is `send_requests_insert` (0069), which
+   * resolves the flag from `auth.uid()` and never from anything this client sends — so a caller who
+   * reached the insert without the flag is refused by the database whatever this value says.
+   *
+   * A member without it gets *Mark ready for Mintro review* in its place rather than a greyed
+   * button: absent, not disabled.
+   */
+  readonly canSubmitToIqwallet: boolean;
 }
 
 export type AuthState =
@@ -71,6 +149,17 @@ interface AuthContextValue {
   /** Magic link. Secondary, for anyone who prefers it or has forgotten a password. */
   signIn(email: string): Promise<{ readonly sent: boolean; readonly error?: string }>;
   signOut(): Promise<void>;
+  /**
+   * Re-reads the signed-in analyst's row (D-230, the UI analogue of the worker's fourth gate).
+   *
+   * Capabilities were read once at sign-in, so a revoked flag left its control on screen until
+   * somebody reloaded. That is not a security boundary — the API is, and it refuses the revoked
+   * caller either way — but a control that lingers after revocation misleads the owner about what
+   * that person can still do, and misleads the person into pressing something that will be refused.
+   *
+   * Called on focus, on tab visibility returning, and on pane navigation. A no-op when signed out.
+   */
+  refreshAnalyst(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -84,6 +173,10 @@ export function useAuth(): AuthContextValue {
 export function AuthProvider({ children }: { readonly children: ReactNode }): JSX.Element {
   const config = useMemo(() => readConfig(), []);
   const [state, setState] = useState<AuthState>({ status: 'loading' });
+  // Held in a ref so `refreshAnalyst` is stable across renders and need not be rebuilt whenever the
+  // state it reads changes — a consumer calling it from an effect would otherwise get a new
+  // function identity on every re-read it caused.
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if ('missing' in config) {
@@ -128,52 +221,78 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
         /* transport only; the roster read below is what resolves the state */
       }
 
-      const { data, error } = await client
-        .from('analysts')
-        .select('id, email, full_name, role, org_id, can_run_documents_check, organizations ( type )')
-        .eq('id', session.user.id)
-        .maybeSingle();
+      const analyst = await readAnalyst(client, session.user.id);
 
       if (!live) return;
 
-      if (error !== null || data === null) {
+      if (analyst === null) {
         setState({ status: 'not_invited', email: session.user.email ?? 'unknown' });
         return;
       }
 
-      const row = data as {
-        id: string;
-        email: string;
-        full_name: string | null;
-        role: string;
-        org_id: string;
-        can_run_documents_check: boolean;
-        organizations: { type: string } | { type: string }[] | null;
-      };
-      const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
-      setState({
-        status: 'signed_in',
-        analyst: {
-          id: row.id,
-          email: row.email,
-          fullName: row.full_name,
-          role: row.role === 'owner' ? 'owner' : 'admin',
-          orgId: row.org_id,
-          isHost: org?.type === 'host',
-          canRunDocumentsCheck: row.can_run_documents_check,
-        },
-        client,
-      });
+      setState({ status: 'signed_in', analyst, client });
     };
+
+    /*
+      Re-read the roster row, and apply it only if something actually changed (D-230).
+
+      Unconditional `setState` here would hand every consumer a new `analyst` object on every focus
+      event and every tick, remounting the run list and losing scroll position for a poll that found
+      nothing. `sameAnalyst` is what makes a quiet re-read quiet.
+
+      **A failed read is not a revocation.** Null from `readAnalyst` on a refresh leaves the state
+      alone rather than dropping the session to `not_invited`: a dropped connection would otherwise
+      sign somebody out of a screen they are working on, and the API refuses a revoked caller
+      whether or not this succeeded. The one thing that must not happen is a *stale grant* being
+      trusted as a permission, and it never is — nothing here is a gate.
+    */
+    const refresh = async (): Promise<void> => {
+      const { data } = await client.auth.getSession();
+      const session = data.session;
+      if (session === null || !live) return;
+
+      const analyst = await readAnalyst(client, session.user.id);
+      if (analyst === null || !live) return;
+
+      setState((current) =>
+        current.status === 'signed_in' && !sameAnalyst(current.analyst, analyst)
+          ? { status: 'signed_in', analyst, client }
+          : current,
+      );
+    };
+    refreshRef.current = refresh;
 
     void client.auth.getSession().then(({ data }) => resolve(data.session));
     const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       void resolve(session);
     });
 
+    /*
+      When to re-read.
+
+      Focus and visibility rather than only an interval, because the moment that matters is the one
+      where somebody comes back to a tab that has been open since before the owner changed
+      something. The slow interval backs them up for a tab left in the foreground all afternoon —
+      the case focus never fires for. Sixty seconds is short enough that a revoked control does not
+      survive a conversation, and long enough to be invisible.
+    */
+    const onFocus = (): void => void refresh();
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh();
+    }, CAPABILITY_POLL_MS);
+
     return () => {
       live = false;
       subscription.subscription.unsubscribe();
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
+      refreshRef.current = null;
     };
   }, [config]);
 
@@ -215,6 +334,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
       async signOut() {
         if ('missing' in config) return;
         await makeClient(config).auth.signOut();
+      },
+      async refreshAnalyst() {
+        await refreshRef.current?.();
       },
     }),
     [state, config],

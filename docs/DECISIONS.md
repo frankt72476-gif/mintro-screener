@@ -15518,3 +15518,194 @@ re-issue or withdraw an invitation, and both are addressed to the person they in
 Enforced in `bind_invited_analyst()`, where the session's address is read, compared and discarded
 without reaching a column, and asserted by a test that scans the whole log row rather than one
 field — a narrower check would pass a future change that put the address somewhere else.
+
+---
+
+## D-240 — The review state is a row about the run, never a column on it
+**2026-09-02 · engineering · `supabase/migrations/0070_review_path.sql`**
+
+Stage 5 adds a state between complete and sent: **ready for Mintro review**. The obvious design is
+`runs.review_state`, and it is not available.
+
+`reject_finished_run_mutation()` (0004) refuses **every** update to a run once `finished_at` is set,
+and refuses it against `service_role` too — which is the point of it. Runs are immutable (D-002), so
+a run that could acquire a new state after it finished would be a run whose record changed after
+somebody read it. The worker could not have written that column either.
+
+So marking appends a row to `run_review_requests` — the run, who marked it, their organization, and
+when — and the run is untouched. Same shape `run_quarantine` (0012) already uses to say something
+about a frozen run without writing to it, and it carries what a column could not: the mark is dated
+and attributed, so the log line and the row agree about when it happened and who did it.
+
+The state a surface renders is then **derived**, from three facts that already exist:
+
+| | mark | send | state |
+|---|---|---|---|
+| finished | no | no | complete |
+| finished | yes | no | with Mintro / ready for review |
+| finished | — | yes | sent |
+
+Nothing has to be updated as a run moves between them. That is why there is no `withdrawn`, no
+`satisfied_at` and no second write anywhere: **a send supersedes a mark by existing**, rather than by
+anyone remembering to clear it. One mark per run by unique index, and a second mark is a
+double-click rather than a second decision — `on conflict do nothing`, no second log line, the same
+reasoning `set_analyst_capability` (0067) applies to setting a flag to the value it already holds.
+
+The run-list badge therefore reads *marked AND not sent*, both halves. A query that read only the
+mark would leave the badge on a report already with IQwallet.
+
+---
+
+## D-241 — `refused` is a fourth terminal status, and is not `failed`
+**2026-09-02 · engineering · `supabase/migrations/0069_capability_gates.sql`, `apps/worker/src/capabilityGate.ts`**
+
+The fourth gate — the worker re-reading a capability at job start, because a job can sit in the
+queue across a revocation (D-230) — has to put the refused row somewhere. `failed` is the wrong
+place.
+
+This project settled the same distinction one level down, for sends: a provider rejection finishes
+`done` with `outcome: 'rejected'`, and `failed` is reserved for a job that could not get that far,
+because *"collapsing the two would hide a provider refusal among infrastructure errors"* (0017,
+D-001). A revoked capability is that shape again. Nothing broke; the work was not permitted. An
+owner reading the queue has to be able to tell a fault they must fix from an access decision that
+worked exactly as intended, and one bucket holding both cannot say which happened.
+
+`refused` is added to `send_requests`, `document_uploads` and `document_send_requests`, each with a
+`refused_*_say_why` constraint: a terminal row that says nothing about what happened is the shape
+every defect in this project has taken, and the database refuses to store it. The reason goes in the
+existing `error` column, which on these tables already means *what this row says about why it did not
+produce what it was for* — three near-empty `refused_reason` columns would say it worse. The column
+comments now say that on a refused row this is an access decision, not a fault.
+
+The reason names the **capability**, never who revoked it. Who revoked it is the access log's
+business and the access log is owner-only (D-229); this row is read by the person whose job it was.
+
+Two properties of the refusal, both load-bearing:
+
+- **It happens inside the claim, not beside it.** Three queues carry capability-gated work, and a
+  check the three handlers each have to remember is the check that will be missing from the fourth
+  queue somebody adds. `refuseIfRevoked` runs before a claim hands a job back, so no path reaches a
+  handler without it.
+- **A failed roster read is not a revocation.** It throws rather than refusing. Returning "not held"
+  on a dropped connection would write `refused` against somebody's name and say their capability was
+  gone when nobody had touched it; thrown, the claim fails and the row stays queued for the next
+  pass.
+
+---
+
+## D-242 — What `can_run_documents_check` gates, given nothing creates a document run yet
+**2026-09-02 · engineering · `supabase/migrations/0069_capability_gates.sql`**
+
+The spec says the capability *"gates creating a document run"*. Nothing in the product creates one:
+`documentRunStore.persist` has no production caller, and CLAUDE.md holds Documents Check as a later
+phase. Taken literally, the gate of record for this capability would have had nothing to attach to
+and Stage 5 would have shipped one capability enforced and one described.
+
+What exists and is reachable from the Documents Check pane is the work a document run is later
+computed *from*, plus the send of the resulting report. Those are gated:
+
+- `create_document_package` — the root of every document object, and the earliest point the
+  capability can refuse the work
+- `set_slot_state` — recording a slot decision
+- `document_uploads` insert — uploading a document
+- `document_send_requests` insert — sending the Documents Check report
+
+The last needs saying out loud because it is a send rather than a creation. It is gated because it is
+Documents Check work reachable only by somebody driving that pane, and because it is forward-only: it
+refuses a new send and hides no report already produced (D-232). When `document_runs` gains a
+creating path, `current_admin_can_run_documents_check()` is the predicate it takes — already written,
+already granted, already tested.
+
+Two things fell out of writing it that are worth keeping:
+
+**The active clause is defence in depth against suspension, and operative against `invited`.** The
+predicate composes `current_admin_is_active()`. For a suspended member `is_analyst()` refuses first —
+`active` and `status` are constrained to agree (0055) — so the clause does no work there. It does
+work against a row that is `invited`: `is_analyst()` asks only `active`, and an invited row is active
+until suspended. Both cases are tested, and the suspension test asserts *refused by one of the two*
+rather than pinning a message, so it does not fail the day the order changes.
+
+**Rewriting a function body from the wrong migration nearly landed again.** `create_document_package`
+had to be reproduced to add the guard, and the first draft invented a `package_slot_removals` insert
+from memory rather than copying 0060's. This is the third instance of D-235 on this project, and the
+only thing that catches it is reading the current definition to the end before typing.
+
+---
+
+## D-243 — Marking is not a capability, and the UI decides who is offered it
+**2026-09-02 · business owner · `supabase/migrations/0070_review_path.sql`, `apps/web/src/lib/homeShape.ts`**
+
+`mark_run_ready_for_review` is open to anyone who can read the run. It is not gated by
+`can_submit_to_iqwallet`, not gated by its absence, and not owner-only.
+
+The review path exists for a partner **without** submit, and the screen reflects that: *Mark ready
+for Mintro review* is drawn as the exact complement of *Send to IQwallet*, so a reader is never
+offered two ways to finish and never offered none. That second case is the whole reason the state
+exists, and writing the two as separate conditions is how it would come back.
+
+But that is a choice about **what to draw**, and it stays out of the database. A gate there would
+refuse a host member marking a run for a colleague to look at, which is a reasonable thing to want
+and nothing in the spec forbids. Handing work over is not an administrative act.
+
+Three consequences, each deliberate:
+
+- **A colleague may hand over work they did not do.** `run_review_requests.requested_by` and
+  `runs.created_by` are separate, and the log line names both: the actor is who passed it on, the
+  subject is who did the screening. A partner covering for a colleague who is away is the case org
+  scoping exists for (D-228), and a log that collapsed the two would read as one person doing both.
+- **Another organization's run is refused as "no such run".** Indistinguishable from a run that is
+  not there, deliberately — a different answer would confirm that some other organization holds a run
+  with this id.
+- **`submitted_on_behalf_of` compares organizations, not people.** A partner submitting a colleague's
+  run is one organization doing its own work; logging that as a handover would bury the real ones. It
+  is written by an `after insert` trigger on `send_requests` rather than by a second call from the
+  client — the argument 0067 makes for combining a flag with its log line, applied to a submission: a
+  trigger cannot be forgotten by a caller and cannot be skipped by a client speaking PostgREST
+  directly, which since there is no HTTP API here is every client.
+
+**The state has two names and one definition.** *With Mintro* to the partner who handed it over,
+*Ready for review* to the host member it now waits on — the same fact from two sides, each the plain
+truth from where that person stands. Neither phrasing is available to the other: *with Mintro* said
+to a host member is Mintro telling itself where its own work is, and *ready for review* said to a
+partner reads as an instruction to review it. Both live in `homeShape.ts` beside everything else that
+differs by viewer, picked by the same `seesEveryOrg` flag, so they cannot drift into describing
+different states.
+
+None of it reaches print. The review line renders inside the actions block, which the PDF does not
+draw at all — and that absence is asserted against the print render rather than inferred from where
+the JSX sits, because an edit that moved the line out of that block would pass every other test and
+leak into a document that goes to IQwallet (D-233).
+
+---
+
+## D-244 — A capability shown is re-read; a capability enforced is not the same thing
+**2026-09-02 · engineering · `apps/web/src/lib/auth.tsx`**
+
+Capabilities were read once at sign-in, so a revoked flag left its control on screen until somebody
+reloaded. They are now re-read on focus, on tab visibility returning, on pane navigation, and on a
+60-second interval while the tab is in the foreground.
+
+**This is not a security boundary and must never be treated as one.** The API refuses the revoked
+caller either way (0069, D-230), and a control that is drawn does not become permitted by being
+drawn. What a lingering control does is mislead: it tells the owner the revocation did not take, and
+tells the person holding the screen that it did not happen. That is worth fixing, and it is worth
+being clear about what kind of fix it is — the UI analogue of the worker's fourth gate, not a fifth
+gate.
+
+Three properties, each of which the naive version gets wrong:
+
+- **One read serves sign-in and refresh.** Two copies of the select is how a refresh ends up reading
+  one fewer column than sign-in does, and the symptom is a capability that only ever updates on
+  reload — the exact defect the refresh exists to remove, hidden behind a refresh that appears to
+  work.
+- **A re-read that found nothing new causes no render.** Unconditional `setState` hands every
+  consumer a new object on every focus event and every tick, remounting the run list and losing
+  scroll position for a poll that found nothing.
+- **A failed read leaves the session alone.** Null on a refresh is not a revocation: dropping to
+  `not_invited` on a dropped connection would sign somebody out of a screen they are working on. The
+  one thing that must not happen is a stale grant being trusted as a permission, and it never is,
+  because nothing here is a gate.
+
+Focus and visibility are the primary triggers — the moment that matters is somebody returning to a
+tab open since before the owner changed something. The interval backs up the tab left in the
+foreground all afternoon, which focus never fires for.

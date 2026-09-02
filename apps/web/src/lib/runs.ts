@@ -52,6 +52,16 @@ export interface RunSummary {
    * did not supply it, which the header renders as nothing rather than as "no responses".
    */
   readonly responded: boolean;
+  /**
+   * Marked ready for Mintro review, and not yet sent (0070).
+   *
+   * Both halves, because a send supersedes a mark by existing — a run that was handed over and then
+   * submitted is sent, and a badge still saying it is waiting would have the list describing a state
+   * the run left. The two embeds are read together for that reason rather than the mark alone.
+   *
+   * False where the read did not supply it, which renders as no badge rather than as "not waiting".
+   */
+  readonly awaitingReview: boolean;
 }
 
 /**
@@ -111,7 +121,16 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
               refuses the whole request with PGRST201 — for every role, on every call. The one this
               wants is the run the comment was written on, not the run it was carried forward from.
             */
-            'merchant_comments!merchant_comments_run_id_fkey ( count )',
+            'merchant_comments!merchant_comments_run_id_fkey ( count )' +
+            /*
+              The review path (0070). Both sides of it, because the badge is "marked and not sent"
+              and a query that read only the mark would leave it on a report already with IQwallet.
+
+              `run_review_requests` is scoped by `can_read_run`, the same predicate that let this
+              run into the list at all — so the embed adds no reach. It is the one thing worth
+              checking when adding an embed to this query (D-238).
+            */
+            ', run_review_requests ( id ), sends ( id )',
         )
         .eq('status', 'complete')
         .order('started_at', { ascending: false })
@@ -156,6 +175,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             counts: { fail: report.counts.fail, review: report.counts.review },
             quarantine: quarantineReason(row.run_quarantine),
             responded: commentCount(row.merchant_comments) > 0,
+            awaitingReview: embedCount(row.run_review_requests) > 0 && embedCount(row.sends) === 0,
             ...(creators.has(row.id) ? { runBy: creators.get(row.id)!.name } : {}),
           },
         ];
@@ -195,8 +215,22 @@ function quarantineReason(embed: QuarantineEmbed): string | null {
   return row?.reason ?? null;
 }
 
+/**
+ * How many rows came back in a to-many embed.
+ *
+ * PostgREST answers one as an array, and as an object when it reads the relationship as to-one.
+ * Both are counted rather than assumed, for the same reason `quarantineReason` handles both:
+ * guessing wrong drops the fact silently, and a dropped fact here reads as a run nobody handed over.
+ */
+function embedCount(embed: unknown): number {
+  if (embed === null || embed === undefined) return 0;
+  return Array.isArray(embed) ? embed.length : 1;
+}
+
 interface RunRow {
   readonly merchant_comments?: unknown;
+  readonly run_review_requests?: unknown;
+  readonly sends?: unknown;
   id: string;
   finished_at: string | null;
   /** Not null since 0057. Optional here only because a local-file run carries none. */
@@ -246,10 +280,12 @@ export function createLocalRunSource(): RunSource {
                 domain: report.merchantDomain,
                 finishedAt: report.finishedAt,
                 counts: { fail: report.counts.fail, review: report.counts.review },
-                // Local files carry no quarantine record and no commentary. Development only, and
+                // Local files carry no quarantine record, no commentary and no review path — the
+                // last of those lives in the database and there is none here. Development only, and
                 // the source line in the UI says which source is in use.
                 quarantine: null,
                 responded: false,
+                awaitingReview: false,
               },
         ];
       });

@@ -58,6 +58,7 @@ import { runResponseNotice } from '../src/responseNoticeJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
+import { refuseIfRevoked } from '../src/capabilityGate.js';
 import { claimNextEyeTest, runEyeTestJob } from '../src/eyeTestJob.js';
 import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
 import {
@@ -1267,7 +1268,21 @@ async function claimNextSend(supabase: WorkerSupabase): Promise<SendRequestRow |
     throw new Error(`could not claim send request ${candidate.id}: ${claimError.message}`);
   }
 
-  return ((claimed ?? [])[0] as SendRequestRow | undefined) ?? null;
+  const row = ((claimed ?? [])[0] as SendRequestRow | undefined) ?? null;
+  if (row === null) return null;
+
+  /*
+    The fourth gate (D-230), on the one action in this product with an outside recipient.
+
+    A send queued under `can_submit_to_iqwallet` and picked up after the owner revoked it is refused
+    here, before anything is rendered and before a mailer is touched. That ordering is the whole
+    value of the layer: a check made after transmission could only decide what to write down.
+  */
+  if (await refuseIfRevoked(supabase.client, 'send_requests', { id: row.id, requestedBy: row.requested_by }, 'can_submit_to_iqwallet')) {
+    return null;
+  }
+
+  return row;
 }
 
 /**

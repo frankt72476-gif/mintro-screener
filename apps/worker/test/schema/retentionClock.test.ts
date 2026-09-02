@@ -175,7 +175,8 @@ describe('the number nobody ruled', () => {
     const [user] = await db.query<{ id: string }>(
       `insert into auth.users (email) values ('clock@example.com') returning id`,
     );
-    await db.query(`insert into public.analysts (id, email, org_id) values ($1, 'clock@example.com', (select id from public.organizations where type = 'host'))`, [user!.id]);
+    // Active and holding Documents Check — `create_document_package` gates on both from 0069.
+    await db.query(`insert into public.analysts (id, email, org_id, status, can_run_documents_check) values ($1, 'clock@example.com', (select id from public.organizations where type = 'host'), 'active', true)`, [user!.id]);
     await db.actAs(user!.id);
 
     const [merchant] = await db.query<{ id: string }>(

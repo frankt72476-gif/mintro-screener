@@ -29,6 +29,7 @@ function run(runId: string, domain: string, finishedAt: string): RunSummary {
     counts: { fail: 5, review: 18 },
     quarantine: null,
     responded: false,
+    awaitingReview: false,
   };
 }
 

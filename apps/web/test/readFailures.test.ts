@@ -43,6 +43,7 @@ const RUN = {
   counts: { fail: 1, review: 2 },
   quarantine: null,
   responded: false,
+  awaitingReview: false,
 };
 
 describe('a failed read', () => {

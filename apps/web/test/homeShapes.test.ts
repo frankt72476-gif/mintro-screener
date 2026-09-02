@@ -18,10 +18,36 @@ import { Disclosure, PartnerEmptyState } from '../src/components/PartnerNotes.js
 import { RunFilterRow } from '../src/components/RunFilterRow.js';
 import { PARTNER_DISCLOSURE, POSTURE, homeShape } from '../src/lib/homeShape.js';
 
-const OWNER = { role: 'owner' as const, isHost: true, canRunDocumentsCheck: true };
-const HOST = { role: 'admin' as const, isHost: true, canRunDocumentsCheck: true };
-const PARTNER = { role: 'admin' as const, isHost: false, canRunDocumentsCheck: false };
+/*
+  The owner holds both capabilities by construction — `analysts_owner_holds_every_capability` (0060)
+  makes an owner without one unrepresentable.
+
+  The host member does NOT. Capabilities are a separate axis from visibility (D-229): a second
+  Mintro person sees every organisation's work and holds whatever the owner has granted them and
+  nothing more. `HOST` therefore carries them explicitly rather than inheriting them from being
+  host, and `HOST_WITH_SUBMIT` is the one who can actually finish a partner's run.
+*/
+const OWNER = {
+  role: 'owner' as const,
+  isHost: true,
+  canRunDocumentsCheck: true,
+  canSubmitToIqwallet: true,
+};
+const HOST = {
+  role: 'admin' as const,
+  isHost: true,
+  canRunDocumentsCheck: true,
+  canSubmitToIqwallet: false,
+};
+const HOST_WITH_SUBMIT = { ...HOST, canSubmitToIqwallet: true };
+const PARTNER = {
+  role: 'admin' as const,
+  isHost: false,
+  canRunDocumentsCheck: false,
+  canSubmitToIqwallet: false,
+};
 const PARTNER_WITH_DOCS = { ...PARTNER, canRunDocumentsCheck: true };
+const PARTNER_WITH_SUBMIT = { ...PARTNER, canSubmitToIqwallet: true };
 
 /*
   The nav is asserted through `visibleNav` rather than by rendering `Rail`: the component renders

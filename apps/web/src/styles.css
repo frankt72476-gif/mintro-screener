@@ -3281,3 +3281,14 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .na-brand { display: block; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
 .na-head { font-size: 1.25rem; margin: 0 0 0.75rem; }
 .na-body { line-height: 1.5; margin: 0 0 1.25rem; }
+
+/* ── Stage 5: the Mintro review path ──────────────────────────────────────────────────────────── */
+/* A state, not a warning. Violet like `.dgroup-responded`, because both are context for a decision
+   rather than something wrong with the run — amber here would read as a problem with the report. */
+.drun-review {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--violet); flex: 0 0 auto;
+}
+/* Sits where the Send button would be, and reads as a sentence rather than a control. */
+.review-line { margin: 0; align-self: center; font-size: 0.85rem; color: var(--muted, #6d6788); }
