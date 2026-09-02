@@ -287,6 +287,12 @@ Two constraints on it, and they are the whole reason this is written down rather
 `recorded_by` and `recorded_by_email` remain on the table for exactly this, and D-233 pins the email
 to the analyst it names so the internal surface is worth trusting when it is built.
 
+**Known and accepted — the invite form's two writes.** Creating a partner organisation and queueing
+its first member are two writes and can half-succeed, leaving an organisation with nobody in it.
+Self-healing on retry: `create_partner_org` is idempotent by name, so the owner's second attempt
+lands on the same organisation rather than a second one. Left as two writes deliberately — make it
+atomic only if the empty organisations become noise on the People screen.
+
 **Stage 4 — member screens.** Partner home, host-member home, empty state, not-available page, the
 disclosure line.
 

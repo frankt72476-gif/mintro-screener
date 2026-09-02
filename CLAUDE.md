@@ -147,6 +147,14 @@ Documents Check is a later phase. Leave the nav item and route stubbed. Do not b
   capability defaulting false. Any constraint added over existing rows is validated against a
   restored production copy, not only the empty tier — and the migration carries whatever `UPDATE`
   makes existing rows satisfy it before the constraint is added.
+- **A measurement is evidence about the thing measured, not about its class.** State the instance
+  until the instance count earns the generalisation. One preview branch returned the default auth
+  config, and that was reported as *"branches provision with defaults, so the redirect cannot be
+  proven on a branch"* — which then shaped two rounds of reporting and a standing caveat. A later
+  branch inherited production's config and returned the real redirect, so the true finding had been
+  *"this branch shows defaults; I cannot tell whether that is inheritance lag or policy"* all along.
+  The cost of the narrow claim is a sentence; the cost of the broad one is everybody planning
+  around a constraint that is not there.
 - **Heredocs corrupt multi-line content in this environment; use the Write tool.** Heredocs mangled
   files four times in one session (two Python patches, a fixture truncation, a seed). Multi-line
   content that matters — SQL, seeds, patches — is written with the Write tool, which does not go
