@@ -15709,3 +15709,77 @@ Three properties, each of which the naive version gets wrong:
 Focus and visibility are the primary triggers — the moment that matters is somebody returning to a
 tab open since before the owner changed something. The interval backs up the tab left in the
 foreground all afternoon, which focus never fires for.
+
+---
+
+## D-245 — Run attribution is a named decision, not a side effect of RLS
+**2026-09-02 · business owner · `apps/web/src/lib/homeShape.ts`, `apps/web/src/components/DomainGroups.tsx`**
+
+**A partner gets no Run by column.** The owner and host-org members do.
+
+This was already the design — Stage 4 put Run by in the set a partner does not get, alongside the
+org filter — and it was not what shipped. `homeShape.showsRunBy` was computed correctly and read by
+nothing, so `DomainGroups` drew the column whenever `analysts_select` handed back a name, which for
+a partner is their own colleagues. Partners saw attribution, `homeShape` said they did not, and the
+suite was green either way. Nobody chose the behaviour that shipped; it is what an unconsumed field
+leaves behind.
+
+Two questions were being answered by one mechanism, and only one of them had ever been asked:
+
+- **Which names *can* resolve** — RLS. `analysts_select` gives a partner their own organisation's
+  members and nobody else's. That boundary is right and is not changed by this.
+- **Which readers get the column at all** — a product decision, which had no answer in the code.
+  It does now, and it is `homeShape.showsRunBy`, threaded to the two lists that draw it.
+
+The field stays rather than being dropped in favour of letting RLS decide. Letting RLS decide would
+mean *who sees run attribution* is whatever falls out of a policy written for a different purpose,
+discoverable only by rendering the screen as five different people. It is a sentence in
+`homeShape.ts` instead.
+
+Note what this is not: the org filter genuinely leaks — its chips name other organisations — and the
+Run by column does not, because RLS already confines it to the partner's own org. Stage 4 bundled
+them because they sit together on the screen, not because both leak. The ruling holds anyway, on the
+narrower ground that attribution across an agency's own staff is the agency's business to expose or
+not, and Mintro's tool should not decide it for them by accident.
+
+Threaded as a **required** prop through `PastReports`, `DomainGroups` and `ScanInput` — the scan
+form's recent strip is the same component in a second place, and a list that disagreed with the
+library about who sees attribution would be the harder half of this defect to find.
+
+---
+
+## D-246 — A flag nothing renders is a screen nobody gets
+**2026-09-02 · engineering · `apps/web/test/homeShapeIsConsumed.test.ts`, `apps/web/src/components/Rail.tsx`**
+
+`homeShape.showsAdministration` was computed, documented at length, asserted true for the owner in
+three tests, and **read by no component**. The `/people` and `/access-log` routes existed and were
+guarded correctly since Stage 3; nothing linked to them. The account owner could reach their own
+roster screen only by typing the URL, and every check was green — the flag was right, the guard was
+right, the route was right, and nothing joined them.
+
+The same audit found two more: `showsOrgFilter` (unread, but computed to the same value the screen
+happened to use, so behaviourally identical) and `showsRunBy` (unread, and the screen did the
+opposite — D-245).
+
+**Why the guards already here could not catch it.** `reachability.test.ts` walks the import graph
+from `main.tsx`: `homeShape.ts` is imported, so it passed. `bundledControls.test.ts` reads the built
+JavaScript for the strings each control needs: `PeoplePane` is imported by `App`, so "People" was in
+the bundle. The orphan was one granularity finer than either — not a module, not a string, but an
+exported **field** with no consumer. `homeShapeIsConsumed.test.ts` is that granularity, and it reads
+the field names out of the interface rather than listing them, because a hand-written list would
+report full coverage of a shape it had stopped describing.
+
+Three practices follow, and they are the reusable part:
+
+- **A pure function whose output nothing renders is a fact about an object, not about a screen.**
+  Test both. `visibleNav` was asserted *and* traced into markup, and the nav worked; administration
+  got only the first half, and did not.
+- **Assert presence, not only absence.** Stage 4 tested every absence D-230 asks for and no
+  presence. A check that only ever confirms something is missing passes just as happily when the
+  feature was never built.
+- **Prefer a required prop to a defaulted one for anything that decides what a viewer sees.** The
+  `showsAdministration` prop was going to be optional with a `false` default; a default is what let
+  this be forgotten in the first place. Required makes forgetting it a compile error rather than a
+  silently empty account area. Where the safe direction differs — `hidePanes` defaults to hiding
+  nothing, so forgetting it leaks rather than hides — that is worth a second look, and is not
+  changed here.

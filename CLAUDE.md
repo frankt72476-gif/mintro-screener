@@ -147,6 +147,15 @@ Documents Check is a later phase. Leave the nav item and route stubbed. Do not b
   capability defaulting false. Any constraint added over existing rows is validated against a
   restored production copy, not only the empty tier — and the migration carries whatever `UPDATE`
   makes existing rows satisfy it before the constraint is added.
+- **A flag nothing renders is a screen nobody gets.** A pure function's output is a fact about an
+  object; only markup is a fact about a screen. Test both, and assert **presence**, not only absence.
+  `homeShape.showsAdministration` was computed, documented, and asserted true for the owner in three
+  tests while no component read it — so the owner's own People screen was reachable only by typing
+  the URL, and the suite was green. `reachability.test.ts` missed it (the module *is* imported) and
+  `bundledControls.test.ts` missed it (the string *is* in the bundle); the orphan was one
+  granularity finer, an exported field with no consumer. Prefer a required prop to a defaulted one
+  for anything that decides what a viewer sees. See D-246.
+
 - **A measurement is evidence about the thing measured, not about its class.** State the instance
   until the instance count earns the generalisation. One preview branch returned the default auth
   config, and that was reported as *"branches provision with defaults, so the redirect cannot be

@@ -58,6 +58,15 @@ interface Props {
   readonly onNewScreen?: () => void;
   /** What a run awaiting Mintro review is called for this reader (0070). See `DomainGroups`. */
   readonly reviewLabel?: string;
+  /**
+   * Whether to draw the Run by column (D-229).
+   *
+   * Separate from `viewer`, which carries who is reading for the filter's benefit. Passing it
+   * through rather than deriving it from `viewer?.seesEveryOrg` keeps the decision in `homeShape`,
+   * where the rest of what differs by viewer already lives — two places computing it is how the two
+   * come to disagree.
+   */
+  readonly showsRunBy: boolean;
 }
 
 export function PastReports({
@@ -74,6 +83,7 @@ export function PastReports({
   showsDisclosure = false,
   onNewScreen,
   reviewLabel,
+  showsRunBy,
 }: Props): JSX.Element {
   /*
     A failed read is shown as one, never as an empty list (D-213).
@@ -150,6 +160,7 @@ export function PastReports({
           groups={groups}
           onOpen={onOpen}
           source={source}
+          showsRunBy={showsRunBy}
           {...(onRescan === undefined ? {} : { onRescan })}
           {...(reviewLabel === undefined ? {} : { reviewLabel })}
         />

@@ -50,15 +50,46 @@ export const NAV: readonly {
  * The nav a viewer actually gets (D-230).
  *
  * Pure, and separate from the component, because `Rail` renders `SignOutButton` and therefore needs
- * an `AuthProvider` — so the component cannot be rendered standalone, and the thing worth asserting
- * is not the chrome but which items survive. A group left with nothing in it is dropped rather than
- * rendered as a heading over an absence.
+ * an `AuthProvider`. The thing worth asserting is not the chrome but which items survive. A group
+ * left with nothing in it is dropped rather than rendered as a heading over an absence.
+ *
+ * **Assert the rendered markup as well as this.** Testing only the pure function is what let the
+ * administration links ship unreachable: `homeShape.showsAdministration` was computed, documented
+ * and asserted true for the owner, and no component read it. A pure function whose output nothing
+ * renders is a fact about an object, not about a screen.
  */
 export function visibleNav(hidePanes: readonly Pane[] = []): typeof NAV {
   return NAV.map((group) => ({
     ...group,
     items: group.items.filter((item) => !hidePanes.includes(item.pane)),
   })).filter((group) => group.items.length > 0);
+}
+
+/**
+ * The owner's two screens, as data (D-229).
+ *
+ * Whole routes rather than panes — `/people` and `/access-log` are read from
+ * `window.location.pathname` in `App`, above `Screener`, because they are screens rather than panes
+ * inside one. So these are real `href`s and a real navigation, not `onPane` calls.
+ *
+ * As data for the reason `NAV` is: a destination that lives inside a closure is invisible to a
+ * static render and to every test, which is exactly the state the nav was in when it had a dead
+ * link back to the scan pane.
+ */
+export const ADMIN_LINKS: readonly { readonly href: string; readonly label: string }[] = [
+  { href: '/people', label: 'People' },
+  { href: '/access-log', label: 'Access log' },
+];
+
+/**
+ * The administration links this viewer gets — all of them, or none.
+ *
+ * Administration is owner-only, not host-member (D-229): a second Mintro person has the owner's view
+ * of the work and none of the owner's controls. Absent, not disabled — a greyed *People* would tell
+ * a host member that a roster screen exists and that they are shut out of it.
+ */
+export function visibleAdminLinks(showsAdministration: boolean): typeof ADMIN_LINKS {
+  return showsAdministration ? ADMIN_LINKS : [];
 }
 
 interface Props {
@@ -71,12 +102,28 @@ interface Props {
    * markup at all — which is the only way a test can tell absent from styled-away.
    */
   readonly hidePanes?: readonly Pane[];
+  /**
+   * Whether to draw People and the access log (D-229).
+   *
+   * **Required, deliberately.** It was going to be optional with a `false` default, and a default
+   * here is how this was broken in the first place: `showsAdministration` existed, was correct, and
+   * no caller passed it anywhere, so the owner's own screens were reachable only by typing the URL.
+   * A required prop makes forgetting it a compile error rather than a silently empty account area.
+   */
+  readonly showsAdministration: boolean;
   readonly onPane: (pane: Pane) => void;
   readonly ruleset: Ruleset;
   readonly analystEmail: string;
 }
 
-export function Rail({ pane, onPane, ruleset, analystEmail, hidePanes = [] }: Props): JSX.Element {
+export function Rail({
+  pane,
+  onPane,
+  ruleset,
+  analystEmail,
+  hidePanes = [],
+  showsAdministration,
+}: Props): JSX.Element {
   return (
     <nav className="rail">
       <div className="brand">
@@ -107,6 +154,21 @@ export function Rail({ pane, onPane, ruleset, analystEmail, hidePanes = [] }: Pr
       {/* Who is signed in. An analyst reading a merchant's evidence should be able to see, at a
           glance, which account is doing so. */}
       <div className="rail-user">
+        {/*
+          The owner's screens, above the address they belong to (D-229).
+
+          Plain anchors, because `/people` and `/access-log` are routes resolved from
+          `window.location.pathname` rather than panes — a click has to be a real navigation, and a
+          button calling `assign` would be the same thing with the destination hidden from the
+          markup.
+
+          Nothing is rendered at all for anybody else: no group, no heading, no disabled row.
+        */}
+        {visibleAdminLinks(showsAdministration).map((link) => (
+          <a key={link.href} className="rail-admin" data-admin={link.href} href={link.href}>
+            {link.label}
+          </a>
+        ))}
         <span className="who">{analystEmail}</span>
         <SignOutButton />
       </div>

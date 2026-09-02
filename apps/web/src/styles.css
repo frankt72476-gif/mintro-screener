@@ -3292,3 +3292,11 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 }
 /* Sits where the Send button would be, and reads as a sentence rather than a control. */
 .review-line { margin: 0; align-self: center; font-size: 0.85rem; color: var(--muted, #6d6788); }
+
+/* The owner's two screens, above the address they belong to (D-229). Quiet: they are a way in, not
+   a call to action, and the account area is not where the work happens. */
+.rail-admin {
+  display: block; color: rgba(255,255,255,0.62); text-decoration: none;
+  font-size: 12px; padding: 2px 0;
+}
+.rail-admin:hover { color: #fff; }

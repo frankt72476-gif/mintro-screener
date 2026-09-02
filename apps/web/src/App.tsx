@@ -1102,6 +1102,9 @@ function Screener({
         }}
         ruleset={ruleset.value}
         analystEmail={analystEmail}
+        // People and the access log, which are the owner's and nobody else's (D-229). The routes
+        // have existed since Stage 3; until now nothing linked to them.
+        showsAdministration={shape.showsAdministration}
         {...(shape.showsDocumentsTab ? {} : { hidePanes: ['docs' as const] })}
       />
 
@@ -1131,9 +1134,17 @@ function Screener({
               responded={responded}
               onRescan={rescan}
               reviewLabel={reviewStateLabel(shape)}
-              {...(seesEveryOrg
+              showsRunBy={shape.showsRunBy}
+              {/*
+                The org filter row, from the field that names it rather than from `seesEveryOrg`.
+                The two are the same value today — `homeShape` computes `showsOrgFilter` as
+                `seesEveryOrg` — so this changes nothing that renders. It changes what a later edit
+                does: narrowing `showsOrgFilter` had no effect while the screen consulted a
+                different field, which is exactly how `showsAdministration` came to be correct and
+                unread.
+              */ ...(shape.showsOrgFilter
                 ? {
-                    viewer: { id: analyst.id, seesEveryOrg: true },
+                    viewer: { id: analyst.id, seesEveryOrg: shape.showsOrgFilter },
                     filter: runFilter,
                     onFilter: setRunFilter,
                   }
@@ -1160,6 +1171,7 @@ function Screener({
               client={client}
               credentialEpoch={credentialEpoch}
               depositedAt={depositedAt}
+              showsRunBy={shape.showsRunBy}
               onRequest={async (url) => {
                 const result = await queue.request(url);
                 if (result.ok) {
@@ -1456,6 +1468,7 @@ export function ScanInput({
   client,
   credentialEpoch,
   depositedAt,
+  showsRunBy,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
@@ -1476,6 +1489,14 @@ export function ScanInput({
   readonly credentialEpoch: number;
   /** When a deposit was made for each domain in this session (D-191). */
   readonly depositedAt: Readonly<Record<string, string>>;
+  /**
+   * Whether the recent strip draws the Run by column (D-229).
+   *
+   * The strip is the same `DomainGroups` the library uses, so it inherits the same ruling and has to
+   * be told the same thing. Required rather than defaulted: a second list that quietly disagreed
+   * with the first about who sees attribution would be the harder half of this defect to find.
+   */
+  readonly showsRunBy: boolean;
   readonly onRequest: (
     url: string,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
@@ -1702,7 +1723,12 @@ export function ScanInput({
               )}
             </p>
             {recentGroups.length > 0 && (
-              <DomainGroups groups={recentGroups} onOpen={onRun} startOpen={false} />
+              <DomainGroups
+                groups={recentGroups}
+                onOpen={onRun}
+                startOpen={false}
+                showsRunBy={showsRunBy}
+              />
             )}
           </div>
         )}

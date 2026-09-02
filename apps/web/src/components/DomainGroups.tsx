@@ -31,6 +31,16 @@ interface Props {
    * viewer should get.
    */
   readonly reviewLabel?: string;
+  /**
+   * Whether to draw the Run by column (D-229).
+   *
+   * **Required, and not defaulted.** Who sees run attribution is a named decision, and it belongs in
+   * `homeShape` beside the rest of what differs by viewer — not as an emergent property of whichever
+   * names `analysts_select` happened to resolve. `homeShape.showsRunBy` was computed correctly and
+   * read by nothing, so the column drew for a partner whenever a colleague's name came back, which
+   * nobody chose. A required prop is what makes the next call site decide rather than inherit.
+   */
+  readonly showsRunBy: boolean;
 }
 
 export function DomainGroups({
@@ -40,6 +50,7 @@ export function DomainGroups({
   startOpen = true,
   source,
   reviewLabel,
+  showsRunBy,
 }: Props): JSX.Element {
   return (
     <div className="dgroups">
@@ -49,6 +60,7 @@ export function DomainGroups({
           group={group}
           onOpen={onOpen}
           startOpen={startOpen}
+          showsRunBy={showsRunBy}
           {...(onRescan === undefined ? {} : { onRescan })}
           {...(reviewLabel === undefined ? {} : { reviewLabel })}
         />
@@ -65,6 +77,7 @@ function DomainRow({
   onRescan,
   startOpen,
   reviewLabel,
+  showsRunBy,
 }: {
   readonly group: DomainGroup;
   readonly onOpen: (runId: string) => void;
@@ -72,6 +85,8 @@ function DomainRow({
   readonly startOpen: boolean;
   /** What a run awaiting Mintro review is called for this reader. Absent draws no badge. */
   readonly reviewLabel?: string;
+  /** Whether to draw the Run by column (D-229). See `Props`. */
+  readonly showsRunBy: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(startOpen);
   const screenings = group.runs.length;
@@ -129,14 +144,21 @@ function DomainRow({
                 {run.counts.fail} not met · {run.counts.review} unclear
               </span>
               {/*
-                Run by (D-228, D-233).
+                Run by (D-228, D-229, D-233).
 
-                Present only where `analysts_select` resolved a name — a partner reading their own
-                organisation's runs sees their colleagues, and nobody else. Absent rather than a
-                uuid: a uuid in this column looks like information and is not. Resolved by the
-                authenticated assembly and never by the print path.
+                **Two conditions, and they answer different questions.** `showsRunBy` is whether this
+                reader gets the column at all — the owner and host-org members do, a partner does
+                not. `run.runBy !== undefined` is whether a name resolved for this particular run.
+
+                It used to be the second alone, which meant the column drew for a partner whenever
+                `analysts_select` handed back a colleague's name. That was not a decision anybody
+                made; `homeShape.showsRunBy` said the opposite and nothing read it. Attribution
+                visibility is now the named ruling and the resolved name is only the content.
+
+                Absent rather than a uuid: a uuid in this column looks like information and is not.
+                Resolved by the authenticated assembly and never by the print path.
               */}
-              {run.runBy !== undefined && <span className="drun-by">{run.runBy}</span>}
+              {showsRunBy && run.runBy !== undefined && <span className="drun-by">{run.runBy}</span>}
               {/*
                 Marked ready for Mintro review, and not yet sent (0070).
 
