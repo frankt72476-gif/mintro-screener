@@ -4,17 +4,36 @@
  * Separate from `inviteJob.ts` throughout. That job issues a merchant comment link against an
  * existing run; this one creates a person. They share the mailer and nothing else.
  *
- * ## The order matters, and it is not the obvious one
+ * ## `generateLink` creates the user. Do not create it first
  *
- * The auth user is created **first**, because `analysts.id` IS the `auth.users` id (0001's foreign
- * key) and there is no separate `auth_user_id` column to fill in later. The roster row is then
- * inserted under that id, which is what makes `bind_invited_analyst()` able to find it by
- * `auth.uid()` on first sign-in.
+ * The first version of this job called `auth.admin.createUser` and then `generateLink`, on the
+ * reasoning that `analysts.id` IS the `auth.users` id (0001's foreign key) and the roster row needs
+ * an id to be created under. **That does not work.** `generateLink({ type: 'invite' })` creates the
+ * user itself, and against an address that already exists it fails with *"A user with this email
+ * address has already been registered"* — so the pair could never both succeed. Every invitation
+ * would have died at the second call.
  *
- * The invitation is sent **last**. A link that reaches an inbox before the roster row exists is a
- * link that binds to nothing and tells the recipient the account is broken; a roster row with no
- * link sent is a row the owner can see and re-invite. Of the two ways to fail, only the second is
- * recoverable without the recipient noticing.
+ * Nothing in the unit tests could see it: both calls are Supabase's, and the failure is a response
+ * from a live Auth server. It was found by issuing one real invitation against a branch, which is
+ * the only place it could have been found.
+ *
+ * So: one call, which returns both the user and the link. The roster row goes in under
+ * `data.user.id`, which is what lets `bind_invited_analyst()` find it by `auth.uid()`.
+ *
+ * The invitation is sent **last**. A link that reaches an inbox before the roster row exists binds
+ * to nothing and tells the recipient the account is broken; a roster row with no link sent is a row
+ * the owner can see and re-invite. Only the second is recoverable without the recipient noticing.
+ *
+ * ## And the redirect is verified, because Supabase substitutes it silently
+ *
+ * `redirectTo` is honoured only if the URL is on the project's redirect allow list. It is not
+ * rejected when it is not — Supabase quietly substitutes the project's Site URL and returns a link
+ * that looks entirely normal. Measured on a branch: asking for
+ * `https://screener.gomintro.com/auth/set-password` returned `http://localhost:3000`.
+ *
+ * An invitation whose link lands somewhere we did not ask for is worse than one that fails to send,
+ * because it fails at the recipient rather than at us. So the returned `redirect_to` is compared to
+ * what was asked for and the job refuses rather than sending.
  *
  * ## What this job does not do
  *
@@ -96,17 +115,32 @@ export async function issueAnalystInvitation(
     );
   }
 
-  // 1. The auth user, so the roster row has an id to be created under.
-  const { data: created, error: userError } = await client.auth.admin.createUser({
+  // 1. The link, which is also what creates the auth user. See the header: these are one call and
+  //    not two, and the returned `user` is where the roster row's id comes from.
+  const { data: linkData, error: linkError } = await client.auth.admin.generateLink({
+    type: 'invite',
     email,
-    email_confirm: true,
+    options: { redirectTo: input.redirectTo },
   });
-  if (userError !== null || created?.user === undefined) {
-    throw new Error(`could not create an account for ${email}: ${userError?.message ?? 'no user returned'}`);
+  if (linkError !== null || linkData?.user === undefined || linkData?.properties?.action_link === undefined) {
+    throw new Error(
+      `could not issue an invitation for ${email}: ${linkError?.message ?? 'no link returned'}`,
+    );
   }
-  const analystId = created.user.id;
+  const analystId = linkData.user.id;
 
-  // 2. The roster row, under that id. `status` defaults to 'invited'; `active` defaults true, which
+  // 2. The redirect, verified rather than trusted. A substituted one is silent (see the header).
+  const landedOn = linkData.properties.redirect_to;
+  if (landedOn !== input.redirectTo) {
+    throw new Error(
+      `refusing to send an invitation to ${email}: the link would land on ${String(landedOn)}, ` +
+        `not ${input.redirectTo}. Supabase substitutes the project's Site URL when a redirect is ` +
+        'not on the allow list, and does so without an error. Add the URL under ' +
+        'Authentication → URL Configuration → Redirect URLs.',
+    );
+  }
+
+  // 3. The roster row, under that id. `status` defaults to 'invited'; `active` defaults true, which
   //    the 0055 constraint requires of any row that is not suspended.
   const { error: rowError } = await client.from('analysts').insert({
     id: analystId,
@@ -120,16 +154,6 @@ export async function issueAnalystInvitation(
   });
   if (rowError !== null) {
     throw new Error(`could not add ${email} to the roster: ${rowError.message}`);
-  }
-
-  // 3. The set-password link.
-  const { data: linkData, error: linkError } = await client.auth.admin.generateLink({
-    type: 'invite',
-    email,
-    options: { redirectTo: input.redirectTo },
-  });
-  if (linkError !== null || linkData?.properties?.action_link === undefined) {
-    throw new Error(`could not mint an invitation link for ${email}: ${linkError?.message ?? 'no link returned'}`);
   }
 
   // 4. Which organization type, so the body can say what they will see — a boolean, never a name.
