@@ -225,3 +225,130 @@ describe('recorded_by_email is the recorder, on attestations too', () => {
     ]);
   });
 });
+
+/*
+  The UPDATE path (0064).
+
+  Two things are true at once and both need saying. On the schema as it stands **every UPDATE to
+  these tables is refused outright** by `..._is_append_only` (0016, 0044), which runs
+  `reject_mutation()` and sorts ahead of the pin in trigger-name order — so the pin's UPDATE clause
+  cannot fire today, and the first test here pins that precedence so nobody mistakes which control
+  is doing the work.
+
+  The rest of the block exercises the pin on UPDATE with the append-only trigger disabled for the
+  duration. That is the standard shape for testing a layer underneath another one: the outer guard
+  is removed so the inner one is reachable, and it is restored immediately. It answers the question
+  the layer exists for — if append-only were ever relaxed, does the pin still refuse a repointed
+  attribution, and does it still leave inherited rows alone?
+*/
+describe('the pin on the UPDATE path', () => {
+  let pinned: string;
+  let inherited: string;
+
+  beforeAll(async () => {
+    const [a] = await schema.query<{ id: string }>(
+      `insert into public.merchant_comments
+         (run_id, rule_id, body, recorded_by, recorded_by_email, recorded_at)
+       values ($1, 'UPD-001', 'Told to us by phone.', $2, $3, now()) returning id`,
+      [runId, analystId, RECORDER],
+    );
+    pinned = a!.id;
+
+    const [b] = await schema.query<{ id: string }>(
+      `insert into public.merchant_comments
+         (run_id, rule_id, body, recorded_by, recorded_by_email, recorded_at,
+          inherited_from_run, originally_answered_at)
+       values ($1, 'UPD-002', 'Carried forward.', $2, 'an-old-address@gomintro.test', now(),
+               $3, now()) returning id`,
+      [runId, analystId, runId],
+    );
+    inherited = b!.id;
+  });
+
+  it('is not what refuses an update today — append-only is', async () => {
+    const error = await schema.attempt(
+      `update public.merchant_comments set recorded_by_email = $2 where id = $1`,
+      [pinned, COLLEAGUE],
+    );
+    expect(error).toMatch(/append-only/);
+    expect(error).not.toMatch(/must be the address of the analyst/);
+  });
+
+  describe('with append-only lifted, so the layer underneath is reachable', () => {
+    beforeAll(async () => {
+      await schema.exec(
+        `alter table public.merchant_comments disable trigger merchant_comments_is_append_only`,
+      );
+    });
+
+    afterAll(async () => {
+      await schema.exec(
+        `alter table public.merchant_comments enable trigger merchant_comments_is_append_only`,
+      );
+    });
+
+    it('refuses a non-inherited row repointed at a colleague’s address', async () => {
+      const error = refused(
+        await schema.attempt(
+          `update public.merchant_comments set recorded_by_email = $2 where id = $1`,
+          [pinned, COLLEAGUE],
+        ),
+        'an update repointing a comment at a colleague’s address',
+      );
+      expect(error).toMatch(/recorded_by_email must be the address of the analyst recording it/);
+    });
+
+    it('leaves an inherited row alone, even with an address that no longer matches', async () => {
+      // The case that matters: re-processing a carried-forward row after the recording analyst's
+      // address changed. The row keeps what it said when it was written (D-002), so the pin must
+      // not trip on it — and would, if the skip were INSERT-only reasoning that did not survive.
+      const error = await schema.attempt(
+        `update public.merchant_comments set body = 'Carried forward, touched.' where id = $1`,
+        [inherited],
+      );
+      expect(error).toBeNull();
+    });
+
+    it('still defers a null address to the whole-row constraint on update', async () => {
+      const error = await schema.attempt(
+        `update public.merchant_comments set recorded_by_email = null where id = $1`,
+        [pinned],
+      );
+      expect(error).toMatch(/comment_recorder_is_whole/);
+      expect(error).not.toMatch(/must be the address of the analyst/);
+    });
+
+    it('accepts an update to the recorder’s own address', async () => {
+      const error = await schema.attempt(
+        `update public.merchant_comments set recorded_by_email = $2 where id = $1`,
+        [pinned, RECORDER.toUpperCase()],
+      );
+      expect(error).toBeNull();
+    });
+  });
+
+  it('restores append-only afterwards, so the table is as it was', async () => {
+    const error = await schema.attempt(
+      `update public.merchant_comments set body = 'nope' where id = $1`,
+      [pinned],
+    );
+    expect(error).toMatch(/append-only/);
+  });
+
+  it('covers insert and update on both tables', async () => {
+    // `tgtype` bit 2 is INSERT, bit 4 is UPDATE (pg_trigger). Asserted rather than assumed: the
+    // clause this migration adds is unreachable today, so nothing else would notice its absence.
+    const rows = await schema.query<{ tgname: string; on_insert: boolean; on_update: boolean }>(
+      `select tgname, (tgtype & 4) <> 0 as on_insert, (tgtype & 16) <> 0 as on_update
+         from pg_trigger
+        where tgname in ('merchant_comments_recorder_is_pinned',
+                         'merchant_attestations_recorder_is_pinned')
+        order by tgname`,
+    );
+    expect(rows.length).toBe(2);
+    for (const row of rows) {
+      expect(row.on_insert).toBe(true);
+      expect(row.on_update).toBe(true);
+    }
+  });
+});
