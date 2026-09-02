@@ -44,6 +44,13 @@ export interface Analyst {
    * `organizations_one_host` (0060), and the type is what says so.
    */
   readonly isHost: boolean;
+  /**
+   * Whether the Documents Check nav item is drawn (D-230).
+   *
+   * Presence only. The gate of record is the API and the worker re-read at job start — Stage 5 —
+   * and a nav item has never been a gate. Read here so the rail can omit it rather than grey it.
+   */
+  readonly canRunDocumentsCheck: boolean;
 }
 
 export type AuthState =
@@ -123,7 +130,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
 
       const { data, error } = await client
         .from('analysts')
-        .select('id, email, full_name, role, org_id, organizations ( type )')
+        .select('id, email, full_name, role, org_id, can_run_documents_check, organizations ( type )')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -140,6 +147,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
         full_name: string | null;
         role: string;
         org_id: string;
+        can_run_documents_check: boolean;
         organizations: { type: string } | { type: string }[] | null;
       };
       const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
@@ -152,6 +160,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
           role: row.role === 'owner' ? 'owner' : 'admin',
           orgId: row.org_id,
           isHost: org?.type === 'host',
+          canRunDocumentsCheck: row.can_run_documents_check,
         },
         client,
       });

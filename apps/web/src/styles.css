@@ -3271,3 +3271,13 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .runfilter-susp { margin-left: 0.35rem; font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--muted, #6d6788); }
 .drun-by { color: var(--muted, #6d6788); font-size: 0.85rem; }
+
+/* ── Stage 4: what a non-owner sees ───────────────────────────────────────────────────────────── */
+.disclosure { margin: 1rem 0 0; font-size: 0.85rem; color: var(--muted, #6d6788); }
+.empty-state { padding: 2.5rem 0; max-width: 34rem; }
+.empty-head { font-size: 1.25rem; margin: 0 0 0.6rem; }
+.empty-body { line-height: 1.5; margin: 0 0 1.25rem; }
+.na { max-width: 30rem; margin: 4rem auto; padding: 2rem; }
+.na-brand { display: block; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
+.na-head { font-size: 1.25rem; margin: 0 0 0.75rem; }
+.na-body { line-height: 1.5; margin: 0 0 1.25rem; }

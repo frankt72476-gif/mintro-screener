@@ -14,7 +14,7 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
-import { AccessLogPane, NotAvailable, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
+import { AccessLogPane, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
 import {
@@ -67,6 +67,9 @@ import { CommentPane, commentToken } from './components/CommentPane.js';
 import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
 import { EVERYONE, type RunFilter } from './lib/runFilter.js';
+import { homeShape } from './lib/homeShape.js';
+import { Disclosure, PartnerEmptyState } from './components/PartnerNotes.js';
+import { NotAvailable } from './components/NotAvailable.js';
 import { AttestationForm } from './components/Attestations.js';
 import { recordAnswer, recordComment } from './lib/operatorAnswers.js';
 import type { InFlightRun } from './lib/domainGroups.js';
@@ -423,7 +426,8 @@ function Screener({
 
     `seesEveryOrg` is a UI convenience. The database decides what is in the list.
   */
-  const seesEveryOrg = analyst.role === 'owner' || analyst.isHost === true;
+  const shape = homeShape(analyst);
+  const seesEveryOrg = shape.seesEveryOrg;
   const [runFilter, setRunFilter] = useState<RunFilter>(EVERYONE);
 
   const analystEmail = analyst.email;
@@ -1025,6 +1029,7 @@ function Screener({
         }}
         ruleset={ruleset.value}
         analystEmail={analystEmail}
+        {...(shape.showsDocumentsTab ? {} : { hidePanes: ['docs' as const] })}
       />
 
       <main className="main">
@@ -1058,7 +1063,7 @@ function Screener({
                     filter: runFilter,
                     onFilter: setRunFilter,
                   }
-                : {})}
+                : { showsDisclosure: shape.showsDisclosure, onNewScreen: () => setPane('scan') })}
               onOpen={(runId) => {
                 setPane('scan');
                 void load(runId);
@@ -1250,7 +1255,16 @@ function Screener({
             "no package open" state until one exists. The id comes from the URL so a package can
             be opened directly while the picker is outstanding.
           */}
-          <DocumentsPane client={client} analystId={analyst.id} packageId={openPackageId} />
+          {/*
+            The same answer as the missing nav item, for somebody who reached the pane another way
+            — a bookmark, a stale tab, a typed URL (D-230). Two of the four layers; the API
+            rejection that is the gate of record is Stage 5.
+          */}
+          {shape.showsDocumentsTab ? (
+            <DocumentsPane client={client} analystId={analyst.id} packageId={openPackageId} />
+          ) : (
+            <NotAvailable />
+          )}
         </section>
       </main>
 

@@ -46,14 +46,37 @@ export const NAV: readonly {
   },
 ];
 
+/**
+ * The nav a viewer actually gets (D-230).
+ *
+ * Pure, and separate from the component, because `Rail` renders `SignOutButton` and therefore needs
+ * an `AuthProvider` — so the component cannot be rendered standalone, and the thing worth asserting
+ * is not the chrome but which items survive. A group left with nothing in it is dropped rather than
+ * rendered as a heading over an absence.
+ */
+export function visibleNav(hidePanes: readonly Pane[] = []): typeof NAV {
+  return NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !hidePanes.includes(item.pane)),
+  })).filter((group) => group.items.length > 0);
+}
+
 interface Props {
   readonly pane: Pane;
+  /**
+   * Panes this viewer has no item for (D-230).
+   *
+   * Absent, not disabled: a greyed control teaches somebody that a feature exists and that they
+   * are excluded from it. Filtered out of `NAV` before it renders, so the string is not in the
+   * markup at all — which is the only way a test can tell absent from styled-away.
+   */
+  readonly hidePanes?: readonly Pane[];
   readonly onPane: (pane: Pane) => void;
   readonly ruleset: Ruleset;
   readonly analystEmail: string;
 }
 
-export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Element {
+export function Rail({ pane, onPane, ruleset, analystEmail, hidePanes = [] }: Props): JSX.Element {
   return (
     <nav className="rail">
       <div className="brand">
@@ -63,7 +86,7 @@ export function Rail({ pane, onPane, ruleset, analystEmail }: Props): JSX.Elemen
         </div>
       </div>
 
-      {NAV.map((group) => (
+      {visibleNav(hidePanes).map((group) => (
         <div key={group.label}>
           <div className="nav-label">{group.label}</div>
           {group.items.map((item) => (

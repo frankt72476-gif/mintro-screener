@@ -6,7 +6,8 @@
  *
  * ## The guard is here and it is also in the database
  *
- * `NotAvailable` is what a partner or a host member sees on these routes. It is a convenience, not
+ * `NotAvailable` — one definition, in its own file, shared with every other guard so two pages
+ * cannot drift into saying different amounts about what they are hiding. It is a convenience, not
  * the enforcement: `admin_access_log_select` (0058) is owner-only, and each of 0067's functions
  * asks `current_admin_is_owner()` before it does anything. Somebody who got past this component
  * would read an empty log and be refused every write.
@@ -30,20 +31,8 @@ import { readAccessLog, type AccessLogEntry } from '../lib/accessLog.js';
 import { PeopleTable } from './People.js';
 import { AccessLogTable, RecentAccessChanges } from './AccessLog.js';
 import { InviteAnalyst } from './InviteAnalyst.js';
+import { NotAvailable } from './NotAvailable.js';
 import { readOrgs, type OrgOption } from '../lib/people.js';
-
-export function NotAvailable(): JSX.Element {
-  return (
-    <div className="shell">
-      <main className="main">
-        <div className="empty">
-          {/* Nothing about what is behind it, and no invitation to ask (D-229). */}
-          This isn’t available to you.
-        </div>
-      </main>
-    </div>
-  );
-}
 
 /** True only for the account owner. Administration is owner-only, not host-member (D-229). */
 export const ownsTheAccount = (analyst: Analyst | null): boolean => analyst?.role === 'owner';

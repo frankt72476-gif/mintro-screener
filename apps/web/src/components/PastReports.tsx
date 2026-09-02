@@ -21,6 +21,7 @@ import { groupByDomain } from '../lib/domainGroups.js';
 import { DomainGroups } from './DomainGroups.js';
 import { RunFilterRow } from './RunFilterRow.js';
 import { EVERYONE, applyFilter, orgChips, type RunFilter } from '../lib/runFilter.js';
+import { Disclosure, PartnerEmptyState } from './PartnerNotes.js';
 
 interface Props {
   /** The read's own result, so a failure can be shown as one (D-213). */
@@ -43,7 +44,18 @@ interface Props {
   readonly viewer?: { readonly id: string; readonly seesEveryOrg: boolean };
   readonly filter?: RunFilter;
   readonly onFilter?: (next: RunFilter) => void;
+  /**
+   * Populated by nothing, deliberately.
+   *
+   * The chip can mark a suspended organisation (D-232) and no query computes the set, because
+   * "a suspended organisation" is not defined — every member suspended? the org itself flagged?
+   * That is a product ruling and is pending. Threaded rather than removed so the marker does not
+   * have to be rebuilt when the ruling lands, and empty so it never claims something untrue.
+   */
   readonly suspendedOrgIds?: readonly string[];
+  /** A partner: the disclosure line under the list, and the empty state when there is none. */
+  readonly showsDisclosure?: boolean;
+  readonly onNewScreen?: () => void;
 }
 
 export function PastReports({
@@ -57,6 +69,8 @@ export function PastReports({
   filter = EVERYONE,
   onFilter,
   suspendedOrgIds = [],
+  showsDisclosure = false,
+  onNewScreen,
 }: Props): JSX.Element {
   /*
     A failed read is shown as one, never as an empty list (D-213).
@@ -107,6 +121,14 @@ export function PastReports({
         Every merchant this account can read, most recently active first. Re-scanning adds a run; it
         never replaces one, so a merchant's runs stack up under its name.
       </p>
+      {/*
+        A partner with nothing yet (D-229). The headline names the space rather than the absence,
+        and the disclosure line is repeated there because there is no list for it to caption.
+      */}
+      {showsDisclosure && listing.runs.length === 0 && (
+        <PartnerEmptyState {...(onNewScreen === undefined ? {} : { onNewScreen })} />
+      )}
+
       {showsFilter && onFilter !== undefined && (
         <RunFilterRow chips={chips} filter={filter} onChange={onFilter} />
       )}
@@ -128,6 +150,12 @@ export function PastReports({
           </p>
         )}
       </div>
+
+      {/*
+        Stated once, under the list, and never repeated on this page (D-229). The empty state
+        carries it instead when there is no list — the two are mutually exclusive by the condition.
+      */}
+      {showsDisclosure && listing.runs.length > 0 && <Disclosure />}
     </div>
   );
 }
