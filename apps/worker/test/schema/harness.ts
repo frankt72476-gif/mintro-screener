@@ -23,6 +23,16 @@
  */
 
 import { PGlite } from '@electric-sql/pglite';
+/*
+  The real citext, not a shim.
+
+  0065 makes `analysts.email` citext, and PGlite carries no extensions by default — an earlier
+  session got as far as substituting `create domain citext as text`, which would have left the one
+  property under test (case-folded uniqueness) untested while looking green. PGlite ships the
+  genuine contrib extension, so the harness loads it and `create extension if not exists citext`
+  in the migration does what it does in production.
+*/
+import { citext } from '@electric-sql/pglite/contrib/citext';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -104,7 +114,7 @@ export interface SchemaFixture {
  * what ships, and drift is what this is for.
  */
 export async function createSchema(): Promise<SchemaFixture> {
-  const db = new PGlite();
+  const db = new PGlite({ extensions: { citext } });
   await db.exec(SUPABASE_STUBS);
 
   const files = readdirSync(MIGRATIONS)

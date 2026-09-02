@@ -46,6 +46,23 @@ export const INVITATION_CONTACT_LINE =
   'contact at Mintro, or the agent who sent this to you.';
 
 /**
+ * The analyst invitation's line (0065).
+ *
+ * A third, because neither existing line fits and bending one would have been worse than adding.
+ * The merchant line ends "or the agent who sent this to you" — there is no agent in an account
+ * invitation, and pointing a new colleague at one is a sentence that cannot be acted on. The report
+ * line says "about this report", and this is not a report.
+ *
+ * What survives from both is the shape D-065 settled: a pointer out of the message, never an
+ * address inside it. Somebody who has just been told they have an account on a system they may
+ * never have heard of is in the same position as the merchant — already wondering whether it is
+ * real — and the only thing that answers that is a channel they already trust.
+ */
+export const ACCOUNT_INVITATION_CONTACT_LINE =
+  'Questions about this invitation, or want to confirm it is genuine? Contact your usual point of ' +
+  'contact at Mintro.';
+
+/**
  * The IQwallet report's line, adjusted for its audience.
  *
  * No "confirm it is genuine". IQwallet commissioned the screening and is expecting the report;

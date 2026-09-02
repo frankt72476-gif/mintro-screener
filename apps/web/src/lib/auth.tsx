@@ -81,6 +81,27 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
         return;
       }
 
+      /*
+        Bind on first sign-in (0065).
+
+        Called before the roster is read, because a successful bind is what makes the row readable:
+        an `invited` row fails `current_admin_is_active()` and every policy that depends on it.
+
+        The outcome is deliberately not branched on here beyond letting it happen. A refusal — the
+        session's address is not the one invited — leaves the row `invited`, and the read below then
+        resolves to `not_invited`, which is the state the UI already knows how to show and the
+        honest description of where that person stands. The refusal is enforced in the database
+        (D-233's posture: the guard is server-side, and the UI is not what makes it true).
+      */
+      // Errors are swallowed on purpose: the bind returns its outcome as data and never raises
+      // (0065), so anything thrown here is transport. A sign-in must not fail because a bind that
+      // had nothing to do could not be reached — the read below decides what this person sees.
+      try {
+        await client.rpc('bind_invited_analyst');
+      } catch {
+        /* transport only; the roster read below is what resolves the state */
+      }
+
       const { data, error } = await client
         .from('analysts')
         .select('id, email, full_name')
