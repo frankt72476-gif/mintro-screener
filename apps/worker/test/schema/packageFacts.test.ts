@@ -22,7 +22,7 @@ beforeAll(async () => {
     `insert into auth.users (email) values ('facts@example.com') returning id`,
   );
   const [analyst] = await db.query<{ id: string }>(
-    `insert into public.analysts (id, email) values ($1, 'facts@example.com') returning id`,
+    `insert into public.analysts (id, email, org_id) values ($1, 'facts@example.com', (select id from public.organizations where type = 'host')) returning id`,
     [user!.id],
   );
   analystId = analyst!.id;

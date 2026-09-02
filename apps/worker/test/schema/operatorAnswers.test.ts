@@ -37,7 +37,7 @@ beforeAll(async () => {
   );
   analystId = user!.id;
   await schema.query(
-    `insert into public.analysts (id, email, full_name) values ($1, 'frankt@gomintro.example', 'Frank')`,
+    `insert into public.analysts (id, email, full_name, org_id) values ($1, 'frankt@gomintro.example', 'Frank', (select id from public.organizations where type = 'host'))`,
     [analystId],
   );
 }, 60_000);
@@ -48,8 +48,8 @@ afterAll(async () => {
 
 async function makeRun(): Promise<string> {
   const [run] = await schema.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status, report, created_by)
-     values ($1, 'public', '3.3.0', 'running', $2::jsonb, $3) returning id`,
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, report, created_by, org_id)
+     values ($1, 'public', '3.3.0', 'running', $2::jsonb, $3, (select org_id from public.analysts where id = $3)) returning id`,
     [merchantId, JSON.stringify(REPORT), OWNER_ID],
   );
   return run!.id;

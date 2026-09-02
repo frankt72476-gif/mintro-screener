@@ -26,7 +26,7 @@ beforeAll(async () => {
       `insert into auth.users (email) values ($1) returning id`, [email],
     );
     await db.query(
-      `insert into public.analysts (id, email, purge_approver) values ($1, $2, $3)`,
+      `insert into public.analysts (id, email, purge_approver, org_id) values ($1, $2, $3, (select id from public.organizations where type = 'host'))`,
       [user!.id, email, isApprover],
     );
     if (isApprover) approver = user!.id; else analyst = user!.id;
@@ -45,8 +45,8 @@ async function seedPackage(): Promise<string> {
     [`purge-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-     values ($1, 'iqwallet', 'documents-1', $2) returning id`,
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+     values ($1, 'iqwallet', 'documents-1', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchant!.id, OWNER_ID],
   );
   const [slot] = await db.query<{ id: string }>(

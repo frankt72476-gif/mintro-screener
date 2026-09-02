@@ -103,8 +103,15 @@ async function main(argv: readonly string[]): Promise<number> {
     // read from the run rather than resolved to the owner anyway: a resume must not be able to
     // change who a run belongs to, and passing the owner would make that possible the day this
     // path grows an insert.
-    const createdBy = await runOwner(supabase, runId);
-    await persistRun(supabase, { report, artifacts: [], runId, artifactKeys, createdBy });
+    const existing = await runOwner(supabase, runId);
+    await persistRun(supabase, {
+      report,
+      artifacts: [],
+      runId,
+      artifactKeys,
+      createdBy: existing.createdBy,
+      orgId: existing.orgId,
+    });
   } catch (error) {
     console.error(`\n${error instanceof Error ? error.message : String(error)}`);
     console.error(

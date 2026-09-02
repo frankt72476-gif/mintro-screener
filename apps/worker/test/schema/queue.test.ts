@@ -21,7 +21,7 @@ beforeAll(async () => {
     `insert into auth.users (email) values ('analyst@example.com') returning id`,
   );
   const [analyst] = await schema.query<{ id: string }>(
-    `insert into public.analysts (id, email, full_name) values ($1, 'analyst@example.com', 'A') returning id`,
+    `insert into public.analysts (id, email, full_name, org_id) values ($1, 'analyst@example.com', 'A', (select id from public.organizations where type = 'host')) returning id`,
     [user!.id],
   );
   analystId = analyst!.id;

@@ -36,8 +36,8 @@ async function seedPackage(label = 'northwind'): Promise<{ merchantId: string; p
     [`${label}-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-     values ($1, 'iqwallet', 'seed-2026-08-24', $2) returning id`,
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+     values ($1, 'iqwallet', 'seed-2026-08-24', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchant!.id, OWNER_ID],
   );
   return { merchantId: merchant!.id, packageId: pkg!.id };
@@ -79,8 +79,8 @@ describe('packages key to an application attempt, not a merchant', () => {
   it('allows two packages under one merchant with different templates', async () => {
     const { merchantId } = await seedPackage();
     const error = await db.attempt(
-      `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-       values ($1, 'second-processor', 'seed-2026-08-24', $2)`,
+      `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+       values ($1, 'second-processor', 'seed-2026-08-24', $2, (select org_id from public.analysts where id = $2))`,
       [merchantId, OWNER_ID],
     );
     // A merchant declined by one processor and resubmitted to another is two packages, and
@@ -299,7 +299,7 @@ describe('retrieval logging', () => {
     const [user] = await db.query<{ id: string }>(
       `insert into auth.users (email) values ('analyst@example.test') returning id`,
     );
-    await db.query(`insert into public.analysts (id, email) values ($1, 'analyst@example.test')`, [user!.id]);
+    await db.query(`insert into public.analysts (id, email, org_id) values ($1, 'analyst@example.test', (select id from public.organizations where type = 'host'))`, [user!.id]);
     await db.query(`update public.packages set lifecycle = 'submitted', retention_started_at = now() where id = $1`, [packageId]);
     await db.query(`update public.packages set lifecycle = 'archived', archived_at = now() where id = $1`, [packageId]);
 

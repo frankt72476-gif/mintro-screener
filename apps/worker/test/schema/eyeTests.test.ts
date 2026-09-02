@@ -36,8 +36,8 @@ afterAll(async () => {
 /** A run in flight, the way `persistRun` inserts one before it finishes. */
 async function startRun(): Promise<string> {
   const rows = await schema.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by)
-     values ($1, 'public', '3.3.0', 'running', $2) returning id`,
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by, org_id)
+     values ($1, 'public', '3.3.0', 'running', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchantId, OWNER_ID],
   );
   return (rows[0] as { id: string }).id;

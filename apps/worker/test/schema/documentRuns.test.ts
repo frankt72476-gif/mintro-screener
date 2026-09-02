@@ -27,8 +27,8 @@ async function seedPackage(): Promise<string> {
     [`runs-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-     values ($1, 'iqwallet', 'seed', $2) returning id`,
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+     values ($1, 'iqwallet', 'seed', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchant!.id, OWNER_ID],
   );
   return pkg!.id;
@@ -237,7 +237,7 @@ describe('sending is an event, not a state transition (D-083)', () => {
       [`sender-${Math.random().toString(36).slice(2)}@gomintro.com`],
     );
     const [analyst] = await db.query<{ id: string }>(
-      `insert into public.analysts (id, email) values ($1, $2) returning id`,
+      `insert into public.analysts (id, email, org_id) values ($1, $2, (select id from public.organizations where type = 'host')) returning id`,
       [user!.id, `sender-${Math.random().toString(36).slice(2)}@gomintro.com`],
     );
     return analyst!.id;

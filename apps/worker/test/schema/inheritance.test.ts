@@ -52,8 +52,8 @@ afterAll(async () => {
 
 async function makeRun(report: unknown): Promise<string> {
   const [run] = await schema.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status, report, created_by)
-     values ($1, 'public', '3.3.0', 'running', $2::jsonb, $3) returning id`,
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, report, created_by, org_id)
+     values ($1, 'public', '3.3.0', 'running', $2::jsonb, $3, (select org_id from public.analysts where id = $3)) returning id`,
     [merchantId, JSON.stringify(report), OWNER_ID],
   );
   return run!.id;
@@ -65,7 +65,8 @@ async function makeLink(runId: string, token: string): Promise<string> {
     [`ops+${token}@mintro.example`],
   );
   await schema.query(
-    `insert into public.analysts (id, email, full_name) values ($1, $2, 'Ops')
+    `insert into public.analysts (id, email, full_name, org_id)
+     values ($1, $2, 'Ops', (select id from public.organizations where type = 'host'))
        on conflict (id) do nothing`,
     [analyst!.id, `ops+${token}@mintro.example`],
   );

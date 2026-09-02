@@ -72,7 +72,7 @@ beforeAll(async () => {
     `insert into auth.users (email) values ('analyst@example.com') returning id`,
   );
   await schema.query(
-    `insert into public.analysts (id, email, full_name) values ($1, 'analyst@example.com', 'A')`,
+    `insert into public.analysts (id, email, full_name, org_id) values ($1, 'analyst@example.com', 'A', (select id from public.organizations where type = 'host'))`,
     [user!.id],
   );
   analystId = user!.id;

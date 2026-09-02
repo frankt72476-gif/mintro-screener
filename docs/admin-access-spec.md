@@ -1,307 +1,327 @@
 ---
-purpose: Build spec for admin accounts, per-user run scoping, and the Documents Check capability gate. Read in full before writing any code.
-status: approved by Frank 2026-09-01; design mockups reviewed and accepted
+purpose: Build spec for organization-scoped access, the two operator capabilities, and the Mintro review path. Supersedes the 2026-09-01 v1 in full. Read before writing any code.
+status: v2, revised 2026-09-01 after the segregation ruling. Stages 0, 1 and 1b are built; the predicates from 1 and 1b are reworked by this revision.
 ---
 
-# Admin access and Documents Check gating
+# Organization access, capabilities, and the Mintro review path
 
-Two roles, one capability flag, run ownership enforced in the database. The owner sees every run;
-an admin sees only the runs they started. Documents Check is off for every admin until the owner
-turns it on.
+The screener is used by more than one organization. Mintro is the host. The others are partner
+agencies who each have a relationship with Mintro and none with each other, and who must not learn
+of each other's existence through this tool.
 
-This spec assumes the screener has no per-user login today — one operator context, access
-controlled by knowing the URL. If an auth layer already exists beyond that, stop and say so before
-Stage 1; the RLS work rebases onto it rather than replacing it.
+The boundary is the **organization**, not the person. Colleagues at one agency see each other's
+work and cover for each other. Nothing crosses between agencies. Mintro sees everything.
+
+## What changed from v1, and why
+
+v1 scoped runs to the person who created them. That was correct for a single-organization tool and
+wrong for this one — colleagues at an agency could not cover for each other, and the model had no
+concept of a boundary that outbound email and merchant-facing pages also have to respect.
+
+Three corrections carried into this version:
+
+1. **The boundary is the organization.** The read predicate moves from creator to org.
+2. **Documents Check anchors on the package, not the run.** v1 said runs. That was wrong on the
+   facts — packages hang off merchants, never off runs. Corrected throughout.
+3. **There are two capabilities, not one.** v1 said one boolean was the limit. Submission to
+   IQwallet is the second. Two named columns remain clearer than a grants table; three is where
+   that stops being true, and that is a decision for whoever proposes a third.
+
+Dropped from v1 entirely: package hand-off, and merchant reassignment between Mintro staff.
+Host-org members see everything, so there is nothing to reassign.
 
 ---
 
 ## Non-goals — do not build these
 
-1. **No permissions system.** One boolean, `can_run_documents_check`. Not a capabilities table, not
-   a role matrix, not per-feature grants. If a second gated feature ever appears, that migration is
-   its own decision. Building the general case now costs clarity and buys nothing.
+1. **No permissions system.** Two named booleans on `analysts`. Not a capabilities table, not a
+   role matrix, not per-feature grants.
 2. **No login wall on anonymous surfaces.** Merchant comment pages, agent links and IQwallet sends
-   stay token-scoped exactly as they are today. A merchant clicking a forwarded link must never be
-   asked to authenticate. This is a named requirement, not an omission.
-3. **No deletion of people.** Suspension is the only exit. Removing a person orphans their runs, and
-   D-097 forbids losing run history. The row overflow menu carries resend invite, suspend and
-   reinstate — nothing else.
-4. **No retroactive blinding.** Revoking Documents Check stops new document checks. It does not hide
-   a completed run the person already produced and read. Runs are immutable and append-only (D-002);
-   hiding part of a report someone already holds makes the record inconsistent with itself.
-5. **No admin-invites-admin.** Only the owner invites, grants, suspends and reinstates.
+   stay token-scoped. A merchant clicking a forwarded link is never asked to authenticate.
+3. **No deletion of people.** Suspension is the only exit (D-097).
+4. **No retroactive blinding.** Revoking a capability stops future actions. It does not hide
+   completed work (D-002).
+5. **No admin invites admin.** Only the owner invites, grants, suspends and reinstates — including
+   as against other host-org members.
+6. **No cross-org assignment.** A merchant relationship never moves between organizations.
+7. **No second owner.** If the owner is unavailable, nobody can invite or grant. That is the
+   accepted cost of a single owner at this size. The remedy, if it ever bites, is a host-org
+   administrative role — not a workaround.
 
 ---
 
 ## Data model
 
-### Roles and status
-
-`owner` — exactly one, enforced by a partial unique index. `admin` — everyone else.
-
-Status is `invited` → `active` → `suspended`, with `suspended` → `active` on reinstate. A row is
-`invited` until first successful sign-in binds it to a Supabase auth user.
-
-### `admin_users`
+### `organizations`
 
 | Column | Notes |
 |---|---|
 | `id` | uuid, primary key |
-| `auth_user_id` | uuid, unique, nullable until first sign-in, references `auth.users` |
-| `email` | citext, unique, not null — the invite is scoped to this address |
-| `display_name` | text, not null |
-| `role` | enum `owner` / `admin`, not null, default `admin` |
-| `can_run_documents_check` | boolean, not null, **default false** |
-| `status` | enum `invited` / `active` / `suspended`, not null, default `invited` |
-| `invited_by` | uuid, references `admin_users(id)` |
-| `invited_at` | timestamptz, not null, default now() |
-| `activated_at` | timestamptz, nullable |
-| `suspended_at` | timestamptz, nullable |
+| `name` | text, not null — display name |
+| `type` | enum `host` / `partner`, not null |
+| `created_at` | timestamptz, not null |
 
-Two constraints that must be in the schema rather than in application code:
+Exactly one `host`, enforced by a partial unique index on `type` where `type = 'host'`. Mintro is
+the host. Every other organization is a partner.
 
-- Partial unique index on `role` where `role = 'owner'` — a second owner is a schema violation.
-- Check constraint: `role = 'owner'` implies `can_run_documents_check = true`. The owner's access is
-  not a grant that can be revoked by a stray update.
+### `analysts` — additions to the existing table
 
-### `admin_access_log`
+`analysts` is the one actor table. Do not create a second.
 
-Append-only. Every invite, activation, grant, revocation, suspension, reinstatement and reroute.
+Already added in Stage 0: `role`, `can_run_documents_check`, `status`, `invited_by`,
+`activated_at`, `suspended_at`, the partial unique owner index, the owner-implies-capability check,
+and `check (active = (status <> 'suspended'))`.
+
+Added by this revision:
 
 | Column | Notes |
 |---|---|
-| `id` | bigserial, primary key |
-| `actor_id` | uuid, not null — who did it |
-| `subject_id` | uuid, nullable — who it was done to |
-| `action` | text, not null — see enumerated values below |
-| `value_before` | jsonb, nullable |
-| `value_after` | jsonb, nullable |
-| `created_at` | timestamptz, not null, default now() |
+| `org_id` | uuid, references `organizations(id)`, not null after backfill |
+| `can_submit_to_iqwallet` | boolean, not null, default false |
 
-Actions: `invited`, `invite_resent`, `activated`, `granted_documents_check`,
-`revoked_documents_check`, `suspended`, `reinstated`, `replies_rerouted`.
+The owner check constraint extends: `role = 'owner'` implies both capabilities true.
 
-Append-only is enforced by grants and policy, not by convention: an insert policy exists, update and
-delete policies do not, and `update` / `delete` are revoked from the authenticated role. "Who gave
-this person access to the document files" is exactly the question IQwallet or a bank would ask, and
-the answer must not be the owner's memory.
+Backfill `org_id` using the approved DDL pattern — guard first, then
+`ADD COLUMN ... NOT NULL DEFAULT '<host-org uuid resolved via format(%L)>'`, then `DROP DEFAULT`.
+No `UPDATE`. The existing analyst rows are Mintro.
 
-### `runs.created_by`
+### `runs.created_by` and `packages.created_by`
 
-New column, uuid, references `admin_users(id)`, **not null after backfill**.
+Both stay, both stay not-null. They are **attribution**, not the read predicate — who did the work,
+which the access log, the review path and any future audit all need. Do not remove them when the
+predicate changes.
 
-Backfill every existing run to the owner's row. Then add the not-null constraint in the same
-migration, and **fail the migration if any run still holds null**. A null owner is a row no policy
-covers, and both readings of null — nobody, everybody — are wrong.
+### `admin_access_log`
+
+Unchanged from Stage 0. Append-only, insert policy only, `reject_mutation()` trigger, owner-only
+select. Actions extend to cover the second capability and the review path:
+`granted_iqwallet_submit`, `revoked_iqwallet_submit`, `marked_ready_for_review`,
+`submitted_on_behalf_of`.
+
+Owner-only select is now load-bearing rather than incidental: the log names people across
+organizations, so a host-org member who is not the owner must not read it.
 
 ---
 
-## Enforcement
+## Access model
 
-### Scoping lives in RLS, not in application filtering
+### The predicate
 
-Runs are read from the web UI, the worker, PDF generation and the email sender. A filter has to be
-correct in every one of those paths; a policy is correct once. This is the D-014 shape — a control
-that depends on each caller remembering it is blind to the caller that forgets.
-
-Helper functions, both `security definer`, both resolving from `auth.uid()`:
-
-- `current_admin_id()` → uuid, null if no matching row
-- `current_admin_is_owner()` → boolean
-
-Select policy on `runs`:
+Replaces the creator-scoped predicates built in Stages 1 and 1b.
 
 ```
-status of the current admin must be 'active'
-AND (
-  created_by = current_admin_id()
-  OR current_admin_is_owner()
-)
+can_read_run(run_id):
+  is_analyst()
+  AND current_admin_is_active()
+  AND (
+    run.org_id = current_admin_org()
+    OR current_admin_is_host()
+  )
 ```
 
-Note the status clause. A suspended admin sees nothing — their session, if live, goes empty rather
-than stale. Their runs remain visible to the owner and are not deleted.
+`can_read_package(package_id)` is the same shape against the package's org.
 
-Documents Check artifacts and findings are scoped by the run they belong to, not by the capability
-flag. The flag gates creation; it does not gate reading. This is what makes the revocation ruling
-above true in the database rather than only in the UI.
+`runs` and `packages` therefore need `org_id` alongside `created_by`, populated from the creating
+analyst's org. Denormalized deliberately: resolving org through `created_by → analysts.org_id` on
+every policy evaluation means a re-orged analyst silently changes what their old runs belong to,
+and a run's organization is a fact about the run at the time it was made.
 
-### The service role bypasses RLS by design
+`current_admin_org()` and `current_admin_is_host()` join `current_admin_id()` and
+`current_admin_is_owner()` — same construction, security definer, stable, resolving from
+`auth.uid()`.
 
-The worker and the PDF generator use the service role and are not subject to these policies. That is
-correct — they have no viewer. The companion requirement: **every service-role write to `runs` must
-carry `created_by` explicitly.** There is no inference, no default, no fallback to the owner. A
-service-role code path that reaches an insert without an owner in hand must throw, loudly, at that
-point — not silently pick one.
+### Who sees what
 
----
+| | Partner member | Host member | Owner |
+|---|---|---|---|
+| Own org's runs and packages | yes | — | — |
+| All orgs' runs and packages | no | yes | yes |
+| That other organizations exist | no | yes | yes |
+| People, invites, grants | no | **no** | yes |
+| Access log | no | **no** | yes |
 
-## The Documents Check gate — four places
+A host member has the owner's view of the work and none of the owner's controls. People is absent
+from their account menu — absent, not disabled. Enforced by `current_admin_is_owner()`, which
+resolves to exactly one row by the partial unique index, and by `reject_self_promotion()`, already
+built in Stage 1.
 
-These are not redundant. Each covers a case the others don't.
+### Scoping discipline — carried forward from Stages 1 and 1b
 
-1. **Nav item hidden.** Cosmetic only. Never the gate.
-2. **Route guard on the page.** Covers a typed or bookmarked URL.
-3. **API rejects the enqueue when the flag is false. This is the gate of record.** Every other layer
-   can be bypassed; this one cannot.
-4. **Worker re-reads the flag at job start.** A job can sit in the queue across a revocation. The
-   worker checks the current value, not the value at enqueue time, and abandons the job with a
-   recorded reason if it has changed.
+These held and must keep holding through the rework:
 
-Absent, not locked: an admin without the capability sees no Documents Check tab, no greyed item, no
-lock icon, no request-access prompt. A visible-but-disabled control teaches someone that a feature
-exists and that they are excluded from it.
+- **Replace policies, never add alongside.** Multiple permissive policies OR together, so an added
+  policy grants more access and the new one is decorative.
+- **Rewrite from the current definition.** For any `create or replace`, list every migration
+  defining that name and take the last. Grep finds the introducing migration, not the current
+  definition. This has bitten twice — D-040 and 0053 in Stage 1, the D-084 retention clock in
+  Stage 1b — and is now a standing convention in CLAUDE.md.
+- **Re-derive the FK graph rather than trusting a prior enumeration.** Stage 1b's re-derivation
+  found nine tables the first pass missed.
+- **Objects reached by storage key, not foreign key, are part of the graph.** Evidence objects in
+  Stage 1; the documents bucket in Stage 1b.
+- **Content-addressed tables anchor on nothing and leak everything.** `extractions` is keyed by
+  hash and handed over every document's text to anyone who could observe one. Scoped through
+  `document_versions` sharing its `sha256`.
 
----
+### Already scoped, and not revisited by this revision
 
-## Invite flow
+Credentials are stricter than org scoping and stay that way. `credentials`, `credential_deposits`
+and `vault_entries` are readable by nobody through PostgREST — RLS on, no policy, revoked.
+`credential_state` and `credential_access` are owner-only. Widening any of these is its own
+decision.
 
-1. Owner opens People, clicks **Invite admin**, enters name and email, and sets the Documents Check
-   checkbox — unchecked by default, and visible in the form so declining it is a choice rather than
-   an omission.
-2. Row is created with `status = 'invited'`, the flag as set, `invited_by` = owner.
-3. Supabase Auth issues the set-password link. **The mail goes out through Resend from
-   `reports@gomintro.com`**, not a Supabase sender — the domain a recipient sees must be one they
-   recognise.
-4. First successful sign-in binds `auth_user_id`, sets `status = 'active'` and `activated_at`, and
-   writes an `activated` log entry.
-5. The invite is scoped to the address it was sent to. A different address landing on the link gets
-   the not-available page. Same precedent as the response-round Submit gate.
+The documents storage bucket has no policy and is served by signed URLs through the service role.
+That is the correct resting state. Any screen that tries to read it as `authenticated` fails closed
+with no policy to explain why — whoever builds such a screen needs to know this in advance.
 
-Resending an invite reissues the link and logs `invite_resent`. It does not create a second row.
-
----
-
-## Screens
-
-Three, all reviewed and approved as mockups on 2026-09-01. Build to those.
-
-### People (owner only)
-
-Header with the scope sentence — *Admins see only the runs they started. Documents check is off
-unless you turn it on.* — and an **Invite admin** button top right, which reveals the form inline or
-as a small dialog; match whatever the app already does elsewhere.
-
-The list: person, role, run count, Documents Check toggle, overflow menu. Run count sits beside the
-toggle deliberately — it tells the owner whether a grant matters. The owner's own row reads
-**Always on** as plain text rather than a disabled toggle; a disabled control invites a click and
-then explains nothing. Suspended rows stay in the list, greyed, with the run count intact and the
-line *N runs still visible to you*.
-
-Below it, **Recent access changes** — three entries and a **View full log** link. Three is enough to
-answer "did something change recently that explains what I'm seeing." The full log is its own page,
-not a tab: it is somewhere you go with a question and then leave, and it will want filters and a
-date range that don't belong under the people list.
-
-### Home — owner
-
-Top bar: Runs, Documents check, New screen, account menu. The account menu holds People, Rule set
-and Retention. People is not a top-level tab — it is a settings surface touched a few times a
-quarter, and giving it equal weight with the daily working surface is wrong.
-
-The runs list gains two owner-only pieces: a **Run by** column and a filter row
-(Everyone / Mine / one chip per admin, suspended admins marked). **Everyone is the default, not
-Mine** — the owner is the person for whom the full picture is the job, and defaulting to their own
-runs means having to remember to look.
-
-### Home — admin
-
-The same page with four things **absent**, not disabled: the Documents Check tab (unless granted),
-the Run by column, the filter row, and People in the account menu. Rule set stays for everyone — an
-admin needs to know which version their run was scored against — and is read-only.
-
-Under the **Your runs** heading, one line, stated once and never repeated:
-
-> You see the screens you started. Frank, as account owner, can see runs from everyone on the
-> account.
-
-This is disclosure, not warning. The tool's whole posture is that observation is disclosed rather
-than implied; the visibility rules inside the tool should not work differently from the ones it
-applies to merchants.
-
-### Empty state
-
-For a newly activated admin with no runs. Headline names the space, one paragraph carries the
-posture sentence **verbatim from the invitation email** — *Mintro reports what it observed; it does
-not underwrite the account or decide the outcome* — a **New screen** button, and the disclosure line
-repeated at the bottom, because on an empty page there is no list for it to caption.
-
-### Not available
-
-An admin follows a direct link to a run that isn't theirs, or to a Documents Check URL without the
-capability. One plain page: the item isn't available to them, with a link back to their runs.
-
-Not a 404 — that lies about something which plainly exists, and erodes trust in every other message
-the tool shows. And **the page must not echo the merchant domain, the run state, or anything else
-about the record.** Confirming which merchant sits behind an ID is precisely the leak the scoping
-exists to prevent.
+`merchants` is scoped to the owner, or an analyst whose **org** holds a run or a package for that
+merchant. Note the second clause: it was runs only until packages gained an owner, which left an
+analyst able to read a package and not its merchant row.
 
 ---
 
-## Suspended admins and merchant replies
+## Capabilities
 
-A suspended admin's runs stay open. If a merchant replies on one, the response-round notification
-reroutes to the owner silently, and a `replies_rerouted` entry is written to the access log so the
-reroute is recorded rather than invisible.
+Two booleans on `analysts`, both default false, both granted only by the owner, both shown on the
+People screen.
 
-The Submit gate stays scoped to the invited addresses. Nothing about suspension changes what the
-merchant sees or can do.
+### `can_run_documents_check`
 
----
+Gates **creating** a document run. Does not gate reading one — reading is org scope. Revocation is
+forward-only.
 
-## Stages — one commit each, held for Frank's review
+### `can_submit_to_iqwallet`
 
-**Stage 0 — schema.** `admin_users`, `admin_access_log`, `runs.created_by`, the backfill, both
-constraints, the two helper functions. No RLS yet, no UI. Seed the owner row.
+Gates sending a report to IQwallet. A partner without it cannot submit; the work goes to Mintro to
+finish and send.
 
-**Stage 1 — RLS.** Policies on `runs`, on `admin_users`, on `admin_access_log`. Verify the service
-role still works and that every service-role write carries `created_by`.
+Each capability needs the same four gates. They are not redundant — each covers a case the others
+do not:
 
-**Stage 2 — auth and invite.** Supabase Auth wiring, the Resend template, the bind-on-first-sign-in
-path, address scoping.
+1. **Nav or action hidden.** Cosmetic. Never the gate.
+2. **Route guard.** Covers a typed or bookmarked URL.
+3. **API rejects the request. This is the gate of record.** Every other layer can be bypassed.
+4. **Worker re-reads the flag at job start.** A job can sit in the queue across a revocation.
 
-**Stage 3 — owner screens.** People, the full log page, the owner home changes (Run by, filters,
-account menu).
-
-**Stage 4 — admin screens.** Admin home, empty state, not-available page, the disclosure line.
-
-**Stage 5 — Documents Check gates.** All four, plus the reroute path and its log entry.
+Absent, not locked. No greyed control, no lock icon, no request-access prompt. A visible-but-
+disabled control teaches someone that a feature exists and that they are excluded from it.
 
 ---
 
-## Validation — the part that actually matters
+## The Mintro review path
 
-The recurring defect pattern on this project is code that is internally consistent and wrong at a
-boundary: invisible to tests that check the code against itself, caught only by running it against
-the real thing. **Make every control fail in the specific way it exists to catch, before trusting
-it.** A gate that has only ever been tested against itself is not a gate.
+A partner without `can_submit_to_iqwallet` finishes a report and needs a way to say so. Without
+this state that becomes a Slack message and a dropped ball.
 
-Required, each one observed failing:
+Add a run state between complete and sent: **ready for Mintro review**. The partner marks it; it
+surfaces to host-org members; a host member reviews, completes what needs completing, and submits.
 
-1. Revoke Documents Check while a job is queued. The worker must refuse the job, not run it.
-2. Sign in as an admin, follow a direct link to another admin's run. Not-available page, no merchant
-   domain anywhere in the response body.
-3. Suspend an admin with a live session. Their run list goes empty; the owner's view is unchanged.
-4. Call the service-role run-insert path without an owner. It must throw at that point, not default.
-5. Attempt an update and a delete against `admin_access_log` as an authenticated user. Both rejected.
-6. Run the Stage 0 migration against a copy of production with a deliberately orphaned run. The
-   migration must fail rather than complete.
+- Marking writes `marked_ready_for_review` to the access log.
+- Submission by a host member on a partner's run writes `submitted_on_behalf_of`, naming both.
+- The state is visible to the partner — they can see the work is with Mintro, which is the point.
+- Nothing about the report itself changes. The submission is identical whoever sends it.
 
-Test 6 is the one most likely to be skipped and the most expensive to skip.
+---
+
+## Outbound surfaces — where segregation is actually enforced
+
+Everything above is a database boundary. These three are where a leak reaches a person, and they
+are the part of this build carrying real exposure. **Design pass before Stage 3 builds them.**
+
+1. **The invitation email** — `apps/worker/src/invite.ts`.
+2. **The merchant comment page** — `apps/web/src/components/CommentPane.tsx`.
+3. **The PDF participation record.**
+
+All three must identify **Mintro**, never the partner agency. A merchant who forwards a link must
+not thereby tell one agency that another is working the account. Audit every merchant-, agent- and
+IQwallet-facing string for an operator name, address or organization.
+
+IQwallet sees Mintro and nothing below it. No org identity in the report, the email or the
+participation record. Reports are identical regardless of which organization produced them.
+
+---
+
+## Stages
+
+**Stage 0 — schema.** Built, approved as 42fad10. No change.
+
+**Stage 1 — run scoping.** Built, approved as b51b869. The predicate is reworked by Stage 1c; the
+enumeration, the policy list and the service-role fixes all stand.
+
+**Stage 1b — documents and credentials.** Built, approved as c2bb643. Same: predicate reworked,
+everything else stands.
+
+**Stage 1c — organizations.** `organizations` table, `analysts.org_id`, `runs.org_id`,
+`packages.org_id`, all backfilled by the DDL pattern to the host org. `current_admin_org()` and
+`current_admin_is_host()`. Rework `can_read_run` and `can_read_package` to the org predicate.
+
+**Stage 2 — auth and invite.** Supabase Auth, the Resend template, bind-on-first-sign-in, address
+scoping. `analysts.email` gets unique + citext here — it is a Stage 2 dependency, and the invite
+lookup must be case-insensitive at the query regardless of column type. The invite form carries org
+selection and both capability checkboxes.
+
+**Stage 3 — owner screens.** People, with an organization column and both capability toggles; the
+full access log page; the owner home changes. No reassignment surface — dropped with the host-org
+visibility ruling.
+
+**Stage 4 — member screens.** Partner home, host-member home, empty state, not-available page, the
+disclosure line.
+
+**Stage 5 — capability gates and the review path.** All four gates for both capabilities, the
+ready-for-review state, `submitted_on_behalf_of` logging.
+
+One commit per stage, held for review. Every stage reports the full test suite result — file and
+test counts — and is not approved without it.
+
+---
+
+## Validation
+
+The recurring defect on this project is code internally consistent and wrong at a boundary:
+invisible to tests that check the code against itself, caught only against the real thing. **Make
+every control fail in the specific way it exists to catch, before trusting it.**
+
+Two failure modes to guard against by name, both observed on this build:
+
+- **Vacuous passes.** A delete refused against an empty table proves nothing. Confirm the row is
+  visible to someone first, so every zero is a denial rather than an absence.
+- **Guards that report a protected thing as unprotected.** Stage 0's grant-audit regex was
+  unanchored and matched the word "revoke" inside prose.
+
+Required for Stage 1c, each observed, on a Supabase branch off production, with two partner
+organizations and at least two members in one of them:
+
+1. Partner A member reads partner B's run, finding, evidence, screenshot, package, document run,
+   document, extraction and slot — by id, directly. Empty in every case.
+2. Partner A member reads a colleague's run in the same org. Visible.
+3. Host member who is not the owner reads both partners' runs and packages. Visible.
+4. Host member reads `admin_access_log`. Empty. Owner reads it. Populated.
+5. Host member attempts to grant a capability by direct write. Refused by
+   `reject_self_promotion()`.
+6. Partner member attempts to set their own `org_id`. Refused.
+7. Suspended partner member reads their own org's runs. Empty.
+8. Merchant comment link, no session. Loads.
+9. Every Stage 1 and Stage 1b check re-run. Nothing loosened.
+
+Delete the branch afterwards and re-link to production. Never read from a credential store — if
+blocked on access, stop and say what is needed.
 
 ---
 
 ## Decision records
 
-Three, written into DECISIONS.md before any code cites them:
+Written into DECISIONS.md before any code cites them. Numbers assigned at writing.
 
-- **Run ownership and RLS enforcement.** `created_by` not-null, scoping in policies rather than
-  application filters, service role carries the owner explicitly, anonymous token surfaces untouched.
-- **The Documents Check capability and its four gates.** Off by default, absent rather than locked,
-  API enqueue as the gate of record, worker re-read at job start.
+- **Organization as the access boundary.** Org-scoped rather than creator-scoped; `created_by`
+  retained as attribution; org denormalized onto runs and packages because a run's organization is
+  a fact about the run at the time it was made.
+- **Host and partner organizations.** Host members see all work and hold no administrative
+  controls; administration is owner-only; a merchant relationship never crosses an org boundary.
+- **The two capabilities and their four gates.** Off by default, absent rather than locked, API
+  rejection as the gate of record, worker re-read at job start, revocation forward-only.
+- **Documents Check anchors on the package.** Correcting v1 of this spec, which said runs.
+- **Replace-don't-add and current-definition discipline.** Multiple permissive policies OR
+  together; the latest definition of a function or policy is not in the migration that introduced
+  it. Policy-text-asserting tests are load-bearing and must not be softened.
 - **Revocation versus suspension.** Revocation is forward-only; suspension removes all access and
-  retains all runs; nothing is deleted; suspended admins' replies reroute to the owner and are
-  logged.
-
-Numbers are assigned when the records are written. Do not cite a number in code before it exists in
-DECISIONS.md.
+  retains all work; nothing is deleted.

@@ -26,7 +26,7 @@ beforeAll(async () => {
   );
   const analyst = (users[0] as { id: string }).id;
   await schema.query(
-    `insert into public.analysts (id, email, full_name) values ($1, 'ops@mintro.example', 'Ops')`,
+    `insert into public.analysts (id, email, full_name, org_id) values ($1, 'ops@mintro.example', 'Ops', (select id from public.organizations where type = 'host'))`,
     [analyst],
   );
 

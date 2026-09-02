@@ -121,23 +121,28 @@ export async function createSchema(): Promise<SchemaFixture> {
     }
   }
 
-  // The roster the tests act as.
+  // The organizations and the roster the tests act as.
   //
   // Migrations apply to an empty database, so 0055 promotes nobody and 0057 takes its no-runs
   // path. Every run needs an owner from here on (`runs.created_by` is not null with no default),
   // and Stage 1's policies need two distinct actors to be scoped *between* — one admin's run has
   // to be invisible to another admin, and a fixture with a single analyst cannot show that.
   await db.exec(`
+    insert into public.organizations (id, name, type) values
+      ('${PARTNER_A_ORG}', 'Partner A', 'partner'),
+      ('${PARTNER_B_ORG}', 'Partner B', 'partner');
+
     insert into auth.users (id, email) values
       ('${OWNER_ID}', 'owner@example.test'),
       ('${ADMIN_A_ID}', 'admin-a@example.test'),
       ('${ADMIN_B_ID}', 'admin-b@example.test');
 
-    insert into public.analysts (id, email, full_name, active, role, can_run_documents_check, status)
+    insert into public.analysts (id, email, full_name, active, role, can_run_documents_check, can_submit_to_iqwallet, status, org_id)
     values
-      ('${OWNER_ID}',   'owner@example.test',   'Test Owner',   true, 'owner', true,  'active'),
-      ('${ADMIN_A_ID}', 'admin-a@example.test', 'Test Admin A', true, 'admin', false, 'active'),
-      ('${ADMIN_B_ID}', 'admin-b@example.test', 'Test Admin B', true, 'admin', false, 'active');
+      ('${OWNER_ID}',   'owner@example.test',   'Test Owner',   true, 'owner', true,  true,  'active',
+        (select id from public.organizations where type = 'host')),
+      ('${ADMIN_A_ID}', 'admin-a@example.test', 'Test Admin A', true, 'admin', false, false, 'active', '${PARTNER_A_ORG}'),
+      ('${ADMIN_B_ID}', 'admin-b@example.test', 'Test Admin B', true, 'admin', false, false, 'active', '${PARTNER_B_ORG}');
   `);
 
   return {
@@ -169,27 +174,45 @@ export async function createSchema(): Promise<SchemaFixture> {
   };
 }
 
-/** The account owner. Every run belongs to this analyst unless a test says otherwise. */
+/** The account owner, a member of the host organization. */
 export const OWNER_ID = '00000000-0000-4000-8000-000000000001';
-/** Two ordinary admins, so a test can show one cannot see the other's work. */
+/** Two ordinary admins in two DIFFERENT partner organizations, which is the boundary under test. */
 export const ADMIN_A_ID = '00000000-0000-4000-8000-00000000000a';
 export const ADMIN_B_ID = '00000000-0000-4000-8000-00000000000b';
+/** Their organizations. The host org is seeded by 0060 itself and looked up by type. */
+export const PARTNER_A_ORG = '00000000-0000-4000-8000-0000000000a0';
+export const PARTNER_B_ORG = '00000000-0000-4000-8000-0000000000b0';
+
+/** The host organization Mintro, seeded by 0060. Resolved rather than pinned to a literal. */
+export async function hostOrgId(fixture: SchemaFixture): Promise<string> {
+  const [row] = await fixture.query<{ id: string }>(
+    `select id from public.organizations where type = 'host'`,
+  );
+  return row!.id;
+}
 
 /** A merchant and an open run, for tests that need something to hang findings off. */
 export async function seedRun(
   fixture: SchemaFixture,
   domain = 'shop.example',
   createdBy: string = OWNER_ID,
+  orgId?: string,
 ): Promise<{ merchantId: string; runId: string }> {
   const [merchant] = await fixture.query<{ id: string }>(
     `insert into public.merchants (domain) values ($1) returning id`,
     [domain],
   );
 
+  // The run's organization is the creator's, read at seed time — the same thing the worker does,
+  // rather than a literal that could drift from the roster above.
+  const org = orgId ?? (await fixture.query<{ org_id: string }>(
+    `select org_id from public.analysts where id = $1`, [createdBy],
+  ))[0]!.org_id;
+
   const [run] = await fixture.query<{ id: string }>(
-    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by)
-     values ($1, 'public', '2.4.0', 'running', $2) returning id`,
-    [merchant!.id, createdBy],
+    `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by, org_id)
+     values ($1, 'public', '2.4.0', 'running', $2, $3) returning id`,
+    [merchant!.id, createdBy, org],
   );
 
   return { merchantId: merchant!.id, runId: run!.id };

@@ -147,9 +147,15 @@ async function scan(
     // A command-line scan has no signed-in operator, so the owner is resolved and named rather
     // than defaulted. `runs.created_by` carries no default (0057); this is the decision that
     // fills it, and it is printed so the attribution is visible in the log.
-    const createdBy = await ownerAnalystId(supabase);
-    console.log(`  attributed to the account owner (${createdBy})`);
-    const result = await persistRun(supabase, { report, artifacts, runId, createdBy });
+    const owner = await ownerAnalystId(supabase);
+    console.log(`  attributed to the account owner (${owner.id}), organization ${owner.orgId}`);
+    const result = await persistRun(supabase, {
+      report,
+      artifacts,
+      runId,
+      createdBy: owner.id,
+      orgId: owner.orgId,
+    });
     // Read back rather than reported from the writer's own return value. `persistRun` refuses to
     // close an incomplete run, and this confirms from the database that it did close one.
     const after = await assessRun(supabase, runId, { checkObjects: true });

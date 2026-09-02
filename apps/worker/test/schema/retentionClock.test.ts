@@ -31,8 +31,8 @@ async function newPackage(): Promise<string> {
     [`clock-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-     values ($1, 'iqwallet', 'documents-1', $2) returning id`,
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+     values ($1, 'iqwallet', 'documents-1', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchant!.id, OWNER_ID],
   );
   return pkg!.id;
@@ -175,7 +175,7 @@ describe('the number nobody ruled', () => {
     const [user] = await db.query<{ id: string }>(
       `insert into auth.users (email) values ('clock@example.com') returning id`,
     );
-    await db.query(`insert into public.analysts (id, email) values ($1, 'clock@example.com')`, [user!.id]);
+    await db.query(`insert into public.analysts (id, email, org_id) values ($1, 'clock@example.com', (select id from public.organizations where type = 'host'))`, [user!.id]);
     await db.actAs(user!.id);
 
     const [merchant] = await db.query<{ id: string }>(

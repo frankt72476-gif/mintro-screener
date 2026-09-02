@@ -63,6 +63,18 @@ export interface PersistInput {
    */
   readonly createdBy: string;
   /**
+   * The organization the run belongs to.
+   *
+   * `runs.org_id` is not null and carries no default (0060), and it is the read predicate: every
+   * Stage 1c policy resolves visibility through it. It is passed rather than derived from
+   * `createdBy` on purpose — a run's organization is a fact about the run at the time it was made,
+   * and resolving it later through the creator's current row would silently re-attribute old work
+   * when somebody changes organization.
+   *
+   * Required at the type level for the same reason `createdBy` is.
+   */
+  readonly orgId: string;
+  /**
    * Every key the run captured, when that is known separately from `artifacts`.
    *
    * A resume has the key list — it can read the evidence directory — but deliberately carries no
@@ -93,42 +105,51 @@ export interface PersistResult {
  * Throws when there is not exactly one owner. Guessing between two, or inventing one where there
  * are none, is how a run ends up belonging to the wrong person.
  */
-export async function ownerAnalystId(supabase: WorkerSupabase): Promise<string> {
+export async function ownerAnalystId(supabase: WorkerSupabase): Promise<{ id: string; orgId: string }> {
   const { data, error } = await supabase.client
     .from('analysts')
-    .select('id, email')
+    .select('id, email, org_id')
     .eq('role', 'owner');
 
   if (error !== null) {
     throw new Error(`could not resolve the account owner: ${error.message}`);
   }
 
-  const rows = (data ?? []) as { id: string; email: string }[];
+  const rows = (data ?? []) as { id: string; email: string; org_id: string }[];
   if (rows.length !== 1) {
     throw new Error(
       `could not resolve the account owner: ${rows.length} analyst row(s) carry role = 'owner', ` +
         'and exactly one is required. Apply supabase/migrations/0055 and check the roster.',
     );
   }
-  return rows[0]!.id;
+  return { id: rows[0]!.id, orgId: rows[0]!.org_id };
 }
 
-/** Who an existing run already belongs to. Used when resuming: the run's owner does not change. */
-export async function runOwner(supabase: WorkerSupabase, runId: string): Promise<string> {
+/**
+ * Who an existing run already belongs to, and which organization made it.
+ *
+ * Used when resuming. Both are read from the run rather than from the analyst doing the resuming:
+ * a resume must not be able to move a run to another person or another organization, and deriving
+ * either from the caller is exactly how it would.
+ */
+export async function runOwner(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<{ createdBy: string; orgId: string }> {
   const { data, error } = await supabase.client
     .from('runs')
-    .select('created_by')
+    .select('created_by, org_id')
     .eq('id', runId)
     .maybeSingle();
 
   if (error !== null) {
     throw new Error(`could not read the owner of run ${runId}: ${error.message}`);
   }
-  const row = data as { created_by: string } | null;
+  const row = data as { created_by: string; org_id: string } | null;
   if (row === null) {
     throw new Error(`run ${runId} does not exist, so it has no owner to preserve`);
   }
-  return row.created_by;
+  return { createdBy: row.created_by, orgId: row.org_id };
 }
 
 export async function persistRun(
@@ -165,7 +186,14 @@ export async function persistRun(
           'start it.',
       );
     }
-    await insertRun(supabase, runId, merchantId, report, input.createdBy);
+    if (input.orgId.trim() === '') {
+      throw new Error(
+        `refusing to open run ${runId}: no organization was supplied. runs.org_id is not null, ` +
+          'has no default, and is what every read policy scopes on — a run written without one ' +
+          'would be visible to nobody or to everybody, and both are wrong.',
+      );
+    }
+    await insertRun(supabase, runId, merchantId, report, input.createdBy, input.orgId);
   }
 
   try {
@@ -285,11 +313,13 @@ async function insertRun(
   merchantId: string,
   report: ScreeningReport,
   createdBy: string,
+  orgId: string,
 ): Promise<void> {
   const { error } = await supabase.client.from('runs').insert({
     id: runId,
     merchant_id: merchantId,
     created_by: createdBy,
+    org_id: orgId,
     started_at: report.startedAt,
     mode: report.mode,
     ruleset_version: report.rulesetVersion,

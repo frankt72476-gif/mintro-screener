@@ -22,7 +22,7 @@ beforeAll(async () => {
   const [user] = await db.query<{ id: string }>(
     `insert into auth.users (email) values ('exports@example.com') returning id`,
   );
-  await db.query(`insert into public.analysts (id, email, status) values ($1, 'exports@example.com', 'active')`, [user!.id]);
+  await db.query(`insert into public.analysts (id, email, status, org_id) values ($1, 'exports@example.com', 'active', (select id from public.organizations where type = 'host'))`, [user!.id]);
   analyst = user!.id;
   await db.actAs(analyst);
   // Supabase grants `authenticated` everything on `public` and our migrations revoke; PGlite has no
@@ -50,8 +50,8 @@ async function seedPackage(): Promise<string> {
     [`exp-${Math.random().toString(36).slice(2)}.example`],
   );
   const [pkg] = await db.query<{ id: string }>(
-    `insert into public.packages (merchant_id, processor_key, template_version, created_by)
-     values ($1, 'iqwallet', 'documents-1', $2) returning id`,
+    `insert into public.packages (merchant_id, processor_key, template_version, created_by, org_id)
+     values ($1, 'iqwallet', 'documents-1', $2, (select org_id from public.analysts where id = $2)) returning id`,
     [merchant!.id, analyst],
   );
   const [slot] = await db.query<{ id: string }>(
