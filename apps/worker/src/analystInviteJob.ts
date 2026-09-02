@@ -66,6 +66,15 @@ export interface AnalystInviteInput {
   readonly redirectTo: string;
   readonly from: string;
   readonly replyTo?: string;
+  /**
+   * A first invitation, or another link for somebody already on the roster.
+   *
+   * A resend must not try to create the account again — it exists, and `generateLink({type:
+   * 'invite'})` refuses an address that is already registered, which is the defect the Stage 3 gate
+   * found. It mints a `recovery` link instead, which is what a set-a-password link is for an
+   * account that already has one.
+   */
+  readonly kind?: 'invite' | 'resend';
 }
 
 export interface AnalystInviteResult {
@@ -108,17 +117,24 @@ export async function issueAnalystInvitation(
   if (lookupError !== null) {
     throw new Error(`could not check the roster for ${email}: ${lookupError.message}`);
   }
-  if (existing !== null) {
+  const resending = input.kind === 'resend';
+
+  if (existing !== null && !resending) {
     throw new Error(
       `${email} is already on the roster. Re-issuing a link for an existing person is a resend, ` +
         'not an invitation, and does not create a second row.',
     );
   }
+  if (existing === null && resending) {
+    throw new Error(`${email} is not on the roster, so there is no invitation to resend.`);
+  }
 
   // 1. The link, which is also what creates the auth user. See the header: these are one call and
   //    not two, and the returned `user` is where the roster row's id comes from.
   const { data: linkData, error: linkError } = await client.auth.admin.generateLink({
-    type: 'invite',
+    // `invite` creates the account; `recovery` mints a set-a-password link for one that exists.
+    // Asking for `invite` on an existing address is refused outright — the Stage 3 gate found that.
+    type: resending ? 'recovery' : 'invite',
     email,
     options: { redirectTo: input.redirectTo },
   });
@@ -127,7 +143,7 @@ export async function issueAnalystInvitation(
       `could not issue an invitation for ${email}: ${linkError?.message ?? 'no link returned'}`,
     );
   }
-  const analystId = linkData.user.id;
+  const analystId = resending ? (existing as { id: string }).id : linkData.user.id;
 
   // 2. The redirect, verified rather than trusted. A substituted one is silent (see the header).
   const landedOn = linkData.properties.redirect_to;
@@ -140,9 +156,9 @@ export async function issueAnalystInvitation(
     );
   }
 
-  // 3. The roster row, under that id. `status` defaults to 'invited'; `active` defaults true, which
-  //    the 0055 constraint requires of any row that is not suspended.
-  const { error: rowError } = await client.from('analysts').insert({
+  // 3. The roster row, under that id — on a first invitation only. A resend has one already, and
+  //    rewriting it would reset a status somebody may have changed since.
+  const { error: rowError } = resending ? { error: null } : await client.from('analysts').insert({
     id: analystId,
     email,
     full_name: input.fullName,
@@ -182,7 +198,11 @@ export async function issueAnalystInvitation(
   //    way and an access change nobody recorded is the thing the log is for (Stage 0).
   await client
     .from('admin_access_log')
-    .insert({ actor_id: input.invitedBy, subject_id: analystId, action: 'invited' });
+    .insert({
+      actor_id: input.invitedBy,
+      subject_id: analystId,
+      action: resending ? 'invite_resent' : 'invited',
+    });
 
   if (!send.accepted) {
     throw new Error(

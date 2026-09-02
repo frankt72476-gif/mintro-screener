@@ -3258,3 +3258,16 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .invite-caps { border: 0; padding: 0; margin: 0; }
 .invite-caps legend { font-weight: 600; margin-bottom: 0.3rem; }
 .invite-caps label { display: block; font-size: 0.9rem; }
+
+/* ── Whose runs (owner and host members only) ─────────────────────────────────────────────────── */
+.runfilter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.75rem; }
+.runfilter-chip { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.65rem; cursor: pointer;
+  background: none; border: 1px solid var(--line, #d7d4e4); border-radius: 999px; }
+.runfilter-chip.is-on { background: var(--tint, #f4f2fb); border-color: var(--ink, #2c2942);
+  font-weight: 600; }
+.runfilter-count { margin-left: 0.35rem; color: var(--muted, #6d6788); font-size: 0.8rem; }
+/* Marked, never dropped (D-232). */
+.runfilter-chip.is-suspended { opacity: 0.7; }
+.runfilter-susp { margin-left: 0.35rem; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted, #6d6788); }
+.drun-by { color: var(--muted, #6d6788); font-size: 0.85rem; }

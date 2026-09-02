@@ -53,6 +53,8 @@ import {
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
+import { issueAnalystInvitation } from '../src/analystInviteJob.js';
+import { SET_PASSWORD_PATH } from '../src/analystInvite.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
 import { sendRunReport, SentButUnrecordedError } from '../src/sendJob.js';
 import { mailersFor } from '../src/send.js';
@@ -414,6 +416,14 @@ async function main(argv: readonly string[]): Promise<number> {
       const invite = await claimNextInvite(supabase);
       if (invite !== null) {
         await handleInvite(supabase, invite, addresses);
+        continue;
+      }
+
+      // Roster invitations, beside the merchant ones and for the same reason: no browser, a second
+      // of work, and an owner pressing Invite must not delay a queued scan.
+      const rosterInvite = await claimNextAnalystInvite(supabase);
+      if (rosterInvite !== null) {
+        await handleAnalystInvite(supabase, rosterInvite, addresses);
         continue;
       }
 
@@ -1055,6 +1065,133 @@ async function handleInvite(
     await supabase.client
       .from('comment_invites')
       .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .then(() => undefined, () => undefined);
+  }
+}
+
+interface AnalystInviteRequest {
+  readonly id: string;
+  readonly email: string;
+  readonly full_name: string;
+  readonly org_id: string;
+  readonly can_run_documents_check: boolean;
+  readonly can_submit_to_iqwallet: boolean;
+  readonly requested_by: string;
+  readonly kind: 'invite' | 'resend';
+  readonly status: string;
+}
+
+const ANALYST_INVITE_COLUMNS =
+  'id, email, full_name, org_id, can_run_documents_check, can_submit_to_iqwallet, requested_by, kind, status';
+
+/** Same compare-and-swap as the other queues, for the same reasons. */
+async function claimNextAnalystInvite(
+  supabase: WorkerSupabase,
+): Promise<AnalystInviteRequest | null> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+
+  const { data, error } = await supabase.client
+    .from('analyst_invites')
+    .select(ANALYST_INVITE_COLUMNS)
+    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error !== null) {
+    const hint = /analyst_invites/i.test(error.message)
+      ? `
+  The roster invitation queue is created by supabase/migrations/0068_analyst_invite_queue.sql. Apply it.`
+      : '';
+    throw new Error(`could not read the roster invitation queue: ${error.message}${hint}`);
+  }
+
+  const candidate = (data ?? [])[0] as AnalystInviteRequest | undefined;
+  if (candidate === undefined) return null;
+
+  const { data: claimed, error: claimError } = await supabase.client
+    .from('analyst_invites')
+    .update({ status: 'running', claimed_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', candidate.status)
+    .select(ANALYST_INVITE_COLUMNS);
+
+  if (claimError !== null) {
+    throw new Error(`could not claim roster invitation ${candidate.id}: ${claimError.message}`);
+  }
+
+  return ((claimed ?? [])[0] as AnalystInviteRequest | undefined) ?? null;
+}
+
+/**
+ * Issues one roster invitation and records what happened. Never throws.
+ *
+ * ## A refused redirect leaves the request claimable, not failed
+ *
+ * `issueAnalystInvitation` refuses to send when Supabase substituted the redirect — it returns the
+ * project's Site URL silently when a URL is not on the allow list, and a working link to the wrong
+ * place fails at the recipient rather than at us.
+ *
+ * That refusal is a **configuration** problem, not a bad request: the same row will go out
+ * untouched the moment the allow list is corrected. So it is put back to `queued` with the reason
+ * on it rather than marked `failed`, which would need somebody to notice and re-ask. Every other
+ * failure is the request's own and is terminal.
+ */
+async function handleAnalystInvite(
+  supabase: WorkerSupabase,
+  request: AnalystInviteRequest,
+  addresses: MailAddresses,
+): Promise<void> {
+  console.log(`
+roster  ${request.id.slice(0, 8)}  → ${request.email}`);
+
+  try {
+    if (WEB_ORIGIN === undefined) {
+      throw new Error('WEB_ORIGIN is not set, so there is nowhere for the invitation to land');
+    }
+
+    const result = await issueAnalystInvitation(supabase.client, mailersFor().messenger, {
+      email: request.email,
+      fullName: request.full_name,
+      orgId: request.org_id,
+      canRunDocumentsCheck: request.can_run_documents_check,
+      canSubmitToIqwallet: request.can_submit_to_iqwallet,
+      invitedBy: request.requested_by,
+      kind: request.kind,
+      redirectTo: `${WEB_ORIGIN}${SET_PASSWORD_PATH}`,
+      from: addresses.inviteFrom,
+      ...(addresses.inviteReplyTo === undefined ? {} : { replyTo: addresses.inviteReplyTo }),
+    });
+
+    const { error } = await supabase.client
+      .from('analyst_invites')
+      .update({
+        status: 'done',
+        analyst_id: result.analystId,
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', request.id);
+
+    if (error !== null) {
+      console.error(`  could not record the roster invitation outcome: ${error.message}`);
+      return;
+    }
+
+    console.log(`  account ${result.analystId.slice(0, 8)} created, invitation sent`);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    console.error(`  FAILED: ${message}`);
+
+    // The redirect refusal is the one failure that is ours to fix and not the request's to retry.
+    const isRedirect = /would land on/.test(message);
+
+    await supabase.client
+      .from('analyst_invites')
+      .update(
+        isRedirect
+          ? { status: 'queued', claimed_at: null, error: message.slice(0, 2000) }
+          : { status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() },
+      )
       .eq('id', request.id)
       .then(() => undefined, () => undefined);
   }

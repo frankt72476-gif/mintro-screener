@@ -35,6 +35,15 @@ export interface Analyst {
    */
   readonly role: 'owner' | 'admin';
   readonly orgId: string;
+  /**
+   * Whether this person is in the host organisation (D-229).
+   *
+   * Host members see every organisation's work and hold none of the owner's controls, so the run
+   * list's Run by column and filter row are theirs and People is not. Read from the embedded
+   * organisation rather than compared against a known id — there is exactly one host by
+   * `organizations_one_host` (0060), and the type is what says so.
+   */
+  readonly isHost: boolean;
 }
 
 export type AuthState =
@@ -114,7 +123,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
 
       const { data, error } = await client
         .from('analysts')
-        .select('id, email, full_name, role, org_id')
+        .select('id, email, full_name, role, org_id, organizations ( type )')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -131,7 +140,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
         full_name: string | null;
         role: string;
         org_id: string;
+        organizations: { type: string } | { type: string }[] | null;
       };
+      const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
       setState({
         status: 'signed_in',
         analyst: {
@@ -140,6 +151,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }): JS
           fullName: row.full_name,
           role: row.role === 'owner' ? 'owner' : 'admin',
           orgId: row.org_id,
+          isHost: org?.type === 'host',
         },
         client,
       });

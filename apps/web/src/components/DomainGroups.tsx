@@ -114,6 +114,15 @@ function DomainRow({
               <span className="drun-counts">
                 {run.counts.fail} not met · {run.counts.review} unclear
               </span>
+              {/*
+                Run by (D-228, D-233).
+
+                Present only where `analysts_select` resolved a name — a partner reading their own
+                organisation's runs sees their colleagues, and nobody else. Absent rather than a
+                uuid: a uuid in this column looks like information and is not. Resolved by the
+                authenticated assembly and never by the print path.
+              */}
+              {run.runBy !== undefined && <span className="drun-by">{run.runBy}</span>}
               {run.quarantine !== null && <span className="drun-flag">evidence incomplete</span>}
               <button className="btn btn-ghost drun-open" onClick={() => onOpen(run.runId)}>
                 Open

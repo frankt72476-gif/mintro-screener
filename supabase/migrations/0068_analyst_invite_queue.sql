@@ -37,6 +37,15 @@ create table public.analyst_invites (
 
   status       text not null default 'queued'
                check (status in ('queued', 'running', 'done', 'failed')),
+
+  /*
+    A first invitation or another link for somebody already on the roster.
+
+    Two shapes, one queue, because the work is the same: mint a link and send it. What differs is
+    that a resend must not try to create the account again — the roster row exists — and the log
+    line is `invite_resent` rather than `invited` (0056 has carried both since Stage 0).
+  */
+  kind         text not null default 'invite' check (kind in ('invite', 'resend')),
   claimed_at   timestamptz,
   finished_at  timestamptz,
   -- Why it failed, for the owner to read. The send-time redirect guard lands here.

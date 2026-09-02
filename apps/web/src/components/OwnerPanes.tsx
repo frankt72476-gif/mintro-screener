@@ -21,6 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Analyst } from '../lib/auth.js';
 import {
   readRoster,
+  requestResend,
   setCapability,
   setSuspended,
   type RosterEntry,
@@ -136,11 +137,8 @@ export function PeoplePane({
         onAction={(person, action) => {
           if (action === 'suspend') void act(() => setSuspended(client, person.id, true), person.id);
           if (action === 'reinstate') void act(() => setSuspended(client, person.id, false), person.id);
-          if (action === 'resend') {
-            // Resending issues a fresh link, which is the worker's to mint — the browser holds no
-            // service key and must not. Surfaced rather than silently doing nothing.
-            setError('Resending an invitation is issued by the worker; ask for it to be re-sent.');
-          }
+          if (action === 'resend')
+            void act(() => requestResend(client, person, analyst.id), person.id);
         }}
       />
 

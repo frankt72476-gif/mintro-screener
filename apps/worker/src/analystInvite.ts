@@ -30,6 +30,16 @@
 
 import { ACCOUNT_INVITATION_CONTACT_LINE } from './contactLine.js';
 
+/**
+ * Where the invitation lands, appended to `WEB_ORIGIN`.
+ *
+ * Paired with `SET_PASSWORD_PATH` in `apps/web/src/lib/setPasswordRoute.ts`, which is the route
+ * that answers on it. The two cannot import each other — different packages, different bundles —
+ * so they are two constants with one value, and `apps/worker/test/analystInviteJob.test.ts` holds
+ * them to it rather than leaving the pairing to memory.
+ */
+export const SET_PASSWORD_PATH = '/auth/set-password';
+
 export interface InvitationToJoin {
   /**
    * The address this invitation is scoped to. Rendered in the body so the recipient can see which

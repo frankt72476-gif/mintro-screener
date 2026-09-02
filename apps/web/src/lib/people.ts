@@ -158,6 +158,38 @@ export const createPartnerOrg = (
 ): Promise<ActResult & { readonly id?: string }> =>
   call(client, 'create_partner_org', { p_name: name }) as Promise<ActResult & { id?: string }>;
 
+/**
+ * Asks for another link for somebody already on the roster.
+ *
+ * A request, like a first invitation: the browser holds no service key and cannot mint a link. The
+ * drain picks it up, mints a `recovery` link — `invite` is refused for an address that already
+ * exists — and writes `invite_resent`.
+ */
+export async function requestResend(
+  client: SupabaseClient,
+  person: RosterEntry,
+  requestedBy: string,
+): Promise<ActResult> {
+  const { error } = await client.from('analyst_invites').insert({
+    email: person.email,
+    full_name: person.name,
+    org_id: person.orgId,
+    can_run_documents_check: person.canRunDocumentsCheck,
+    can_submit_to_iqwallet: person.canSubmitToIqwallet,
+    requested_by: requestedBy,
+    kind: 'resend',
+    status: 'queued',
+  });
+  if (error !== null) {
+    // The partial unique index refuses a second live request for one address, which is the answer
+    // rather than an error: one is already on its way.
+    return { ok: false, reason: /analyst_invites_one_pending/.test(error.message)
+      ? 'An invitation for this person is already queued.'
+      : error.message };
+  }
+  return { ok: true, changed: true };
+}
+
 export interface OrgOption {
   readonly id: string;
   readonly name: string;

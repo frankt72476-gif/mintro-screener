@@ -66,6 +66,7 @@ import { Rail } from './components/Rail.js';
 import { CommentPane, commentToken } from './components/CommentPane.js';
 import { anonymousClient } from './lib/supabase.js';
 import { PastReports } from './components/PastReports.js';
+import { EVERYONE, type RunFilter } from './lib/runFilter.js';
 import { AttestationForm } from './components/Attestations.js';
 import { recordAnswer, recordComment } from './lib/operatorAnswers.js';
 import type { InFlightRun } from './lib/domainGroups.js';
@@ -410,8 +411,21 @@ function Screener({
   analyst,
 }: {
   readonly client: import('@supabase/supabase-js').SupabaseClient;
-  readonly analyst: { readonly id: string; readonly email: string };
+  readonly analyst: import('./lib/auth.js').Analyst;
 }): JSX.Element {
+  /*
+    Whose runs (D-229).
+
+    The owner and host-org members see every organisation's work, so they get the Run by column and
+    the filter row. A partner gets neither — not a disabled control, not an empty chip list, but no
+    row at all. Their list is already their organisation's by `runs_select`, and a filter naming
+    organisations they must not know exist would be the leak the whole build exists to prevent.
+
+    `seesEveryOrg` is a UI convenience. The database decides what is in the list.
+  */
+  const seesEveryOrg = analyst.role === 'owner' || analyst.isHost === true;
+  const [runFilter, setRunFilter] = useState<RunFilter>(EVERYONE);
+
   const analystEmail = analyst.email;
   const printDomain = useMemo(() => printRequest(), []);
   /** `?report=<domain>` without `print` — the run link an operator notification carries. */
@@ -1038,6 +1052,13 @@ function Screener({
               inFlight={inFlight}
               responded={responded}
               onRescan={rescan}
+              {...(seesEveryOrg
+                ? {
+                    viewer: { id: analyst.id, seesEveryOrg: true },
+                    filter: runFilter,
+                    onFilter: setRunFilter,
+                  }
+                : {})}
               onOpen={(runId) => {
                 setPane('scan');
                 void load(runId);

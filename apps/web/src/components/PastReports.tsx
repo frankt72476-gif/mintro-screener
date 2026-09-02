@@ -19,6 +19,8 @@ import type { RunList } from '../lib/runs.js';
 import type { InFlightRun } from '../lib/domainGroups.js';
 import { groupByDomain } from '../lib/domainGroups.js';
 import { DomainGroups } from './DomainGroups.js';
+import { RunFilterRow } from './RunFilterRow.js';
+import { EVERYONE, applyFilter, orgChips, type RunFilter } from '../lib/runFilter.js';
 
 interface Props {
   /** The read's own result, so a failure can be shown as one (D-213). */
@@ -31,6 +33,17 @@ interface Props {
   readonly responded?: ReadonlySet<string>;
   /** Queues a new run for a domain. The agent presses it where she is already looking. */
   readonly onRescan?: (domain: string) => void;
+  /**
+   * Whose runs, for the owner and host members (D-229).
+   *
+   * Absent for a partner, and absent is the whole of it: no filter row, no Run by column, no chips
+   * naming organisations they must not learn exist. Stage 4 builds their home; this is what it
+   * does not get.
+   */
+  readonly viewer?: { readonly id: string; readonly seesEveryOrg: boolean };
+  readonly filter?: RunFilter;
+  readonly onFilter?: (next: RunFilter) => void;
+  readonly suspendedOrgIds?: readonly string[];
 }
 
 export function PastReports({
@@ -40,6 +53,10 @@ export function PastReports({
   inFlight = [],
   responded = new Set<string>(),
   onRescan,
+  viewer,
+  filter = EVERYONE,
+  onFilter,
+  suspendedOrgIds = [],
 }: Props): JSX.Element {
   /*
     A failed read is shown as one, never as an empty list (D-213).
@@ -77,7 +94,10 @@ export function PastReports({
     );
   }
 
-  const groups = groupByDomain(listing.runs, inFlight, responded);
+  const showsFilter = viewer?.seesEveryOrg === true;
+  const visible = showsFilter ? applyFilter(listing.runs, filter, viewer.id) : listing.runs;
+  const chips = showsFilter ? orgChips(listing.runs, suspendedOrgIds) : [];
+  const groups = groupByDomain(visible, inFlight, responded);
 
   return (
     <div>
@@ -87,6 +107,9 @@ export function PastReports({
         Every merchant this account can read, most recently active first. Re-scanning adds a run; it
         never replaces one, so a merchant's runs stack up under its name.
       </p>
+      {showsFilter && onFilter !== undefined && (
+        <RunFilterRow chips={chips} filter={filter} onChange={onFilter} />
+      )}
       <div className="card">
         <DomainGroups
           groups={groups}
