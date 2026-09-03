@@ -61,11 +61,14 @@ const merchantBox = (_f: ReportFinding, _o?: number, reference?: string): JSX.El
       ),
     ),
     createElement('textarea', { className: 'input cbox-input respond-t' }),
-    createElement(
-      'div',
-      { className: 'respond-foot' },
-      createElement('button', { className: 'btn btn-ghost' }, 'Add response'),
-    ),
+    /*
+      No footer and no button.
+
+      The merchant's box saves on blur and the page carries one Save; a per-field button was tried
+      under emphasis D and removed, because a control that does what has already happened teaches a
+      merchant their words are unsaved until they press it. The footer appears only once there is a
+      confirmation to put in it.
+    */
   );
 
 const staffBox = (_f: ReportFinding, _o?: number, reference?: string): JSX.Element =>
@@ -132,19 +135,39 @@ describe('the D structure, on both branches', () => {
     ['staff', staffBox],
   ] as const;
 
-  it.each(cases)('%s: renders the block, header, textarea and button', (_name, box) => {
+  /*
+    What both branches share is the emphasis: the block, the rail, the labelled header, the field.
+    The controls beneath differ and always did — an analyst commits an act ("Record on their
+    behalf"), a merchant's text is already saved by the time they look away.
+  */
+  it.each(cases)('%s: renders the block, the labelled header and the field', (_name, box) => {
     const markup = render(box);
     expect(markup).toContain('class="respond');
     expect(markup).toContain('respond-head');
     expect(markup).toContain('respond-label');
     expect(markup).toContain('respond-t');
-    expect(markup).toContain('respond-foot');
+  });
+
+  it('gives the merchant NO per-field button, which is the autosave decision', () => {
+    /*
+      The assertion that would have failed the day emphasis D shipped with one. "Save response" was
+      once the only way to store a field and was removed for it; autosave replaced it, and a button
+      that duplicates an automatic save is a control someone can believe is load-bearing.
+    */
+    const markup = render(merchantBox);
+    expect(markup).not.toContain('Add response');
+    expect(markup).not.toMatch(/<button[^>]*>\s*(Add|Save|Submit)/);
+  });
+
+  it('keeps the analyst’s button, which commits an act rather than confirming a save', () => {
+    const markup = render(staffBox);
     expect(markup).toContain('<button');
+    expect(markup).toContain('Record on their behalf');
   });
 
   it('gives the merchant their own wording and not the operator’s', () => {
     const markup = render(merchantBox);
-    expect(markup).toContain('Add response');
+    expect(markup).toMatch(/Respond to [A-Z]+-\d{3}/);
     expect(markup).not.toContain('Record on their behalf');
     expect(markup).not.toContain('on the merchant’s behalf');
   });
@@ -203,7 +226,7 @@ describe('the print path has no respond apparatus', () => {
       } as never),
     );
     expect(markup).not.toContain('respond-foot');
-    expect(markup).not.toContain('Add response');
+    expect(markup).not.toContain('respond-t');
     expect(markup).not.toContain('Record on their behalf');
   });
 

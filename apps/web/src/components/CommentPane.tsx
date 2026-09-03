@@ -865,7 +865,6 @@ function OpenReport({
               })}
           eyeCommentBox={() => (
             <CommentBox
-              onSubmit={() => autosave(EYE_TEST_SUBJECT, undefined)}
               body={bodyOf(EYE_TEST_SUBJECT, undefined)}
               onChange={(next) =>
                 setDrafts((existing) => new Map(existing).set(keyOf(EYE_TEST_SUBJECT, undefined), next))
@@ -880,7 +879,6 @@ function OpenReport({
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
               {...(reference === undefined ? {} : { reference })}
-              onSubmit={() => autosave(finding.ruleId, ordinal)}
               body={bodyOf(finding.ruleId, ordinal)}
               onChange={(next) =>
                 setDrafts((existing) => new Map(existing).set(keyOf(finding.ruleId, ordinal), next))
@@ -1190,7 +1188,6 @@ function CommentBox({
   existing,
   identified,
   reference,
-  onSubmit,
 }: {
   /**
    * What is in the box, held by the page (D-147).
@@ -1215,13 +1212,6 @@ function CommentBox({
    * test, which answers a read rather than a finding (D-203).
    */
   readonly reference?: string;
-  /**
-   * Saves this field now.
-   *
-   * The same call `onBlur` makes, offered as a button — see the footer note. Optional so the eye
-   * test's box, which the page saves the same way, need not pass a second handler.
-   */
-  readonly onSubmit?: () => void;
 }): JSX.Element {
   return (
     /*
@@ -1304,31 +1294,27 @@ function CommentBox({
       )}
 
       {/*
-        A button again — and the reason it was removed no longer applies.
+        No button here, and that remains the change rather than an omission.
 
-        It used to carry "Save response" as the ONLY way to store a field, which made saving a
-        per-field act somebody could forget on the field they cared about most. Autosave on blur
-        closed that, and the page still carries one Save for the whole document. So this is a
-        redundant affordance rather than a trap: it triggers the same save `onBlur` already makes,
-        and a merchant who never presses it loses nothing.
+        The box used to carry "Save response", which made saving a per-field act somebody could
+        forget on the field they cared about most. It saves when the field loses focus, and the page
+        carries one Save for the whole document — so there is nothing in this box a person has to
+        remember to press.
 
-        Kept ghost, not filled. The rail is the only colour in this block (D-201).
+        Emphasis D was built with an "Add response" button here and it came straight back out. It
+        reversed the decision above for no gain: autosave had already stored the text, the page Save
+        was already there, and a second control that does what has just happened anyway teaches a
+        merchant that their words are not saved until they press something. **Nothing in D depends
+        on it** — the rail, the surface shift and the labelled header carry the emphasis, and the
+        block measures identically without it.
 
         The confirmation stays local, because *this field is stored* is a fact about this field.
       */}
-      <div className="respond-foot">
-        {onSubmit !== undefined && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={!identified || body.trim() === ''}
-            onClick={onSubmit}
-          >
-            Add response
-          </button>
-        )}
-        {savedAt !== undefined && <span className="respond-note">Saved · {formatClock(savedAt)}</span>}
-      </div>
+      {savedAt !== undefined && (
+        <div className="respond-foot">
+          <span className="respond-note">Saved · {formatClock(savedAt)}</span>
+        </div>
+      )}
     </div>
   );
 }
