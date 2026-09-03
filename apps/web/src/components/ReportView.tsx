@@ -208,13 +208,15 @@ interface Props {
    * the eye-test panel. A response to an impression is not evidence, and nothing counts, scores or
    * states it as one.
    *
-   * `ordinal` is the rubric id's own number, which is what the reply is stored under — stable where
-   * `number` is a display pointer that moves with the report's contents.
+   * `ordinal` is the rubric id's own number, which is what the reply is stored under.
+   *
+   * **No display number is passed** (D-251). It used to be, and both callers painted it in the box
+   * header — the same number twice on one concern. The line carries it; a box that cannot be handed
+   * one cannot repeat it.
    */
   readonly eyeLineCommentBox?: (line: {
     readonly rubricId: string;
     readonly ordinal: number;
-    readonly number: number;
   }) => JSX.Element | null;
   readonly eyeResponses?: readonly MerchantComment[];
   /**
@@ -1143,7 +1145,6 @@ function EyeTestPanel({
   readonly lineCommentBox?: (line: {
     readonly rubricId: string;
     readonly ordinal: number;
-    readonly number: number;
   }) => JSX.Element | null;
   /** What the merchant wrote back. Rendered on every surface, including the PDF (D-203). */
   readonly responses?: readonly MerchantComment[];
@@ -1413,7 +1414,6 @@ function EyeTestPanel({
             {lineCommentBox?.({
               rubricId: verdict.id,
               ordinal: eyeLineOrdinal(verdict.id),
-              number: numbering.forEyeLine(verdict.id),
             })}
           </li>
         ))}

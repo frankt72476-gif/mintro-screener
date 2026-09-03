@@ -157,7 +157,36 @@ const ROW_SELECTORS = {
 } as const;
 
 describe('every section is in the sequence (D-250)', () => {
-  const markup = (): string => render(REPORTS[0]![1], { eyeTest: EYE_TEST, attestations: ATTESTATIONS });
+  /*
+    Rendered WITH the per-line boxes, because that is what a reader gets (D-251).
+
+    The first version of this guard rendered without `eyeLineCommentBox`, so the eye-test panel had
+    no response boxes in it — and when those boxes each painted a second chip for a line that already
+    had one, the count still matched and this test still passed. It was checking a render shape no
+    surface produces: the merchant page and the analyst report both pass a box builder.
+
+    A guard that renders less than production is a guard with a hole exactly the size of what it
+    left out. Both callers are represented here now.
+  */
+  const markup = (): string =>
+    render(REPORTS[0]![1], {
+      eyeTest: EYE_TEST,
+      attestations: ATTESTATIONS,
+      eyeLineCommentBox: (line: { rubricId: string; ordinal: number }) =>
+        createElement(
+          'div',
+          { className: 'respond', 'data-line': line.rubricId },
+          createElement('span', { className: 'respond-label' }, 'Record the merchant’s plan for this'),
+          createElement('textarea', { className: 'input respond-t' }),
+        ),
+      commentBox: (_f: unknown, _o?: number, reference?: string) =>
+        createElement(
+          'div',
+          { className: 'respond' },
+          createElement('span', { className: 'respond-label' }, `Respond to ${reference ?? ''}`),
+          createElement('textarea', { className: 'input respond-t' }),
+        ),
+    });
 
   it('renders all five sections, so a sixth cannot arrive unnoticed', () => {
     /*
@@ -174,6 +203,16 @@ describe('every section is in the sequence (D-250)', () => {
       /data-section="review"/.test(m),
     ];
     expect(sections.filter(Boolean)).toHaveLength(5);
+  });
+
+  it('paints each number exactly once, even where a row carries a response box', () => {
+    /*
+      The bug this is written for. An eye-test line and its box each drew from the sequence with the
+      same key, so the number was right and was painted twice — 68 chips over 66 numbers, with 6 and
+      7 doubled. Not an inflated sequence; a repeated one, which reads as two things to point at.
+    */
+    const numbers = numbersIn(markup());
+    expect(new Set(numbers).size, 'a number is painted more than once').toBe(numbers.length);
   });
 
   it('gives every referenceable row exactly one chip', () => {

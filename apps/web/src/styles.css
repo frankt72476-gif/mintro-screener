@@ -3433,10 +3433,13 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 /* A per-line response inside the rubric list: the same block, indented under the line it answers. */
 .eye-mr { display: block; margin-top: var(--s2); }
 
-/* The rubric list is a two-column grid (verdict word · question), so anything that answers a whole
-   line spans both rather than landing in the question column. */
+/* The rubric list is a two-column grid: the verdict word, then everything about the line.
+   `1 / -1` was the first attempt and it aligned the box with the VERDICT rather than with the line
+   it answers — chip, question and reason all sat at the question column and the box started 94px to
+   their left. Column 2 instead, which is where a finding's box sits relative to its own title:
+   chip, text and box on one left edge (D-251). */
 .eye-list li > .respond,
-.eye-list li > .eye-mr { grid-column: 1 / -1; }
+.eye-list li > .eye-mr { grid-column: 2; }
 
 /* The attestation row is a flex line; the chip sits with the mark rather than stretching. */
 .att-n { flex: 0 0 auto; align-self: baseline; margin-right: var(--s2); }

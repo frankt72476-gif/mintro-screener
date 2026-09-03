@@ -876,7 +876,6 @@ function OpenReport({
             <CommentBox
               key={line.rubricId}
               reference={`${line.rubricId} · Mintro’s read`}
-              number={line.number}
               label="Your plan for this"
               body={bodyOf(EYE_TEST_SUBJECT, line.ordinal)}
               onChange={(next) =>
@@ -1213,7 +1212,6 @@ function CommentBox({
   existing,
   identified,
   reference,
-  number,
   label,
 }: {
   /**
@@ -1239,8 +1237,6 @@ function CommentBox({
    * test, which answers a read rather than a finding (D-203).
    */
   readonly reference?: string;
-  /** The report-wide pointer (D-248). Prominent; the reference is the quiet tag beside it. */
-  readonly number?: number;
   /**
    * Overrides the header wording.
    *
@@ -1285,10 +1281,9 @@ function CommentBox({
 
         Ink, not accent — the rail carries the colour and a coloured heading would be a second claim.
       */}
-      <label className="flabel respond-head" htmlFor={`c-${number ?? existing.length}`}>
+      <label className="flabel respond-head" htmlFor={`c-${reference ?? existing.length}`}>
         <span className="respond-icon" aria-hidden="true">✎</span>
-        {/* The number a person says, before the words (D-248). */}
-        {number !== undefined && <span className="ref-n">{number}</span>}
+        {/* No number here (D-251) — the line above carries it. See `RecordBox`. */}
         <span className="respond-label">
           {label ??
             (existing.length > 0
@@ -1326,7 +1321,7 @@ function CommentBox({
       */}
       <textarea
         className="input cbox-input respond-t"
-        id={`c-${number ?? existing.length}`}
+        id={`c-${reference ?? existing.length}`}
         rows={4}
         value={body}
         disabled={!identified}

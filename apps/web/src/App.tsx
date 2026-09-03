@@ -373,7 +373,6 @@ function AnalystWorkspace(): JSX.Element {
 function RecordBox({
   label,
   reference,
-  number,
   value,
   savedAt,
   onChange,
@@ -387,8 +386,6 @@ function RecordBox({
    * (D-203). The header then carries the label alone, which already says what is being answered.
    */
   readonly reference?: string;
-  /** The report-wide pointer (D-248). Prominent; the reference is the quiet tag beside it. */
-  readonly number?: number;
   readonly value: string;
   readonly savedAt: string | undefined;
   readonly onChange: (next: string) => void;
@@ -401,8 +398,14 @@ function RecordBox({
     <div className="respond recbox">
       <div className="respond-head">
         <span className="respond-icon" aria-hidden="true">✎</span>
-        {/* The number a person says, before the words (D-248). */}
-        {number !== undefined && <span className="ref-n">{number}</span>}
+        {/*
+          No number here (D-251).
+
+          The line this box answers already carries one, a few pixels above. A chip in the header
+          repeated it — the same number twice on one concern, which reads as two things to point at
+          and is the first thing anybody asked about. The number belongs once, on the row; the header
+          says what the box is for and the quiet reference says what it is filed under.
+        */}
         <span className="respond-label">{label}</span>
         {reference !== undefined && <span className="respond-ref">{reference}</span>}
       </div>
@@ -1334,13 +1337,11 @@ function Screener({
                       eyeLineCommentBox: (line: {
                         readonly rubricId: string;
                         readonly ordinal: number;
-                        readonly number: number;
                       }) => (
                         <RecordBox
                           key={`rec-eye-${line.rubricId}`}
                           label="Record the merchant’s plan for this"
                           reference={`${line.rubricId} · Mintro’s read`}
-                          number={line.number}
                           value={recordedDrafts.get(`subject:eye-test:${line.ordinal}`) ?? ''}
                           savedAt={recordedSaved.get(`subject:eye-test:${line.ordinal}`)}
                           onChange={(next: string) =>

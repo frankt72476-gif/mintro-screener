@@ -16038,3 +16038,56 @@ the chip removed — and the chip made three overlapping things where there had 
 
 `minmax(82px, max-content)`: the marks stay aligned where they fit and the track grows for the one
 label that does not.
+
+---
+
+## D-251 — The number belongs once, and a guard that renders less than production has a hole
+**2026-09-02 · engineering · `apps/web/src/components/ReportView.tsx`, `apps/web/src/styles.css`, `apps/web/test/numbering.test.ts`**
+
+Two defects on the eye-test panel, both from D-249/D-250, both found by looking at a live report.
+
+### The number was painted twice, not allocated twice
+
+Measured before touching anything: **68 chips over 66 distinct numbers, duplicates `6` and `7`** —
+exactly the two rubric lines — and the underlying sequence clean `1..66` with no gaps.
+
+So the line and its response box both called `numbering.forEyeLine(verdict.id)` with the *same key*,
+and `allocate` is idempotent: one slot, one number, two chips. The sequence was never inflated and
+there were no hidden doubles. Worth stating precisely, because the two readings have different
+fixes and only one of them is a data problem — this was the cosmetic one.
+
+The fix is not to stop passing the number, it is to **stop being able to pass it**:
+`eyeLineCommentBox` no longer receives one. A box that cannot be handed a display number cannot
+repeat it, where a box that merely *should not use* one is a comment somebody has to obey. The
+respond header keeps the label and the quiet reference; the row above carries the number.
+
+### The guard had a hole the size of what it left out
+
+D-250's count guard rendered with `eyeTest` and `attestations` and **no `eyeLineCommentBox`**. So the
+panel had no response boxes, the second chip did not exist in the tested render, and `chips == rows`
+passed while production painted 68.
+
+It was checking a render shape no surface produces: the merchant page and the analyst report both
+pass a box builder. **A guard that renders less than production has a hole exactly the size of what
+it left out** — and this one's hole was in the section the same commit had just changed, which is the
+worst place for it.
+
+It now renders both box builders, and carries a second assertion — every number painted exactly
+once — because the count check alone cannot tell a repeated number from an extra row. Reinstating the
+duplicate chip fails three assertions, including *"a number is painted more than once: expected 63 to
+be 65"*.
+
+### The box was aligned to the wrong column
+
+`.eye-list li` is `82px 1fr`: the verdict word, then everything about the line. The response box was
+`grid-column: 1 / -1`, which was right about not landing in the question cell and wrong about
+alignment — measured at `left 0` while the chip, the question and the reason all sat at `left 94`.
+Three things on one edge and the box 94px to their left.
+
+`grid-column: 2`. Measured after: chip, question, reason and box all at `left 94`, which is the
+pattern a finding row already has — its chip, title and box share one left edge at 0.
+
+**Both were invisible to the unit tests and visible at a glance in the browser.** That is now four in
+this cluster: `.na`, `.respond` inheriting `.cbox`'s border, the ellipse chip and the mark overflow,
+and this. The common shape is a rule that is correct in isolation and wrong in composition, and the
+only thing that finds them is rendering the built artifact and measuring it.
