@@ -16091,3 +16091,58 @@ pattern a finding row already has — its chip, title and box share one left edg
 this cluster: `.na`, `.respond` inheriting `.cbox`'s border, the ellipse chip and the mark overflow,
 and this. The common shape is a rule that is correct in isolation and wrong in composition, and the
 only thing that finds them is rendering the built artifact and measuring it.
+
+---
+
+## D-252 — The numbers were on the one surface nobody reads, and the guard was green about it
+**2026-09-03 · engineering · `apps/web/src/components/Attestations.tsx`, `apps/web/test/numbering.test.ts`**
+
+Operational questions rendered without numbers on the live report while the suite — including
+D-250's count guard and D-251's painted-once assertion — stayed green.
+
+### Two components emit `att-row`, and only one was numbered
+
+| component | emits | numbered | rendered by |
+|---|---|---|---|
+| `AttestationRow` (in `AttestationSection`) | `att-row att-{outcome}` | yes, since D-250 | the print route only |
+| `AttestationField` (in `AttestationForm`) | `att-row att-field` | **no** | the analyst report **and** the merchant page |
+
+`ReportView` reads `questionsForm ?? <AttestationSection …>`, and both real surfaces pass a form —
+`App.tsx` for the analyst and `CommentPane.tsx` for the merchant. Only the print route falls through
+to the section. **So the numbers existed exactly where nobody reads them**, on the one path slated
+for removal.
+
+### The guard was green because it rendered the shape nobody sees
+
+Its referenceable set did include operational questions — `att-row` was in the selector list and
+matched two rows. It passed `attestations` and **no `questionsForm`**, so `ReportView` took the
+section branch, the rows it counted were `AttestationRow`s, and those were numbered.
+
+This is the third time the same hole has produced a green suite over a real defect, and the shape is
+identical each time: **the guard omits a prop that every real caller supplies.** `eyeLineCommentBox`
+in D-251, `questionsForm` here. A guard that renders less than production is green about the
+difference, and the difference is where the bug lives.
+
+The guard now passes a real `AttestationForm`. Against the unfixed tree it fails with *"a
+referenceable row rendered without a number: expected 60 to be 62"* — which is what it should have
+said a commit ago.
+
+### The rule this leaves behind
+
+**A render guard must be given every prop a production caller gives the component.** Not a
+representative subset, not the ones the test needs to reach the assertion — all of them, because the
+one that is missing is the one whose branch goes unchecked. Where two branches exist, both belong in
+the guard: this one now renders the form and the section is still reachable by the print path it
+serves.
+
+### Two things found while fixing it
+
+**`AttestationForm` reads `question.id`; the resolved read-only row reads `question.questionId`.**
+Two names for the identifier of one thing, which the first fixture got wrong — giving both rows the
+key `attestation:undefined` and therefore the same number, `6`. Caught by D-251's painted-once
+assertion, which is the first time one of these guards caught a defect in a test rather than in the
+product. The keys are namespaced on the same value, so both shapes of one question take one number.
+
+**`NotCheckedSection` renders `<li>` lines with no numbers** and is in neither the selector list nor
+the section count. Whether "what was not checked" is referenceable is a product question, still open,
+and recorded here so the next person meets it as a question rather than as an absence.

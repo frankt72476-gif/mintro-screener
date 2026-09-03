@@ -570,9 +570,24 @@ function AttestationField({
     if (failure === null && outcome === 'answered') setBody('');
   };
 
+  /*
+    The same pool every other referenceable line draws from (D-248, D-252).
+
+    `AttestationRow` — the read-only shape — was numbered and this one was not, and this is the shape
+    both real surfaces render: `App.tsx` and `CommentPane.tsx` each pass a `questionsForm`, so the
+    section only appears on the print route. The numbers existed exactly where nobody reads them.
+
+    Keyed by `questionId` like the read-only row, so the two shapes of one question take the same
+    key and neither can hand out a second number for it.
+  */
+  const number = useLineNumber(`attestation:${questionId}`);
+
   return (
     <li className="att-row att-field">
-      <p className="att-text">{question}</p>
+      <p className="att-text">
+        <span className="ref-n att-n">{number}</span>
+        {question}
+      </p>
 
       {sent !== undefined && (
         <>

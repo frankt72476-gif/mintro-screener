@@ -18,6 +18,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync, readdirSync } from 'node:fs';
 import { ReportView } from '../src/components/ReportView.js';
+import { AttestationForm } from '../src/components/Attestations.js';
 import { createNumbering, eyeLineOrdinal } from '../src/lib/numbering.js';
 import type { ScreeningReport } from '@mintro/engine';
 
@@ -47,6 +48,15 @@ const EYE_TEST = {
 
 /** How many rubric lines the fixture renders. */
 const EYE_LINES = 3;
+
+/** What `AttestationForm` takes: the questions themselves. */
+const ATTESTATION_QUESTIONS = [
+  // `id`, not `questionId`: `AttestationForm` reads `question.id` where the resolved read-only row
+  // reads `question.questionId`. A fixture using the wrong one gives every row the same key, which
+  // is how the first version of this made both questions number 6.
+  { id: 'OPS-01', question: 'Who fulfils orders?', prompt: 'Who fulfils orders?' },
+  { id: 'OPS-02', question: 'Where is stock held?', prompt: 'Where is stock held?' },
+] as never;
 
 /** Two operational questions, so the fourth structure on the page really renders rows. */
 const ATTESTATIONS = {
@@ -153,6 +163,7 @@ describe('the number sits beside the code, not instead of it', () => {
 const ROW_SELECTORS = {
   finding: /<div class="find [^"]*"/g,
   eyeLine: /<li key[^>]*data-verdict=|<li data-verdict=/g,
+  // Both shapes: `att-row att-{outcome}` from the section, `att-row att-field` from the form.
   attestation: /<li class="att-row /g,
 } as const;
 
@@ -172,6 +183,23 @@ describe('every section is in the sequence (D-250)', () => {
     render(REPORTS[0]![1], {
       eyeTest: EYE_TEST,
       attestations: ATTESTATIONS,
+      /*
+        The operational questions as PRODUCTION renders them (D-252).
+
+        `ReportView` reads `questionsForm ?? <AttestationSection …>`, and **both real surfaces pass a
+        form** — `App.tsx` for the analyst report and `CommentPane.tsx` for the merchant page. Only
+        the print route falls through to the section.
+
+        This guard passed `attestations` and no form, so it rendered the section — the one shape that
+        was numbered, and the one shape a person never sees. Same hole as the missing
+        `eyeLineCommentBox` one commit earlier: a prop every real caller supplies, omitted here.
+      */
+      questionsForm: createElement(AttestationForm, {
+        questions: ATTESTATION_QUESTIONS,
+        answers: new Map(),
+        identified: true,
+        onAnswer: async () => null,
+      } as never),
       eyeLineCommentBox: (line: { rubricId: string; ordinal: number }) =>
         createElement(
           'div',
