@@ -356,14 +356,36 @@ function AnalystWorkspace(): JSX.Element {
  * what you have already written; this one says whose answer is being written down and for whom.
  * Sharing a component would have meant one of the two lying about who is typing.
  */
+/**
+ * The respond zone, on the operator's side of it (emphasis D).
+ *
+ * Same block as the merchant's `CommentBox` — surface shift, top border, 3px rail, labelled header,
+ * textarea, button — and **deliberately different wording**. An analyst typing here is putting words
+ * into a document that reaches an underwriter on somebody else's behalf, and every string says so.
+ * The merchant's box says *Respond to*; this one says *Record the merchant's answer*.
+ *
+ * The rail is the only colour and never a fill (D-201); see `.respond` in the stylesheet.
+ *
+ * **No operator identity renders here** (D-233). The zone shows the finding's reference and the
+ * standing note about whose statement it becomes — never the recorder's address. `recorded_by_email`
+ * is pinned by trigger on the row and read by the internal assembly, not by this surface.
+ */
 function RecordBox({
   label,
+  reference,
   value,
   savedAt,
   onChange,
   onSave,
 }: {
   readonly label: string;
+  /**
+   * The finding's own name — `COA-002 · 3 of 5` (D-063).
+   *
+   * Absent for the eye test, which answers a read rather than a finding and has no rule id to name
+   * (D-203). The header then carries the label alone, which already says what is being answered.
+   */
+  readonly reference?: string;
   readonly value: string;
   readonly savedAt: string | undefined;
   readonly onChange: (next: string) => void;
@@ -373,16 +395,20 @@ function RecordBox({
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
-    <div className="recbox">
-      <label className="recbox-l">{label}</label>
+    <div className="respond recbox">
+      <div className="respond-head">
+        <span className="respond-icon" aria-hidden="true">✎</span>
+        <span className="respond-label">{label}</span>
+        {reference !== undefined && <span className="respond-ref">{reference}</span>}
+      </div>
       <textarea
-        className="recbox-t"
+        className="input respond-t"
         rows={2}
         value={value}
         placeholder="What the merchant told you"
         onChange={(event) => onChange(event.target.value)}
       />
-      <div className="recbox-foot">
+      <div className="respond-foot">
         <button
           className="btn btn-ghost"
           disabled={busy || value.trim() === ''}
@@ -402,7 +428,7 @@ function RecordBox({
           An operator writing here is putting words into a document that reaches an underwriter, and
           the surface should say so while she types rather than only after (D-212).
         */}
-        <span className="recbox-note">
+        <span className="respond-note">
           {problem ?? (savedAt === undefined ? 'Recorded as yours, on the merchant’s behalf.' : 'Recorded.')}
         </span>
       </div>
@@ -1265,10 +1291,11 @@ function Screener({
                         `ReportView` already accepted these; nothing rendered them for an analyst.
                         What they write is attributed to them and never to the merchant.
                       */
-                      commentBox: (finding: ReportFinding, ordinal?: number) => (
+                      commentBox: (finding: ReportFinding, ordinal?: number, reference?: string) => (
                         <RecordBox
                           key={`rec-${finding.ruleId}-${ordinal ?? 'x'}`}
                           label="Record the merchant’s answer"
+                          {...(reference === undefined ? {} : { reference })}
                           value={recordedDrafts.get(`${finding.ruleId}::${ordinal ?? 'x'}`) ?? ''}
                           savedAt={recordedSaved.get(`${finding.ruleId}::${ordinal ?? 'x'}`)}
                           onChange={(next: string) =>

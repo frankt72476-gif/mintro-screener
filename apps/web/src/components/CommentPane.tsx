@@ -865,6 +865,7 @@ function OpenReport({
               })}
           eyeCommentBox={() => (
             <CommentBox
+              onSubmit={() => autosave(EYE_TEST_SUBJECT, undefined)}
               body={bodyOf(EYE_TEST_SUBJECT, undefined)}
               onChange={(next) =>
                 setDrafts((existing) => new Map(existing).set(keyOf(EYE_TEST_SUBJECT, undefined), next))
@@ -875,9 +876,11 @@ function OpenReport({
               identified={identity !== null}
             />
           )}
-          commentBox={(finding, ordinal) => (
+          commentBox={(finding, ordinal, reference) => (
             <CommentBox
               key={`${finding.ruleId}-${ordinal ?? 'x'}`}
+              {...(reference === undefined ? {} : { reference })}
+              onSubmit={() => autosave(finding.ruleId, ordinal)}
               body={bodyOf(finding.ruleId, ordinal)}
               onChange={(next) =>
                 setDrafts((existing) => new Map(existing).set(keyOf(finding.ruleId, ordinal), next))
@@ -1186,6 +1189,8 @@ function CommentBox({
   savedAt,
   existing,
   identified,
+  reference,
+  onSubmit,
 }: {
   /**
    * What is in the box, held by the page (D-147).
@@ -1203,9 +1208,30 @@ function CommentBox({
   readonly existing: readonly MerchantComment[];
   /** Until someone says who they are, the box is readable but not writable. */
   readonly identified: boolean;
+  /**
+   * The finding's own name — `COA-002 · 3 of 5` (D-063).
+   *
+   * Shown in the header so the merchant and the stored row name the same thing. Absent for the eye
+   * test, which answers a read rather than a finding (D-203).
+   */
+  readonly reference?: string;
+  /**
+   * Saves this field now.
+   *
+   * The same call `onBlur` makes, offered as a button — see the footer note. Optional so the eye
+   * test's box, which the page saves the same way, need not pass a second handler.
+   */
+  readonly onSubmit?: () => void;
 }): JSX.Element {
   return (
-    <div className="cbox">
+    /*
+      Emphasis D: a distinct block, not a muted box.
+
+      Surface shift, a top border separating it from the finding text, and a 3px left rail. The rail
+      is the only colour and must never become a fill — the section bands own colour as section
+      identity (D-201), and a tinted zone would stack a second colour system against them.
+    */
+    <div className="respond cbox">
       {existing.length > 0 && (
         <div className="cbox-prior">
           {existing.map((comment, index) => (
@@ -1224,8 +1250,20 @@ function CommentBox({
         </div>
       )}
 
-      <label className="flabel" htmlFor={`c-${existing.length}`}>
-        {existing.length > 0 ? 'Add to your response' : 'Your response'}
+      {/*
+        A labelled header naming what is being answered.
+
+        The reference is the anchor the comment is filed under, made visible where the answer is
+        written: a merchant saying "COA-002 · 3 of 5" and the row storing it are then one name for
+        one thing, which is what D-063 asks for and what a sequential number would have broken.
+
+        Ink, not accent — the rail carries the colour and a coloured heading would be a second claim.
+      */}
+      <label className="flabel respond-head" htmlFor={`c-${existing.length}`}>
+        <span className="respond-icon" aria-hidden="true">✎</span>
+        <span className="respond-label">
+          {existing.length > 0 ? 'Add to your response' : reference === undefined ? 'Respond' : `Respond to ${reference}`}
+        </span>
         {/*
           "optional" on every box, always (D-067).
 
@@ -1250,7 +1288,7 @@ function CommentBox({
         ground. The question asks what they do; the reader draws the conclusion.
       */}
       <textarea
-        className="input cbox-input"
+        className="input cbox-input respond-t"
         id={`c-${existing.length}`}
         rows={4}
         value={body}
@@ -1266,16 +1304,31 @@ function CommentBox({
       )}
 
       {/*
-        No button here any more, and that is the change rather than an omission.
+        A button again — and the reason it was removed no longer applies.
 
-        The box used to carry "Save response", which made saving a per-field act somebody could
-        forget on the field they cared about most. It now saves when the field loses focus, and the
-        page carries one Save for the whole document — so there is nothing left in this box that a
-        person has to remember to press.
+        It used to carry "Save response" as the ONLY way to store a field, which made saving a
+        per-field act somebody could forget on the field they cared about most. Autosave on blur
+        closed that, and the page still carries one Save for the whole document. So this is a
+        redundant affordance rather than a trap: it triggers the same save `onBlur` already makes,
+        and a merchant who never presses it loses nothing.
+
+        Kept ghost, not filled. The rail is the only colour in this block (D-201).
 
         The confirmation stays local, because *this field is stored* is a fact about this field.
       */}
-      {savedAt !== undefined && <p className="cbox-saved">Saved · {formatClock(savedAt)}</p>}
+      <div className="respond-foot">
+        {onSubmit !== undefined && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={!identified || body.trim() === ''}
+            onClick={onSubmit}
+          >
+            Add response
+          </button>
+        )}
+        {savedAt !== undefined && <span className="respond-note">Saved · {formatClock(savedAt)}</span>}
+      </div>
     </div>
   );
 }

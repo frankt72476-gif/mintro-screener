@@ -157,7 +157,16 @@ interface Props {
    */
   readonly participation?: Participation;
   /** The merchant's own view supplies a box; nothing else does. */
-  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  /**
+   * The respond zone for one finding.
+   *
+   * `reference` is the finding's own name — `COA-002 · 3 of 5`, from `referencesFor` — passed in
+   * rather than recomposed by the caller. It is the anchor the comment is filed under (D-063), and
+   * the respond header shows it so the person answering and the row storing the answer name the
+   * same thing. Passed from the render site because that is where the map is already in hand; a
+   * caller deriving it again would be a second traversal that could order differently (D-216).
+   */
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number, reference?: string) => JSX.Element;
   /**
    * One box for the whole eye test, never one per verdict (D-202, §3).
    *
@@ -165,9 +174,20 @@ interface Props {
    * finding and must never become one (D-196). Nine boxes would ask a merchant to rebut a rubric
    * line by line; the read is a paragraph and the useful answer is a paragraph back.
    *
-   * **No caller supplies this yet.** Where such a response is stored is a business ruling, not a
-   * technical one: `merchant_comments` keys on `rule_id`, and the eye test has no rule. Inventing a
-   * key would put a merchant's words in the document under a rule that does not exist.
+   * **Both surfaces supply it** — `App.tsx` for an analyst recording on the merchant's behalf, and
+   * `CommentPane.tsx` for the merchant themselves. This comment used to read *"no caller supplies
+   * this yet"*, which was true when it was written and had been false for two callers since; a
+   * reader who believed it would conclude the eye test has no respond affordance at all, which is
+   * how it came to be reported as missing.
+   *
+   * Where the answer is stored was the open question and D-203 closed it: not a reserved rule id —
+   * `merchant_comments.rule_id` is `check (rule_id ~ '^[A-Z]+-[0-9]{3}$')` and an `EYE-000` would be
+   * read as a finding comment by everything above it — but a nullable `subject` column, with
+   * `check ((rule_id is null) <> (subject is null))` making the two exclusive at the database.
+   *
+   * **One box for the read, and that is the design** (D-196, D-202 §3). The verdicts stay
+   * uncommentable: a box under each would imply a verdict is a finding, which is the one thing the
+   * eye test may never become.
    */
   readonly eyeCommentBox?: () => JSX.Element | null;
   /**
@@ -477,7 +497,8 @@ export function ReportView({
         inside each section, so the report still reads the way the rules do.
       */}
       {/*
-        The print branch carries `commentaryOf` and never `commentBox`.
+        The print CALL SITE carries `commentaryOf` and never `commentBox` — there is no print
+        branch any more; `print` decides what is open, never what exists.
 
         It carried neither. The PDF is the document that reaches IQwallet and it was rendering **no
         merchant responses at all** — the props existed, `CategoryCard` accepted them, and this one
@@ -816,7 +837,7 @@ function StoppingPanel({
   readonly print: boolean;
   readonly access?: EvidenceAccess;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
-  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element | null;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number, reference?: string) => JSX.Element | null;
   readonly ordinals?: ReadonlyMap<ReportFinding, number>;
   readonly references?: ReadonlyMap<ReportFinding, string>;
 }): JSX.Element | null {
@@ -872,7 +893,7 @@ function StoppingPanel({
                   {...(commentaryOf === undefined
                     ? {}
                     : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
-                  {...boxProp(commentBox?.(finding, ordinals?.get(finding)))}
+                  {...boxProp(commentBox?.(finding, ordinals?.get(finding), references?.get(finding)))}
                 />
               ))}
             </div>
@@ -955,7 +976,7 @@ function StoppingPanel({
                         {...(commentaryOf === undefined
                           ? {}
                           : { commentary: commentaryOf(finding, ordinals?.get(finding)) })}
-                        {...boxProp(commentBox?.(finding, ordinals?.get(finding)))}
+                        {...boxProp(commentBox?.(finding, ordinals?.get(finding), references?.get(finding)))}
                       />
                     ))
                   )}
@@ -1746,7 +1767,7 @@ function PassDisclosure({
   readonly references: ReadonlyMap<ReportFinding, string>;
   readonly print?: boolean;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
-  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number, reference?: string) => JSX.Element;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const shown = print === true || open;
@@ -1819,7 +1840,7 @@ function GroupCard({
    * (D-067).
    */
   readonly participation?: Participation;
-  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number, reference?: string) => JSX.Element;
   /** The export expands every instance inline (D-042 as revised by D-166). */
   readonly print?: boolean;
 }): JSX.Element {
@@ -1878,7 +1899,7 @@ function GroupCard({
               {...(print === true ? { print: true } : {})}
               {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
               {...(hideEmptyEvidence ? { hideEmptyEvidence: true } : {})}
-              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
+              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding), references?.get(finding)) })}
             />
           ))}
           <Consequences
@@ -1915,7 +1936,7 @@ function GroupCard({
             {...(references?.get(finding) === undefined ? {} : { reference: references.get(finding)! })}
             access={access}
             {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
-            {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
+            {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding), references?.get(finding)) })}
           />
         ))}
         <Consequences
@@ -1953,7 +1974,7 @@ function Consequences({
   readonly ordinals: ReadonlyMap<ReportFinding, number>;
   readonly references: ReadonlyMap<ReportFinding, string>;
   readonly commentaryOf?: (finding: ReportFinding, ordinal?: number) => FindingCommentary;
-  readonly commentBox?: (finding: ReportFinding, ordinal?: number) => JSX.Element;
+  readonly commentBox?: (finding: ReportFinding, ordinal?: number, reference?: string) => JSX.Element;
   readonly print?: boolean;
 }): JSX.Element | null {
   if (group.consequences.length === 0) return null;
@@ -1976,7 +1997,7 @@ function Consequences({
               {...(inheritsEvidence(group, child) ? { evidenceFrom: group.ruleId } : {})}
               {...(print === true ? { print: true } : {})}
               {...(commentaryOf === undefined ? {} : { commentary: commentaryOf(finding, ordinals.get(finding)) })}
-              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding)) })}
+              {...(commentBox === undefined ? {} : { commentBox: commentBox(finding, ordinals.get(finding), references?.get(finding)) })}
             />
           ))}
         </div>

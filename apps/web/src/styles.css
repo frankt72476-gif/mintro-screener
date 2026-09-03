@@ -3303,3 +3303,60 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   font-size: 12px; padding: 2px 0;
 }
 .rail-admin:hover { color: #fff; }
+
+/* ── The respond zone (emphasis D) ─────────────────────────────────────────────────────────────
+   The block a reader answers a finding in. It was a muted box that read as part of the finding
+   text; it is now a distinct surface with one thin vertical cue.
+
+   **The rail is the only colour, and it must never become a fill.** The section bands own colour as
+   section identity (D-201) — five hues, ordered so no two neighbours are close — and a tinted
+   respond zone would stack a second colour system against them at a different granularity. One
+   horizontal band cue at the section level, one 3px vertical cue at the finding level, no
+   collision. The button stays ghost and the header stays ink for the same reason: a coloured
+   control here would be a third claim on the reader's attention.
+
+   Both tokens are aliases, never new hues — the convention D-201 set for section identity. */
+:root {
+  --surface-1: var(--paper);
+  --fill-accent: var(--violet);
+}
+
+.respond {
+  background: var(--surface-1);
+  /*
+    Reset first, then the two borders this block has.
+
+    It composes with `.cbox`, which was an amber-railed tinted box with a 1px surround and an 8px
+    radius. Overriding only what D names left the merchant branch with that surround and the staff
+    branch without it — the same block, two shapes. Declaring the whole border here makes the block
+    self-contained rather than dependent on what it is mixed with.
+  */
+  border: 0;
+  border-top: 0.5px solid var(--line);
+  /* Left only, and no radius on this block: a rail with rounded corners reads as a chip. */
+  border-left: 3px solid var(--fill-accent);
+  border-radius: 0;
+  padding: var(--s3) var(--s4);
+  margin-top: var(--s3);
+}
+
+.respond-head { display: flex; align-items: baseline; gap: var(--s2); margin: 0 0 var(--s2); }
+.respond-icon { flex: 0 0 auto; font-size: 11px; color: var(--slate); line-height: 1.4; }
+/* Ink, not accent. See the header note above. */
+.respond-label { font-size: 12px; font-weight: 600; color: var(--ink); }
+/* The reference the comment is filed under, made visible where the answer is written (D-063). */
+.respond-ref {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px; color: var(--slate); letter-spacing: 0.02em;
+}
+.respond-opt { font-weight: 400; font-size: 11px; color: var(--slate); }
+
+.respond-t { width: 100%; font-family: inherit; font-size: 13px; line-height: 1.55; resize: vertical; }
+.respond-foot { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s2); flex-wrap: wrap; }
+.respond-note { font-size: 11.5px; color: var(--slate); }
+
+/* Print carries the answer, never the empty apparatus: there is nowhere to type on paper. */
+@media print {
+  .respond { background: none; border-left: 2px solid #8A8598; }
+  .respond-foot, .respond-t { display: none; }
+}
