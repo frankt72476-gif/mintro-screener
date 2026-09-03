@@ -267,6 +267,16 @@ export {
 } from './commentLink.js';
 
 export {
+  REPORT_BUCKET,
+  REPORT_CAPTURE_EXTENSION,
+  REPORT_TOKEN_PATTERN,
+  isReportToken,
+  reportObjectKey,
+  reportCaptureRefFrom,
+  type ReportCaptureRef,
+} from './reportCapture.js';
+
+export {
   participationFor,
   type Participation,
   type InvitedRef,
