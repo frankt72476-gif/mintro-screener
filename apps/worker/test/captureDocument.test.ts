@@ -14,6 +14,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  CHARACTERISATION_TERMS,
+  DETERMINATION_TERMS,
+  DIRECTIVE_TERMS,
+  REMEDY_TERMS,
+  REPORT_POSTURE,
+  auditCopy,
+} from '@mintro/engine';
+import {
   CAPTURE_SIZE_CEILING_BYTES,
   CAPTURE_SIZE_FLOOR_BYTES,
   assembleCapture,
@@ -29,7 +37,7 @@ function rendered(body: string, head = ''): string {
 }
 
 /** Padding, so a document under test clears the floor for reasons other than the one being tested. */
-const filler = `<p>${'observation '.repeat(900)}</p>`;
+const filler = `<p class="posture">${REPORT_POSTURE}</p><p>${'observation '.repeat(900)}</p>`;
 
 function capture(
   body: string,
@@ -352,5 +360,49 @@ describe('the real print DOM', () => {
     expect(html).toContain('Rule set v2.4.0');
     expect(html).toContain('GATE-002');
     expect(html).toContain('The footer states research use only.');
+  });
+});
+
+/**
+ * The one sentence that has to survive into the artifact.
+ *
+ * A captured report is a forwardable link. Someone at the sponsoring bank may open it with no
+ * covering email, having never heard of Mintro, and `REPORT_POSTURE` is the only thing in the
+ * document that tells them what they are reading. Anything that lived only in `send.ts` would not
+ * have travelled with it.
+ */
+describe('what the report says about itself', () => {
+  it('is required in the delivered file', () => {
+    const without = capture('<p>report</p>').replace(REPORT_POSTURE, '');
+
+    expect(() => assertCapturable(without, { images: 0, runId: RUN })).toThrow(/statement of what it is/);
+  });
+
+  it('is present in the real print DOM', () => {
+    // In the fixture because ReportView renders it into the masthead. If it is ever moved out of
+    // the captured surface, this fails alongside the guard rather than after it.
+    const fixture = readFileSync('apps/worker/test/fixtures/print-dom.html', 'utf8');
+
+    expect(fixture).toContain(REPORT_POSTURE);
+  });
+
+  it('makes no determination and characterises nothing', () => {
+    /*
+      Frank's copy, audited rather than trusted. It states what Mintro did — reviewed public pages,
+      recorded what it found — and never what anyone should conclude or do.
+
+      `CHARACTERISATION_TERMS` is the one to watch: "issues", "problems", "concerns" are readings,
+      and IQwallet makes them. "Things" is doing deliberate work in this sentence.
+    */
+    for (const terms of [DIRECTIVE_TERMS, DETERMINATION_TERMS, CHARACTERISATION_TERMS, REMEDY_TERMS]) {
+      expect(auditCopy(REPORT_POSTURE, terms).flagged).toEqual([]);
+    }
+  });
+
+  it('holds on the blocked-package path, where IQwallet never receives it', () => {
+    // "Before the underwriting team makes its boarding decision" describes a sequence, not a
+    // recipient — so the sentence stays true when the report goes only to the agent.
+    expect(REPORT_POSTURE).not.toContain('IQwallet');
+    expect(REPORT_POSTURE).not.toMatch(/attached|enclosed|this email/i);
   });
 });

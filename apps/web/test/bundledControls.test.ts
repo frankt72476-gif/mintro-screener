@@ -199,3 +199,33 @@ describe('nothing that could purge reaches the bundle', () => {
     expect(bundle).not.toContain(marker);
   });
 });
+
+/**
+ * The report says what it is, and the sentence has to be in the bundle to be in the document.
+ *
+ * `REPORT_POSTURE` is the only thing in a captured report that tells a reader who Mintro is and
+ * what the findings are. The report is a forwardable link, so it may be opened by someone at the
+ * sponsoring bank with no covering email around it.
+ *
+ * This is the D-246 shape applied to a string: `homeShape.showsAdministration` was computed,
+ * documented and asserted true in three tests while no component read it, and the owner's own
+ * People screen was reachable only by typing the URL. A constant that no component renders is a
+ * sentence nobody reads, and a unit test on the constant would pass either way.
+ *
+ * There is no DOM renderer in this repository, so "ReportView renders it" is proven in two steps
+ * rather than one: the string is compiled into the shipped bundle (here), and the capture step
+ * **refuses to deliver a document that does not contain it** (`assertCapturable`). The second is
+ * the stronger of the two, because it inspects the artifact rather than the code that makes it.
+ */
+describe('what the report says about itself', () => {
+  it('is compiled into the bundle', () => {
+    expect(bundle).toContain('Mintro reviewed the public pages of this site');
+    expect(bundle).toContain('before the underwriting team makes its boarding decision');
+  });
+
+  it('keeps the partner empty state sentence as a separate string', () => {
+    // Two audiences, two strings, deliberately not consolidated: this one is a signed-in screen,
+    // the other is a document that leaves the building.
+    expect(bundle).toContain('it does not underwrite the account or decide the outcome');
+  });
+});

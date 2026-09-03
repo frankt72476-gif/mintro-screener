@@ -22,6 +22,8 @@
  * report handed to a bank's processor. It comes out.
  */
 
+import { REPORT_POSTURE } from '@mintro/engine';
+
 /** What the assembler needs. Everything is already fetched; nothing here reaches for anything. */
 export interface CaptureInput {
   /** `page.content()` — the serialized DOM after the report has rendered. */
@@ -222,6 +224,27 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
 
   if (!/<meta\s+name="robots"\s+content="noindex, nofollow">/i.test(html)) {
     throw new Error('the captured report has no noindex meta tag');
+  }
+
+  /*
+    The report says what it is, in the delivered bytes.
+
+    Asserted here rather than trusted to the component, because this is the only place that sees
+    the artifact. `homeShape.showsAdministration` was computed, documented and asserted true in
+    three tests while no component read it, and the owner's own People screen was unreachable
+    (D-246). The same shape applies to a string: one that lives in a component and does not reach
+    the file is a sentence nobody reads.
+
+    It matters more here than it would on a screen. The report is a forwardable link, so it may be
+    opened by someone at the sponsoring bank with no covering email and no idea who Mintro is —
+    and this is the only thing in the document that tells them.
+  */
+  if (!html.includes(REPORT_POSTURE)) {
+    throw new Error(
+      'the captured report does not carry the statement of what it is. It is delivered as a ' +
+        'forwardable link and may be opened with no email around it, so the sentence has to be ' +
+        'in the document.',
+    );
   }
 
   if (!html.includes(expected.runId)) {

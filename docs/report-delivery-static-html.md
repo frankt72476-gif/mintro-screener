@@ -156,6 +156,21 @@ Concretely:
   render cap does not by itself hold the file under 30 MB, and a report that grows without a
   ceiling is one that eventually cannot be opened on a phone by the person it was sent to. A
   ceiling that is only logged is not a ceiling.
+- **No footer.** Ruled 2026-09-03. The PDF stamped *"Mintro screening report · domain · Page N of
+  M"* through Chromium's paged-media footer; a document with no pages has no equivalent, and
+  nothing replaces it. The masthead already carries the domain and the date, and a footer repeating
+  them is redundant.
+- **The masthead states what the report is.** `REPORT_POSTURE`, rendered in `.rhead` under the
+  domain, and `assertCapturable` refuses any document that does not contain it.
+
+  This is here rather than in the covering email because **a link is forwardable**. The PDF arrived
+  attached to an email that framed it; a URL passed from IQwallet to someone at the sponsoring bank
+  arrives with nothing. Anything that lives only in `send.ts` does not travel with the document,
+  and this sentence is the only thing in the report that tells a stranger who Mintro is.
+
+  It is not `POSTURE` in `apps/web/src/lib/homeShape.ts`, and the two are **not consolidated**.
+  That one is a signed-in screen for a partner with no runs yet; this one leaves the building. Two
+  audiences, two strings.
 - No relative URLs of any kind in the output.
 - **The 23 `@media print` blocks are hoisted to unconditional CSS, in place.** They are not
   decoration — they hide the analyst rail and the nav cards, expand the category bodies and show

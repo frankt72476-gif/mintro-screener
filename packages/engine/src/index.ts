@@ -177,6 +177,7 @@ export {
   describeNoteWarning,
   type CopyAudit,
   type RequirementAudit,
+  REPORT_POSTURE,
 } from './copy.js';
 
 export { checkDomAssert } from './checks/domAssert.js';

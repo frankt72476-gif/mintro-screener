@@ -568,3 +568,40 @@ export const EYE_TEST_TERMS: readonly string[] = [
   ...REMEDY_TERMS,
   ...VERDICT_TERMS,
 ];
+
+/**
+ * What the report says about itself, in its own masthead (D-255).
+ *
+ * ## Why it is on the document and not in the email
+ *
+ * The report used to be a PDF attached to a covering email, and the email did this work: it said
+ * who Mintro was and what the attachment was for. A captured report is a **link**, and a link is
+ * forwardable. Someone at IQwallet may pass it to someone at the sponsoring bank who opens it with
+ * no email around it, having never heard of Mintro. Anything that lives only in `send.ts` does not
+ * travel with the document.
+ *
+ * So it goes in the masthead, where it cannot be separated from the findings it frames.
+ *
+ * ## Why this wording
+ *
+ * Drafted deliberately, and it is not to be reworded here or anywhere downstream.
+ *
+ *   * No approval language, and no verdict. It says what Mintro *did* — reviewed public pages,
+ *     recorded what it found — which is a description of an activity, not a determination about a
+ *     merchant (hard constraint 7, D-001).
+ *   * Findings are not characterised. Not issues, not problems, not concerns. "Things" is doing
+ *     deliberate work: those are readings, and IQwallet makes them (`CHARACTERISATION_TERMS`).
+ *   * It holds on the **blocked-package path**, where the report goes to the agent and IQwallet
+ *     never receives it. "Before the underwriting team makes its boarding decision" describes a
+ *     sequence, not a recipient, so the sentence is true whether or not a send happens.
+ *
+ * ## It is not `POSTURE`, and the two are not consolidated
+ *
+ * `apps/web/src/lib/homeShape.ts` holds a different sentence for the partner empty state — a
+ * screen, a signed-in audience, and a different thing to say. Two audiences, two strings. Merging
+ * them would make one of them wrong somewhere, and it is not obvious which.
+ */
+export const REPORT_POSTURE =
+  'Mintro reviewed the public pages of this site and recorded what it found. The point is to ' +
+  "surface things early, while there's time to address them, before the underwriting team makes " +
+  'its boarding decision.';

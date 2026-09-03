@@ -35,6 +35,7 @@ export {
   describeNoteWarning,
   type CopyAudit,
   type RequirementAudit,
+  REPORT_POSTURE,
 } from './copy.js';
 
 export type {

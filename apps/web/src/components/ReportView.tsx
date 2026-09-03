@@ -11,6 +11,7 @@
 import { Fragment, useContext, useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
 import {
+  REPORT_POSTURE,
   REQUIREMENT_HEADINGS,
   distinctRuleCount,
   type FindingCommentary,
@@ -330,6 +331,20 @@ export function ReportView({
               .filter((part): part is string => part !== undefined && part !== '')
               .join(' · ')}
           </p>
+          {/*
+            What the report is, on the report (D-255).
+
+            Here rather than in the covering email because the report is now a **link**, and a link
+            is forwardable. Someone at IQwallet may pass it to someone at the bank who opens it with
+            no email around it and has never heard of Mintro; anything that lives only in `send.ts`
+            does not travel with the document. In the masthead it cannot be separated from the
+            findings it frames.
+
+            The string is owned by `REPORT_POSTURE` in the engine, because the capture step asserts
+            it is present in the delivered file — a sentence that lives in a component and does not
+            reach the artifact is a sentence nobody reads.
+          */}
+          <p className="posture">{REPORT_POSTURE}</p>
           {/*
             What the run could reach, stated where the reader decides how much weight to give the
             coverage numbers. Only when a wall was met: on an ordinary public crawl there is
