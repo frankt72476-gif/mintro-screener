@@ -157,6 +157,27 @@ Concretely:
   ceiling is one that eventually cannot be opened on a phone by the person it was sent to. A
   ceiling that is only logged is not a ceiling.
 - No relative URLs of any kind in the output.
+- **The 23 `@media print` blocks are hoisted to unconditional CSS, in place.** They are not
+  decoration — they hide the analyst rail and the nav cards, expand the category bodies and show
+  the masthead — and they do not apply when a saved file is opened on screen. In place rather than
+  appended, because a media query adds no specificity and the cascade decides ties by document
+  order: moving them would hand each print rule a win over an equal-specificity screen rule it
+  currently loses to, silently, in a document nobody re-renders to compare.
+
+#### Open observation — an unresolved capture is omitted, not declared
+
+`@media print{.shot:has(.shot-missing){display:none}}` hides a slip whose capture could not be
+read. Hoisted, the captured document does the same. **This is unchanged behaviour** — it is what
+the PDF has always done — so preserving it is not a decision and changing it would be.
+
+Recorded because it sits against the principle that runs the rest of this system: an unrendered
+page is *declared* rather than passed over, and a `not_evaluable` finding has to evidence why. An
+omission is not a synthesis, so hard constraint 3 is not breached — nothing asserts a capture that
+does not exist. But a reader cannot tell the difference between a finding that cited no capture and
+one whose capture went missing, and that is a distinction this system makes everywhere else.
+
+Ruled separately. It is a report-copy and report-rendering question, not a capture question, and
+the capture step is the wrong place to change what the document says.
 
 **Fail loud.** If capture fails, the job fails and the report is not delivered. Do not write a
 partial file, do not fall back to a link that 404s, do not send an email pointing at nothing.
@@ -285,6 +306,30 @@ The useful assertions here are about the captured bytes, not the render path.
 - Email body contains the report URL and no attachment.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
+
+#### Two findings from building these, both worth keeping
+
+**A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
+file inlines as many images as the page displayed — was first tested by leaving a marker
+unsubstituted. It went green. It was never running: an unsubstituted marker is `src="#mintro-capture-1"`,
+which the *reference* check rejects first, because a `src` that is not a `data:` URI is a request
+the file would make. The count guard had never once executed, and it would have stayed green
+forever while asserting nothing, because the case that reaches it — every image properly inline
+and one simply absent — is not the case anyone naturally reaches for.
+
+It now has its own test: a document that is perfect in every other respect and one capture short.
+Both cases are kept, because both are real failures and they fail differently.
+
+This is the whole of the verification discipline in one example. The pass was not evidence; the
+question *which assertion actually fired* was. A test made to fail before it is trusted is the only
+kind that has been checked, and it applies to the guards in this document as much as to the checks
+in the engine — `not_evaluable` exists because a check that cannot see must not report as one that
+looked.
+
+**The browser entry caught the import.** `browserEntry.test.ts` and `bundledControls.test.ts`
+failed the moment the app imported `reportLinkForKey`: `@mintro/engine` resolves to `browser.ts` in
+the browser, and the symbol had only been exported from `index.ts`. Typecheck and every worker test
+passed. Nothing else in the suite would have found it before the bundle broke at build time.
 
 ### 7. Storage-drift tripwire
 

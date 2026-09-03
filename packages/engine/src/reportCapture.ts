@@ -83,6 +83,63 @@ export function isReportToken(token: string): boolean {
 }
 
 /**
+ * The path the delivered link lands on, without a run or a token.
+ *
+ * Stated here and nowhere else. It is written in `netlify.toml`, composed into an email by the
+ * worker, and rendered as a link by the app — three places, which is exactly the shape D-034 is
+ * about. The last URL spelled out in two places disagreed with itself and would have sent a
+ * merchant to a sign-in screen holding the only token that report would ever have.
+ */
+export const REPORT_LINK_PATH = '/r/';
+
+/**
+ * The link to give someone.
+ *
+ * Not the storage URL. The object lives at the storage endpoint; what is sent is this, proxied to
+ * it — so the storage backend can change without invalidating a link already issued, and so a
+ * third party is never handed the project ref.
+ *
+ * `origin` is tolerated with or without a trailing slash, for the same reason `commentLinkFor`
+ * tolerates it: it comes from configuration, and a doubled slash is the kind of thing nobody
+ * notices until somebody reports a dead link.
+ */
+export function reportLinkFor(origin: string, runId: string, token: string): string {
+  if (!RUN_ID_PATTERN.test(runId) || !isReportToken(token)) {
+    throw new Error('report capture: refusing to build a link from a malformed run id or token');
+  }
+  return `${origin.replace(/\/+$/, '')}${REPORT_LINK_PATH}${runId}/${token}`;
+}
+
+/**
+ * The same link, from the stored object key.
+ *
+ * The key is what the database holds, so this is the form every caller actually has. Parsing it
+ * here rather than at each call site keeps the one place that knows `<run>/<token>.html` means a
+ * capture.
+ */
+export function reportLinkForKey(origin: string, storageKey: string): string {
+  const ref = reportCaptureRefFromKey(storageKey);
+  if (ref === null) {
+    throw new Error(`report capture: '${storageKey}' is not a capture key`);
+  }
+  return reportLinkFor(origin, ref.runId, ref.token);
+}
+
+/** The run and token in a stored object key, or null if it is not one. */
+export function reportCaptureRefFromKey(storageKey: string): ReportCaptureRef | null {
+  const parts = storageKey.split('/');
+  if (parts.length !== 2) return null;
+
+  const [runId, file] = parts as [string, string];
+  if (!file.endsWith(REPORT_CAPTURE_EXTENSION)) return null;
+
+  const token = file.slice(0, -REPORT_CAPTURE_EXTENSION.length);
+  if (!RUN_ID_PATTERN.test(runId) || !isReportToken(token)) return null;
+
+  return { runId, token };
+}
+
+/**
  * The run and token in a captured-report URL, or null if it is not one.
  *
  * Matches on the tail of the path rather than on a whole URL, and treats the `.html` as optional,

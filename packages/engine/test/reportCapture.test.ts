@@ -15,6 +15,9 @@ import {
   REPORT_BUCKET,
   isReportToken,
   reportCaptureRefFrom,
+  reportCaptureRefFromKey,
+  reportLinkFor,
+  reportLinkForKey,
   reportObjectKey,
 } from '@mintro/engine';
 
@@ -111,5 +114,52 @@ describe('the token shape', () => {
     expect(isReportToken(`${TOKEN.slice(0, 42)}+`)).toBe(false);
     expect(isReportToken(`${TOKEN.slice(0, 42)}/`)).toBe(false);
     expect(isReportToken(`${TOKEN.slice(0, 42)}=`)).toBe(false);
+  });
+});
+
+describe('the delivered link', () => {
+  it('is the shape the spec names, on a Mintro origin', () => {
+    expect(reportLinkFor('https://screener.gomintro.com', RUN, TOKEN)).toBe(
+      `https://screener.gomintro.com/r/${RUN}/${TOKEN}`,
+    );
+  });
+
+  it('is built from the stored key, which is what callers actually hold', () => {
+    const key = reportObjectKey(RUN, TOKEN);
+
+    expect(reportLinkForKey('https://screener.gomintro.com', key)).toBe(
+      `https://screener.gomintro.com/r/${RUN}/${TOKEN}`,
+    );
+  });
+
+  it('round-trips: a link this module builds is one it reads', () => {
+    // The assertion `commentLink.test.ts` exists for, applied here. The link is composed in the
+    // worker for an email, rendered by the app, and stated in `netlify.toml` — three places.
+    const link = reportLinkForKey('https://screener.gomintro.com', reportObjectKey(RUN, TOKEN));
+
+    expect(reportCaptureRefFrom(link)).toEqual({ runId: RUN, token: TOKEN });
+  });
+
+  it('tolerates a trailing slash on the origin', () => {
+    // The origin comes from configuration, and a doubled slash is the kind of thing nobody notices
+    // until somebody reports a dead link.
+    const link = reportLinkFor('https://screener.gomintro.com/', RUN, TOKEN);
+
+    expect(link).not.toContain('com//');
+    expect(reportCaptureRefFrom(link)).toEqual({ runId: RUN, token: TOKEN });
+  });
+
+  it('refuses to build a link from a malformed run or token', () => {
+    expect(() => reportLinkFor('https://x.test', RUN, '')).toThrow();
+    expect(() => reportLinkFor('https://x.test', 'not-a-uuid', TOKEN)).toThrow();
+    expect(() => reportLinkForKey('https://x.test', `${RUN}/.html`)).toThrow(/not a capture key/);
+    expect(() => reportLinkForKey('https://x.test', 'nonsense')).toThrow(/not a capture key/);
+  });
+
+  it('reads a run and token back out of a stored key', () => {
+    expect(reportCaptureRefFromKey(reportObjectKey(RUN, TOKEN))).toEqual({ runId: RUN, token: TOKEN });
+    // Not a key: the extension is required on the object, unlike on the delivered link.
+    expect(reportCaptureRefFromKey(`${RUN}/${TOKEN}`)).toBeNull();
+    expect(reportCaptureRefFromKey(`a/${RUN}/${TOKEN}.html`)).toBeNull();
   });
 });

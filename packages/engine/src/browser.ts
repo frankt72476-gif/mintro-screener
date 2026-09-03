@@ -180,6 +180,23 @@ export {
   commentTokenFrom,
 } from './commentLink.js';
 
+/*
+  The captured report's link shape, in the browser too.
+
+  The app renders "Open report" from a stored object key, and the worker composes the same link
+  into an email. One owner for the shape, or the two disagree — which is the defect `commentLink`
+  above exists because of.
+*/
+export {
+  REPORT_LINK_PATH,
+  isReportToken,
+  reportLinkFor,
+  reportLinkForKey,
+  reportCaptureRefFrom,
+  reportCaptureRefFromKey,
+  type ReportCaptureRef,
+} from './reportCapture.js';
+
 export {
   participationFor,
   type Participation,

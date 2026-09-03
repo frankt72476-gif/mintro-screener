@@ -52,6 +52,7 @@ import {
 } from '@mintro/engine';
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { renderRunPdf } from '../src/pdfJob.js';
+import { captureRunReport } from '../src/captureJob.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { claimNextAnalystInvite, handleAnalystInvite } from '../src/analystInviteDrain.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -660,6 +661,24 @@ async function handle(
     if (!after.complete) {
       throw new Error(`run closed but is not complete: ${after.problems.join('; ')}`);
     }
+
+    /*
+      The capture, at assembly.
+
+      Here rather than at send, because the artifact does not differ by path: a blocked package
+      goes to the agent with no IQwallet send and no comment link, and that path gets a link to
+      the same captured report. Delivery differs; the document does not.
+
+      After `assessRun`, so nothing is captured from a run this worker has not confirmed complete.
+      The run is already closed and immutable at this point (D-002) — the capture is a second
+      artifact derived from it, never a write back into it, and a failure here leaves a finished
+      run with no capture rather than an unfinished one.
+    */
+    const captured = await captureRunReport(supabase, browser, { runId, webRoot: WEB_ROOT });
+    console.log(
+      `  captured ${(captured.bytes / 1048576).toFixed(1)} MB, ${captured.images} capture(s) ` +
+        `→ ${captured.storageKey}`,
+    );
 
     await settleThenFinish(progress, supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
