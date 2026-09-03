@@ -57,7 +57,7 @@ not. The capture costs one extra step in a pipeline that is already rendering th
 
 ## Implementation spec
 
-Eight pieces. Commit them separately and stop for review between each.
+Nine pieces. Commit them separately and stop for review between each.
 
 ### 1. Storage
 
@@ -83,7 +83,7 @@ New Supabase storage bucket for rendered reports. Public-read, unguessable path.
   it**, as defence in depth. It is not the gate of record, and the original spec was wrong to call
   it that. Supabase storage cannot attach it to an object at all: `FileOptions.headers` merges into
   the request headers of the upload, and user metadata is readable through `info()` but never
-  emitted on a GET. The rewrite in step 4 is where the header is available.
+  emitted on a GET. The route in step 4 is where the header is set, and it is ours.
 - Bucket is not listable.
 - **`allowed_mime_types` and `file_size_limit` are deliberately not set on the bucket yet.**
   Constraining a public bucket to `text/html` is worth having — it is what stops anything else
@@ -262,7 +262,88 @@ been sent has always been a permanent artifact here, and D-130 says run history 
 in as many words. This decision does not change that position. It changes the artifact's format and
 where it is addressed from.
 
-### 4. Netlify fronting
+### 4. Serving — the worker, not storage
+
+**Supabase cannot serve this document.** It serves public HTML as `text/plain`, with `nosniff` and
+a sandbox CSP, **whatever mimetype is stored** — confirmed both through the Netlify proxy and
+against the direct storage URL, with the object detail showing `text/html; charset=utf-8` stored.
+The sandbox strips inline styles and inline image data, so even served as HTML the report would
+arrive unstyled with no captures. A self-contained document that a sandbox strips is not delivered,
+and the document is not being weakened to fit a header. The proxy was innocent throughout.
+
+So a read-only route on the worker serves the bytes, at `/r/<runId>/<token>`, and Netlify proxies
+to it instead of to storage.
+
+#### The security consequence, stated as such
+
+**The worker gains a public HTTP surface it has never had, and it holds `SUPABASE_SERVICE_KEY`.**
+Until this shipped, `fly.toml` said *"the worker polls the job queue, it does not serve traffic"* —
+no `[http_service]`, no `EXPOSE`, and the only listener in the codebase bound to `127.0.0.1` for
+rendering. That key carries `BYPASSRLS` and can read and write every merchant's evidence.
+
+That is why the route's constraints are load-bearing rather than stylistic, and each is asserted
+with a test that has been made to fail in the way it exists to catch:
+
+- **Read-only.** It downloads one object. No write path exists in the file.
+- **Validate, then read.** Nothing from the URL is built into a storage key until the run id
+  matches a uuid and the token matches 43 base64url characters.
+- **No listing, no enumeration.** It never lists a prefix, and **every refusal is byte-identical** —
+  a malformed token, a well-formed token for a report that does not exist, and an unknown run id
+  all return the same 404 and the same body.
+
+  The reason is worth stating exactly, because the alternative looks like good API manners. **A 400
+  for a malformed token and a 404 for a missing one turn the route into a probing oracle**: the
+  difference between the two answers tells a stranger their token was *shaped* correctly, so they
+  can search the shape before searching the value, and the same split on run ids tells them which
+  runs exist. Distinguishing the cases is a feature for a caller who already has a valid link and a
+  search tool for everyone else. One answer, one body, no signal.
+- **Nothing about storage escapes.** No bucket, no key, no Supabase error text, in a body or a
+  header.
+
+#### The availability coupling
+
+**Report delivery now inherits the worker's availability, and the worker is one machine that runs
+Chromium.** Plainly, and not designed around:
+
+- Netlify proxies `/r/*` to the worker, so if the worker is not answering, the reader gets a 502.
+- There is **one machine**. A deploy restarts it, and during that restart every delivered report
+  link is dead.
+- **Crawling and serving share a process and a 1 GB memory budget.** `fly.toml` says crashes under
+  load are usually OOM from Chromium. An OOM used to cost a scan; now it also takes down every
+  report link an underwriter holds.
+
+`auto_stop_machines` stays off. It was already off for a different reason — a sleeping machine
+stops picking up runs — and this design now depends on it, because a sleeping machine also means a
+report link that cold-starts or fails.
+
+#### Why the bucket stays public
+
+Under this design the path is no longer the credential for the primary route: the route checks it.
+Making the bucket private would remove the public object entirely, which is better for merchant
+screenshots, and nothing depends on public read once the route exists.
+
+It stays public anyway, ruled deliberately. **The fallback it would remove matters more than the
+exposure it would close.** One machine running Chromium on 1 GB, where the config says crashes are
+usually OOM, becomes the single point of failure for an artifact whose entire purpose is
+durability. A storage URL that still resolves — even served as `text/plain`, where the bytes can be
+saved and opened locally — is an ugly fallback that beats no fallback.
+
+The tradeoff, honestly: **the object remains publicly readable by anyone holding the path, and the
+path is the credential for that fallback even though it is no longer the credential for the primary
+route.** Full-resolution merchant screenshots are inlined in that object. This is a considered
+trade of confidentiality against availability, not an oversight, and it should be revisited if the
+worker ever stops being a single machine.
+
+#### Unverified until deployed
+
+**Fly routing traffic to the new listener, and Netlify proxying to it, are unverified.** They
+cannot be checked locally and are not described here as working. The route itself is verified
+locally — started, requested, and asserted on status, headers, bytes and the four constraints. The
+CSP is written to permit exactly what the document contains (inline styles, `data:` images, `data:`
+fonts) and **has not been checked against a real browser**; if it is wrong the report renders
+unstyled, which is the failure being fixed, so it is the first thing to look at on a deployed link.
+
+### 5. Netlify fronting
 
 The delivered link is on a Mintro origin. Nothing outside this repo is sent a storage URL.
 
@@ -289,7 +370,7 @@ Two things this must not become:
 
 `reportCaptureRefFrom` in `packages/engine/src/reportCapture.ts` matches on the path tail rather
 than on a hostname and treats the `.html` as optional, so both spellings of one capture — the
-storage object and the delivered link — read back to the same run. The tripwire in step 7 fetches
+storage object and the delivered link — read back to the same run. The tripwire in step 8 fetches
 through this origin, because that is the URL that was actually delivered.
 
 #### `/r/` has one owner, and `netlify.toml` is not it
@@ -307,7 +388,7 @@ proxy production storage. A Netlify build with no `VITE_SUPABASE_URL` **fails**;
 omits the rule without failing, because there is no Netlify layer to configure and
 `bundledControls.test.ts` runs a real `vite build` with no environment.
 
-The SPA fallback moved into the same generated file. See the catch-all trap in step 6 — this is
+The SPA fallback moved into the same generated file. See the catch-all trap in step 7 — this is
 not tidiness, it is the only way the order between the two rules is visible and testable.
 
 #### Verify once, against the deployed site
@@ -330,7 +411,7 @@ match; anything that returns the analyst app means a redirect rule is matching f
 **Do not land the step-3 download change until this returns a real report.** Until the rewrite is
 deployed, every `/r/` link in the app is dead, and an analyst clicking a dead link is a dead link.
 
-### 5. Email bodies
+### 6. Email bodies
 
 Attachment comes out, link goes in, in every path that currently sends a report.
 
@@ -342,7 +423,7 @@ Copy: state that the report is a link and that the link does not expire. Do not 
 the format change. Operator identity enforcement is unchanged and already correct at the payload
 level (D-233) — the link and the surrounding copy carry no operator identity.
 
-### 6. Tests
+### 7. Tests
 
 The useful assertions here are about the captured bytes, not the render path.
 
@@ -356,7 +437,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Six findings from building this, all worth keeping
+#### Seven findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -446,10 +527,8 @@ of its six assertions with a message naming the fix.
 The verification of the fix itself was built the same way. A harness derives the binaries an
 apps/web-scoped install would provide from that manifest, puts only those on PATH, and runs the
 real build script: without the declaration, `exit 127, tsc: command not found`, Netlify's error
-exactly; with it, the build succeeds. The harness needed two corrections of its own on the way —
-it first passed a Windows-style `C:\...` PATH that `sh` reads none of, so *every* binary was
-missing and it "reproduced" the failure for the wrong reason. A harness can have the defect it is
-testing for.
+exactly; with it, the build succeeds. The harness needed two corrections of its own on the way, one of
+which is the first instance in the right-error-wrong-cause finding below.
 
 **And a fourth time, which is where the method changed rather than the code.** With `tsc` finally
 resolving, Netlify failed with exit 1: `tsc --build ../../packages/engine` builds the engine's
@@ -502,6 +581,49 @@ already satisfies a prerequisite cannot tell you whether the prerequisite is met
 you that it was met this time. State the prerequisite in the command, and verify from the state a
 stranger would start in.
 
+**Right error, wrong cause — three times, and it nearly cost a correct control.** The most
+expensive failure shape in this whole sequence was not a broken thing. It was a broken thing whose
+breakage produced *exactly the output that success or a correct diagnosis would produce*.
+
+Three instances, all in the tooling rather than the product:
+
+1. **The clean-room harness** passed a Windows-style `C:\...` PATH, which `sh` reads none of. Every
+   binary was missing, the build failed, and it looked like a faithful reproduction of the
+   `tsc: command not found` it was written to reproduce. The harness had the defect it was testing
+   for.
+2. **A test helper** matched every `src=` and put the first image marker on the module script,
+   leaving the last evidence capture unmarked. The failure read precisely like the lockup bug under
+   test — a capture not inlined.
+3. **A break-test edit that silently did not apply.** Removing a guard is supposed to make a test
+   fail; this one did not, and the obvious reading was that the guard was weak. The shell-quoted
+   `.replace()` had simply not matched, so the guard was never removed and the test was right to
+   pass. Re-running the same edit from a file showed it firing on two assertions. The repository's
+   own conventions warn about exactly this quoting trap, in `CLAUDE.md`.
+
+And a fourth instance, of a different and worse kind, in the same sitting as writing this finding.
+Having just described a negative result as a claim about two things where the setup is the half
+nobody checks, I staged a file I **knew** carried two unrelated changes — the route wiring and a
+held commit's queue removal — without running the one command that would have shown me. `git diff
+--cached` was one keystroke away. The commit shipped half of a change that was being deliberately
+held, leaving a button in the app enqueueing work that nothing would claim.
+
+**Knowing a discipline and applying it are different acts, and the gap between them is where this
+class of error lives.** That is the more useful half of the finding. Every control in this document
+was written by someone who understood the principle it encodes; none of them exists because the
+principle was unknown. They exist because a principle held in mind at the moment of writing is not
+a principle applied at the moment of acting, and only the mechanical check spans the two. Write the
+check, then run it, on your own work, especially right after explaining why others should.
+
+The general form, and it is the one to carry: **when a control does not fire, establish that the
+condition was actually created before concluding the control is weak.** A negative result is a
+claim about two things — the control and the setup — and the setup is the half nobody checks,
+because a setup that failed to set up looks identical to a control that failed to fire. The cheap
+discriminant is to assert the precondition directly: print what the harness built, diff the file
+after the edit, check the count of matches before replacing.
+
+Weakening a correct guard because a broken experiment said it was weak is the worst available
+outcome here, and instance 3 came one step from it.
+
 **The tree had already written this lesson down, and nobody read it.**
 `packages/ruleset/tsconfig.json` carries a comment, from an earlier deploy failure, saying that a
 missing project reference is *"invisible locally, where a root `tsc --build` has already produced
@@ -542,14 +664,14 @@ rule precedes the fallback. The general form: **when adding a route, ask what al
 — a catch-all is not a default, it is a rule that matches everything, and where it sits decides
 whether anything below it exists.
 
-### 7. Storage-drift tripwire
+### 8. Storage-drift tripwire
 
 CI, not the validator. Fetch a captured report from a completed run and assert it still parses and
 still contains no external references. This is the check that catches an asset pipeline change
 reaching backwards into old reports. It belongs in CI because it needs network and because a
 validator that requires touching the engine to add a rule violates hard constraint 1.
 
-### 8. Decision record
+### 9. Decision record
 
 Write D-255 as above. Three things belong in the record rather than in a code comment, because each
 is a dependency someone reading the code six months out would otherwise have to rediscover:
@@ -570,10 +692,11 @@ is a dependency someone reading the code six months out would otherwise have to 
 2. CC reports on evidence image storage. Ruling before implementation. **Done 2026-09-03: inline.**
 3. Capture step in the worker, replacing `page.pdf()` — **with the run-scoped delete for captured
    reports (step 3's reports half) in the same commit.** Commit, review.
-4. Netlify fronting: the `/r/*` rewrite and the header. Commit, review.
-5. Email bodies and index renumbering. Commit, review.
-6. Tests and CI tripwire. Commit, review.
-7. Decision record.
+4. The worker route that serves captured reports. Commit, review.
+5. Netlify fronting: the `/r/*` rewrite pointed at the worker. Commit, review.
+6. Email bodies and index renumbering. Commit, review.
+7. Tests and CI tripwire. Commit, review.
+8. Decision record.
 
 Run-scoped **evidence** purge is not on this list. It does not exist, it is not created by this
 work, and it is ruled separately — see step 3.

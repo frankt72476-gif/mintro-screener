@@ -53,6 +53,7 @@ import {
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { captureRunReport } from '../src/captureJob.js';
+import { startReportRoute } from '../src/reportRoute.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { claimNextAnalystInvite, handleAnalystInvite } from '../src/analystInviteDrain.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -153,6 +154,28 @@ async function main(argv: readonly string[]): Promise<number> {
     console.error('Preflight failed. The worker will not start against a store it cannot write to.');
     return 1;
   }
+
+  /*
+    The report route, alongside the queue loop.
+
+    Supabase serves public HTML as text/plain under a sandbox CSP whatever mimetype is stored, which
+    strips the inline styles and inline captures a self-contained report is made of. So the bytes are
+    served from here, where the headers are ours.
+
+    **This is the first inbound HTTP surface this process has ever had, and it holds
+    `SUPABASE_SERVICE_KEY`.** Everything the route does is arranged around that: read-only, validate
+    before reading, no listing, and one indistinguishable refusal. See `reportRoute.ts`.
+
+    It also couples report delivery to this machine's availability. There is one machine, it runs
+    Chromium, and the memory note in `fly.toml` says crashes under load are usually OOM. A crash now
+    takes down every delivered report link as well as the scan. The bytes remain in storage and the
+    public storage URL still resolves, which is the fallback that decision rests on.
+  */
+  const reportRoute = await startReportRoute({
+    supabase,
+    port: Number.parseInt(process.env['PORT'] ?? '8080', 10),
+  });
+  console.log(`  report route listening on :${reportRoute.port}`);
 
   /*
     The credential key pair, proved rather than loaded (D-191).

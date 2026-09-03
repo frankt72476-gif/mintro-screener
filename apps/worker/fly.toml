@@ -27,10 +27,27 @@ primary_region = "iad"
   # Chromium wants more than the Fly default. Crashes under load are usually OOM, not code.
   memory = "1gb"
 
-# No [http_service] block: the worker polls the job queue, it does not serve traffic.
+# The worker now serves traffic as well as polling the queue.
 #
-# Deliberately no auto-stop. A machine that sleeps stops picking up runs, and a screening job
-# that silently never starts is worse than one that fails loudly.
+# It serves exactly one thing: a captured report, read-only, at /r/<runId>/<token>. Supabase serves
+# public HTML as text/plain under a sandbox CSP whatever mimetype is stored, which strips the inline
+# styles and inline captures a self-contained report is made of, so the bytes come from here where
+# the headers are ours.
+#
+# **This process holds SUPABASE_SERVICE_KEY**, which carries BYPASSRLS. Giving it a public surface
+# is the security consequence of that decision, and the route is built around it: read-only,
+# validated before it reads, no listing, no enumeration, and one identical refusal for every miss.
+#
+# Deliberately no auto-stop, and now for two reasons. A machine that sleeps stops picking up runs,
+# and a screening job that silently never starts is worse than one that fails loudly — and a
+# sleeping machine also means a delivered report link that cold-starts or fails.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
 # One machine. The queue is a compare-and-swap so more than one is safe, but a demo does not need
 # it and a second machine doubles the Chromium memory bill for nothing.
 [processes]

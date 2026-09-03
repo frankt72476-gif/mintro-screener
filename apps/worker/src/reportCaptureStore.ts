@@ -59,9 +59,20 @@ export async function storeReportCapture(
   const { error } = await supabase.client.storage.from(REPORT_BUCKET).upload(storageKey, body, {
     contentType: 'text/html; charset=utf-8',
     upsert: false,
-    // A frozen document at a key that is never reused. The long cache is safe precisely because
-    // the bytes at this address cannot change.
-    cacheControl: 'public, max-age=31536000, immutable',
+    /*
+      `cacheControl` takes a number of SECONDS, not a header value.
+
+      storage-js emits `cache-control: max-age=${cacheControl}` (StorageFileApi), so passing a whole
+      header produced `max-age=public, max-age=31536000, immutable`, which Supabase then served with
+      its own `public,` prefix. Verified by driving the real client with a recording fetch.
+
+      The seconds go here so the option is used as intended, and the exact header is set through
+      `headers`, which storage-js merges last. `immutable` is not expressible any other way — and it
+      is true: a re-capture mints a new token and writes a new object, so the bytes at this key
+      never change.
+    */
+    cacheControl: '31536000',
+    headers: { 'cache-control': 'public, max-age=31536000, immutable' },
   });
 
   if (error !== null) {

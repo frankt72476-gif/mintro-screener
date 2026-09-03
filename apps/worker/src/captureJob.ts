@@ -121,11 +121,7 @@ export async function captureRunReport(
       runId: input.runId,
     });
 
-    // Before a byte is written. Storage is append-only and the bucket is public-read, so an object
-    // written here is one nobody can quietly take back.
-    assertCapturable(html, { images: rendered.images.total, runId: input.runId });
-
-    const stored = await storeReportCapture(supabase, {
+    const stored = await deliverCapture(supabase, {
       runId: input.runId,
       html,
       images: rendered.images.total,
@@ -135,6 +131,32 @@ export async function captureRunReport(
   } finally {
     await server.close();
   }
+}
+
+/**
+ * The only path by which a captured report becomes real.
+ *
+ * Both writes live behind one function so that "checked before anything is written" is a property
+ * of a named unit rather than of the order of two statements in a long job — and so a test can
+ * assert the negative that matters: **on refusal, nothing reaches the bucket and nothing reaches
+ * the table.**
+ *
+ * The order is the whole point. The bucket is public-read and has no delete policy, and
+ * `report_captures` is append-only by trigger, so an object or a row written here is one nobody
+ * can quietly take back. Everything that decides whether this document is fit to deliver happens
+ * before either.
+ */
+export async function deliverCapture(
+  supabase: WorkerSupabase,
+  input: { readonly runId: string; readonly html: string; readonly images: number },
+): Promise<StoredCapture> {
+  assertCapturable(input.html, { images: input.images, runId: input.runId });
+
+  return storeReportCapture(supabase, {
+    runId: input.runId,
+    html: input.html,
+    images: input.images,
+  });
 }
 
 /**

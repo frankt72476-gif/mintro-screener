@@ -15,18 +15,17 @@ import { readFileSync } from 'node:fs';
 import {
   REPORT_BUCKET,
   REPORT_LINK_PATH,
-  reportCaptureRefFrom,
   reportLinkFor,
   reportObjectKey,
 } from '@mintro/engine';
 import { headersFile, redirectsFile } from '../netlifyReportProxy.js';
 
-const ORIGIN = 'https://abcdefghijkl.supabase.co';
+const ORIGIN = 'https://mintro-screener-worker.fly.dev';
 const SITE = 'https://screener.gomintro.com';
 const RUN = '11111111-2222-4333-8444-555555555555';
 const TOKEN = 'x7Qp-_9aB3cD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4';
 
-const deployed = (): string => redirectsFile({ storageOrigin: ORIGIN, onNetlify: true });
+const deployed = (): string => redirectsFile({ workerOrigin: ORIGIN, onNetlify: true });
 
 /** The proxy rule, as Netlify would read it: `from`, `to`, status. */
 function proxyRule(file: string): { from: string; to: string; status: string } {
@@ -42,45 +41,49 @@ function proxyRule(file: string): { from: string; to: string; status: string } {
 /** What Netlify does with `:splat`. */
 const resolve = (to: string, splat: string): string => to.replace(':splat', splat);
 
-describe('the two spellings of one capture', () => {
-  it('resolve to the same object key', () => {
+describe('the link and the proxy', () => {
+  it('resolve to one path, end to end', () => {
     /*
-      The assertion this file exists for.
+      The assertion this file exists for, now one hop longer.
 
-      Left: the link composed for a person, from `REPORT_LINK_PATH`. Right: the URL the proxy
-      sends that link to. Both are derived — neither is a literal written here — so a change to
-      the path scheme that broke one and not the other fails this test rather than a report.
+      A delivered link is `/r/<run>/<token>` on the Mintro origin. Netlify proxies it to the same
+      path on the worker. The worker parses that path and builds the object key. Every step is
+      derived from `REPORT_LINK_PATH` and `reportObjectKey` — nothing here is a literal — so a
+      change to the path scheme that broke one hop and not the others fails here rather than in an
+      underwriter's inbox.
     */
     const link = reportLinkFor(SITE, RUN, TOKEN);
-    const key = reportObjectKey(RUN, TOKEN);
 
     const splat = link.slice(`${SITE}${REPORT_LINK_PATH}`.length);
     const proxied = resolve(proxyRule(deployed()).to, splat);
 
-    // The proxied URL ends in exactly the bucket and key the worker wrote.
-    expect(proxied).toBe(`${ORIGIN}/storage/v1/object/public/${REPORT_BUCKET}/${key}`);
-    expect(new URL(proxied).pathname.endsWith(`/${REPORT_BUCKET}/${key}`)).toBe(true);
+    // Netlify's hop: the same path, on the worker origin. The worker's hop — that this path
+    // resolves to the object key — is asserted in `apps/worker/test/reportRoute.test.ts`, because
+    // a test in this project may not import across the app boundary.
+    expect(proxied).toBe(`${ORIGIN}${REPORT_LINK_PATH}${RUN}/${TOKEN}`);
+    expect(new URL(proxied).pathname).toBe(`${REPORT_LINK_PATH}${RUN}/${TOKEN}`);
   });
 
-  it('read back to the same run and token', () => {
-    // The round trip, through the parser both the app and the CI tripwire use. A capture is one
-    // capture whether it is named by its link or by its storage URL.
-    const link = reportLinkFor(SITE, RUN, TOKEN);
-    const proxied = resolve(
-      proxyRule(deployed()).to,
-      link.slice(`${SITE}${REPORT_LINK_PATH}`.length),
-    );
+  it('never sends the reader to storage', () => {
+    /*
+      The whole point of the ruling. Supabase serves public HTML as text/plain under a sandbox CSP
+      whatever mimetype is stored, so a proxy pointed at storage delivers an unstyled document with
+      no captures. The storage URL remains the fallback for a reader who has the path; it is not
+      what the link resolves to.
+    */
+    const to = proxyRule(deployed()).to;
 
-    expect(reportCaptureRefFrom(link)).toEqual({ runId: RUN, token: TOKEN });
-    expect(reportCaptureRefFrom(proxied)).toEqual(reportCaptureRefFrom(link));
+    expect(to).not.toContain('supabase');
+    expect(to).not.toContain('storage/v1');
+    expect(to).not.toContain(REPORT_BUCKET);
   });
 
-  it('reconciles the extension in exactly one place', () => {
-    // The delivered link carries no `.html` and the object does — deliberately, because a URL
-    // handed to a person should not advertise a file format. The proxy is where that is bridged,
-    // and it must be the only place.
+  it('keeps the extension out of the delivered link and out of the proxy', () => {
+    // The object carries `.html`; the link does not, because a URL handed to a person should not
+    // advertise a file format. The worker now reconciles that, so the rewrite must not.
     expect(reportLinkFor(SITE, RUN, TOKEN)).not.toContain('.html');
-    expect(proxyRule(deployed()).to).toContain(':splat.html');
+    expect(proxyRule(deployed()).to).not.toContain('.html');
+    expect(reportObjectKey(RUN, TOKEN)).toContain('.html');
   });
 });
 
@@ -110,19 +113,19 @@ describe('the generated redirects', () => {
     expect(deployed()).toContain('/*  /index.html  200');
   });
 
-  it('tolerates a trailing slash on the storage origin', () => {
-    const file = redirectsFile({ storageOrigin: `${ORIGIN}/`, onNetlify: true });
+  it('tolerates a trailing slash on the worker origin', () => {
+    const file = redirectsFile({ workerOrigin: `${ORIGIN}/`, onNetlify: true });
 
-    expect(proxyRule(file).to).not.toContain('.co//');
+    expect(proxyRule(file).to).not.toContain('.dev//');
   });
 
-  it('fails a Netlify build with no storage origin, rather than shipping dead links', () => {
+  it('fails a Netlify build with no worker origin, rather than shipping dead links', () => {
     // A deploy whose report links 404 is worse than a build that stops, and Netlify is the only
     // place this file means anything.
-    expect(() => redirectsFile({ storageOrigin: undefined, onNetlify: true })).toThrow(
-      /VITE_SUPABASE_URL/,
+    expect(() => redirectsFile({ workerOrigin: undefined, onNetlify: true })).toThrow(
+      /VITE_REPORT_ORIGIN/,
     );
-    expect(() => redirectsFile({ storageOrigin: '', onNetlify: true })).toThrow(/VITE_SUPABASE_URL/);
+    expect(() => redirectsFile({ workerOrigin: '', onNetlify: true })).toThrow(/VITE_REPORT_ORIGIN/);
   });
 
   it('omits the rule on a local build without failing it', () => {
@@ -132,7 +135,7 @@ describe('the generated redirects', () => {
       This is what keeps `bundledControls.test.ts`, which runs a real `vite build` with no
       environment, from depending on deployment configuration.
     */
-    const file = redirectsFile({ storageOrigin: undefined, onNetlify: false });
+    const file = redirectsFile({ workerOrigin: undefined, onNetlify: false });
 
     expect(file).toContain('/*  /index.html  200');
     expect(() => proxyRule(file)).toThrow();

@@ -51,14 +51,17 @@ import type { Plugin } from 'vite';
   package built. It is declared in the build command rather than inherited from whatever happened
   to run first.
 */
-import { REPORT_BUCKET, REPORT_LINK_PATH } from '@mintro/engine';
-
-/** Where Supabase serves a public object from, under the storage origin. */
-const PUBLIC_OBJECT_PREFIX = 'storage/v1/object/public';
+import { REPORT_LINK_PATH } from '@mintro/engine';
 
 export interface ProxyConfig {
-  /** The Supabase project origin, e.g. `https://abcdef.supabase.co`. */
-  readonly storageOrigin: string | undefined;
+  /**
+   * The worker's public origin, e.g. `https://mintro-screener-worker.fly.dev`.
+   *
+   * **Not the storage origin.** Supabase serves public HTML as `text/plain` with a sandbox CSP
+   * whatever mimetype is stored, which strips the inline styles and inline captures a
+   * self-contained report is made of. The worker serves the bytes with headers we control.
+   */
+  readonly workerOrigin: string | undefined;
   /** True on a Netlify build, where a missing origin is fatal rather than irrelevant. */
   readonly onNetlify: boolean;
 }
@@ -83,25 +86,26 @@ export function redirectsFile(config: ProxyConfig): string {
     '',
   ];
 
-  if (config.storageOrigin !== undefined && config.storageOrigin !== '') {
-    const origin = config.storageOrigin.replace(/\/+$/, '');
+  if (config.workerOrigin !== undefined && config.workerOrigin !== '') {
+    const origin = config.workerOrigin.replace(/\/+$/, '');
     lines.push(
-      '# Captured reports. Proxied, not redirected: a 301 would disclose the storage URL.',
-      `${REPORT_LINK_PATH}* ${origin}/${PUBLIC_OBJECT_PREFIX}/${REPORT_BUCKET}/:splat.html 200`,
+      '# Captured reports, served by the worker. Proxied, not redirected: a 301 would put the',
+      '# worker origin in the address bar, and the link people hold should be a Mintro one.',
+      `${REPORT_LINK_PATH}* ${origin}${REPORT_LINK_PATH}:splat 200`,
       '',
     );
   } else if (config.onNetlify) {
     // A deploy whose report links 404 is worse than a build that stops. Netlify is the only place
     // this file means anything, so this is where the requirement is real.
     throw new Error(
-      'VITE_SUPABASE_URL is not set, so there is no storage origin to proxy captured reports to. ' +
+      'VITE_REPORT_ORIGIN is not set, so there is nowhere to proxy captured reports to. ' +
         `Every ${REPORT_LINK_PATH} link would 404.`,
     );
   } else {
     // A local build — `npm run web:build`, or the bundle the worker renders from. There is no
     // Netlify serving layer here, so the rule is absent rather than wrong.
     lines.push(
-      '# No VITE_SUPABASE_URL at build time, so no report proxy. Local builds are served by the',
+      '# No VITE_REPORT_ORIGIN at build time, so no report proxy. Local builds are served by the',
       "# worker's own report server, which has no Netlify layer to configure.",
       '',
     );
@@ -137,7 +141,7 @@ export function headersFile(): string {
 /** Emits both files into the build output. */
 export function netlifyReportProxy(env: NodeJS.ProcessEnv = process.env): Plugin {
   const config: ProxyConfig = {
-    storageOrigin: env['VITE_SUPABASE_URL'],
+    workerOrigin: env['VITE_REPORT_ORIGIN'],
     onNetlify: env['NETLIFY'] === 'true',
   };
 
