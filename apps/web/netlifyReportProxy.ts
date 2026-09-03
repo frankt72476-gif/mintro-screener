@@ -31,6 +31,26 @@
  */
 
 import type { Plugin } from 'vite';
+/*
+  This import is why `apps/web`'s build script compiles the engine first.
+
+      "build": "tsc --build ../../packages/engine && vite build"
+
+  **Do not remove that step, and do not resolve this import any other way.** Vite pre-bundles its
+  own config with esbuild before any of the config's own settings apply, so `resolve.alias` — which
+  points `@mintro/engine` at `src/browser.ts` for the *app* bundle — does not govern this line. It
+  falls through to ordinary package resolution, and the engine's `exports` names one entry:
+  `./dist/src/index.js`. No dist, no entry, and the build dies with *"Failed to resolve entry for
+  package @mintro/engine"* before `VITE_SUPABASE_URL` is ever read.
+
+  That is exactly how this shipped broken. A local build and CI both passed, because both ran in a
+  tree where something had already compiled the engine — CI's `npm run check` does it as a side
+  effect of typechecking before the tests. Netlify starts clean, and the first real deploy failed.
+
+  The prerequisite is real and permanent: a config that imports a workspace package needs that
+  package built. It is declared in the build command rather than inherited from whatever happened
+  to run first.
+*/
 import { REPORT_BUCKET, REPORT_LINK_PATH } from '@mintro/engine';
 
 /** Where Supabase serves a public object from, under the storage origin. */

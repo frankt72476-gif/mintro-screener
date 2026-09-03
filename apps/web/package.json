@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --build ../../packages/engine && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --build"
   },

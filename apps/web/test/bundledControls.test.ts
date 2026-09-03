@@ -28,12 +28,32 @@ const DIST = 'apps/web/dist/assets';
 let bundle = '';
 
 beforeAll(() => {
+  const run = (command: string, args: readonly string[]): void => {
+    execFileSync(command, [...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
+  };
+
+  /*
+    The engine first, and this line is not optional.
+
+    `apps/web/vite.config.ts` imports `netlifyReportProxy.ts`, which imports `@mintro/engine`. Vite
+    pre-bundles its config with esbuild before `resolve.alias` applies, so that import resolves
+    through the package's `exports` — which names `./dist/src/index.js` and nothing else. Without a
+    compiled engine the build dies before it starts.
+
+    This test passed for the same reason the Netlify build did not: `npm run check` typechecks
+    before it tests, and `tsc --build` leaves the engine's dist behind. The dependency was real,
+    inherited from whatever ran first, and declared nowhere. `apps/web`'s build script now states
+    it — but this invokes the binary directly rather than the script, deliberately, so it has to
+    state it too.
+  */
+  run('npx', ['tsc', '--build', 'packages/engine']);
+
   // `npx vite build` rather than the workspace script, so this does not depend on a package.json
   // name staying put. Output is swallowed; a failure throws and the message is the build's.
-  execFileSync('npx', ['vite', 'build', 'apps/web', '--logLevel', 'error'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: process.platform === 'win32',
-  });
+  run('npx', ['vite', 'build', 'apps/web', '--logLevel', 'error']);
 
   expect(existsSync(DIST), `${DIST} does not exist after a build`).toBe(true);
   bundle = readdirSync(DIST)

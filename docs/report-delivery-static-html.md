@@ -356,7 +356,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Four findings from building this, all worth keeping
+#### Five findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -398,6 +398,34 @@ This is the same discipline as saved storefront HTML in the check fixtures, appl
 failed the moment the app imported `reportLinkForKey`: `@mintro/engine` resolves to `browser.ts` in
 the browser, and the symbol had only been exported from `index.ts`. Typecheck and every worker test
 passed. Nothing else in the suite would have found it before the bundle broke at build time.
+
+**A build that depended on a build step nobody declared.** `vite.config.ts` imports
+`netlifyReportProxy.ts`, which imports `@mintro/engine`. Vite pre-bundles its own config with
+esbuild **before** any of the config's settings apply, so `resolve.alias` — which points the engine
+at `src/browser.ts` for the app bundle — does not govern that line. It falls through to ordinary
+package resolution, and the engine's `exports` names one entry, `./dist/src/index.js`. On a clean
+checkout there is no dist, and the build dies with *"Failed to resolve entry for package
+@mintro/engine"* before `VITE_SUPABASE_URL` is ever read.
+
+Every check that could have caught it ran somewhere the prerequisite was already satisfied. My
+local build had a dist from an earlier `tsc --build`. **And so did CI, by accident**:
+`bundledControls.test.ts` shells out to `vite build`, and it passed only because `npm run check`
+typechecks before it tests, and `tsc --build` leaves the engine compiled as a side effect. Nothing
+declared the dependency; two independent environments inherited it and both reported success.
+Netlify starts clean, and the first real deploy failed.
+
+The fix declares it in both places, because the two invoke the build differently:
+`apps/web`'s script is now `tsc --build ../../packages/engine && vite build`, and the test runs the
+same `tsc --build` before shelling out — it calls the binary rather than the script, deliberately,
+so the script's line does not reach it. Verified by deleting every `dist/` and running each from
+that state, rather than by a build in a tree that already worked.
+
+The general form, and it is the widest of the five: **the fixture problem is not limited to
+fixtures. An environment can be a fixture.** When the thing under test is a build, the environment
+it runs in is an input — and an input inherited from previous work is one nobody chose. A tree that
+already satisfies a prerequisite cannot tell you whether the prerequisite is met; it can only tell
+you that it was met this time. State the prerequisite in the command, and verify from the state a
+stranger would start in.
 
 **A catch-all above the report rule would have served the wrong document, successfully.** Netlify
 evaluates `netlify.toml` redirects **before** `_redirects`, and first match wins. The existing SPA
