@@ -57,7 +57,7 @@ not. The capture costs one extra step in a pipeline that is already rendering th
 
 ## Implementation spec
 
-Seven pieces. Commit them separately and stop for review between each.
+Eight pieces. Commit them separately and stop for review between each.
 
 ### 1. Storage
 
@@ -65,8 +65,14 @@ New Supabase storage bucket for rendered reports. Public-read, unguessable path.
 
 - Path: `reports/<runId>/<token>.html` where `token` is 32 bytes of CSRNG, base64url.
 - Content type `text/html; charset=utf-8`.
-- No expiry. Retention follows the existing run retention posture: long-term, purge only on
-  operator approval after export verification.
+- No expiry, and nothing sets a lifecycle rule on the bucket.
+
+  This was specced as *"retention follows the existing run retention posture"*. **There is no run
+  retention posture.** D-130's clock, approval gate and purge are package-scoped, over the documents
+  bucket; nothing in the repository deletes from the evidence bucket, and D-130 rules explicitly that
+  run history stays in the database indefinitely. Captured reports therefore inherit what runs
+  already have, which is indefinite retention — the same position the emailed PDF was always in.
+  Step 3 records what that does and does not oblige.
 - `<meta name="robots" content="noindex">` in the captured document itself. **This is the primary
   control and it is required unconditionally.** For an HTML document the meta tag is the mechanism,
   not a fallback for one: it travels with the bytes, so it holds if the file is ever served from
@@ -77,7 +83,7 @@ New Supabase storage bucket for rendered reports. Public-read, unguessable path.
   it**, as defence in depth. It is not the gate of record, and the original spec was wrong to call
   it that. Supabase storage cannot attach it to an object at all: `FileOptions.headers` merges into
   the request headers of the upload, and user metadata is readable through `info()` but never
-  emitted on a GET. The rewrite in step 3 is where the header is available.
+  emitted on a GET. The rewrite in step 4 is where the header is available.
 - Bucket is not listable.
 - **`allowed_mime_types` and `file_size_limit` are deliberately not set on the bucket yet.**
   Constraining a public bucket to `text/html` is worth having — it is what stops anything else
@@ -125,11 +131,31 @@ Concretely:
 - Fonts: either inlined as data URIs or dropped to a system font stack. Decide by file size and
   report which you chose. A report that silently loses its typeface in 2029 because a CDN moved is
   the same failure in a smaller costume.
-- **Evidence captures need a ruling from you, CC.** Report back before implementing: are the
-  evidence images already stored as immutable objects under the run's own retention, with stable
-  URLs? If yes, reference them and note the dependency in the decision record. If they are served
-  from anything that regenerates, resizes, or expires, inline them as data URIs and accept the
-  file size. Do not guess. A frozen HTML file pointing at assets that can move is not frozen.
+- **Evidence captures: inlined as data URIs, full fidelity, no re-encoding.** Ruled 2026-09-03.
+
+  The objects themselves are as stable as they could be — keys are `<run_id>/<layer>/<sha256>`, so
+  the key is the hash of the bytes; they are append-only; nothing anywhere passes Supabase's
+  `transform` option, so nothing resizes or regenerates on read. What disqualifies referencing them
+  is **delivery**: the report reaches its captures through `signEvidenceUrl(…, 300)`, a
+  five-minute signed URL minted per render. A frozen file holding those is dead in five minutes,
+  and the only way to a stable URL would be a public evidence bucket, which 0008 refuses by raised
+  exception.
+
+  Inlining happens **in Node, against the fetched bytes** — never inside the Playwright page, which
+  would hold the whole document in browser memory during capture.
+
+  Measured on the five stored storefront reports: 1–9 cited captures each, 0.1–10.5 MB raw,
+  0.2–14.4 MB once base64 inflates them by a third. Across all 83 stored runs, mean 9.7 captures at
+  7.9 MB, largest single capture 3.8 MB.
+
+  Rejected: copying the cited captures into the reports bucket and referencing those. It is cheaper
+  on every axis and it trades away the self-contained property this decision exists to create.
+- **A 40 MB ceiling on the captured file, asserted at capture.** Exceeding it **fails the job**. It
+  does not warn and proceed, and it does not write a truncated file. The measurements above put a
+  realistic report at 8–15 MB, so this is headroom rather than a routine bound — but the 25-page
+  render cap does not by itself hold the file under 30 MB, and a report that grows without a
+  ceiling is one that eventually cannot be opened on a phone by the person it was sent to. A
+  ceiling that is only logged is not a ceiling.
 - No relative URLs of any kind in the output.
 
 **Fail loud.** If capture fails, the job fails and the report is not delivered. Do not write a
@@ -137,7 +163,70 @@ partial file, do not fall back to a link that 404s, do not send an email pointin
 Silent failure rendering as an empty state instead of an error is a recurring pattern here
 (D-036, D-200, D-213). Assert on the failure path, not just the happy one.
 
-### 3. Netlify fronting
+### 3. Purge coverage — the half that is a task, and the half that is not
+
+**The rule, ruled 2026-09-03: any purge that destroys a run's evidence must also destroy that run's
+captured reports, and an operator approving it must see both buckets and both counts stated rather
+than infer them.** Inlined captures are full-resolution merchant screenshots living in a
+**public-read** bucket. A purge that reports a run's evidence destroyed while complete copies of it
+sit behind a link that never expires would make the retention posture false.
+
+The obligation splits cleanly, and the two halves are not the same kind of work.
+
+#### The correction this step rests on
+
+An earlier session reported that the existing purge removes a run's evidence, and that inlining
+would therefore falsify a working mechanism. **That was wrong.** Checked against the code:
+
+- `purgePlanJob` is wired to `DOCUMENTS_BUCKET`, not to evidence (`apps/worker/bin/worker.ts`).
+- `purgeExecutor` reconciles a **package** prefix, derived from a `package_purge_approvals` row.
+  `packages` references `merchants` and carries no run id. Nothing in the chain is run-scoped.
+- The only storage deletions in the repository are that purge, over the documents bucket, and the
+  export job and its sweep, over export staging. **Nothing anywhere deletes from the evidence
+  bucket**, which is what 0008 says in as many words and what hard constraint 5 requires.
+- D-130 is package retention, 180 days from `retention_started_at`. It rules that *run history stays
+  in the database indefinitely*. It does not create a run purge and does not gesture at one.
+
+So nothing is falsified today, because there is no run purge to falsify. There was an ordering
+ruling here — purge coverage before inlining — and it was made on the assumption that a mechanism
+existed to extend. It is withdrawn. **The capture step does not block on any of this.**
+
+#### The reports half: a task, and it ships with the capture step
+
+Everything under `reports/<runId>/` belongs to that run **by construction** — the path scheme says
+so, and nothing else may write there. So this half needs no reconciliation model, no approval gate
+and no intent ledger: it is a prefix delete. That is unlike the documents bucket, where the whole
+point of reconciling is that staged copies appear in no column and a purge driven from the columns
+would leave them.
+
+A run-scoped delete for captured reports is built **alongside the capture step**, not before it.
+Building it with the thing it deletes is what keeps the two in step; building it first would be
+writing a delete for a path shape nothing has written to yet.
+
+It is not wired to any queue and it deletes nothing on its own — same posture as `executePurge`,
+which exists and runs when a person decides it does. The point is that the reports half is
+**correct and in place on the day a run purge is built**, so whoever builds the hard half finds this
+one already done rather than discovering it as a gap.
+
+#### The evidence half: an open question, not in scope here
+
+Run-scoped evidence purge **does not exist**. Building it needs an approval model, a retention clock
+over runs and a reconciliation model, and it needs rulings this document has no business inventing:
+who may approve a run purge, what starts the clock, and whether export-before-purge applies to runs
+as it does to packages.
+
+That question predates this work and is not created by it. **It is Frank's to rule on separately,
+and this document does not block on it.**
+
+#### What is true today, stated plainly
+
+**A captured report is retained indefinitely. No mechanism in this system destroys it.** Neither
+does one destroy a run's evidence, and neither did one destroy the emailed PDF — a report that has
+been sent has always been a permanent artifact here, and D-130 says run history stays indefinitely
+in as many words. This decision does not change that position. It changes the artifact's format and
+where it is addressed from.
+
+### 4. Netlify fronting
 
 The delivered link is on a Mintro origin. Nothing outside this repo is sent a storage URL.
 
@@ -164,14 +253,14 @@ Two things this must not become:
 
 `reportCaptureRefFrom` in `packages/engine/src/reportCapture.ts` matches on the path tail rather
 than on a hostname and treats the `.html` as optional, so both spellings of one capture — the
-storage object and the delivered link — read back to the same run. The tripwire in step 6 fetches
+storage object and the delivered link — read back to the same run. The tripwire in step 7 fetches
 through this origin, because that is the URL that was actually delivered.
 
-The link itself is composed in the worker for the email in step 4 and stated in `netlify.toml`
+The link itself is composed in the worker for the email in step 5 and stated in `netlify.toml`
 here. That is a URL shape in two places, which is what D-034 is about — give `/r/` one owner in
 `reportCapture.ts` when this step lands, rather than spelling it out on both sides.
 
-### 4. Email bodies
+### 5. Email bodies
 
 Attachment comes out, link goes in, in every path that currently sends a report.
 
@@ -183,7 +272,7 @@ Copy: state that the report is a link and that the link does not expire. Do not 
 the format change. Operator identity enforcement is unchanged and already correct at the payload
 level (D-233) — the link and the surrounding copy carry no operator identity.
 
-### 5. Tests
+### 6. Tests
 
 The useful assertions here are about the captured bytes, not the render path.
 
@@ -197,33 +286,46 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-### 6. Storage-drift tripwire
+### 7. Storage-drift tripwire
 
 CI, not the validator. Fetch a captured report from a completed run and assert it still parses and
 still contains no external references. This is the check that catches an asset pipeline change
 reaching backwards into old reports. It belongs in CI because it needs network and because a
 validator that requires touching the engine to add a rule violates hard constraint 1.
 
-### 7. Decision record
+### 8. Decision record
 
-Write D-239 as above. Note the evidence-image ruling from step 2 once CC reports back — that
-dependency is load-bearing and belongs in the record rather than in a code comment.
+Write D-255 as above. Three things belong in the record rather than in a code comment, because each
+is a dependency someone reading the code six months out would otherwise have to rediscover:
+
+- **The evidence-image ruling** (step 2): inlined, because the captures are reached by five-minute
+  signed URLs and the only stable-URL alternative is a public evidence bucket.
+- **What retention actually is** (steps 1 and 3): a captured report is retained indefinitely and no
+  mechanism destroys it — the same position the emailed PDF was in. Run-scoped evidence purge is an
+  open question ruled elsewhere, and this decision neither creates it nor waits on it.
+- **Why the delivered URL is not the storage URL** (step 1): indirection, so storage can move
+  without invalidating issued links and no partner is handed the project ref.
 
 ---
 
 ## Order of work
 
 1. Bucket, path scheme, token generation. Commit, review. **Done 2026-09-03.**
-2. CC reports on evidence image storage. Ruling before implementation.
-3. Capture step in the worker, replacing `page.pdf()`. Commit, review.
+2. CC reports on evidence image storage. Ruling before implementation. **Done 2026-09-03: inline.**
+3. Capture step in the worker, replacing `page.pdf()` — **with the run-scoped delete for captured
+   reports (step 3's reports half) in the same commit.** Commit, review.
 4. Netlify fronting: the `/r/*` rewrite and the header. Commit, review.
 5. Email bodies and index renumbering. Commit, review.
 6. Tests and CI tripwire. Commit, review.
 7. Decision record.
 
-The fronting lands before the email change because the email is the first thing that states a URL
-to anyone outside the system. An email shipped ahead of the rewrite would carry links that 404 —
-and this is the one artifact whose links are meant to work in five years.
+Run-scoped **evidence** purge is not on this list. It does not exist, it is not created by this
+work, and it is ruled separately — see step 3.
+
+One ordering here is load-bearing. **The fronting precedes the email change**, because the email is
+the first thing that states a URL to anyone outside the system. An email shipped ahead of the
+rewrite would carry links that 404 — and this is the one artifact whose links are meant to work in
+five years.
 
 ## Outside the code
 

@@ -44,9 +44,19 @@
 --
 -- ## Retention
 --
--- No expiry, following the existing run retention posture (0035, 0036): long-term, purged only on
--- operator approval after export verification. Nothing here sets a lifecycle rule and nothing in
--- application code deletes from this bucket.
+-- No expiry. Nothing here sets a lifecycle rule and nothing in application code deletes from this
+-- bucket.
+--
+-- An earlier draft of this comment said retention here follows "the existing run retention posture
+-- (0035, 0036)". It does not, and there is no such posture. 0035 and 0036 are **package** retention
+-- — D-130's clock, approval gate and purge, over the `documents` bucket. Nothing in the repository
+-- deletes from the `evidence` bucket, and D-130 rules that run history stays indefinitely. So a
+-- captured report inherits what a run already has, which is indefinite retention.
+--
+-- That is tolerable while a captured report cites its evidence. It stops being tolerable once the
+-- capture step inlines evidence images, because then this public-read bucket holds full-resolution
+-- merchant screenshots. See `docs/report-delivery-static-html.md`, step 3: purge coverage over both
+-- buckets is a precondition for inlining, and it is not built.
 
 -- ---------------------------------------------------------------------------------------------
 -- The bucket
