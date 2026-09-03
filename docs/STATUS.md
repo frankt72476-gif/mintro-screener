@@ -659,11 +659,51 @@ taken or a measurement that has not been made, and each says which.
 | **Evidence slip composition** | D-075 | **Unmeasured.** 16.6 pages, the largest component of the printed report, and how much is reserved space versus the captures themselves is not known — the measuring browser is not served evidence. Needs a run measured with evidence served. Reducing the largest thing in the document on an assumption is the trade D-047 ruled out. |
 | **PDF byte-level verification** | known limit | `loop-check` reads the rendered DOM, which is what `page.pdf()` prints and the honest authority on content. It does **not** read the PDF's bytes: `extractPdfText` cannot decode Chromium's subset-embedded fonts (D-057) and returns a shifted alphabet on our own output. Proving the file on disk says what the page said needs a real PDF parser, and is a separate decision. |
 | **NAME-003 — proper names for non-peptide compounds** | D-137 | **Two inputs, neither of which exists.** The map holds two peptides; the catalogues seen are largely SARMs and SARM-adjacent compounds. Extending it needs (1) a ruling that the programme's naming clause reaches non-peptides at all — the programme document never mentions them — and (2) authoritative proper names from a specimen rather than from memory (D-118). Frank's ruling 2026-08-26: **do not extend the map on either.** Until then the rule reports `no_check_built` per page, which names Mintro as the limitation and counts as outstanding rather than resolved. |
+| **Two palette tokens collide across the two stylesheets** | needs a ruling | `documentsReport.css` declares a bare `:root` that redefines `--ink` and `--paper`. It is imported second, so the **Documents Check values win everywhere**, including on the Site Check report. Pre-existing, recorded rather than fixed: which palette Site Check should use is a ruling, and the fix is its own commit. See *A token block that claims a scope it does not have* below. |
 | **`report_date` and the program document** | D-041, and the questions section below | `report_date` was renamed on an *interpretation* of the program document rather than a ruling from its owner. That and the other open questions are listed under **Questions for whoever owns the program document** — they are answerable only by that person, not by reading the rules harder. |
 
 Frank has signed off on the screening loop. Documents Check is built through M6 and verified
 against the test project; what remains is listed above as carried rather than open, because none
 of it is waiting on a decision nobody has taken.
+
+### A token block that claims a scope it does not have
+
+`apps/web/src/documentsReport.css` opens by saying it is *"scoped under `.documents-report` so it
+cannot reach the Site Check report, which has its own visual language."* Ninety-nine of its rules
+are. Its `:root` block is not — `:root` is the document element, and a custom property declared
+there is inherited by everything on the page.
+
+`main.tsx` imports `styles.css` first and `documentsReport.css` second, so on a tie the second file
+wins. Two tokens tie:
+
+| token | `styles.css` (Site Check) | `documentsReport.css` | in force | uses in `styles.css` |
+|---|---|---|---|---|
+| `--ink` | `#1B1233` | `#16181C` | **`#16181C`** | 48 |
+| `--paper` | `#F6F5FA` | `#FBFBF9` | **`#FBFBF9`** | 9 |
+
+Exactly two, checked by parsing both files' `:root` blocks rather than by reading them — the other
+twelve tokens Documents Check declares (`--ink-2`, `--rule`, `--fail`, `--pass`, `--shell`, …) have
+no counterpart in `styles.css` and collide with nothing.
+
+**What is measured and what is not.** The computed values are measured, on the built bundle: the
+Site Check report renders with `--ink: #16181C` and `--paper: #FBFBF9`. Both substitutions drop a
+violet cast for a neutral one — Site Check's ink is a violet-tinted near-black and its paper a faint
+violet-grey; the Documents Check pair are neutral and faintly warm. Whether that is *visually*
+objectionable is not measured and is not for this note to decide; it is the ruling the row above
+waits on.
+
+**Why it is recorded and not fixed.** Three fixes are available and they are not equivalent — scope
+the block under `.documents-report`, rename its tokens, or reorder the imports — and each answers a
+different question about which palette Site Check is supposed to have. That is a design ruling, and
+it belongs in its own commit rather than folded into whatever happened to be touching the stylesheet.
+
+**Same class as two defects already recorded.** `.na` was a page container colliding with the
+`not_evaluable` state class and reaching 76 elements in one report (D-247); `.respond` composed with
+`.cbox` and inherited a border it did not declare. All three are a rule that is correct in its own
+file and wrong in composition, and none is visible to typechecking, to a unit test, or to a person
+reading the diff. `stateClassCollision.test.ts` guards the first shape. Nothing yet guards this one:
+a guard would be *no stylesheet may declare a token another stylesheet already declares*, and it is
+worth writing at the same time as the fix.
 
 ---
 
