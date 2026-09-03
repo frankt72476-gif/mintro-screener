@@ -8,7 +8,7 @@
  * unchanged; the data's own name for it is `not_evaluable`.
  */
 
-import { Fragment, createContext, useContext, useMemo, useState } from 'react';
+import { Fragment, useContext, useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
 import {
   REQUIREMENT_HEADINGS,
@@ -43,7 +43,7 @@ import { EvidenceSlip } from './EvidenceSlip.js';
 import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
-import { createNumbering, eyeLineOrdinal, type Numbering } from '../lib/numbering.js';
+import { NumberingContext, createNumbering, eyeLineOrdinal, useFindingNumber } from '../lib/numbering.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { leadSentence, notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
@@ -810,22 +810,6 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
  * work, which is the treatment the lines already have (D-167).
  */
 /** `exactOptionalPropertyTypes`: an absent box is an absent prop, not a prop holding undefined. */
-/**
- * The report's numbering, reachable from any row without threading it through eight components
- * (D-248).
- *
- * Context rather than props because the number is needed at the leaves — a finding row, an eye-test
- * line — and the path to each runs through the stopping panel, two section renderers, a band, a
- * block and a category card. Drilling it would touch every one of those signatures for a value none
- * of them uses, and a prop that eight components pass and do not read is a prop somebody eventually
- * forgets to pass.
- *
- * The default numbering is a live one rather than null, so a component rendered outside the
- * provider still gets consistent numbers instead of throwing. Nothing renders these rows outside
- * `ReportView`, and if something starts to, a number is not the thing that should break it.
- */
-const NumberingContext = createContext<Numbering>(createNumbering());
-
 const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Element } =>
   box === null || box === undefined ? {} : { commentBox: box };
 
@@ -1394,7 +1378,7 @@ function EyeTestPanel({
               it, which is why the sequence is continuous rather than per-section.
             */}
             <span className="eye-q">
-              <span className="find-n eye-n">{numbering.forEyeLine(verdict.id)}</span>
+              <span className="ref-n eye-n">{numbering.forEyeLine(verdict.id)}</span>
               {verdict.question}
             </span>
             {/* A clear row is the question and the word, nothing more. */}
@@ -1619,7 +1603,7 @@ function FindingRow({
   readonly evidenceFrom?: string;
 }): JSX.Element {
   // Allocated on first sight, which is display order (D-248).
-  const number = useContext(NumberingContext).forFinding(finding);
+  const number = useFindingNumber(finding);
   const [open, setOpen] = useState(false);
   const source = finding.evidence[0]?.sourceUrl;
   // Every finding is expanded in the export. Nothing is collapsed, grouped or dropped.
@@ -1646,7 +1630,7 @@ function FindingRow({
               the chip alone would hide the key a stored answer carries, and the tag alone is what
               nobody outside Mintro can pronounce.
             */}
-            <span className="find-n">{number}</span>
+            <span className="ref-n">{number}</span>
             {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{reference ?? finding.ruleId}</span>
           </span>
           {/*

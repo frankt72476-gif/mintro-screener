@@ -402,7 +402,7 @@ function RecordBox({
       <div className="respond-head">
         <span className="respond-icon" aria-hidden="true">✎</span>
         {/* The number a person says, before the words (D-248). */}
-        {number !== undefined && <span className="find-n">{number}</span>}
+        {number !== undefined && <span className="ref-n">{number}</span>}
         <span className="respond-label">{label}</span>
         {reference !== undefined && <span className="respond-ref">{reference}</span>}
       </div>

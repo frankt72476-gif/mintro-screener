@@ -2835,7 +2835,15 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .eye-list li,
 .att-q {
   display: grid;
-  grid-template-columns: 82px 1fr;
+  /*
+    `minmax`, not a fixed 82px.
+
+    The mark is `white-space: nowrap`, and NO ANSWER RECORDED is about 140px at 9.5px mono — so on
+    every unanswered question it overflowed the track and printed on top of the question text. That
+    predates the number chip; adding the chip made it visible rather than causing it. The minimum
+    keeps the marks aligned where they fit, and the track grows for the one label that does not.
+  */
+  grid-template-columns: minmax(82px, max-content) 1fr;
   gap: var(--s1) var(--s3);
   align-items: baseline;
 }
@@ -3319,6 +3327,14 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 :root {
   --surface-1: var(--paper);
   --fill-accent: var(--violet);
+  /*
+    What goes ON the accent.
+
+    Named rather than hardcoded `#fff` at each site, so the pair moves together if the accent ever
+    changes — a fill and its text are one decision. White measures 11.7:1 against `--violet`
+    (#4318A8), comfortably past WCAG AA for the 10.5px this is set at, which needs 4.5:1.
+  */
+  --on-accent: #FFFFFF;
 }
 
 .respond {
@@ -3361,27 +3377,51 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .respond-foot, .respond-t { display: none; }
 }
 
-/* ── The finding number (D-248) ────────────────────────────────────────────────────────────────
+/* ── The reference number (D-248, D-250) ────────────────────────────────────────────────────────────────
+   `ref-n`, not `find-n`. The pool covers findings, eye-test impressions and operational questions,
+   and `attestationSection.test.ts` refuses any class matching `find` on an attestation row —
+   "a row that carried `find` ... would look like a finding whatever the heading said". That guard
+   caught the first name, and it was right to: a chip called `find-n` on a merchant's own statement
+   is the finding/attestation boundary blurring by class name.
+
    The pointer a person can say out loud. `GATE-002 · 3 of 5` is what a comment is keyed on and it
    is unsayable on a call; the chip is what an agent and a merchant use to mean the same line.
 
-   Weighted against the mono tag beside it: this is the label, that is the key. Ink on the D
-   surface, never the accent — the rail owns the one colour in a respond zone (D-201), and a
-   coloured number would read as a state. It is a pointer, not a verdict. */
-.find-n {
-  display: inline-block;
-  min-width: 1.55em;
-  padding: 1px 5px;
+   Weighted against the mono tag beside it: this is the label, that is the key.
+
+   **A solid accent fill, and that is a deliberate exception** (D-250). Everything else at this
+   density is restrained — the respond zone gets one 3px rail and no tint, because the section bands
+   own colour as identity (D-201). The chip is louder on purpose: it is the thing a reader scans for
+   when somebody says "look at 24", and a number that has to be hunted for is a pointer that does not
+   point. One flat fill, no gradient and no shadow, so it stays an index rather than becoming a
+   control. */
+.ref-n {
+  /*
+    A circle at one and two digits, which is every report anybody has run.
+
+    `inline-flex` with a square minimum rather than a fixed width: `border-radius: 50%` on a box
+    whose width and height differ is an ellipse, which is what the first cut rendered (16×20). Past
+    99 it relaxes into a pill rather than clipping the third digit — a number that cannot be read is
+    worse than one that is not perfectly round.
+  */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
   margin-right: var(--s2);
-  border-radius: 3px;
-  background: var(--surface-1);
-  border: 0.5px solid var(--line);
+  /* A circle, not a tag: at one or two digits a pill and a circle are the same shape, and the
+     circle is what reads as an index rather than as a state chip. */
+  border-radius: 999px;
+  background: var(--fill-accent);
+  border: 0;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10.5px;
   font-weight: 700;
-  line-height: 1.5;
+  line-height: 1;
   text-align: center;
-  color: var(--ink);
+  color: var(--on-accent);
   /* The row is a flex line; the chip must not stretch or shrink with the title. */
   flex: 0 0 auto;
   vertical-align: baseline;
@@ -3397,3 +3437,6 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
    line spans both rather than landing in the question column. */
 .eye-list li > .respond,
 .eye-list li > .eye-mr { grid-column: 1 / -1; }
+
+/* The attestation row is a flex line; the chip sits with the mark rather than stretching. */
+.att-n { flex: 0 0 auto; align-self: baseline; margin-right: var(--s2); }

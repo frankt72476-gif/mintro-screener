@@ -48,6 +48,16 @@ const EYE_TEST = {
 /** How many rubric lines the fixture renders. */
 const EYE_LINES = 3;
 
+/** Two operational questions, so the fourth structure on the page really renders rows. */
+const ATTESTATIONS = {
+  asking: 'asked',
+  questions: [
+    { questionId: 'OPS-01', question: 'Who fulfils orders?', outcome: 'unanswered', prompt: 'Who fulfils orders?' },
+    { questionId: 'OPS-02', question: 'Where is stock held?', outcome: 'unanswered', prompt: 'Where is stock held?' },
+  ],
+  counts: { answered: 0, unanswered: 2, declined: 0, inherited: 0 },
+} as never;
+
 const render = (report: ScreeningReport, extra: Record<string, unknown> = {}): string =>
   renderToStaticMarkup(
     createElement(ReportView, {
@@ -59,9 +69,9 @@ const render = (report: ScreeningReport, extra: Record<string, unknown> = {}): s
     } as never),
   );
 
-/** Every `.find-n` chip, in document order. */
+/** Every `.ref-n` chip, in document order. */
 const numbersIn = (markup: string): number[] =>
-  [...markup.matchAll(/<span class="find-n[^"]*">(\d+)<\/span>/g)].map((m) => Number(m[1]));
+  [...markup.matchAll(/<span class="ref-n[^"]*">(\d+)<\/span>/g)].map((m) => Number(m[1]));
 
 describe('the sequence, on rendered output', () => {
   it.each(REPORTS)('%s: reads 1..N top to bottom, no gaps, no repeats', (_name, report) => {
@@ -92,7 +102,7 @@ describe('the sequence, on rendered output', () => {
     const markup = render(report, { eyeTest: EYE_TEST });
 
     // The chips inside the eye list carry `eye-n`; they must not start over.
-    const eyeNumbers = [...markup.matchAll(/<span class="find-n eye-n">(\d+)<\/span>/g)].map((m) =>
+    const eyeNumbers = [...markup.matchAll(/<span class="ref-n eye-n">(\d+)<\/span>/g)].map((m) =>
       Number(m[1]),
     );
     expect(eyeNumbers).toHaveLength(EYE_LINES);
@@ -122,8 +132,73 @@ describe('the number sits beside the code, not instead of it', () => {
     */
     const [, report] = REPORTS[0]!;
     const markup = render(report);
-    expect(markup).toMatch(/<span class="find-n">\d+<\/span>/);
+    expect(markup).toMatch(/<span class="ref-n">\d+<\/span>/);
     expect(markup).toMatch(/[A-Z]+-\d{3}/);
+  });
+});
+
+/**
+ * The guard for the class, not the instance (D-250).
+ *
+ * A section has now fallen out of the sequence twice — the eye test, then the operational questions
+ * — and both times nothing failed. An unnumbered section is indistinguishable from a section that
+ * was never meant to be numbered, so the only thing that can catch it is a count taken from the
+ * rendered document and compared against the rows that should carry a number.
+ *
+ * `ROW_SELECTORS` is the list that has to grow when a section is added. It is not self-maintaining
+ * and cannot be: nothing in the markup says "this is a referenceable line". What makes forgetting
+ * loud is the section count below — add a sixth section and that assertion fails, which sends
+ * whoever added it to this file.
+ */
+const ROW_SELECTORS = {
+  finding: /<div class="find [^"]*"/g,
+  eyeLine: /<li key[^>]*data-verdict=|<li data-verdict=/g,
+  attestation: /<li class="att-row /g,
+} as const;
+
+describe('every section is in the sequence (D-250)', () => {
+  const markup = (): string => render(REPORTS[0]![1], { eyeTest: EYE_TEST, attestations: ATTESTATIONS });
+
+  it('renders all five sections, so a sixth cannot arrive unnoticed', () => {
+    /*
+      The trip-wire. This number is not interesting in itself — what it does is fail when the report
+      grows a section, so the person who added it reads the file that explains why numbering is not
+      automatic.
+    */
+    const m = markup();
+    const sections = [
+      /class="panel stop-panel/.test(m),
+      /data-section="notmet"/.test(m),
+      /class="panel eye-panel"/.test(m),
+      /data-section="questions"/.test(m),
+      /data-section="review"/.test(m),
+    ];
+    expect(sections.filter(Boolean)).toHaveLength(5);
+  });
+
+  it('gives every referenceable row exactly one chip', () => {
+    const m = markup();
+    const chips = numbersIn(m).length;
+    const rows = Object.values(ROW_SELECTORS).reduce(
+      (total, pattern) => total + [...m.matchAll(pattern)].length,
+      0,
+    );
+
+    // Not vacuous: all three kinds must actually be present in this render.
+    for (const [kind, pattern] of Object.entries(ROW_SELECTORS)) {
+      expect([...m.matchAll(pattern)].length, `no ${kind} rows rendered`).toBeGreaterThan(0);
+    }
+    expect(chips, 'a referenceable row rendered without a number').toBe(rows);
+  });
+
+  it('numbers the operational questions, continuing the pool', () => {
+    const m = markup();
+    const attNumbers = [...m.matchAll(/<span class="ref-n att-n">(\d+)<\/span>/g)].map((x) => Number(x[1]));
+    expect(attNumbers.length).toBeGreaterThan(0);
+    // After the eye test, which is after the findings — no restart anywhere.
+    const eyeNumbers = [...m.matchAll(/<span class="ref-n eye-n">(\d+)<\/span>/g)].map((x) => Number(x[1]));
+    expect(Math.min(...attNumbers)).toBeGreaterThan(Math.max(...eyeNumbers));
+    expect(numbersIn(m)).toEqual(Array.from({ length: numbersIn(m).length }, (_, i) => i + 1));
   });
 });
 
@@ -135,7 +210,7 @@ describe('a response box on every eye-test line (D-249)', () => {
         createElement(
           'div',
           { className: 'respond', 'data-line': line.rubricId, 'data-ordinal': line.ordinal },
-          createElement('span', { className: 'find-n' }, String(line.number)),
+          createElement('span', { className: 'ref-n' }, String(line.number)),
           createElement('span', { className: 'respond-label' }, 'Your plan for this'),
           createElement('textarea', { className: 'input respond-t' }),
         ),

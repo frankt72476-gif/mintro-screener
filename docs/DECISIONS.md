@@ -15965,3 +15965,76 @@ A `clear` line gets a box too. Every box in this product is optional and says so
 a merchant has nothing to add to costs them nothing — and a line they want to answer and cannot is
 the failure worth avoiding. Deciding for them which impressions are worth a reply is the same
 mistake as asking them to rebut a rubric.
+
+---
+
+## D-250 — Every section is in the sequence, and the chip is a deliberate exception to the restraint
+**2026-09-02 · business owner · `apps/web/src/lib/numbering.ts`, `apps/web/src/components/Attestations.tsx`, `apps/web/src/styles.css`**
+
+D-248 numbered findings and eye-test lines. Operational questions were not numbered, and nobody
+noticed until somebody looked — which is the second time a section fell out of the sequence.
+
+### Why it happened twice, and what actually fixes it
+
+`NumberingContext` was declared inside `ReportView.tsx` and **not exported**. A context that is not
+exported can only be consumed from the file that declares it, so the eye test joined the sequence
+when it was wired inside that file, and the operational questions — rendered by `Attestations.tsx` —
+could not have joined it even if somebody had tried. Nothing failed. A section with no numbers is
+indistinguishable from a section that was never meant to have any.
+
+The context now lives in `lib/numbering.ts` beside the allocator, with `useLineNumber(key)` and
+`useFindingNumber(finding)`. Any file can reach it. **That is necessary and not sufficient** — it
+makes numbering possible from a new section, not automatic — so the guard is the real fix:
+
+`numbering.test.ts` counts the chips in the rendered document against the referenceable rows, per
+kind, and asserts each kind renders at least one so the count is never a comparison of two zeros.
+Removing the chip from operational questions fails it with *"a referenceable row rendered without a
+number: expected 60 to be 62"*. Beside it sits a section-count assertion whose only job is to fail
+when the report grows a sixth section, sending whoever added it to the file that explains why
+numbering is not automatic.
+
+### The pool includes things that are not findings, and that is fine
+
+An operational question is an attestation the merchant answers; an eye-test line is Mintro's
+impression. Neither is an observation, and the number does not make either one. A pointer is a
+pointer — *"look at 24"* works regardless — and what says which kind of thing a line is remains the
+section heading and structure, exactly where D-249 left it.
+
+### `ref-n`, not `find-n` — a guard caught the first name
+
+The chip shipped as `.find-n` and `attestationSection.test.ts` refused it: the attestation section
+asserts it carries no class matching `\bfind\b`, because *"a row that carried `find`, a state chip or
+a rule id would look like a finding whatever the heading said."*
+
+That guard was right and the name was wrong. The pool covers findings, impressions and merchant
+statements, so the chip is a **reference** number and is named for what it is. The finding/attestation
+boundary is not something a numbering change may erode by class name, and it very nearly did.
+
+### A solid accent fill, against the restraint everywhere else
+
+`background: var(--fill-accent)`, `--on-accent` white, 18×18 circle, flat — no gradient, no shadow.
+Measured on the built artifact: **10.85:1**, where WCAG AA at this size needs 4.5:1.
+
+This is louder than the rule this project otherwise follows. The respond zone gets one 3px rail and
+no tint precisely because the section bands own colour as identity (D-201), and a second filled
+element at that density would stack a colour system against them. The chip is the deliberate
+exception: it is the thing a reader scans for when somebody says *"look at 24"*, and a pointer that
+has to be hunted for does not point. It stays flat so it reads as an index rather than a control,
+and it is the only filled element at the row level.
+
+`--on-accent` is a token rather than `#fff` at each site, so a fill and the text on it move together.
+
+**Dark mode was asked about and does not exist.** No `prefers-color-scheme`, no `data-theme`, no dark
+class anywhere in the app — the report renders on one ground. The contrast above is the light figure,
+which is the only figure there is. If a dark mode is ever added, `--on-accent` is the token that has
+to answer for it.
+
+### One pre-existing defect surfaced, and fixed because the chip made it worse
+
+`.att-q` was `grid-template-columns: 82px 1fr` with a `white-space: nowrap` mark. **NO ANSWER
+RECORDED** is about 140px at 9.5px mono, so on every unanswered question it overflowed its track and
+printed on top of the question text. That predates this work — observed by rendering the section with
+the chip removed — and the chip made three overlapping things where there had been two.
+
+`minmax(82px, max-content)`: the marks stay aligned where they fit and the track grows for the one
+label that does not.

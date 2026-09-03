@@ -1288,7 +1288,7 @@ function CommentBox({
       <label className="flabel respond-head" htmlFor={`c-${number ?? existing.length}`}>
         <span className="respond-icon" aria-hidden="true">✎</span>
         {/* The number a person says, before the words (D-248). */}
-        {number !== undefined && <span className="find-n">{number}</span>}
+        {number !== undefined && <span className="ref-n">{number}</span>}
         <span className="respond-label">
           {label ??
             (existing.length > 0

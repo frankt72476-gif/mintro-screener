@@ -27,6 +27,7 @@
  */
 
 import { useState } from 'react';
+import { useLineNumber } from '../lib/numbering.js';
 import type { Attestation, NotChecked } from '@mintro/ruleset';
 import { attestationAsking, type AttestationAsking } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
@@ -235,6 +236,16 @@ function AttestationRow({
   readonly print: boolean;
 }): JSX.Element {
   const superseded = question.superseded ?? [];
+  /*
+    The same pool the findings and the eye-test lines draw from (D-248, D-250).
+
+    An operational question is an attestation the merchant answers rather than something Mintro
+    observed — but a pointer is a pointer, and "look at 24" works regardless. The section heading
+    already says what kind of thing it is, so the number carries no claim about evidentiary weight.
+
+    Keyed by `questionId`, which is stable and is what the answer is stored under.
+  */
+  const number = useLineNumber(`attestation:${question.questionId}`);
 
   return (
     <li className={`att-row att-${question.outcome}`}>
@@ -263,7 +274,10 @@ function AttestationRow({
                 ? 'Carried forward'
                 : OUTCOME_LABEL[question.outcome]}
         </span>
-        <span className="att-text">{question.question}</span>
+        <span className="att-text">
+          <span className="ref-n att-n">{number}</span>
+          {question.question}
+        </span>
       </div>
 
       <div className="att-meta">

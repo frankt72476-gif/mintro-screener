@@ -41,9 +41,19 @@
  * be the second identity the earlier ruling was right to refuse.
  */
 
+import { createContext, useContext } from 'react';
 import type { ReportFinding } from '@mintro/engine';
 
 export interface Numbering {
+  /**
+   * The number for anything referenceable that is neither a finding nor an eye-test line.
+   *
+   * Keyed by a string the caller owns — an operational question's `questionId`, say. Findings key by
+   * object identity because they have no id of their own that survives grouping; everything else
+   * does, and a string key is what lets a component in another file join the sequence without this
+   * module learning about it.
+   */
+  forLine(key: string): number;
   /**
    * The number for a finding, allocated on first sight.
    *
@@ -64,7 +74,7 @@ export interface Numbering {
 
 export function createNumbering(): Numbering {
   const findings = new Map<ReportFinding, number>();
-  const eyeLines = new Map<string, number>();
+  const lines = new Map<string, number>();
   let next = 1;
 
   const allocate = <K,>(map: Map<K, number>, key: K): number => {
@@ -78,11 +88,43 @@ export function createNumbering(): Numbering {
 
   return {
     forFinding: (finding) => allocate(findings, finding),
-    forEyeLine: (rubricId) => allocate(eyeLines, rubricId),
+    // Namespaced, so an eye-test id and an attestation id that happened to match are still two
+    // lines. They do not today; a shared map with unprefixed keys is how they would stop being.
+    forEyeLine: (rubricId) => allocate(lines, `eye:${rubricId}`),
+    forLine: (key) => allocate(lines, key),
     get count() {
       return next - 1;
     },
   };
+}
+
+/**
+ * The report's numbering, reachable from any row in any file.
+ *
+ * **It lived in `ReportView.tsx` and that is why this has now been missed twice.** A context that is
+ * not exported can only be consumed from the file that declares it, so the eye test joined the
+ * sequence when it was wired inside that file and the operational questions — rendered by
+ * `Attestations.tsx` — silently did not. Nothing failed; the section simply had no numbers, which is
+ * indistinguishable from a section that was never meant to have any.
+ *
+ * Here instead, beside the allocator, so a section added in a new file can reach it. That does not
+ * make forgetting impossible — `numbering.test.ts` is what makes forgetting *loud*, by counting the
+ * chips in the rendered document against the rows that should carry them.
+ *
+ * The default is a live numbering rather than null, so a row rendered outside a provider gets a
+ * consistent number instead of throwing. A missing number is a cosmetic fault; a crash in a report
+ * is not.
+ */
+export const NumberingContext = createContext<Numbering>(createNumbering());
+
+/** The number for one referenceable line, by whichever key that kind of line uses. */
+export function useLineNumber(key: string): number {
+  return useContext(NumberingContext).forLine(key);
+}
+
+/** The number for one finding. Keyed by identity — see `Numbering.forFinding`. */
+export function useFindingNumber(finding: ReportFinding): number {
+  return useContext(NumberingContext).forFinding(finding);
 }
 
 /**
