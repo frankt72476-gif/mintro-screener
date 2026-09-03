@@ -36,7 +36,7 @@
  * than left with a control that silently is not there.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commentaryFor,
@@ -82,7 +82,7 @@ export function commentToken(): string | null {
  * the form says where. `carriedForwardFrom` is set only where it came from an earlier screening.
  */
 interface StoredAnswer {
-  readonly outcome: 'answered' | 'declined';
+  readonly outcome: 'answered';
   readonly body?: string;
   readonly writtenBy: string;
   readonly writtenAt: string;
@@ -345,8 +345,17 @@ function OpenReport({
       const seeded = new Map<string, StoredAnswer>();
       for (const stored of opened.attestations) {
         if (stored.questionId === undefined || stored.outcome === undefined) continue;
+        /*
+          A row written before D-253 carried no answer, and there is no state left to show it in.
+
+          Skipped rather than seeded: the box renders empty, which is what *not answered* looks like,
+          and the row stays in the table as the record of what happened. `merchant_attestations` is
+          append-only — `reject_mutation()` refuses an update or a delete against every role — so the
+          collapse can only ever happen on the way out, never by rewriting what a merchant did.
+        */
+        if (stored.outcome !== 'answered') continue;
         seeded.set(stored.questionId, {
-          outcome: stored.outcome,
+          outcome: 'answered',
           ...(typeof stored.body === 'string' ? { body: stored.body } : {}),
           writtenBy: stored.identifiedAs,
           writtenAt: stored.submittedAt,
@@ -373,7 +382,7 @@ function OpenReport({
    */
   const answer = async (
     questionId: string,
-    outcome: 'answered' | 'declined',
+    outcome: 'answered',
     body: string | null,
   ): Promise<string | null> => {
     if (identity === null) return 'Please give an email address above before answering.';
@@ -417,7 +426,7 @@ function OpenReport({
       */
       next.set(questionId, {
         outcome,
-        ...(outcome === 'declined' ? {} : { body: body ?? '' }),
+        body: body ?? '',
         writtenBy: identity.email,
         writtenAt: payload.submittedAt ?? new Date().toISOString(),
       });
@@ -444,6 +453,25 @@ function OpenReport({
     opened.attestations,
   );
   const [saving, setSaving] = useState(false);
+  /**
+   * How the page reaches into each operational-question box (D-254).
+   *
+   * Those boxes keep their own text — they are not in `drafts` — so the page Save cannot read them.
+   * Each registers a flush that writes whatever it holds, and Save calls them all. A field with
+   * nothing typed or nothing changed writes nothing, so pressing Save twice is one write.
+   */
+  const attestationFlush = useRef(new Map<string, () => Promise<string | null>>());
+  /**
+   * Whether to highlight the operational questions nobody has written in (D-254).
+   *
+   * Set when somebody presses Save or Submit, and never unset — once a reader has been shown their
+   * gaps, hiding them again on the next keystroke would be the page deciding they had seen enough.
+   *
+   * **It writes nothing.** A highlighted box that is submitted blank is `unanswered`, exactly as it
+   * would have been without the highlight; nothing about it reaches the database or the report. It
+   * is a prompt at the moment somebody thinks they are finished, and that is all it is.
+   */
+  const [highlightGaps, setHighlightGaps] = useState(false);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [saveProblem, setSaveProblem] = useState<string | null>(null);
 
@@ -567,22 +595,69 @@ function OpenReport({
    * shows.
    */
   const saveEvery = async (): Promise<{ readonly written: number; readonly failure: string | null }> => {
-    const fields = invited
-      .map((finding) => ({
-        ruleId: finding.ruleId,
-        ordinal: finding.ordinal,
-        body: bodyOf(finding.ruleId, finding.ordinal),
-      }))
-      .filter((field) => field.body.trim() !== '');
+    // Show the gaps from here on. See `highlightGaps`.
+    setHighlightGaps(true);
 
-    for (const field of fields) {
-      const failure = await saveField(field.ruleId, field.ordinal, field.body);
+    /*
+      Every box on the page, which is what the button says (D-254).
+
+      It swept findings alone. The eye-test read, the per-line eye-test plans and the operational
+      questions were all outside it — so a control labelled **Save** did not save three of the four
+      kinds of thing a merchant can write here. The two eye-test kinds autosaved on blur and were
+      merely absent from the sweep; the operational questions autosaved nowhere at all, and that was
+      the data-loss bug.
+
+      Comment-shaped fields go through `saveField`; the operational questions have their own write
+      (`submit_merchant_attestation`) and go through `answer`. Two calls because there are two
+      tables, not two save models.
+    */
+    const commentFields = [
+      ...invited.map((finding) => ({
+        ruleId: finding.ruleId as string | null,
+        ordinal: finding.ordinal as number | undefined,
+        subject: null as string | null,
+        body: bodyOf(finding.ruleId, finding.ordinal),
+      })),
+      // The eye-test read, and a plan per rubric line. Keyed by subject rather than by rule id.
+      ...[...drafts.keys()]
+        .filter((key) => key.startsWith(`${EYE_TEST_SUBJECT}::`))
+        .map((key) => {
+          const suffix = key.slice(EYE_TEST_SUBJECT.length + 2);
+          const ordinal = suffix === 'x' ? undefined : Number(suffix);
+          return {
+            ruleId: null as string | null,
+            ordinal,
+            subject: EYE_TEST_SUBJECT as string | null,
+            body: drafts.get(key) ?? '',
+          };
+        }),
+    ].filter((field) => field.body.trim() !== '');
+
+    for (const field of commentFields) {
+      const failure =
+        field.subject === null
+          ? await saveField(field.ruleId!, field.ordinal, field.body)
+          : await saveField(field.subject, field.ordinal, field.body);
       // Stops at the first failure rather than pressing on. Continuing would leave some fields
       // stored and some not behind a single message, and the reader could not tell which.
-      if (failure !== null) return { written: fields.length, failure };
+      if (failure !== null) return { written: commentFields.length, failure };
     }
 
-    return { written: fields.length, failure: null };
+    /*
+      And the operational questions.
+
+      Their boxes hold their own text, so the page cannot read a draft map for them — what it can do
+      is ask each field to flush, which is what `attestationFlush` collects. A field with nothing
+      typed, or nothing changed, writes nothing.
+    */
+    let written = commentFields.length;
+    for (const flush of attestationFlush.current.values()) {
+      const failure = await flush();
+      if (failure !== null) return { written, failure };
+      written += 1;
+    }
+
+    return { written, failure: null };
   };
 
   const saveAll = async (): Promise<void> => {
@@ -860,6 +935,10 @@ function OpenReport({
                     answers={answers}
                     identified={identity !== null}
                     onAnswer={answer}
+                    registerFlush={(id, flush) => {
+                      attestationFlush.current.set(id, flush);
+                    }}
+                    highlightUnanswered={highlightGaps}
                   />
                 ),
               })}

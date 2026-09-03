@@ -26,7 +26,7 @@
  * difference between a gap and a silence, and the report has to be on the right side of it.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLineNumber } from '../lib/numbering.js';
 import type { Attestation, NotChecked } from '@mintro/ruleset';
 import { attestationAsking, type AttestationAsking } from '@mintro/engine';
@@ -36,13 +36,13 @@ import type { AttestationOutcome, ResolvedAttestation, RunAttestations } from '@
 /**
  * What each outcome means, written once.
  *
- * The merchant's page and the underwriter's report show the same three words for the same three
- * facts. Two copies of this would drift, and the pair that matters — *declined* against
- * *unanswered* — is exactly the pair a drifting copy would blur.
+ * The merchant's page and the underwriter's report show the same two words for the same two facts.
+ *
+ * There were three, and *declined* is gone (D-253): a blank has too many real shades to be split
+ * into refused-versus-empty without claiming to know which one it is. Answered, or not.
  */
 const OUTCOME_LABEL: Readonly<Record<AttestationOutcome, string>> = {
   answered: 'Answered',
-  declined: 'Declined to answer',
   unanswered: 'Not answered',
 };
 
@@ -193,7 +193,7 @@ export function AttestationSection({
                 wrote — D-199's reasoning, and the same reason `carried forward` stands apart.
               */}
               {counts.recorded > 0 ? ` · ${counts.recorded} recorded for them` : ''} ·{' '}
-              {counts.declined} declined · {counts.unanswered} not answered
+              {counts.unanswered} not answered
               {asking === 'asked' ? ` · ${counts.total} asked` : ''}
             </>
           )}
@@ -320,20 +320,15 @@ function AttestationRow({
         null
       ) : (
         <div className="att-said">
-          {question.outcome === 'declined' ? (
-            /*
-              A refusal is informative and is reported as one. It is not characterised — no
-              "declined to answer, which may indicate…". The reader draws the conclusion (D-001).
-            */
-            <p className="att-declined">
-              {question.recordedByOperator !== true
-                ? 'The merchant declined to answer this question.'
-                : // Recorded, so the refusal is what the operator was told — not a refusal made here.
-                  'Recorded as not answered.'}
-            </p>
-          ) : (
-            <blockquote className="att-body">{question.body}</blockquote>
-          )}
+          {/*
+            An answered row has words; there is no third shape any more (D-253).
+
+            This branched on `declined` and printed *"The merchant declined to answer this
+            question."* A row with no answer now resolves to `unanswered` and never reaches here, so
+            the sentence has gone with the state it described — the report no longer says why a
+            question is blank, because it does not know.
+          */}
+          <blockquote className="att-body">{question.body}</blockquote>
           {/*
             Only a merchant row has a self-declaration (D-212).
 
@@ -443,6 +438,8 @@ export function AttestationForm({
   identified,
   recordingFor,
   onAnswer,
+  registerFlush,
+  highlightUnanswered,
 }: {
   /**
    * The questions this run was screened under, from `report.attestationQuestions`.
@@ -453,7 +450,17 @@ export function AttestationForm({
    */
   readonly questions: readonly Attestation[];
   /** What this visitor has already sent, by question id, for showing back to them. */
-  readonly answers: ReadonlyMap<string, { readonly outcome: 'answered' | 'declined'; readonly body?: string }>;
+  readonly answers: ReadonlyMap<string, { readonly outcome: 'answered'; readonly body?: string }>;
+  /**
+   * Lets the page's Save reach a box that holds its own text (D-254).
+   *
+   * Each field registers a flush; `saveEvery` calls them all. Without it the page's one Save could
+   * not write the operational questions at all, which is how a button labelled Save came to save
+   * three of the four kinds of thing on the page.
+   */
+  readonly registerFlush?: (questionId: string, flush: () => Promise<string | null>) => void;
+  /** Highlight the empty ones — a prompt at submit time, writing nothing (D-254). */
+  readonly highlightUnanswered?: boolean;
   readonly identified: boolean;
   /**
    * Set on the analyst's copy, where the operator answers for the merchant (D-212).
@@ -465,7 +472,7 @@ export function AttestationForm({
   readonly recordingFor?: string;
   readonly onAnswer: (
     questionId: string,
-    outcome: 'answered' | 'declined',
+    outcome: 'answered',
     body: string | null,
   ) => Promise<string | null>;
 }): JSX.Element {
@@ -516,6 +523,8 @@ export function AttestationForm({
               {...(sent === undefined ? {} : { sent })}
               identified={identified}
               onAnswer={onAnswer}
+              {...(registerFlush === undefined ? {} : { registerFlush })}
+              {...(highlightUnanswered === undefined ? {} : { needsAttention: highlightUnanswered })}
             />
           );
         })}
@@ -529,12 +538,14 @@ function AttestationField({
   question,
   sent,
   identified,
+  needsAttention,
+  registerFlush,
   onAnswer,
 }: {
   readonly questionId: string;
   readonly question: string;
   readonly sent?: {
-    readonly outcome: 'answered' | 'declined';
+    readonly outcome: 'answered';
     readonly body?: string;
     /** Who wrote it. Always known — an answer in this form came from somebody (D-205). */
     readonly writtenBy?: string;
@@ -551,24 +562,81 @@ function AttestationField({
     readonly recordedByOperator?: boolean;
   };
   readonly identified: boolean;
+  /**
+   * Highlight this box because it is empty and the reader has just tried to submit (D-254).
+   *
+   * **A prompt and nothing else.** It writes nothing, records nothing and resolves to nothing: a
+   * highlighted box submitted blank is `unanswered`, exactly as it would have been without the
+   * highlight. It exists so a gap is visible at the moment somebody thinks they are finished, and
+   * that is the whole of its meaning.
+   */
+  readonly needsAttention?: boolean;
+  /** See `AttestationForm.registerFlush`. */
+  readonly registerFlush?: (questionId: string, flush: () => Promise<string | null>) => void;
   readonly onAnswer: (
     questionId: string,
-    outcome: 'answered' | 'declined',
+    outcome: 'answered',
     body: string | null,
   ) => Promise<string | null>;
 }): JSX.Element {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
 
-  const send = async (outcome: 'answered' | 'declined'): Promise<void> => {
+  /*
+    Autosave on blur, and the data-loss bug it closes (D-254).
+
+    This box used to persist ONLY when its own button was pressed. Nothing autosaved it, and the
+    page's Save swept findings alone — so a merchant who typed an answer and navigated away lost it,
+    with no indicator to contradict the impression that it had been kept. Every other response
+    surface on the page had autosaved on blur for months.
+
+    Written straight through `onAnswer`, the same call the button made, so this is one path rather
+    than a second one that could drift.
+
+    Nothing is written for an empty box or for text that has not changed. An empty box is not a
+    refusal and must not become a row: the state it resolves to is `unanswered` either way, and a row
+    would only differ in claiming somebody decided something (D-253).
+  */
+  const saved = useRef('');
+  const write = async (): Promise<string | null> => {
+    const text = body.trim();
+    // Nothing typed, or nothing changed since the last write. Pressing Save twice is one write.
+    if (text === '' || text === saved.current) return null;
+
     setBusy(true);
-    const failure = await onAnswer(questionId, outcome, outcome === 'declined' ? null : body);
+    const failure = await onAnswer(questionId, 'answered', body);
     setBusy(false);
     setError(failure);
-    // Cleared only on success, so nothing typed is lost to a failed send.
-    if (failure === null && outcome === 'answered') setBody('');
+    if (failure === null) {
+      saved.current = text;
+      setSavedAt(new Date().toISOString());
+    }
+    return failure;
   };
+
+  /*
+    The page's Save reaches this box through here (D-254).
+
+    Re-registered whenever `body` changes, because the closure has to see the current text — a flush
+    captured once would write whatever was in the box when the field first mounted.
+  */
+  /*
+    A gap is a question with nothing on file AND nothing typed.
+
+    The first cut asked only whether the textarea was empty — and the textarea starts empty even for
+    a question already answered, because the stored answer renders above it rather than inside it. So
+    every answered question was highlighted as a gap the moment somebody pressed Save. `sent` is what
+    distinguishes "no answer" from "an answer that is not in this box".
+  */
+  const isGap = needsAttention === true && body.trim() === '' && sent === undefined;
+
+  const latest = useRef(write);
+  latest.current = write;
+  useEffect(() => {
+    registerFlush?.(questionId, () => latest.current());
+  }, [registerFlush, questionId]);
 
   /*
     The same pool every other referenceable line draws from (D-248, D-252).
@@ -583,7 +651,7 @@ function AttestationField({
   const number = useLineNumber(`attestation:${questionId}`);
 
   return (
-    <li className="att-row att-field">
+    <li className={`att-row att-field${isGap ? ' att-attention' : ''}`}>
       <p className="att-text">
         <span className="ref-n att-n">{number}</span>
         {question}
@@ -613,11 +681,12 @@ function AttestationField({
               — and telling a merchant "you chose not to answer this" about their agent's decision
               would be a false statement in the one place they act on it.
             */}
-            {sent.outcome === 'declined'
-              ? sent.carriedForwardFrom === undefined && sent.recordedByOperator !== true
-                ? 'Recorded: you chose not to answer this one.'
-                : 'Recorded: not answered.'
-              : `Recorded: "${sent.body ?? ''}"`}
+            {/*
+              Only an answer has a stored shape now (D-253). "You chose not to answer this one" went
+              with the state it reported — the page no longer knows why a box is empty, so it says
+              nothing about it.
+            */}
+            {`Recorded: "${sent.body ?? ''}"`}
           </p>
           {sent.recordedByOperator !== true && sent.writtenBy !== undefined && sent.writtenAt !== undefined && (
             /*
@@ -638,35 +707,54 @@ function AttestationField({
         </>
       )}
 
+      {/*
+        One voice for every placeholder on the page (D-254).
+
+        The comment boxes ask a question — *How does your site handle this, now or in future?* — and
+        this one said *Your answer*, a label pretending to be a prompt. A question is the voice,
+        because it is the one that lowers the demand: an unlabelled box beside a compliance question
+        reads as an instruction to justify yourself.
+      */}
       <textarea
         value={body}
         onChange={(event) => setBody(event.target.value)}
-        placeholder={sent === undefined ? 'Your answer' : 'Add to or change your answer'}
+        onBlur={() => void write()}
+        placeholder={
+          sent === undefined
+            ? 'How does your business handle this?'
+            : 'Add to or change your answer'
+        }
         rows={2}
-        disabled={busy}
+        disabled={busy || !identified}
       />
 
-      <div className="att-actions">
-        <button
-          className="btn btn-primary"
-          disabled={!identified || busy || body.trim() === ''}
-          onClick={() => void send('answered')}
-        >
-          {busy ? 'Saving…' : sent === undefined ? 'Send answer' : 'Send revised answer'}
-        </button>
-        <button
-          className="btn btn-ghost"
-          disabled={!identified || busy}
-          onClick={() => void send('declined')}
-        >
-          Prefer not to answer
-        </button>
-      </div>
+      {/*
+        No buttons (D-254).
 
-      {!identified && (
-        <p className="att-hint">Give an email address above before answering.</p>
-      )}
-      {error !== null && <p className="att-error">{error}</p>}
+        *Send answer* and *Prefer not to answer* are both gone: the first because the box saves
+        itself, the second with the state it wrote (D-253). What is left is what is true — the text
+        is kept as it is typed — said once, quietly, in the same words every other box on this page
+        uses.
+      */}
+      {/*
+        "Needs attention." — the whole of the prompt (D-254).
+
+        Not *"Not answered yet — answer it, or choose not to"*, which offered a choice that no longer
+        exists, and not *"Chose not to answer"*, which claimed to know something. Two words that say
+        a box is empty at the moment somebody thought they had finished.
+      */}
+      {isGap && <p className="att-attention-note">Needs attention.</p>}
+      <p className="att-saved">
+        {busy
+          ? 'Saving…'
+          : error !== null
+            ? error
+            : savedAt !== null
+              ? 'Saved automatically'
+              : identified
+                ? 'Saved automatically'
+                : 'Give an email address above before answering.'}
+      </p>
     </li>
   );
 }

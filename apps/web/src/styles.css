@@ -3443,3 +3443,20 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 
 /* The attestation row is a flex line; the chip sits with the mark rather than stretching. */
 .att-n { flex: 0 0 auto; align-self: baseline; margin-right: var(--s2); }
+
+/* ── An operational question nobody has written in (D-254) ─────────────────────────────────────
+   A prompt at submit time and nothing more: it writes nothing, records nothing, and resolves to no
+   state. A highlighted box submitted blank is "not answered", exactly as it would have been.
+
+   Amber, which is this palette's "look at this" and never its "something is wrong" — the rail idiom
+   the respond zone already uses, so a gap reads as an unfinished thing rather than a failed one. */
+.att-attention { border-left: 3px solid var(--amber); padding-left: var(--s3); }
+.att-attention-note {
+  margin: var(--s1) 0 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: #A5620E;
+}
+
+/* What every response box says about itself now that they all save the same way (D-254). */
+.att-saved { margin: var(--s1) 0 0; font-size: 11.5px; color: var(--slate); }

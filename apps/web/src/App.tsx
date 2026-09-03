@@ -415,21 +415,25 @@ function RecordBox({
         value={value}
         placeholder="What the merchant told you"
         onChange={(event) => onChange(event.target.value)}
+        onBlur={() => {
+          if (value.trim() === '') return;
+          setBusy(true);
+          void onSave().then((failure) => {
+            setBusy(false);
+            setProblem(failure);
+          });
+        }}
       />
+      {/*
+        No button (D-254).
+
+        *Record on their behalf* was the last per-box control on the site, and it is retired with the
+        rest: this box saves when it loses focus, like every other one. The words survive as the note
+        below, because what they say is worth saying — an analyst typing here is putting words into a
+        document that reaches an underwriter on somebody else's behalf (D-212) — and that is a fact
+        about the box, not a thing to press.
+      */}
       <div className="respond-foot">
-        <button
-          className="btn btn-ghost"
-          disabled={busy || value.trim() === ''}
-          onClick={() => {
-            setBusy(true);
-            void onSave().then((failure) => {
-              setBusy(false);
-              setProblem(failure);
-            });
-          }}
-        >
-          {busy ? 'Recording…' : 'Record on their behalf'}
-        </button>
         {/*
           Says whose statement it will be, before it is one.
 
@@ -437,7 +441,10 @@ function RecordBox({
           the surface should say so while she types rather than only after (D-212).
         */}
         <span className="respond-note">
-          {problem ?? (savedAt === undefined ? 'Recorded as yours, on the merchant’s behalf.' : 'Recorded.')}
+          {problem ??
+            (busy
+              ? 'Saving…'
+              : 'Saved automatically · recorded as yours, on the merchant’s behalf.')}
         </span>
       </div>
     </div>
@@ -1400,12 +1407,12 @@ function Screener({
                           answers={new Map()}
                           identified
                           recordingFor="the merchant"
-                          onAnswer={async (questionId, outcome, body) => {
+                          onAnswer={async (questionId, _outcome, body) => {
+                            // Answers only (D-253); the box cannot produce anything else.
                             const result = await recordAnswer(client, recorder, {
                               runId: report.runId,
                               questionId,
-                              outcome,
-                              body,
+                              body: body ?? '',
                             });
                             return result.ok ? null : (result.error ?? 'That could not be saved.');
                           }}

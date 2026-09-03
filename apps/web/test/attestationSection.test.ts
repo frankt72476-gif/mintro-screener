@@ -185,27 +185,35 @@ describe('an unanswered question is a gap, not a blank', () => {
   });
 });
 
-describe('a declination is reported as one', () => {
-  it('says the merchant declined, and does not render it as unanswered', () => {
+describe('a row with no answer reads as not answered (D-253)', () => {
+  it('says nothing about why the box is empty', () => {
+    /*
+      The reverse of what this asserted. It required *"The merchant declined to answer this
+      question"* and that the row not render as unanswered. The ruling that replaced it: a blank has
+      too many real shades to be split without claiming to know which one it is.
+    */
     const rendered = text(render([declined('shipping-to-clinics')]));
-    expect(rendered).toContain('The merchant declined to answer this question');
-    expect(rendered).toContain('Declined to answer');
+    expect(rendered).not.toContain('declined');
+    expect(rendered).not.toContain('chose not to');
+    // And it reads as the one thing it is.
+    expect(rendered).toContain('Not answered');
   });
 
   /**
-   * A refusal is informative and the report carries it without characterising it. No "which may
-   * indicate", no adverse framing — the reader draws the conclusion (D-001).
+   * Unchanged in substance: the report states what it has and draws no conclusion from it (D-001).
+   * It now has less — a blank rather than a refusal — and characterises that no further.
    */
-  it('draws no conclusion from the refusal', () => {
+  it('draws no conclusion from the blank', () => {
     const rendered = text(render([declined('shipping-to-clinics')])).toLowerCase();
     for (const word of ['should', 'recommend', 'suggests', 'concerning', 'red flag', 'refusal to']) {
       expect(rendered).not.toContain(word);
     }
   });
 
-  it('distinguishes declining from never answering, in the counts', () => {
+  it('counts it among the unanswered, with no third figure', () => {
     const rendered = text(render([declined('shipping-to-clinics'), answered('ban-list', 'Yes.')]));
-    expect(rendered).toContain(`1 answered · 1 declined · ${QUESTIONS.length - 2} not answered`);
+    expect(rendered).toContain(`1 answered · ${QUESTIONS.length - 1} not answered`);
+    expect(rendered).not.toContain('declined');
   });
 });
 

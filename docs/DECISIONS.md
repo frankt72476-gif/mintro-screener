@@ -13516,6 +13516,10 @@ two to three pages per run, so the earlier measurement was of a broken styleshee
 Copy, ordering within a section, the four states, the evidence contract and every sentence a finding
 renders are untouched.
 ## D-203 — The merchant's reply to the eye test, and why it is not a rule id
+**Partly superseded by D-253 (2026-09-03):** the `subject` column and the reserved-id reasoning
+stand and are still in force. The *attestation* `declined` state this entry's sibling reasoning
+supported is removed — a blank is a blank, and the report no longer says why one is empty.
+
 
 **2026-08-30 · business owner · migration `0050_eye_test_comment.sql`, `packages/engine/src/commentary.ts`, `apps/web/src/components/ReportView.tsx`**
 
@@ -16146,3 +16150,112 @@ product. The keys are namespaced on the same value, so both shapes of one questi
 **`NotCheckedSection` renders `<li>` lines with no numbers** and is in neither the selector list nor
 the section count. Whether "what was not checked" is referenceable is a product question, still open,
 and recorded here so the next person meets it as a question rather than as an absence.
+
+---
+
+## D-253 — Two states, not three. `declined` is removed as false precision
+**2026-09-03 · business owner · `packages/engine/src/attestations.ts`, `apps/web/src/components/Attestations.tsx`**
+
+An operational question is **answered** or **not answered**. `declined` is gone.
+
+D-134 and D-203 built it deliberately: a merchant refusing to say whether they ship to med-spas has
+told an underwriter something, and folding that into silence throws it away. That reasoning is not
+wrong about refusals — it is wrong about what an empty box proves.
+
+**"Not answered" has too many real shades** to be split into refused-versus-blank: did not know how,
+wanted to discuss it first, had not decided, meant to come back. The report is due-diligence
+evidence, not a determinative document, so the honest granularity is answered or not. Anything finer
+claims to know why a box is empty, and nothing here does. A blank is a blank.
+
+### The rows exist and cannot be rewritten
+
+Production holds **3 `declined` rows** against 5 answered — checked before assuming it was clean.
+`merchant_attestations` is append-only: `reject_mutation()` refuses an update or a delete against
+every role, service role included. So there is no migration that could collapse them, and there
+should not be — they are what a merchant did, and rewriting them would be the schema editing
+somebody's statement.
+
+**They collapse on the way out.** `StoredAttestation.outcome` still says `'answered' | 'declined'`,
+because that is what is in the table and a type denying it would be the schema lying about itself.
+`resolveAttestations` maps a stored row carrying no answer to `unanswered`. The row stays; the report
+stops making a claim about it.
+
+### The one thing the collapse must not throw away
+
+A row proves **somebody was there**, even carrying no answer. `attestationAsking` used
+`counts.declined > 0` as evidence the questions reached a person; dropping that would flip a run
+whose questions were all refused from *asked* to *not asked* — a false statement about whether
+anybody was ever put to them, which is a different claim from why a box is blank.
+
+So the count survives as `onFileWithoutAnswer`, named for what it is and **never rendered**. It
+answers *was anybody here*, never *why is this empty*.
+
+### Everything else goes
+
+The button, the outcome label, the count in the section line, the `att-declined` sentence *"The
+merchant declined to answer this question"*, the *"you chose not to answer this one"* line, and the
+operator write path that could still create one. `questionStats` counted `answered + declined` as
+questions dealt with; it counts `answered` now, and a row with no answer is outstanding — which is
+what an empty box has always meant to a reader who was not told why.
+
+`bundledControls.test.ts` gained an absence list: the shipped bundle must not contain *"declined to
+answer"* or *"Prefer not to answer"*. A removed state is only removed when it is gone from the
+artifact.
+
+---
+
+## D-254 — One save model, one CTA vocabulary, and the data-loss bug that hid between them
+**2026-09-03 · business owner · `apps/web/src/components/Attestations.tsx`, `CommentPane.tsx`, `App.tsx`**
+
+Three response surfaces, three different contracts about what happens to what you type:
+
+| | before | after |
+|---|---|---|
+| comment boxes | autosave on blur, swept by page Save | unchanged |
+| eye-test boxes | autosave on blur, **not** swept by page Save | swept |
+| operational questions | **no autosave**, not swept, button-only | autosave, swept |
+
+The third was a **data-loss bug**. An operational answer persisted only when its own *Send answer*
+button was pressed; the text lived in local component state, not even in the page's draft map. Type,
+navigate away, and it was gone — with no indicator to contradict the impression that it had been
+kept, on the one surface where a merchant is asked to write something an underwriter will read.
+
+And the page's **Save** did not save. `saveEvery` swept findings alone, so a control labelled Save
+wrote three of the four kinds of thing on the page. It now sweeps comment fields, the eye-test read,
+the per-line eye-test plans, and the operational questions — the last through a flush each field
+registers, because those boxes hold their own text and the page cannot read a draft map for them.
+
+### One vocabulary
+
+Every per-box button is retired. *Send answer* / *Send revised answer* went with the autosave that
+made them redundant; *Prefer not to answer* went with the state it wrote (D-253); *Record on their
+behalf* went the same way, and its words survive as the note under the staff box, which is where
+they belonged — an analyst putting words into a document on somebody else's behalf is a fact about
+the box, not a thing to press (D-212).
+
+What is left is two page-level verbs, each a real act: **Save** the words, **Submit** yourself. Every
+box says the same thing about itself — *Saved automatically* — and the placeholders speak in one
+voice, a question rather than a label, because an unlabelled box beside a compliance question reads
+as an instruction to justify yourself (D-067).
+
+### The highlight writes nothing
+
+An operational question with no answer is highlighted once somebody presses Save or Submit:
+*Needs attention.* — an amber rail, this palette's "look at this" rather than its "something is
+wrong".
+
+**It records nothing and resolves to nothing.** A highlighted box submitted blank is `unanswered`,
+exactly as it would have been. That is load-bearing: a highlight that wrote a state would be
+`declined` under another name, one insert at a time, which is the thing D-253 removed. A test asserts
+`onAnswer` is never called on render.
+
+A gap is *nothing on file **and** nothing typed*. The first cut asked only whether the textarea was
+empty — and it is empty even for an answered question, because the stored answer renders above the
+box rather than inside it, so every answered question lit up as a gap. Caught by the test that asked
+for one highlight and got two.
+
+### Nothing is written for an empty box
+
+Autosave writes on blur only when there is text and it has changed. An empty box must never become a
+row: it resolves to `unanswered` either way, and a row would differ only in claiming somebody decided
+something.

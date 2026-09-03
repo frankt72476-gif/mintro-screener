@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
-import { resolveAttestations, type StoredAttestation } from '../src/index.js';
+import { attestationAsking, resolveAttestations, type StoredAttestation } from '../src/index.js';
 import { RULESET_PATH } from './paths.js';
 
 const ruleset: Ruleset = loadRulesetFile(RULESET_PATH);
@@ -49,7 +49,7 @@ describe('every question appears, answered or not', () => {
     expect(result.questions).toHaveLength(ruleset.attestations.length);
     expect(result.counts).toEqual({
       answered: 0,
-      declined: 0,
+      onFileWithoutAnswer: 0,
       unanswered: ruleset.attestations.length,
       // Nothing carried forward either: this run inherited nothing because nothing was asked.
       inherited: 0,
@@ -103,27 +103,54 @@ describe('unanswered is an outcome, not an absence', () => {
   });
 });
 
-describe('declined is recorded as declined', () => {
-  it('is its own outcome, never folded into unanswered', () => {
+/**
+ * The reverse of what this block used to assert (D-253).
+ *
+ * It held that declining was its own outcome and *"distinguishable from never having been asked
+ * to"*, on the ground that a refusal tells an underwriter something. The ruling that replaced it:
+ * *not answered* has too many real shades — did not know how, wanted to discuss it first, had not
+ * decided — to be split into refused-versus-blank without claiming to know which. The report is
+ * due-diligence evidence, not a determination, so the honest granularity is answered or not.
+ *
+ * The rows still exist and cannot be rewritten: `merchant_attestations` is append-only. They are
+ * collapsed on the way out.
+ */
+describe('a row with no answer reads as not answered (D-253)', () => {
+  it('collapses to unanswered rather than a third state', () => {
     const result = resolveAttestations(ruleset.attestations, [declined('shipping-to-clinics')]);
     const q = find(result, 'shipping-to-clinics');
 
-    expect(q.outcome).toBe('declined');
+    expect(q.outcome).toBe('unanswered');
     expect(q.body).toBeUndefined();
-    expect(q.identifiedAs).toBe('ops@shop.example');
-    expect(result.counts.declined).toBe(1);
-    expect(result.counts.unanswered).toBe(ruleset.attestations.length - 1);
+    // Every question is now one of two things, and the counts say so.
+    expect(result.counts.unanswered).toBe(ruleset.attestations.length);
+    expect(result.counts.answered).toBe(0);
+  });
+
+  it('is indistinguishable from a question nobody reached, which is the point', () => {
+    const result = resolveAttestations(ruleset.attestations, [declined('shipping-to-clinics')]);
+    expect(find(result, 'shipping-to-clinics').outcome).toBe(
+      find(result, 'prior-termination').outcome,
+    );
   });
 
   /**
-   * A merchant refusing to say whether they ship to med-spas has told the underwriter something.
-   * If declining and never answering rendered alike, that would be thrown away.
+   * The one thing the collapse must NOT throw away.
+   *
+   * A row proves somebody was there, even carrying no answer. Without that, a run whose questions
+   * were all refused would flip from *asked* to *not asked* — a false statement about whether
+   * anybody was ever put to them, which is a different claim from why a box is empty.
    */
-  it('is distinguishable from never having been asked to', () => {
+  it('still counts as proof the questions were asked', () => {
     const result = resolveAttestations(ruleset.attestations, [declined('shipping-to-clinics')]);
-    expect(find(result, 'shipping-to-clinics').outcome).not.toBe(
-      find(result, 'prior-termination').outcome,
-    );
+    expect(result.counts.onFileWithoutAnswer).toBe(1);
+    expect(attestationAsking(result.counts, undefined)).toBe('asked');
+  });
+
+  it('reports nothing about WHY the box is empty', () => {
+    // No surface may reconstruct the distinction from the resolved shape.
+    const q = find(resolveAttestations(ruleset.attestations, [declined('ban-list')]), 'ban-list');
+    expect(JSON.stringify(q)).not.toContain('declined');
   });
 });
 
@@ -170,12 +197,15 @@ describe('a revision supersedes without erasing', () => {
       answered('coa-lab-accreditation', 'b', '2026-08-26T11:00:00.000Z'),
     ]);
     expect(result.counts.answered).toBe(1);
-    expect(result.counts.answered + result.counts.declined + result.counts.unanswered).toBe(
-      result.counts.total,
-    );
+    expect(result.counts.answered + result.counts.unanswered).toBe(result.counts.total);
   });
 
-  it('lets a merchant decline after answering, and says so', () => {
+  it('lets a merchant withdraw an answer, and keeps what they withdrew', () => {
+    /*
+      The newest row wins and it carries no answer, so the question reads as not answered — but the
+      earlier answer is still in `superseded`, because the table is append-only and a reader who was
+      sent the first version is entitled to see that it changed (D-002).
+    */
     const q = find(
       resolveAttestations(ruleset.attestations, [
         answered('ban-list', 'Yes, we keep one.', '2026-08-26T10:00:00.000Z'),
@@ -183,7 +213,7 @@ describe('a revision supersedes without erasing', () => {
       ]),
       'ban-list',
     );
-    expect(q.outcome).toBe('declined');
+    expect(q.outcome).toBe('unanswered');
     expect(q.body).toBeUndefined();
     expect(q.superseded?.[0]?.body).toBe('Yes, we keep one.');
   });

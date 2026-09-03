@@ -122,7 +122,7 @@ describe('invited, nothing answered', () => {
   });
 
   it('reports them as not answered, which is now a fact it has', () => {
-    expect(body).toContain('0 answered · 0 declined · 19 not answered');
+    expect(body).toContain('0 answered · 19 not answered');
     expect(body).toContain('Not answered');
     expect(body).not.toContain('Not asked');
   });
@@ -136,7 +136,7 @@ describe('invited, some answered', () => {
   const body = text(markup(true, stored(4)));
 
   it('counts what came back against what went out', () => {
-    expect(body).toContain('3 answered · 1 declined · 15 not answered · 19 asked');
+    expect(body).toContain('3 answered · 16 not answered · 19 asked');
   });
 
   it('quotes the merchant and names who said it', () => {
@@ -171,9 +171,9 @@ describe('an answer outranks a missing commentary read', () => {
       questions demonstrably reached someone — the evidence in hand beats the read that is missing,
       and the section must not print a denial above a quotation.
     */
-    expect(attestationAsking({ answered: 1, declined: 0, unanswered: 18, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('asked');
-    expect(attestationAsking({ answered: 0, declined: 1, unanswered: 18, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('asked');
-    expect(attestationAsking({ answered: 3, declined: 0, unanswered: 16, inherited: 0, recorded: 0, total: 19 }, false)).toBe('asked');
+    expect(attestationAsking({ answered: 1, onFileWithoutAnswer: 0, unanswered: 18, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('asked');
+    expect(attestationAsking({ answered: 0, onFileWithoutAnswer: 1, unanswered: 18, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('asked');
+    expect(attestationAsking({ answered: 3, onFileWithoutAnswer: 0, unanswered: 16, inherited: 0, recorded: 0, total: 19 }, false)).toBe('asked');
 
     const body = text(markup(undefined, stored(4)));
     expect(body).toContain('Mintro put them to the merchant');
@@ -185,7 +185,7 @@ describe('an answer outranks a missing commentary read', () => {
       Not in the brief, and it is real: asserting "not asked" here would replace one false statement
       with its mirror. The section says what it knows, which is nothing about where they went.
     */
-    expect(attestationAsking({ answered: 0, declined: 0, unanswered: 19, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('not_known');
+    expect(attestationAsking({ answered: 0, onFileWithoutAnswer: 0, unanswered: 19, inherited: 0, recorded: 0, total: 19 }, undefined)).toBe('not_known');
 
     const body = text(markup(undefined));
     expect(body).toContain('Whether they were put to the merchant could not be read for this run');

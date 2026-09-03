@@ -66,7 +66,21 @@ export interface StoredAttestation {
  * make a merchant who never opened the report indistinguishable from one who read every question
  * and answered none.
  */
-export type AttestationOutcome = 'answered' | 'declined' | 'unanswered';
+/**
+ * Two states, not three (D-253).
+ *
+ * **`declined` is gone as a reported outcome.** *Not answered* has too many real shades — did not
+ * know how, wanted to discuss it first, had not decided — to be honestly split into refused-versus-
+ * blank, and this report is due-diligence evidence rather than a determinative document. Anything
+ * finer than *answered* / *not answered* claims to know why a box is empty, and nothing here does.
+ *
+ * **`StoredAttestation.outcome` still carries `'declined'`**, because rows written before this
+ * ruling exist and `merchant_attestations` is append-only — `reject_mutation()` refuses an update or
+ * a delete against every role. They are collapsed on the way in: a stored `declined` row resolves to
+ * `unanswered`. The row stays as the record of what happened; the report stops making a claim about
+ * it.
+ */
+export type AttestationOutcome = 'answered' | 'unanswered';
 
 export interface ResolvedAttestation {
   readonly questionId: string;
@@ -76,7 +90,7 @@ export interface ResolvedAttestation {
   readonly outcome: AttestationOutcome;
   /** Present only when answered. */
   readonly body?: string;
-  /** Present when answered or declined — somebody was there to do it. */
+  /** Present when somebody was there to answer, whether or not they wrote anything. */
   readonly identifiedAs?: string;
   readonly submittedAt?: string;
   /**
@@ -112,8 +126,19 @@ export interface ResolvedAttestation {
 export interface AttestationSummary {
   /** Answered **on this run**. An inherited answer is not one of these (D-204, §5). */
   readonly answered: number;
-  readonly declined: number;
   readonly unanswered: number;
+  /**
+   * Rows on file that carry no answer — the old `declined` (D-253).
+   *
+   * **Never rendered.** It is not a state the report reports; it exists because *somebody was here
+   * and wrote nothing* is still proof the questions reached a person, and `attestationAsking` needs
+   * that to tell "asked, nothing answered" from "never asked". Dropping it entirely would flip a run
+   * whose questions were all refused from *asked* to *not asked*, which is a false statement about
+   * whether anybody was put to them.
+   *
+   * Named for what it is rather than kept as `declined`, so nobody renders it out of habit.
+   */
+  readonly onFileWithoutAnswer: number;
   /**
    * Carried forward from an earlier screening of the same domain (D-204).
    *
@@ -171,16 +196,19 @@ export type AttestationAsking =
 /**
  * Which of the three is true.
  *
- * **An answer is its own proof of asking.** If anything was answered or declined, the questions
- * reached someone, whatever a failed or absent commentary read says about it — so the evidence in
- * hand outranks the missing read, and the section never tells a reader the merchant was not asked
- * while displaying what they said.
+ * **A row is its own proof of asking.** If anything was answered, or a row was written carrying no
+ * answer, the questions reached someone — whatever a failed or absent commentary read says about it.
+ * The evidence in hand outranks the missing read, and the section never tells a reader the merchant
+ * was not asked while displaying what they said.
+ *
+ * The second half is what survives of `declined` (D-253): the report no longer says *why* a question
+ * is unanswered, but a row proving somebody was there still counts as having been asked.
  */
 export function attestationAsking(
   counts: AttestationSummary,
   invited: boolean | undefined,
 ): AttestationAsking {
-  if (counts.answered > 0 || counts.declined > 0) return 'asked';
+  if (counts.answered > 0 || counts.onFileWithoutAnswer > 0) return 'asked';
   if (invited === true) return 'asked';
   if (invited === false) return 'not_asked';
   return 'not_known';
@@ -242,7 +270,14 @@ export function resolveAttestations(
       question: question.question,
       authority: question.authority,
       sev: question.sev,
-      outcome: current.outcome,
+      /*
+        The collapse (D-253). A stored row carrying no answer reads as `unanswered`.
+
+        Here rather than at the row reader, so `StoredAttestation` keeps saying what is actually in
+        the table — the rows are append-only and cannot be rewritten, and a type that denied their
+        contents would be the schema lying about itself.
+      */
+      outcome: current.outcome === 'answered' ? 'answered' : 'unanswered',
       ...(current.body === undefined ? {} : { body: current.body }),
       identifiedAs: current.identifiedAs,
       submittedAt: current.submittedAt,
@@ -264,16 +299,21 @@ export function resolveAttestations(
       defect exactly: a false claim about what happened on this run, in the summary a reader trusts
       most.
 
-      A declined answer that was inherited counts as inherited too. The distinction the reader needs
-      is *did this happen here*, and it does not become less true of a refusal.
+      An answer that was inherited counts as inherited. The distinction the reader needs is *did this
+      happen here*.
     */
     counts: {
       answered: questions.filter(
         (q) => q.outcome === 'answered' && q.inherited === undefined && q.recordedByOperator !== true,
       ).length,
-      declined: questions.filter(
-        (q) => q.outcome === 'declined' && q.inherited === undefined && q.recordedByOperator !== true,
-      ).length,
+      /*
+        Counted from the STORED rows, not from the resolved outcome (D-253).
+
+        A row with no answer now resolves to `unanswered`, which is indistinguishable from a question
+        nobody ever reached — so this is the one place that still has to look at what was written
+        down. It answers "was anybody here", never "why is this blank".
+      */
+      onFileWithoutAnswer: stored.filter((row) => row.outcome === 'declined').length,
       unanswered: questions.filter((q) => q.outcome === 'unanswered').length,
       inherited: questions.filter(
         (q) => q.outcome !== 'unanswered' && q.inherited !== undefined && q.recordedByOperator !== true,

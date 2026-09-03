@@ -1102,8 +1102,15 @@ function eyeStats(record: EyeTestRecord): string {
  * counts line names them separately (D-204, §5).
  */
 function questionStats(attestations: RunAttestations): string {
-  const { answered, inherited, declined, unanswered, total } = attestations.counts;
-  const done = answered + declined;
+  /*
+    `answered` alone is the done count now (D-253).
+
+    It was `answered + declined`, which counted a refusal as a question dealt with. With the state
+    gone, a row carrying no answer resolves to `unanswered` and is outstanding — which is what an
+    empty box has always meant to a reader who was not told why it was empty.
+  */
+  const { answered, inherited, unanswered, total } = attestations.counts;
+  const done = answered;
 
   const parts = [`${total} question${total === 1 ? '' : 's'}`];
   if (done === 0 && inherited === 0) return `${parts[0]} · none answered yet`;

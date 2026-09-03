@@ -109,18 +109,37 @@ describe('every retention control reaches the bundle', () => {
  * defect this file was written after.
  */
 describe('merchant attestations are in the bundle', () => {
+  /** Strings that must be ABSENT from the bundle — a removed state is only removed if it is gone. */
+  const GONE: readonly (readonly [string, string])[] = [
+    ['the declined state', 'declined to answer'],
+    ['the decline button', 'Prefer not to answer'],
+    ['the per-question submit', 'Send answer'],
+    ['the staff button', 'Record on their behalf'],
+  ];
+
   const MARKERS: readonly (readonly [string, string])[] = [
     ['the write path', 'submit_merchant_attestation'],
     ['the read path', 'merchant_attestations'],
     ['the section heading', 'Stated by the merchant'],
     ['the boundary sentence', 'was observed or verified by Mintro'],
     ['the unanswered sentence', 'not observable by Mintro'],
-    ['the declination', 'declined to answer'],
-    ['the merchant-side prompt', 'Prefer not to answer'],
+    /*
+      The declination and its button are gone (D-253, D-254), so the bundle must NOT carry them.
+
+      Asserted as absences beside the presences, because this file's whole job is to check what
+      actually ships — and a removed state that survives in the bundle is a state somebody can still
+      reach. The two markers that were here are the two strings that must never come back.
+    */
+    ['the autosave note', 'Saved automatically'],
+    ['the gap prompt', 'Needs attention'],
   ];
 
   it.each(MARKERS)('carries %s', (_what, marker) => {
     expect(bundle).toContain(marker);
+  });
+
+  it.each(GONE)('does NOT carry %s', (_what, marker) => {
+    expect(bundle, `${marker} is still in the shipped bundle`).not.toContain(marker);
   });
 
   /**

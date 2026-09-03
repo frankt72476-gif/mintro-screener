@@ -77,23 +77,33 @@ export async function recordComment(
   return error === null ? { ok: true } : { ok: false, error: error.message };
 }
 
-/** Records an answer to one of the operational questions. */
+/**
+ * Records an answer to one of the operational questions.
+ *
+ * **Answers only** (D-253). `outcome` used to be `'answered' | 'declined'` and this was the last
+ * path that could still write a refusal. The state is gone from the report, so a writer that could
+ * still create one would be filling the table with rows nothing renders — and re-creating, one
+ * insert at a time, the distinction the ruling removed.
+ *
+ * The column still accepts `'declined'` and the rows written before today are still there. They are
+ * append-only and collapse on the way out; nothing new joins them.
+ */
 export async function recordAnswer(
   client: SupabaseClient,
   recorder: Recorder,
   input: {
     readonly runId: string;
     readonly questionId: string;
-    readonly outcome: 'answered' | 'declined';
-    readonly body: string | null;
+    readonly body: string;
   },
 ): Promise<RecordResult> {
+  if (input.body.trim() === '') return { ok: false, error: 'Nothing written.' };
+
   const { error } = await client.from('merchant_attestations').insert({
     run_id: input.runId,
     question_id: input.questionId,
-    outcome: input.outcome,
-    // The table's own constraint: an answer has words, a declination has none.
-    body: input.outcome === 'declined' ? null : input.body,
+    outcome: 'answered',
+    body: input.body,
     ...asOperator(recorder),
   });
 

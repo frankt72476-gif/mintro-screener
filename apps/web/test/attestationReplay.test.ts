@@ -86,15 +86,22 @@ describe('an answer carried forward from an earlier screening', () => {
   });
 
   it('never calls someone else’s answer "you"', () => {
-    // The link is forwardable. "You chose not to answer this" about an agent's decision is a false
-    // statement in the one place a merchant acts on it.
-    const declined = new Map<string, Answer>([
-      [first, { outcome: 'declined', writtenBy: 'sue@agency.example', writtenAt: '2026-08-12T10:00:00.000Z', carriedForwardFrom: '2026-08-12T10:00:00.000Z' }],
+    /*
+      The link is forwardable, so a sentence in the second person about an agent's decision would be
+      a false statement in the one place a merchant acts on it.
+
+      The refusal case is gone with the state (D-253) — there is no "you chose not to answer this"
+      left to get wrong. What remains is the answer case, where the same rule still applies: an
+      answer carried forward from somebody else is shown as theirs, never as yours.
+    */
+    const carried = new Map<string, Answer>([
+      [first, { outcome: 'answered', body: 'We keep a list.', writtenBy: 'sue@agency.example', writtenAt: '2026-08-12T10:00:00.000Z', carriedForwardFrom: '2026-08-12T10:00:00.000Z' }],
     ]);
-    const body = text(render(declined));
+    const body = text(render(carried));
 
     expect(body).not.toContain('you chose not to answer');
-    expect(body).toContain('Recorded: not answered.');
+    expect(body).not.toMatch(/you answered/i);
+    expect(body).toContain('We keep a list.');
   });
 });
 
