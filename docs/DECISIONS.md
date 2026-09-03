@@ -15783,3 +15783,46 @@ Three practices follow, and they are the reusable part:
   silently empty account area. Where the safe direction differs — `hidePanes` defaults to hiding
   nothing, so forgetting it leaks rather than hides — that is worth a second look, and is not
   changed here.
+
+---
+
+## D-247 — A state class is an adjective; a bare selector on one hits every finding in that state
+**2026-09-02 · engineering · `apps/web/src/components/NotAvailable.tsx`, `apps/web/src/styles.css`**
+
+Stage 4 gave the `NotAvailable` page a container class of `na`:
+
+```css
+.na { max-width: 30rem; margin: 4rem auto; padding: 2rem; }
+```
+
+`na` is what `stateClass()` returns for **not_evaluable**, and has been since M3. The stylesheet
+already carried `.find.na`, `.state.na`, `.band-name.na`, `.tick.na`, `.pip.na` and
+`.stopcheck-row.na` — every one qualified by another class. This one was not, and being last in the
+file it won on every property nothing else set.
+
+Measured on the live site, on one report: **76 elements matched** — 37 finding rows and 39 state
+pills. Each was capped at 30rem, centred by `margin: auto` and pushed 64px down. Inside the Stopping
+conditions panel that put the *Could not be checked* row 92px right of its own group heading, with a
+band of blank above it. Disabling that single rule moved the row from left 217 to 0 and its width
+from 480 to 913.
+
+Nothing caught it and nothing could have: it is valid CSS, the component renders correctly, every
+test passed, and the two meanings of `na` sit three thousand lines apart in one file. It is not a
+regression in the report — the report was never touched — it is a regression *into* the report from a
+screen that has nothing to do with it.
+
+**The rule.** A state class is an adjective on something else: a finding, a pill, a tick. It is never
+a thing in its own right, so a rule targeting one unqualified is always either a mistake or a name
+that wants changing. `stateClassCollision.test.ts` asserts no rule targets a bare `.fail`,
+`.review`, `.pass` or `.na`, reads that list back out of `stateClass()`'s signature so a new state
+cannot slip past it, and checks the qualified rules still exist so "delete every `.na` rule" cannot
+pass as a fix.
+
+The container is `notavail` now. `na-brand`, `na-head` and `na-body` are distinct class names and
+collide with nothing; renaming them would have been churn.
+
+**What generalises.** Two names, both correct in their own file, that only collide in a third place —
+the rendered page. The same shape as D-246 one layer down: there, a field nothing read; here, a
+selector reading things it was never meant to. Neither is visible to typechecking, to a unit test, or
+to a person reading the diff, and both were found only by asking the rendered document what it
+actually contained.

@@ -15,13 +15,21 @@
  * shop.example" would hand over both facts while apologising.
  *
  * The link back is to their own runs, which is the one place they can certainly go.
+ *
+ * ## `notavail`, not `na`
+ *
+ * This container was `.na`, and `na` is the report's class for a **not_evaluable** state — it has
+ * been since M3, on `.find.na`, `.state.na`, `.band-name.na`, `.tick.na`, `.pip.na` and
+ * `.stopcheck-row.na`. Every one of those is qualified by another class; a bare `.na` is not, so the
+ * page container's `max-width: 30rem; margin: 4rem auto; padding: 2rem` landed on all 76 of them in
+ * a single report. See D-247.
  */
 
 export function NotAvailable({ backTo = '/' }: { readonly backTo?: string }): JSX.Element {
   return (
     <div className="shell">
       <main className="main">
-        <div className="na">
+        <div className="notavail">
           <span className="na-brand">Mintro</span>
           <h1 className="na-head">This isn’t available to you</h1>
           {/* Nothing about what is behind the URL. See the header. */}

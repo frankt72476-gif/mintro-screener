@@ -3277,7 +3277,10 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .empty-state { padding: 2.5rem 0; max-width: 34rem; }
 .empty-head { font-size: 1.25rem; margin: 0 0 0.6rem; }
 .empty-body { line-height: 1.5; margin: 0 0 1.25rem; }
-.na { max-width: 30rem; margin: 4rem auto; padding: 2rem; }
+/* `notavail`, never a bare `.na`: `na` is the not_evaluable STATE class (`.find.na`, `.state.na`,
+   `.band-name.na`, …), so an unqualified `.na` here inherited every not_evaluable finding and pill
+   in a report — 76 of them on one page, indented 92px and pushed 64px down. See D-247. */
+.notavail { max-width: 30rem; margin: 4rem auto; padding: 2rem; }
 .na-brand { display: block; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
 .na-head { font-size: 1.25rem; margin: 0 0 0.75rem; }
 .na-body { line-height: 1.5; margin: 0 0 1.25rem; }
