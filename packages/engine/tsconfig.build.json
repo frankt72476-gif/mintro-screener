@@ -1,0 +1,14 @@
+// Source only. See `../extraction/tsconfig.build.json` for why this pair of configs exists.
+//
+// Both references are real at source level: `src` imports `@mintro/ruleset` and
+// `@mintro/extraction`. They point at the *build* configs, so the whole graph stays source-only —
+// a reference to a sibling's full project would pull that sibling's tests back in and the build
+// would fail on the test runner again, one package over.
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../ruleset/tsconfig.build.json" },
+    { "path": "../extraction/tsconfig.build.json" }
+  ]
+}

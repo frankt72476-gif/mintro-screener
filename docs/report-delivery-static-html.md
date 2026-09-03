@@ -356,7 +356,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Five findings from building this, all worth keeping
+#### Six findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -451,12 +451,79 @@ it first passed a Windows-style `C:\...` PATH that `sh` reads none of, so *every
 missing and it "reproduced" the failure for the wrong reason. A harness can have the defect it is
 testing for.
 
+**And a fourth time, which is where the method changed rather than the code.** With `tsc` finally
+resolving, Netlify failed with exit 1: `tsc --build ../../packages/engine` builds the engine's
+*project*, and that project is `src` plus `test` plus `bin`. The tests import `vitest`, a root
+devDependency a production install has no reason to carry. 72 errors — and the distinction that
+decides what this is: **every one of them in a test file, not one in `src`.** The engine compiles
+fine. Its tests cannot typecheck without a test runner. Reading 72 errors as one failure would have
+sent the fix somewhere wrong.
+
+The build now targets `tsconfig.build.json` in each of the three packages: `include` is
+`src/**/*.ts` and references point only at other source-only configs.
+
+**The reference edges were derived from the actual import graph, not assumed.** `engine/src`
+imports `@mintro/ruleset` and `@mintro/extraction`; `ruleset/src` imports neither; `extraction/src`
+imports nothing. So `packages/ruleset`'s source-only config carries **no references at all** — its
+reference to `../extraction` in the package config exists solely because one of its tests imports
+it. Copying the package configs' references across would have produced something that worked by
+coincidence and would have quietly pulled extraction's tests back into the graph the day anything
+about that edge changed. The source graph really is smaller, and it is smaller for a reason that
+was checked.
+
+Nothing narrows what `npm run check` covers: the package projects are untouched and still build
+every test. **That is the better half of the guard, and it is the half worth keeping.** Asserting
+that the source-only configs are source-only protects the deploy; asserting that
+`packages/engine/tsconfig.json` still includes `test/**/*.ts` protects everything else. Without it,
+someone narrows the wrong file later, the deploy stays green, and type coverage of every test in
+the repository disappears with nothing to say so.
+
+#### The standing rule this produced
+
+**A deploy-environment failure gets a clean-room reproduction before a fix is proposed — not after
+the third patch.** Fresh clone of the pushed commit into an empty directory, install exactly as the
+platform installs, run the real command. Not the working tree, not with existing `node_modules`,
+not with `dist` present.
+
+Four attempts happened because each verification was reported as conclusive when the environment it
+ran in had already supplied the answer the check was meant to establish. The three fixes were each
+real and each insufficient, and every one was hidden behind the one in front of it: the engine had
+to be compiled before `tsc` could be found missing, and `tsc` had to run before it could fail on
+its own terms. A clean room on the first failure would have surfaced all three at once.
+
+The reproduction is cheap — the clean-room install here took eight seconds — and it is the only
+check that answers the question actually being asked, which is *what happens somewhere that has
+nothing yet*.
+
 The general form, and it is the widest of the five: **the fixture problem is not limited to
 fixtures. An environment can be a fixture.** When the thing under test is a build, the environment
 it runs in is an input — and an input inherited from previous work is one nobody chose. A tree that
 already satisfies a prerequisite cannot tell you whether the prerequisite is met; it can only tell
 you that it was met this time. State the prerequisite in the command, and verify from the state a
 stranger would start in.
+
+**The tree had already written this lesson down, and nobody read it.**
+`packages/ruleset/tsconfig.json` carries a comment, from an earlier deploy failure, saying that a
+missing project reference is *"invisible locally, where a root `tsc --build` has already produced
+every dist. It is not invisible in a container, which starts with none — the deploy build failed
+here."*
+
+That is the same mechanism as the fourth failure above — a build graph that resolves only because
+a previous build left artefacts behind — described in the file the fix had to be made in. It was
+read only after four attempts, and only by accident, while looking at the sibling configs for a
+different reason.
+
+**This is a different failure from the other five and it has a different correction.** Those were
+about checks that could not see. This one is about a check that had already been made, written
+down, and not consulted. No amount of clean-room discipline would have surfaced it, because the
+answer was never in the environment; it was in the repository.
+
+So: **when a deploy fails in a way that smells structural — build order, resolution, what exists
+before what — read what the tree already says about deploys before reasoning from first
+principles.** Grep the configs and their comments, `docs/DEPLOY.md`, and the migration and tsconfig
+headers, which is where this repository keeps its hard-won operational knowledge. A codebase that
+comments this heavily has usually met the problem before, and the cheapest possible source of a
+diagnosis is the one someone already paid for.
 
 **A catch-all above the report rule would have served the wrong document, successfully.** Netlify
 evaluates `netlify.toml` redirects **before** `_redirects`, and first match wins. The existing SPA

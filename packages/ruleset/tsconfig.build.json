@@ -1,0 +1,11 @@
+// Source only. See `../extraction/tsconfig.build.json` for why this pair of configs exists.
+//
+// **No `references`, deliberately.** `tsconfig.json` references `../extraction` because
+// `test/documents.test.ts` imports it — a test-only edge. Nothing in `src` does, so the build graph
+// for source alone does not include extraction, and saying otherwise would compile a package this
+// one does not need in order to produce its own `dist`.
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts"],
+  "references": []
+}

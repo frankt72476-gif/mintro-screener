@@ -115,3 +115,63 @@ describe('what apps/web scripts invoke', () => {
     },
   );
 });
+
+/**
+ * The frontend build compiles source, and not the tests that need a test runner.
+ *
+ * The fourth deploy failure. `tsc --build ../../packages/engine` builds the engine's *project*,
+ * and that project is `src` plus `test` plus `bin`. Netlify installs what `apps/web` declares, so
+ * there is no `vitest` — and the build died on 72 errors, every one of them in a test file and not
+ * one in `src`.
+ *
+ * The build now targets `tsconfig.build.json`, which is source only. These assertions protect the
+ * property rather than the spelling, and they read config files and nothing else — the same reason
+ * the checks above read `package.json` and nothing else. An environment that happens to have a
+ * test runner installed cannot make them pass.
+ *
+ * **The reference edge is the one to watch.** A source-only project that references a sibling's
+ * *full* project pulls that sibling's tests back into the graph, and the build fails on the test
+ * runner again, one package over. That is not hypothetical: `packages/ruleset/tsconfig.json`
+ * references `../extraction` solely because one of its tests imports it.
+ */
+describe('what the frontend build compiles', () => {
+  const buildScript = manifest.scripts.build;
+
+  const projectOf = (path: string): { include?: string[]; references?: { path: string }[] } =>
+    JSON.parse(
+      readFileSync(path, 'utf8')
+        // These configs carry comments, as the rest of the repository's tsconfigs do.
+        .replace(/^\s*\/\/.*$/gm, ''),
+    );
+
+  it('targets a source-only project, not the package', () => {
+    expect(buildScript).toContain('tsconfig.build.json');
+  });
+
+  const BUILD_CONFIGS = [
+    'packages/engine/tsconfig.build.json',
+    'packages/ruleset/tsconfig.build.json',
+    'packages/extraction/tsconfig.build.json',
+  ];
+
+  it.each(BUILD_CONFIGS)('%s includes source and nothing else', (path) => {
+    // `test/**` is what brought in `vitest`; `bin/**` is tooling the frontend has no use for.
+    expect(projectOf(path).include).toEqual(['src/**/*.ts']);
+  });
+
+  it.each(BUILD_CONFIGS)('%s references only other source-only projects', (path) => {
+    /*
+      The edge that would undo all of it. One reference to a full project and the graph contains
+      that package's tests again — and the failure would arrive on a deploy, not here.
+    */
+    const referenced = (projectOf(path).references ?? []).map((reference) => reference.path);
+
+    expect(referenced.filter((target) => !target.endsWith('tsconfig.build.json'))).toEqual([]);
+  });
+
+  it('still typechecks the tests somewhere', () => {
+    // The coverage this must not have quietly removed. The package projects are unchanged and are
+    // what `npm run check` builds; the source-only configs are additive.
+    expect(projectOf('packages/engine/tsconfig.json').include).toContain('test/**/*.ts');
+  });
+});

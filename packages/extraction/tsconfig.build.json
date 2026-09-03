@@ -1,0 +1,17 @@
+// Source only, for consumers that need `dist` and nothing else.
+//
+// `tsconfig.json` is the project: source, tests, and the tooling they need. This is the subset a
+// *build* needs — the compiled output another package imports.
+//
+// It exists because the frontend deploy compiles this package so `apps/web/vite.config.ts` can
+// import `@mintro/engine`, and Netlify's install carries no test runner. Building the full project
+// there typechecks `test/**`, which imports `vitest`, which is a root devDependency that a
+// production install has no reason to install. Seventy-two errors, every one in a test file, none
+// in `src`.
+//
+// Nothing here narrows what `npm run check` covers. The root build still uses `tsconfig.json` and
+// still typechecks every test.
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts"]
+}
