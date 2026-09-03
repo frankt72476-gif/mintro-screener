@@ -277,9 +277,43 @@ than on a hostname and treats the `.html` as optional, so both spellings of one 
 storage object and the delivered link — read back to the same run. The tripwire in step 7 fetches
 through this origin, because that is the URL that was actually delivered.
 
-The link itself is composed in the worker for the email in step 5 and stated in `netlify.toml`
-here. That is a URL shape in two places, which is what D-034 is about — give `/r/` one owner in
-`reportCapture.ts` when this step lands, rather than spelling it out on both sides.
+#### `/r/` has one owner, and `netlify.toml` is not it
+
+`REPORT_LINK_PATH` in `packages/engine/src/reportCapture.ts`. Nothing else spells it.
+
+`apps/web/netlifyReportProxy.ts` is a Vite plugin that emits `_redirects` and `_headers` into the
+build from that constant, so the config is *generated* rather than kept in agreement by a test.
+`netlify.toml` declares no redirects at all, and a test asserts it never names the report path.
+
+This also solves a problem the original plan did not see: the Supabase project ref is not in this
+repository — every reference in `docs/DEPLOY.md` and `.env.example` is a `<project>` placeholder.
+Generating from the build environment means the ref is never committed and a branch deploy does not
+proxy production storage. A Netlify build with no `VITE_SUPABASE_URL` **fails**; a local build
+omits the rule without failing, because there is no Netlify layer to configure and
+`bundledControls.test.ts` runs a real `vite build` with no environment.
+
+The SPA fallback moved into the same generated file. See the catch-all trap in step 6 — this is
+not tidiness, it is the only way the order between the two rules is visible and testable.
+
+#### Verify once, against the deployed site
+
+Whether Netlify applies `_headers` to **proxied** 200-rewrite responses is not something a local
+build can answer, and it is not worth asserting from memory. It does not block: the ruling makes
+the `<meta name="robots">` in the captured document the primary control, so the noindex
+requirement is met by the bytes whether or not the header applies.
+
+Check it once, after the first deploy, against a real captured report:
+
+```
+curl -I https://screener.gomintro.com/r/<runId>/<token>
+```
+
+Expected: `200`, `content-type: text/html; charset=utf-8`, and — if proxied responses carry them —
+`x-robots-tag: noindex, nofollow`. A `404` means the rewrite is not live or the object key does not
+match; anything that returns the analyst app means a redirect rule is matching first.
+
+**Do not land the step-3 download change until this returns a real report.** Until the rewrite is
+deployed, every `/r/` link in the app is dead, and an analyst clicking a dead link is a dead link.
 
 ### 5. Email bodies
 
@@ -307,7 +341,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Two findings from building these, both worth keeping
+#### Three findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -330,6 +364,23 @@ looked.
 failed the moment the app imported `reportLinkForKey`: `@mintro/engine` resolves to `browser.ts` in
 the browser, and the symbol had only been exported from `index.ts`. Typecheck and every worker test
 passed. Nothing else in the suite would have found it before the bundle broke at build time.
+
+**A catch-all above the report rule would have served the wrong document, successfully.** Netlify
+evaluates `netlify.toml` redirects **before** `_redirects`, and first match wins. The existing SPA
+fallback — `/*  →  /index.html`, status 200 — sat in `netlify.toml`, so a `/r/*` proxy added to
+`_redirects` would never have fired. Every delivered report link would have matched the catch-all
+and served the analyst application.
+
+The reason this one is worth remembering is the shape of the failure, not the mechanics. **It would
+have resolved.** 200, a page renders, no error anywhere — an underwriter opening a screening report
+gets a sign-in screen or an empty app shell, and nothing in Mintro records that the link did
+anything other than work. It is the same class as a `pass` from a check that could not see: the
+output is indistinguishable from success, so nothing downstream can catch it.
+
+Both rules therefore live in one generated file, in one order, with a test asserting the report
+rule precedes the fallback. The general form: **when adding a route, ask what already matches it**
+— a catch-all is not a default, it is a rule that matches everything, and where it sits decides
+whether anything below it exists.
 
 ### 7. Storage-drift tripwire
 

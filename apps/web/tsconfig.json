@@ -10,6 +10,6 @@
     "noEmit": false,
     "emitDeclarationOnly": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "vite.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "vite.config.ts", "netlifyReportProxy.ts"],
   "references": [{ "path": "../../packages/engine" }, { "path": "../../packages/ruleset" }]
 }

@@ -9,10 +9,16 @@
 [build.environment]
   NODE_VERSION = "20"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Redirects are NOT here.
+#
+# `apps/web/netlifyReportProxy.ts` emits `_redirects` into the build, carrying both the `/r/*`
+# proxy for captured reports and the single-page-app fallback, in that order.
+#
+# Two reasons, and neither is style. The report path is owned by `REPORT_LINK_PATH` in
+# `packages/engine/src/reportCapture.ts` and must not be spelled a second time here — a URL shape
+# stated in two places is one that will differ (D-034). And Netlify evaluates redirects in this
+# file *before* `_redirects`, so a catch-all here would match `/r/*` first and serve the analyst
+# app in place of every delivered report.
 
 [[headers]]
   for = "/*"
