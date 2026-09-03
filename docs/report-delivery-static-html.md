@@ -420,6 +420,37 @@ same `tsc --build` before shelling out — it calls the binary rather than the s
 so the script's line does not reach it. Verified by deleting every `dist/` and running each from
 that state, rather than by a build in a tree that already worked.
 
+**And then the same finding again, one layer down.** The fix above was `tsc --build
+../../packages/engine && vite build`, and Netlify failed on it with `exit 127 — tsc: command not
+found`. The reasoning had been *"typescript is a root devDependency and workspaces hoist it, the
+way vite and react resolve"* — true of **module resolution**, and silent about **shell PATH**. They
+are different mechanisms and the second was never checked.
+
+`typescript` was declared only at the repository root. Netlify installs what `apps/web` declares:
+`vite` is its devDependency and resolved; `tsc` was not and did not. The fix is to declare
+`typescript` in `apps/web`, where the binary is invoked. That also covers the pre-existing
+`typecheck` script, which has called bare `tsc` since it was written and had the same latent defect
+— it simply never ran anywhere that would expose it.
+
+Note what made this hard to see twice: `node_modules/.bin` in this repository holds `tsc` and
+`vite` side by side, both hoisted, so a local `npm run build` cannot distinguish a root
+devDependency from a declared one. **The tree could not answer the question, and it returned a
+confident answer anyway.**
+
+The guard is `apps/web/test/buildPrerequisites.test.ts`, and it deliberately reads `package.json`
+and nothing else: for every script, the command it invokes must be a `bin` exported by a package
+`apps/web` itself declares. No environment can answer that favourably by accident, which is the
+whole requirement. It was made to fail before it was trusted — removing the declaration fails three
+of its six assertions with a message naming the fix.
+
+The verification of the fix itself was built the same way. A harness derives the binaries an
+apps/web-scoped install would provide from that manifest, puts only those on PATH, and runs the
+real build script: without the declaration, `exit 127, tsc: command not found`, Netlify's error
+exactly; with it, the build succeeds. The harness needed two corrections of its own on the way —
+it first passed a Windows-style `C:\...` PATH that `sh` reads none of, so *every* binary was
+missing and it "reproduced" the failure for the wrong reason. A harness can have the defect it is
+testing for.
+
 The general form, and it is the widest of the five: **the fixture problem is not limited to
 fixtures. An environment can be a fixture.** When the thing under test is a build, the environment
 it runs in is an input — and an input inherited from previous work is one nobody chose. A tree that
