@@ -34,7 +34,7 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { startReportServer } from './reportServer.js';
-import { renderReportPage } from './capture.js';
+import { renderReportPage, type CaptureImageSource } from './capture.js';
 import { assembleCapture, assertCapturable } from './capture/document.js';
 import { cssUrlReferences, hoistPrintRules, stripImports } from './capture/css.js';
 import { fontFaceCss } from './capture/fonts.js';
@@ -104,7 +104,7 @@ export async function captureRunReport(
       );
     }
 
-    const images = await inlineEvidence(supabase, rendered.imageMarkers);
+    const images = await inlineImages(supabase, rendered.imageMarkers);
 
     const css: string[] = [];
     for (const sheet of rendered.stylesheets) {
@@ -138,46 +138,80 @@ export async function captureRunReport(
 }
 
 /**
- * Marker → data URI, with the bytes read from the bucket by key.
+ * Marker → data URI, for every image the document displays.
  *
- * A capture that cannot be downloaded throws. There is no placeholder and no omission: hard
- * constraint 3 forbids synthesising a visual capture that did not occur, and an empty `src` in a
- * delivered report would be exactly that — a finding presenting as though it had a screenshot.
+ * Two sources and one rule: **anything the page showed, the file holds.** An evidence capture is
+ * downloaded from the bucket by key; an app asset — the Mintro lockup in the masthead — is fetched
+ * from the report server that served the page.
+ *
+ * Either failing throws. There is no placeholder and no omission: hard constraint 3 forbids
+ * synthesising a visual capture that did not occur, and an empty `src` in a delivered report would
+ * be exactly that, a finding presenting as though it had a screenshot.
  */
-async function inlineEvidence(
+async function inlineImages(
   supabase: WorkerSupabase,
-  markers: ReadonlyMap<string, string>,
+  markers: ReadonlyMap<string, CaptureImageSource>,
 ): Promise<Map<string, string>> {
   const inlined = new Map<string, string>();
-  // Distinct keys only. One screenshot may back several findings, and downloading it per citation
-  // would multiply the transfer for bytes that are identical.
-  const bytesByKey = new Map<string, string>();
+  // Deduplicated by source. One screenshot may back several findings and the lockup appears once
+  // per document, but downloading identical bytes per citation would multiply the transfer.
+  const bytesBySource = new Map<string, string>();
 
-  for (const [marker, key] of markers) {
-    let dataUri = bytesByKey.get(key);
+  for (const [marker, source] of markers) {
+    const cacheKey = source.kind === 'evidence' ? `evidence:${source.key}` : `asset:${source.url}`;
+    let dataUri = bytesBySource.get(cacheKey);
 
     if (dataUri === undefined) {
-      const { data, error } = await supabase.client.storage.from(supabase.bucket).download(key);
-      if (error !== null || data === null) {
-        throw new Error(
-          `could not read the capture at ${key}: ${error?.message ?? 'no data'}. The report ` +
-            'displayed it, so it is not delivered without it.',
-        );
-      }
-
-      const buffer = Buffer.from(await data.arrayBuffer());
-      if (buffer.length === 0) {
-        throw new Error(`the capture at ${key} is empty`);
-      }
-
-      dataUri = `data:${contentTypeFor(key)};base64,${buffer.toString('base64')}`;
-      bytesByKey.set(key, dataUri);
+      dataUri =
+        source.kind === 'evidence'
+          ? await evidenceDataUri(supabase, source.key)
+          : await assetDataUri(source.url);
+      bytesBySource.set(cacheKey, dataUri);
     }
 
     inlined.set(marker, dataUri);
   }
 
   return inlined;
+}
+
+async function evidenceDataUri(supabase: WorkerSupabase, key: string): Promise<string> {
+  const { data, error } = await supabase.client.storage.from(supabase.bucket).download(key);
+  if (error !== null || data === null) {
+    throw new Error(
+      `could not read the capture at ${key}: ${error?.message ?? 'no data'}. The report ` +
+        'displayed it, so it is not delivered without it.',
+    );
+  }
+
+  const buffer = Buffer.from(await data.arrayBuffer());
+  if (buffer.length === 0) throw new Error(`the capture at ${key} is empty`);
+
+  return `data:${contentTypeFor(key)};base64,${buffer.toString('base64')}`;
+}
+
+/**
+ * An app asset, from the local report server.
+ *
+ * The brand lockup is in every report, and it is why this path exists at all: without it the
+ * masthead serialized as `src="/brand/mintro-lockup-full.png"` and the document was refused for a
+ * relative URL. Fetched rather than read from `webRoot` by path, because the server already
+ * resolves what the page asked for and a second path resolution is a second thing to get wrong.
+ */
+async function assetDataUri(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(
+      `could not read the asset at ${url}: ${response.status}. The report displayed it, so it is ` +
+        'not delivered without it.',
+    );
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length === 0) throw new Error(`the asset at ${url} is empty`);
+
+  const type = response.headers.get('content-type') ?? contentTypeFor(url);
+  return `data:${type};base64,${buffer.toString('base64')}`;
 }
 
 /** From the key's extension. Screenshots are PNG; nothing else is cited as an image today. */

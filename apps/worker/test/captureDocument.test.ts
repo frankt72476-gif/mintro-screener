@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   CAPTURE_SIZE_CEILING_BYTES,
   CAPTURE_SIZE_FLOOR_BYTES,
@@ -250,5 +251,106 @@ describe('what the file is refused for', () => {
     });
 
     expect(() => assertCapturable(html, { images: 2, runId: RUN })).not.toThrow();
+  });
+});
+
+/**
+ * Against a document shaped like the real one.
+ *
+ * Every other test in this file builds its own HTML, and that is how the lockup defect survived:
+ * the fixtures were written from the same idea of the page as the code was, so both were missing
+ * the same image. The guard fired on everything in production and on nothing here.
+ *
+ * `fixtures/print-dom.html` is the print route's actual shape — a brand lockup with a relative
+ * `src`, evidence images behind signed URLs, a stylesheet link, a module script, a Google Fonts
+ * link and a `<noscript>`.
+ */
+describe('the real print DOM', () => {
+  const fixture = readFileSync('apps/worker/test/fixtures/print-dom.html', 'utf8');
+
+  /** Every image the page displayed, marked — the lockup included. */
+  const allMarked = new Map([
+    ['#mintro-capture-0', PNG],
+    ['#mintro-capture-1', PNG],
+    ['#mintro-capture-2', PNG],
+  ]);
+
+  /**
+   * Marks the first `markers` images, the way `capture.ts` does in the page.
+   *
+   * `<img>` only. An earlier version matched every `src=` and put the first marker on the module
+   * script, which is not an image and is stripped anyway — so the last evidence capture went
+   * unmarked and the failure looked like the bug this fixture is here to catch. Worth keeping in
+   * mind: a helper that is nearly right produces a failure that reads as a real one.
+   */
+  const markUp = (html: string, markers: number): string => {
+    let index = 0;
+    return html.replace(
+      /<img([^>]*?)src="(?!data:)[^"]*"/g,
+      (match, rest: string) =>
+        index < markers ? `<img${rest}src="#mintro-capture-${index++}"` : match,
+    );
+  };
+
+  /*
+    Stylesheet bulk, so the fixture clears the floor for the reason a real capture does.
+
+    The fixture body is a trimmed report — a few kilobytes — while a delivered file carries the
+    app's 88 KB stylesheet and 1.1 MB of inlined fonts before a single finding. Passing a
+    one-rule stylesheet here would put the document under the 8 KB floor and every assertion below
+    would fail on size rather than on the thing it is testing.
+  */
+  const bulkCss = `.a{color:red}${'.pad{margin:0}'.repeat(700)}`;
+
+  const captureFixture = (markers: number, images = allMarked): string =>
+    assembleCapture({
+      html: markUp(fixture, markers),
+      css: [bulkCss],
+      fontCss: '@font-face{font-family:X;src:url(data:font/woff2;base64,AA) format("woff2")}',
+      images,
+      merchantDomain: 'example-peptides.test',
+      runId: RUN,
+    });
+
+  it('delivers when every image is marked and inlined', () => {
+    const html = captureFixture(3);
+
+    expect(() => assertCapturable(html, { images: 3, runId: RUN })).not.toThrow();
+    expect(html.match(/src="data:image\/png/g)).toHaveLength(3);
+  });
+
+  it('refuses the document when the brand lockup is left behind', () => {
+    /*
+      The defect, reproduced. Marking only the two evidence images is exactly what the first
+      version of `capture.ts` did — it marked images found in the injected evidence map, and the
+      lockup is not in it.
+
+      The lockup is in every report, so this was not an edge case: it was every capture.
+    */
+    const html = captureFixture(2);
+
+    expect(html).toContain('/brand/mintro-lockup-full.png');
+    expect(() => assertCapturable(html, { images: 3, runId: RUN })).toThrow(/not inline/);
+  });
+
+  it('strips the bundle, the font link and the noscript out of the real shape', () => {
+    const html = captureFixture(3);
+
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('<noscript');
+    expect(html).not.toContain('This application requires JavaScript');
+    expect(html).not.toContain('fonts.googleapis.com');
+    expect(html).not.toContain('/assets/index-');
+  });
+
+  it('keeps the masthead and the findings', () => {
+    // The strip must not take the document with it. A capture that passed every refusal by being
+    // empty of content is the failure the floor exists for, and this is the positive half.
+    const html = captureFixture(3);
+
+    expect(html).toContain('example-peptides.test');
+    expect(html).toContain('Rule set v2.4.0');
+    expect(html).toContain('GATE-002');
+    expect(html).toContain('The footer states research use only.');
   });
 });

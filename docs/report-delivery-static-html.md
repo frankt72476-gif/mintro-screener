@@ -341,7 +341,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Three findings from building this, all worth keeping
+#### Four findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -359,6 +359,25 @@ question *which assertion actually fired* was. A test made to fail before it is 
 kind that has been checked, and it applies to the guards in this document as much as to the checks
 in the engine — `not_evaluable` exists because a check that cannot see must not report as one that
 looked.
+
+**A fixture written from the code's own model inherits the code's blind spot.** The capture step
+inlined only images that appeared in the injected evidence map. The masthead's Mintro lockup is not
+in that map — it is an app asset — so it serialized as `src="/brand/mintro-lockup-full.png"`, a
+relative URL in a document served from a storage bucket. The assertions refused it on two counts,
+which means **every capture would have failed**, on every run, from the first one.
+
+Nothing in the suite caught it, and the reason is the part worth keeping. The test documents were
+written by hand from the same understanding of the page that produced the bug: I knew the report
+displayed evidence images, so the fixtures contained evidence images. The lockup was invisible in
+both places at once. A guard can therefore fire on **everything in production and nothing in the
+suite** — the exact inverse of the count guard above, and the same root cause, which is that the
+test and the code share an author and therefore share a model.
+
+The general form: **a fixture derived from your own reading of the code tests your reading, not the
+code.** The correction is to take the fixture from the artifact rather than from the model —
+`apps/worker/test/fixtures/print-dom.html` is now the print route's real shape, brand lockup and
+`<noscript>` and module script and all, and the lockup case has a test that fails without the fix.
+This is the same discipline as saved storefront HTML in the check fixtures, applied one layer up.
 
 **The browser entry caught the import.** `browserEntry.test.ts` and `bundledControls.test.ts`
 failed the moment the app imported `reportLinkForKey`: `@mintro/engine` resolves to `browser.ts` in
