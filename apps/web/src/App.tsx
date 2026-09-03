@@ -373,6 +373,7 @@ function AnalystWorkspace(): JSX.Element {
 function RecordBox({
   label,
   reference,
+  number,
   value,
   savedAt,
   onChange,
@@ -386,6 +387,8 @@ function RecordBox({
    * (D-203). The header then carries the label alone, which already says what is being answered.
    */
   readonly reference?: string;
+  /** The report-wide pointer (D-248). Prominent; the reference is the quiet tag beside it. */
+  readonly number?: number;
   readonly value: string;
   readonly savedAt: string | undefined;
   readonly onChange: (next: string) => void;
@@ -398,6 +401,8 @@ function RecordBox({
     <div className="respond recbox">
       <div className="respond-head">
         <span className="respond-icon" aria-hidden="true">✎</span>
+        {/* The number a person says, before the words (D-248). */}
+        {number !== undefined && <span className="find-n">{number}</span>}
         <span className="respond-label">{label}</span>
         {reference !== undefined && <span className="respond-ref">{reference}</span>}
       </div>
@@ -1316,6 +1321,48 @@ function Screener({
                               setRecordedSaved((e) => new Map(e).set(key, new Date().toISOString()));
                             }
                             return result.ok ? null : (result.error ?? 'That could not be saved.');
+                          }}
+                        />
+                      ),
+                      /*
+                        A plan per impression, recorded on the merchant's behalf (D-249).
+
+                        Same key as the merchant's own box — `(subject='eye-test', ordinal=<rubric
+                        number>)` — so an answer an analyst takes down a phone call and one the
+                        merchant types land in the same place and read back to the same line.
+                      */
+                      eyeLineCommentBox: (line: {
+                        readonly rubricId: string;
+                        readonly ordinal: number;
+                        readonly number: number;
+                      }) => (
+                        <RecordBox
+                          key={`rec-eye-${line.rubricId}`}
+                          label="Record the merchant’s plan for this"
+                          reference={`${line.rubricId} · Mintro’s read`}
+                          number={line.number}
+                          value={recordedDrafts.get(`subject:eye-test:${line.ordinal}`) ?? ''}
+                          savedAt={recordedSaved.get(`subject:eye-test:${line.ordinal}`)}
+                          onChange={(next: string) =>
+                            setRecordedDrafts((existing) =>
+                              new Map(existing).set(`subject:eye-test:${line.ordinal}`, next),
+                            )
+                          }
+                          onSave={async () => {
+                            const result = await recordComment(client, recorder, {
+                              runId: report.runId,
+                              ruleId: null,
+                              ordinal: line.ordinal,
+                              subject: 'eye-test',
+                              body: recordedDrafts.get(`subject:eye-test:${line.ordinal}`) ?? '',
+                            });
+                            if (result.ok) {
+                              setRecordedSaved((e) =>
+                                new Map(e).set(`subject:eye-test:${line.ordinal}`, new Date().toISOString()),
+                              );
+                              return null;
+                            }
+                            return result.error ?? 'The plan could not be recorded.';
                           }}
                         />
                       ),

@@ -8,7 +8,7 @@
  * unchanged; the data's own name for it is `not_evaluable`.
  */
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, createContext, useContext, useMemo, useState } from 'react';
 import type { State } from '@mintro/ruleset';
 import {
   REQUIREMENT_HEADINGS,
@@ -43,6 +43,7 @@ import { EvidenceSlip } from './EvidenceSlip.js';
 import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
+import { createNumbering, eyeLineOrdinal, type Numbering } from '../lib/numbering.js';
 import { MerchantResponse } from './MerchantResponse.js';
 import { leadSentence, notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
@@ -197,6 +198,24 @@ interface Props {
    * judgment it answers would be one-sided — the document would carry Mintro's impression of a
    * storefront and not the merchant's account of it, which is the shape D-063 exists to prevent.
    */
+  /**
+   * A box under each rubric line (D-249).
+   *
+   * D-196 kept the verdicts uncommentable, on the ground that a box under each would imply a verdict
+   * is a finding. The account team needs a plan per concern rather than a paragraph about the read,
+   * so the boxes exist — and the reasoning D-196 protected is carried by the section instead: the
+   * lines keep their verdict vocabulary, their *Mintro's impression* framing and their place inside
+   * the eye-test panel. A response to an impression is not evidence, and nothing counts, scores or
+   * states it as one.
+   *
+   * `ordinal` is the rubric id's own number, which is what the reply is stored under — stable where
+   * `number` is a display pointer that moves with the report's contents.
+   */
+  readonly eyeLineCommentBox?: (line: {
+    readonly rubricId: string;
+    readonly ordinal: number;
+    readonly number: number;
+  }) => JSX.Element | null;
   readonly eyeResponses?: readonly MerchantComment[];
   /**
    * The merchant's answer form, rendered where the questions section sits (D-209).
@@ -246,6 +265,7 @@ export function ReportView({
   surface: surfaceProp,
   commentBox,
   eyeCommentBox,
+  eyeLineCommentBox,
   eyeResponses,
   questionsForm,
   attestations,
@@ -287,7 +307,17 @@ export function ReportView({
     () => reportParts(report, surface, { invited }),
     [report, surface, invited],
   );
+  /*
+    One numbering per report (D-248).
+
+    Keyed on `report` and the eye test, so a re-screen — a different report object — starts a fresh
+    1..N, which is what a new report should have. Memoized so a re-render returns the same numbers
+    rather than allocating a second sequence over the same rows.
+  */
+  const numbering = useMemo(() => createNumbering(), [report, eyeTest]);
+
   return (
+    <NumberingContext.Provider value={numbering}>
     <div id="top">
       <div className="rhead">
         <div className="grow">
@@ -540,6 +570,7 @@ export function ReportView({
               <EyeTestPanel
                 record={eyeTest}
                 {...(eyeCommentBox === undefined ? {} : { commentBox: eyeCommentBox })}
+                {...(eyeLineCommentBox === undefined ? {} : { lineCommentBox: eyeLineCommentBox })}
                 {...(eyeResponses === undefined ? {} : { responses: eyeResponses })}
               />
             ) : null;
@@ -699,6 +730,7 @@ export function ReportView({
 
       <RunMeta report={report} access={access} />
     </div>
+    </NumberingContext.Provider>
   );
 }
 
@@ -778,6 +810,22 @@ function ObstructionNote({ report }: { readonly report: ScreeningReport }): JSX.
  * work, which is the treatment the lines already have (D-167).
  */
 /** `exactOptionalPropertyTypes`: an absent box is an absent prop, not a prop holding undefined. */
+/**
+ * The report's numbering, reachable from any row without threading it through eight components
+ * (D-248).
+ *
+ * Context rather than props because the number is needed at the leaves — a finding row, an eye-test
+ * line — and the path to each runs through the stopping panel, two section renderers, a band, a
+ * block and a category card. Drilling it would touch every one of those signatures for a value none
+ * of them uses, and a prop that eight components pass and do not read is a prop somebody eventually
+ * forgets to pass.
+ *
+ * The default numbering is a live one rather than null, so a component rendered outside the
+ * provider still gets consistent numbers instead of throwing. Nothing renders these rows outside
+ * `ReportView`, and if something starts to, a number is not the thing that should break it.
+ */
+const NumberingContext = createContext<Numbering>(createNumbering());
+
 const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Element } =>
   box === null || box === undefined ? {} : { commentBox: box };
 
@@ -1101,14 +1149,22 @@ function questionStats(attestations: RunAttestations): string {
 function EyeTestPanel({
   record,
   commentBox,
+  lineCommentBox,
   responses,
 }: {
   readonly record: EyeTestRecord | null;
   /** One box, under the read, because the read is what it answers (D-202, §3). */
   readonly commentBox?: () => JSX.Element | null;
+  /** A box under each rubric line (D-249). See `eyeLineCommentBox` on `Props`. */
+  readonly lineCommentBox?: (line: {
+    readonly rubricId: string;
+    readonly ordinal: number;
+    readonly number: number;
+  }) => JSX.Element | null;
   /** What the merchant wrote back. Rendered on every surface, including the PDF (D-203). */
   readonly responses?: readonly MerchantComment[];
 }): JSX.Element | null {
+  const numbering = useContext(NumberingContext);
   /*
     Nothing at all in two cases, and they are not the same case.
 
@@ -1285,7 +1341,14 @@ function EyeTestPanel({
 
         Above the verdicts for the same reason the box is: it answers the paragraph, not the rubric.
       */}
-      {(responses ?? []).map((response) => (
+      {/*
+        The read-level replies only.
+
+        A per-line reply is stored under the same subject with the line's ordinal (D-249), so the two
+        would otherwise render together here — a plan about one impression printed under the
+        paragraph it does not answer.
+      */}
+      {(responses ?? []).filter((response) => response.ordinal === undefined).map((response) => (
         <div className="mr" key={`${response.submittedAt}-${response.identifiedAs}`}>
           <span className="mr-head">Merchant response</span>
           <p className="mr-body">{response.body}</p>
@@ -1322,7 +1385,18 @@ function EyeTestPanel({
         {test.verdicts.map((verdict) => (
           <li key={verdict.id} data-verdict={verdict.verdict}>
             <span className="eye-v">{verdict.verdict.replace('_', ' ')}</span>
-            <span className="eye-q">{verdict.question}</span>
+            {/*
+              The same number a finding carries, from the same pool (D-248).
+
+              A pointer, not a promotion. The line is still an impression — it keeps its verdict
+              word, it sits in this panel under the band that says so, and nothing counts it among
+              the findings. What the number buys is that somebody can say "fourteen" on a call about
+              it, which is why the sequence is continuous rather than per-section.
+            */}
+            <span className="eye-q">
+              <span className="find-n eye-n">{numbering.forEyeLine(verdict.id)}</span>
+              {verdict.question}
+            </span>
             {/* A clear row is the question and the word, nothing more. */}
             {verdict.saw !== undefined && <span className="eye-saw">{verdict.saw}</span>}
             {/* Withheld for the same reason as the read, and per line, so one judged line does
@@ -1333,6 +1407,30 @@ function EyeTestPanel({
                 {verdict.sawWithheld.join(', ')}).
               </span>
             )}
+            {/*
+              The merchant's plan for this impression, and what they have already said (D-249).
+
+              Inside the `<li>`, so the answer sits with the line it answers and inside the panel
+              that frames the layer as an impression. Moving it out would be the first step towards
+              the rubric reading as a section of findings.
+            */}
+            {(responses ?? [])
+              .filter((response) => response.ordinal === eyeLineOrdinal(verdict.id))
+              .map((response) => (
+                <span className="mr eye-mr" key={`${response.submittedAt}-${response.identifiedAs}`}>
+                  <span className="mr-head">Merchant response</span>
+                  <span className="mr-body">{response.body}</span>
+                  <span className="mr-attrib">
+                    Written by someone who identified themselves as {response.identifiedAs} ·{' '}
+                    {formatStamp(response.submittedAt)}
+                  </span>
+                </span>
+              ))}
+            {lineCommentBox?.({
+              rubricId: verdict.id,
+              ordinal: eyeLineOrdinal(verdict.id),
+              number: numbering.forEyeLine(verdict.id),
+            })}
           </li>
         ))}
       </ul>
@@ -1520,6 +1618,8 @@ function FindingRow({
    */
   readonly evidenceFrom?: string;
 }): JSX.Element {
+  // Allocated on first sight, which is display order (D-248).
+  const number = useContext(NumberingContext).forFinding(finding);
   const [open, setOpen] = useState(false);
   const source = finding.evidence[0]?.sourceUrl;
   // Every finding is expanded in the export. Nothing is collapsed, grouped or dropped.
@@ -1538,6 +1638,15 @@ function FindingRow({
         <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
         <span className="find-main">
           <span className="find-title">
+            {/*
+              The number a person can say, and the code the system keys on (D-248).
+
+              Both, deliberately, and weighted: the chip is what an agent reads out on a call, the
+              mono tag is what a comment row stores. Side by side they are one line with two labels;
+              the chip alone would hide the key a stored answer carries, and the tag alone is what
+              nobody outside Mintro can pronounce.
+            */}
+            <span className="find-n">{number}</span>
             {finding.title} <span className="mono" style={{ color: 'var(--slate)', fontSize: 10.5 }}>{reference ?? finding.ruleId}</span>
           </span>
           {/*

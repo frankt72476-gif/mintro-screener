@@ -583,11 +583,15 @@ export function ordinalsFor(report: ScreeningReport): ReadonlyMap<ReportFinding,
  *
  * **It is the anchor a comment already uses, made visible** — `ruleId` plus the ordinal from
  * `ordinalOf`, which is what `merchant_comments.rule_id` and `merchant_comments.ordinal` store
- * (D-063). Not a sequential position in the rendered list: that would be a **second identity** for
- * a finding that already has one, it would key differently from the comment filed against it, and
- * it would shift the moment grouping or sample size changed. A reader pointing at "finding 12"
- * and a comment row saying `COA-002 / 2` would be two names for one thing, which is the shape
- * D-063 was written to prevent.
+ * (D-063). It is still the only thing a comment keys on, and nothing below has changed that.
+ *
+ * **A display number now renders beside it (D-248), and that reverses half of what this comment
+ * used to say.** The rejected design was a sequential number *instead of* the reference: a second
+ * identity, keying differently from the comment filed against it. What ships is both, weighted —
+ * the number prominent because it is what a person can pronounce on a call, this reference quiet
+ * beside it because it is what the row is stored under. Two labels on one visibly single line, not
+ * two names for one thing. The number is allocated at render and never stored; if it ever becomes a
+ * storage key, the original objection applies again in full.
  *
  * The position shown is **one-based** where the stored ordinal is zero-based, because "3 of 5"
  * is what a person writes and `2` is not. The conversion happens here and nowhere else, and

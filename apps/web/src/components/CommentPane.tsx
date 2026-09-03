@@ -863,6 +863,31 @@ function OpenReport({
                   />
                 ),
               })}
+          eyeLineCommentBox={(line) => (
+            /*
+              A plan per impression (D-249).
+
+              Keyed `(subject='eye-test', ordinal=<rubric number>)` — the same subject the read-level
+              reply uses, with the line's own ordinal. No migration: `submit_merchant_comment`
+              already carries `p_ordinal` through its dedupe match and its insert for subject rows,
+              and the read-level box keeps `ordinal = null`, so every reply stored before today still
+              reads back where it was written.
+            */
+            <CommentBox
+              key={line.rubricId}
+              reference={`${line.rubricId} · Mintro’s read`}
+              number={line.number}
+              label="Your plan for this"
+              body={bodyOf(EYE_TEST_SUBJECT, line.ordinal)}
+              onChange={(next) =>
+                setDrafts((existing) => new Map(existing).set(keyOf(EYE_TEST_SUBJECT, line.ordinal), next))
+              }
+              onBlur={() => autosave(EYE_TEST_SUBJECT, line.ordinal)}
+              savedAt={savedAt.get(keyOf(EYE_TEST_SUBJECT, line.ordinal))}
+              existing={[]}
+              identified={identity !== null}
+            />
+          )}
           eyeCommentBox={() => (
             <CommentBox
               body={bodyOf(EYE_TEST_SUBJECT, undefined)}
@@ -1188,6 +1213,8 @@ function CommentBox({
   existing,
   identified,
   reference,
+  number,
+  label,
 }: {
   /**
    * What is in the box, held by the page (D-147).
@@ -1212,6 +1239,15 @@ function CommentBox({
    * test, which answers a read rather than a finding (D-203).
    */
   readonly reference?: string;
+  /** The report-wide pointer (D-248). Prominent; the reference is the quiet tag beside it. */
+  readonly number?: number;
+  /**
+   * Overrides the header wording.
+   *
+   * An eye-test line is answered with a plan rather than an account of what the site does, and
+   * *Respond to EYE-07* would name a rubric id at a merchant, which means nothing to them.
+   */
+  readonly label?: string;
 }): JSX.Element {
   return (
     /*
@@ -1249,11 +1285,22 @@ function CommentBox({
 
         Ink, not accent — the rail carries the colour and a coloured heading would be a second claim.
       */}
-      <label className="flabel respond-head" htmlFor={`c-${existing.length}`}>
+      <label className="flabel respond-head" htmlFor={`c-${number ?? existing.length}`}>
         <span className="respond-icon" aria-hidden="true">✎</span>
+        {/* The number a person says, before the words (D-248). */}
+        {number !== undefined && <span className="find-n">{number}</span>}
         <span className="respond-label">
-          {existing.length > 0 ? 'Add to your response' : reference === undefined ? 'Respond' : `Respond to ${reference}`}
+          {label ??
+            (existing.length > 0
+              ? 'Add to your response'
+              : reference === undefined
+                ? 'Respond'
+                : `Respond to ${reference}`)}
         </span>
+        {/* The system's own key for this line, quiet beside the number it shares a row with. */}
+        {label !== undefined && reference !== undefined && (
+          <span className="respond-ref">{reference}</span>
+        )}
         {/*
           "optional" on every box, always (D-067).
 
@@ -1279,7 +1326,7 @@ function CommentBox({
       */}
       <textarea
         className="input cbox-input respond-t"
-        id={`c-${existing.length}`}
+        id={`c-${number ?? existing.length}`}
         rows={4}
         value={body}
         disabled={!identified}

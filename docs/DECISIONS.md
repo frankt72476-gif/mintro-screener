@@ -12945,6 +12945,11 @@ produced under.
 
 ---
 ## D-196 — The eye test: a judgment layer that can never reach a finding
+**Revised by D-249 (2026-09-02):** each rubric line now takes a merchant response. The substance
+below is unchanged — the layer still reaches no finding, moves no state and produces no count. What
+changed is only how that is protected: by the section's structure and vocabulary rather than by the
+absence of a box.
+
 
 **2026-08-30 · business owner · `rules/eyetest.json`, `packages/engine/src/eyetest.ts`, `apps/worker/src/eyetest.ts`, `docs/eye-test-spec.md`**
 
@@ -15826,3 +15831,137 @@ the rendered page. The same shape as D-246 one layer down: there, a field nothin
 selector reading things it was never meant to. Neither is visible to typechecking, to a unit test, or
 to a person reading the diff, and both were found only by asking the rendered document what it
 actually contained.
+
+---
+
+## D-248 — A number people can say, beside the code the system keys on. Reverses 592725e
+**2026-09-02 · business owner · `apps/web/src/lib/numbering.ts`, `apps/web/src/components/ReportView.tsx`**
+
+Every referenceable line in a report carries a plain integer, numbered 1..N in top-to-bottom display
+order across the whole document — findings in both parts and every eye-test rubric line, one
+continuous pool with no restart, no prefix and no per-section scheme.
+
+### What this reverses, and why the earlier reasoning does not hold
+
+`592725e` considered exactly this and rejected it. Its argument: `merchant_comments` keys on
+`(rule_id, ordinal)`, D-063 decided that key in one place, and a sequential number would be **a
+second identity for a finding that already has one** — a reader saying *"finding 12"* and a comment
+row saying `COA-002 / 2` would be two names for one thing.
+
+What that argument missed is that `COA-002 · 3 of 5` **cannot be said**. It is an internal code. An
+agent on a call with a merchant cannot read it out, the merchant cannot repeat it back, and neither
+can point at a line without describing it — which is the complaint that started `592725e` in the
+first place: *"it's hard to reference a particular one — you have to identify the descriptor, and
+some are very similar."* The reference solved the disambiguation and left the pronounceability
+problem exactly where it was.
+
+So the fix is not to replace the reference. **Both render, weighted**: the number is the prominent
+chip, the reference is the quiet mono tag beside it, on the same row. That is what answers the
+objection rather than overriding it — two labels on one visibly single line, not two identities. Take
+either away and `592725e` is right again: the chip alone hides the key a stored answer carries, and
+the tag alone is unpronounceable.
+
+### It is a pointer, not an identity
+
+Per report, display order, fresh on a re-screen — a re-screen is a new report and gets a new
+sequence. **Nothing stores it and nothing keys on it.** Comments still key on `(rule_id, ordinal)`
+or `(subject, ordinal)`; the number never reaches the database. A number that became a storage key
+would be the second identity, and that is the line this decision does not cross.
+
+### Allocated in render order, because only the render knows the order
+
+`ordinalsFor` and `referencesFor` derive from `groupReport` and key by finding identity. They can:
+they answer *which finding is this*, which has one answer whichever way the report is walked.
+
+This answers *where does this sit on the page*, and the page's order is not `groupReport`'s. The
+reader meets the stopping panel, the not-met section, **the eye test**, then the review section — an
+order `ReportView`'s JSX assembles out of four different structures. A function mirroring that walk
+would be a second copy of it, free to drift, and the numbers would be wrong in a way nothing caught
+(D-216's argument, applied to sequence instead of counts).
+
+So numbers are allocated on first sight during render, through a context every row reads. React
+renders depth-first in document order and elements are lazy, so first-sight order *is* display order
+by construction rather than by agreement. Idempotent, so a re-render returns the same numbers.
+
+**The guarantee is the test, not the mechanism.** `numbering.test.ts` reads the chips out of the
+rendered markup in document order and asserts they are exactly 1..N with no gaps and no repeats,
+across every stored fixture. Measured on the built artifact: 67 numbered rows on the CoMo Peptides
+run, contiguous, with the eye-test lines taking 6, 7 and 8 out of the middle of the pool.
+
+### Where the eye-test lines land
+
+In the middle, not at the end. They render immediately after the not-met section and before the
+review section, so they take numbers from there. "Top-to-bottom display order" is the rule, and a
+sequence that jumped over the eye test to keep findings contiguous would be a sequence the reader
+could not follow down the page — which is the one thing a pointer has to do.
+
+---
+
+## D-249 — A plan per impression. Revises D-196
+**2026-09-02 · business owner · `apps/web/src/components/ReportView.tsx`, `apps/web/src/components/CommentPane.tsx`**
+
+Each eye-test rubric line gets its own response box. D-202 §3 gave the layer one box for the whole
+read and D-196 kept the verdicts uncommentable, on the ground that *"a box under each would imply a
+verdict is a finding — the one thing the eye test may never become."*
+
+The account team needs a plan per concern. A paragraph answering the read as a whole does not give
+them one, and the merchant cannot supply what nobody asked for line by line.
+
+### What the revision does not touch
+
+**Eye-test lines are still impressions, not findings.** D-196's substance is unchanged and is not
+softened by this: a model's reading of a photograph is not evidence of the kind hard constraint 3
+requires, nothing the layer produces moves a state, a count, a coverage number or a verdict, and
+`eyeVerdictToState()` still returns null.
+
+What changes is only where the reasoning is carried. D-196 protected the distinction with the
+*absence of a box*; it is now carried by the structure, which is stronger and was always doing most
+of the work:
+
+- the lines keep their own vocabulary — `concern` / `clear` / `cannot_tell`, deliberately not the
+  four finding states
+- they render inside the eye-test panel, under a band that says *Mintro's impression*
+- the response renders inside the `<li>`, beside the line it answers, never in a findings section
+- nothing counts them: the panel still states no tally of concerns (D-202 §3)
+
+A response to an impression is a merchant's account of an impression. It is recorded the way every
+other response is and presented as what it is.
+
+**Being numbered does not promote them.** D-248's sequence covers rubric lines because the number is
+a pointer for people, not a claim of evidentiary weight. A reader can say "fourteen" about a line
+whose panel tells them, in the band above it, that it is an impression.
+
+### The storage key: `subject = 'eye-test'`, `ordinal = <rubric number>`
+
+`EYE-07` stores under `ordinal = 7`. No migration, and three reasons it is the right key:
+
+- **It exists already.** `submit_merchant_comment` (0050) carries `p_ordinal` through both its
+  dedupe match and its insert for subject rows. The migration's own comment says *"the eye test has
+  one box per run per author, so the ordinal plays no part in it"* — a convention, never a
+  constraint. The operator path inserts `ordinal` and `subject` directly. Both write paths took this
+  key without being changed.
+- **It cannot collide with a rule comment.** Not because the integers differ — `EYE-07` and a rule's
+  ordinal 7 are both `7` — but because `merchant_comment_is_about_one_thing` makes `rule_id` and
+  `subject` mutually exclusive. A line reply has a subject and no rule id; a finding reply has a rule
+  id and no subject. The ordinal only ever discriminates within one of them.
+- **It respects D-203's reserved-id constraint by not going near it.** Nothing is written to
+  `rule_id`. `rule_id ~ '^[A-Z]+-[0-9]{3}$'` would in fact accept `EYE-007`, which is precisely why
+  it is not used: a value in that column *is* a rule id to every reader above it.
+
+The rubric id's number rather than the display number, because the rubric id is fixed where the
+display number moves with the report's contents. A plan written against `EYE-07` reads back against
+`EYE-07` on the next screening; against a display number it would land on whatever line happened to
+be seventh. `eyeLineOrdinal` throws on an id it cannot parse rather than returning 0 and filing
+every merchant's plan under one impression.
+
+**The read-level box stays**, keyed as it always was with `ordinal = null`. The read is a paragraph
+and the useful answer to it is a paragraph; the per-line boxes are additive, and every reply stored
+before today still reads back where it was written. The panel filters the two apart so a plan about
+one line is not printed under the paragraph it does not answer.
+
+### Every line, including the clear ones
+
+A `clear` line gets a box too. Every box in this product is optional and says so (D-067), so a line
+a merchant has nothing to add to costs them nothing — and a line they want to answer and cannot is
+the failure worth avoiding. Deciding for them which impressions are worth a reply is the same
+mistake as asking them to rebut a rubric.

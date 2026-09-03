@@ -3360,3 +3360,40 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   .respond { background: none; border-left: 2px solid #8A8598; }
   .respond-foot, .respond-t { display: none; }
 }
+
+/* ── The finding number (D-248) ────────────────────────────────────────────────────────────────
+   The pointer a person can say out loud. `GATE-002 · 3 of 5` is what a comment is keyed on and it
+   is unsayable on a call; the chip is what an agent and a merchant use to mean the same line.
+
+   Weighted against the mono tag beside it: this is the label, that is the key. Ink on the D
+   surface, never the accent — the rail owns the one colour in a respond zone (D-201), and a
+   coloured number would read as a state. It is a pointer, not a verdict. */
+.find-n {
+  display: inline-block;
+  min-width: 1.55em;
+  padding: 1px 5px;
+  margin-right: var(--s2);
+  border-radius: 3px;
+  background: var(--surface-1);
+  border: 0.5px solid var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--ink);
+  /* The row is a flex line; the chip must not stretch or shrink with the title. */
+  flex: 0 0 auto;
+  vertical-align: baseline;
+}
+
+/* On an eye-test line the chip sits after the verdict word, in the same flex row. */
+.eye-n { align-self: baseline; }
+
+/* A per-line response inside the rubric list: the same block, indented under the line it answers. */
+.eye-mr { display: block; margin-top: var(--s2); }
+
+/* The rubric list is a two-column grid (verdict word · question), so anything that answers a whole
+   line spans both rather than landing in the question column. */
+.eye-list li > .respond,
+.eye-list li > .eye-mr { grid-column: 1 / -1; }
