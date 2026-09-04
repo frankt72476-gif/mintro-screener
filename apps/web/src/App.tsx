@@ -28,7 +28,7 @@ import { formatReportDate } from './lib/format.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { readCredentialState, normaliseDomain, type CredentialState } from './lib/credentialState.js';
-import { createPdfQueue, isPdfPending, pdfFilename } from './lib/pdfQueue.js';
+import { readReportCapture, type CapturedReport } from './lib/reportCapture.js';
 import { createInviteQueue, describeInvite } from './lib/inviteQueue.js';
 import { createSendQueue, describeSend } from './lib/sendQueue.js';
 import { invitedFindings } from './lib/grouping.js';
@@ -546,8 +546,7 @@ function Screener({
    * is what it said before, indistinguishable from never having tried.
    */
   const [depositedAt, setDepositedAt] = useState<Readonly<Record<string, string>>>({});
-  const pdfs = useMemo(() => createPdfQueue(client, analyst.id), [client, analyst.id]);
-  const [pdfBusy, setPdfBusy] = useState(false);
+  const [capture, setCapture] = useState<CapturedReport | null>(null);
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
   const review = useMemo(() => createReviewPath(client), [client]);
   /*
@@ -693,66 +692,6 @@ function Screener({
   // Same readiness signal the injected print path uses.
   usePrintReady(printDomain === null ? null : report);
 
-  /**
-   * Queues a render, waits for it, and hands the file to the browser.
-   *
-   * The wait is a poll rather than a spinner over a promise, because the render happens on another
-   * machine. Nothing is reported as downloaded until the worker says the file exists and a signed
-   * URL for it comes back — the toast that used to fire immediately said "Downloaded" when nothing
-   * had been produced at all, which is the false-success shape this project keeps removing.
-   */
-  async function downloadPdf(current: ScreeningReport): Promise<void> {
-    setPdfBusy(true);
-    setToast('Rendering the PDF…');
-
-    const queued = await pdfs.request(current.runId);
-    if ('error' in queued) {
-      setPdfBusy(false);
-      setToast(`The PDF could not be queued: ${queued.error}`);
-      return;
-    }
-
-    const deadline = Date.now() + 180_000;
-
-    const tick = async (): Promise<void> => {
-      if (Date.now() > deadline) {
-        setPdfBusy(false);
-        setToast('The PDF is taking longer than expected — it may still be rendering.');
-        return;
-      }
-
-      const state = await pdfs.poll(queued.id);
-
-      // Null is "could not read", not "failed". Keep waiting.
-      if (state === null || isPdfPending(state.status)) {
-        setTimeout(() => void tick(), 2000);
-        return;
-      }
-
-      setPdfBusy(false);
-
-      if (state.status === 'failed' || state.storageKey === null) {
-        setToast(`The PDF failed to render: ${state.error ?? 'no reason recorded'}`);
-        return;
-      }
-
-      const url = await pdfs.downloadUrl(
-        state.storageKey,
-        pdfFilename(current.merchantDomain, current.finishedAt),
-      );
-
-      if (url === null) {
-        setToast('The PDF was rendered but its download link could not be minted.');
-        return;
-      }
-
-      window.location.assign(url);
-      setToast(`${current.merchantDomain} report downloaded`);
-    };
-
-    void tick();
-  }
-
   /*
     Scans still running, shaped for the group list (D-211).
 
@@ -842,6 +781,7 @@ function Screener({
     setRound(undefined);
     setAttestations(undefined);
     setEyeTest(null);
+    setCapture(null);
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
@@ -887,6 +827,16 @@ function Screener({
       */
       const eye = await readRunEyeTest(client, runId);
       setEyeTest(resolveEyeTest(loaded.report, eye));
+
+      /*
+        The captured report, if this run has one.
+
+        Read after the report is on screen, like every other secondary read here. Null is a fact
+        rather than a pending state — a run screened before captures existed has none and never
+        will, because nothing is back-filled (D-002) — so the link is simply absent rather than
+        offered and dead.
+      */
+      setCapture(await readReportCapture(client, runId, window.location.origin));
 
       const stored = await readRunAttestations(client, runId);
       // A rule set that failed to parse renders no report at all a few lines down, so there is
@@ -1281,7 +1231,7 @@ function Screener({
                           : `${reviewStateLabel(shape)}. ${MARK_READY_NOTE}`,
                       }
                     : {}),
-                  onDownload: () => void downloadPdf(report),
+                  reportUrl: capture?.url ?? null,
                   onInvite: () => setInviting(true),
                   /*
                     Re-screen, where the decision is made (D-211).
@@ -1294,7 +1244,6 @@ function Screener({
                     setPane('reports');
                     rescan(report.merchantDomain);
                   },
-                  downloading: pdfBusy,
                 }}
                 {...commentaryProps(commentary, report)}
                 {...(attestations === undefined ? {} : { attestations })}

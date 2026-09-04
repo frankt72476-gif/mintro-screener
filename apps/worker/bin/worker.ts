@@ -51,7 +51,6 @@ import {
   runTimeoutMessage,
 } from '@mintro/engine';
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
-import { renderRunPdf } from '../src/pdfJob.js';
 import { captureRunReport } from '../src/captureJob.js';
 import { DEFAULT_REPORT_PORT, startReportRoute } from '../src/reportRoute.js';
 import { issueInvitation } from '../src/inviteJob.js';
@@ -296,15 +295,16 @@ async function main(argv: readonly string[]): Promise<number> {
         continue;
       }
 
-      // Scans first: a PDF is a re-render of something already observed, and a queued scan is an
-      // observation not yet made. If the observation is waiting, it goes first.
-      const pdf = await claimNextPdf(supabase);
-      if (pdf !== null) {
-        await handlePdf(supabase, browser, pdf);
-        continue;
-      }
+      /*
+        No PDF queue.
 
-      // A send is a render plus a transmission, so it sits with the PDF rather than ahead of it.
+        A PDF downloaded from the live app is a fresh re-render under whatever bundle is deployed
+        that day, and it is indistinguishable from the report that was delivered. That is not a
+        second artifact; it is an unlabelled counterfeit of the first. The report is captured once,
+        at assembly, and everyone is given that file.
+      */
+
+      // A send is a render plus a transmission.
       const send = await claimNextSend(supabase);
       if (send !== null) {
         await handleSend(supabase, browser, send, addresses);
@@ -896,102 +896,6 @@ main(process.argv.slice(2)).then(
     process.exit(1);
   },
 );
-
-/* -------------------------------------------------------------------------------------------
- * PDF jobs
- * ----------------------------------------------------------------------------------------- */
-
-interface PdfRequest {
-  readonly id: string;
-  readonly run_id: string;
-  readonly status: string;
-}
-
-/** Same compare-and-swap as the scan queue, for the same reasons. */
-async function claimNextPdf(supabase: WorkerSupabase): Promise<PdfRequest | null> {
-  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
-
-  const { data, error } = await supabase.client
-    .from('pdf_requests')
-    .select('id, run_id, status')
-    .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
-    .order('created_at', { ascending: true })
-    .limit(1);
-
-  if (error !== null) {
-    const hint = /pdf_requests/i.test(error.message)
-      ? `
-  The PDF queue table is created by supabase/migrations/0014_pdf_requests.sql. Apply it.`
-      : '';
-    throw new Error(`could not read the PDF queue: ${error.message}${hint}`);
-  }
-
-  const candidate = (data ?? [])[0] as PdfRequest | undefined;
-  if (candidate === undefined) return null;
-
-  const { data: claimed, error: claimError } = await supabase.client
-    .from('pdf_requests')
-    .update({ status: 'running', claimed_at: new Date().toISOString() })
-    .eq('id', candidate.id)
-    .eq('status', candidate.status)
-    .select('id, run_id, status');
-
-  if (claimError !== null) {
-    throw new Error(`could not claim PDF request ${candidate.id}: ${claimError.message}`);
-  }
-
-  return ((claimed ?? [])[0] as PdfRequest | undefined) ?? null;
-}
-
-/** Renders one PDF and records what happened. Never throws: the queue row carries the outcome. */
-async function handlePdf(
-  supabase: WorkerSupabase,
-  browser: Browser,
-  request: PdfRequest,
-): Promise<void> {
-  console.log(`
-pdf  request ${request.id.slice(0, 8)}  run ${request.run_id.slice(0, 8)}`);
-  const started = Date.now();
-
-  try {
-    const result = await renderRunPdf(supabase, browser, {
-      runId: request.run_id,
-      requestId: request.id,
-      webRoot: WEB_ROOT,
-    });
-
-    const { error } = await supabase.client
-      .from('pdf_requests')
-      .update({
-        status: 'done',
-        storage_key: result.storageKey,
-        pages: result.pages,
-        finished_at: new Date().toISOString(),
-      })
-      .eq('id', request.id);
-
-    if (error !== null) {
-      // The file is stored; only the bookkeeping failed. The request will be reclaimed as stale
-      // and re-rendered, which costs a render and loses nothing.
-      console.error(`  could not record the PDF outcome: ${error.message}`);
-      return;
-    }
-
-    console.log(
-      `  ${result.pages} page(s), ${(result.pdf.byteLength / 1024 / 1024).toFixed(2)} MB in ` +
-        `${Math.round((Date.now() - started) / 1000)}s`,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`  FAILED: ${message}`);
-
-    await supabase.client
-      .from('pdf_requests')
-      .update({ status: 'failed', error: message.slice(0, 2000), finished_at: new Date().toISOString() })
-      .eq('id', request.id)
-      .then(() => undefined, () => undefined);
-  }
-}
 
 interface InviteRequest {
   readonly id: string;

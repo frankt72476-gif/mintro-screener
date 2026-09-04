@@ -93,11 +93,16 @@ export interface ReportActions {
    * internal handover is not IQwallet's business (D-233).
    */
   readonly reviewLine?: string;
-  readonly onDownload: () => void;
+  /**
+   * The captured report, or null when this run has none.
+   *
+   * Null is a fact, not a loading state: a run screened before captures existed has none and never
+   * will, because nothing is back-filled (D-002). So the control is absent rather than disabled —
+   * a greyed-out button invites someone to wait for a thing that is not coming.
+   */
+  readonly reportUrl?: string | null;
   /** Opens the merchant-invitation dialog (D-063). */
   readonly onInvite?: () => void;
-  /** True while the worker is rendering. The button says so rather than appearing inert. */
-  readonly downloading?: boolean;
   /**
    * Queues a fresh screening of this merchant (D-211).
    *
@@ -378,13 +383,24 @@ export function ReportView({
                 Re-screen
               </button>
             )}
-            <button
-              className="btn btn-ghost"
-              onClick={actions.onDownload}
-              disabled={actions.downloading === true}
-            >
-              {actions.downloading === true ? 'Rendering…' : 'Download PDF'}
-            </button>
+            {/*
+              A link, not a button — there is nothing to render on demand.
+
+              The report was captured once at assembly and this opens that file: the same bytes an
+              underwriter was sent, rather than a fresh re-render under today's bundle. `noopener`
+              because the target is a document on a proxied origin and has no business reaching
+              back into the app.
+            */}
+            {typeof actions.reportUrl === 'string' && (
+              <a
+                className="btn btn-ghost"
+                href={actions.reportUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open report
+              </a>
+            )}
             {/*
               Enabled, unlike Send — and the difference is not an oversight.
 
