@@ -48,6 +48,10 @@ primary_region = "iad"
   auto_stop_machines = false
   auto_start_machines = false
   min_machines_running = 1
+  # Required, and Fly will not infer it: the app defines a named process below, and a service
+  # without `processes` fails validation with "Service has no processes set but app has 1
+  # processes defined". The one process serves the route and polls the queue.
+  processes = ["worker"]
 # One machine. The queue is a compare-and-swap so more than one is safe, but a demo does not need
 # it and a second machine doubles the Chromium memory bill for nothing.
 [processes]

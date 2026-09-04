@@ -300,6 +300,48 @@ with a test that has been made to fail in the way it exists to catch:
 - **Nothing about storage escapes.** No bucket, no key, no Supabase error text, in a body or a
   header.
 
+#### Two listeners in one process
+
+The worker now runs **two HTTP servers**, and they are not the same kind of thing:
+
+| | binds | port | serves |
+|---|---|---|---|
+| `reportRoute.ts` | `0.0.0.0` | 8080 | captured reports, to the internet, through Fly |
+| `reportServer.ts` | `127.0.0.1` | ephemeral (`0`) | the built app, to this process's own Playwright, during a render |
+
+**Exposing the first changes nothing about the second.** `reportServer.ts` binds loopback
+explicitly and takes an OS-assigned port, so it is unreachable from outside the machine and cannot
+collide with 8080. That distinction is the whole reason it was safe to serve merchant evidence from
+it, and it stays true of that server.
+
+What changed is the sentence around it. **"The worker has a loopback-only listener" was a true
+statement about the worker, and is now true only of one listener.** Anyone who reaches for it — as
+this document did when it argued that serving the built app to Playwright exposed nothing — now
+reaches a wrong conclusion from a sentence that used to be right.
+
+That is a different hazard from a sentence that was always wrong. A claim that was never true gets
+challenged the first time someone checks it. A claim that *was* true carries the credit of having
+been verified, and keeps being repeated after the thing it described has changed underneath it.
+When a component gains a second instance of something it had one of, every sentence that said
+"the X" needs to say **which** X, and the sentences most worth revisiting are the ones nobody
+doubts.
+
+`fly.toml` routes to `internal_port = 8080`; the route defaults to `DEFAULT_REPORT_PORT = 8080`,
+overridable by `PORT`, which neither `fly.toml` nor the `Dockerfile` sets. Those were the same
+number in two files with nothing joining them, so a test now reads `fly.toml` and asserts they
+agree.
+
+**Two literals in two files that happen to match is a coincidence, not an invariant.** They agreed
+on the day they were written and nothing was keeping them that way; either could move alone and
+neither file would notice. And the failure that follows is the quiet kind — `fly config validate`
+passes, the machine boots healthy, the process logs that it is listening, and every delivered link
+times out, because the proxy is knocking on a different door. Nothing in that sequence looks like an
+error until someone opens a report.
+
+The service also has to name its process: `processes = ["worker"]`. Fly will not infer it when the
+app defines a named process, and `fly config validate` refuses the config without it. That is
+asserted too, because the error arrives at deploy time rather than in the suite.
+
 #### The availability coupling
 
 **Report delivery now inherits the worker's availability, and the worker is one machine that runs

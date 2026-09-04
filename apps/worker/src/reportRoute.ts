@@ -46,6 +46,18 @@ const RUN_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
  */
 const NOT_FOUND = 'Not found.\n';
 
+/**
+ * The port the route listens on, and the one `fly.toml` routes to.
+ *
+ * Stated here and asserted against `internal_port` in `reportRoute.test.ts`, because otherwise it
+ * is the same number written in two files with nothing joining them — and the failure mode is a
+ * deploy that passes validation, starts cleanly, and answers nothing.
+ *
+ * `PORT` overrides it if the platform sets one. Fly does not, for a Dockerfile app: neither
+ * `fly.toml` nor the `Dockerfile` sets it, so this default is what runs.
+ */
+export const DEFAULT_REPORT_PORT = 8080;
+
 export interface ReportRouteDeps {
   readonly supabase: WorkerSupabase;
   /** Port to bind. 0 picks a free one, which is what the tests use. */

@@ -53,7 +53,7 @@ import {
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { renderRunPdf } from '../src/pdfJob.js';
 import { captureRunReport } from '../src/captureJob.js';
-import { startReportRoute } from '../src/reportRoute.js';
+import { DEFAULT_REPORT_PORT, startReportRoute } from '../src/reportRoute.js';
 import { issueInvitation } from '../src/inviteJob.js';
 import { claimNextAnalystInvite, handleAnalystInvite } from '../src/analystInviteDrain.js';
 import { runResponseNotice } from '../src/responseNoticeJob.js';
@@ -173,7 +173,7 @@ async function main(argv: readonly string[]): Promise<number> {
   */
   const reportRoute = await startReportRoute({
     supabase,
-    port: Number.parseInt(process.env['PORT'] ?? '8080', 10),
+    port: Number.parseInt(process.env['PORT'] ?? String(DEFAULT_REPORT_PORT), 10),
   });
   console.log(`  report route listening on :${reportRoute.port}`);
 

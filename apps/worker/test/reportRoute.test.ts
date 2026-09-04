@@ -14,7 +14,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { REPORT_LINK_PATH, reportObjectKey } from '@mintro/engine';
 import type { WorkerSupabase } from '../src/store/supabase.js';
-import { REPORT_HEADERS, reportRequestFrom, startReportRoute } from '../src/reportRoute.js';
+import { readFileSync } from 'node:fs';
+import {
+  DEFAULT_REPORT_PORT,
+  REPORT_HEADERS,
+  reportRequestFrom,
+  startReportRoute,
+} from '../src/reportRoute.js';
 
 const RUN = '11111111-2222-4333-8444-555555555555';
 const TOKEN = 'x7Qp-_9aB3cD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4';
@@ -299,5 +305,34 @@ describe('the headers constant', () => {
     // Guarded as data as well as over the wire, because this is the value a future edit touches.
     expect(REPORT_HEADERS['content-security-policy']).not.toContain('sandbox');
     expect(REPORT_HEADERS['content-type']).toBe('text/html; charset=utf-8');
+  });
+});
+
+/**
+ * The port Fly routes to is the port the route listens on.
+ *
+ * Two files, one number, and nothing joining them until this. The failure it prevents is the
+ * quiet kind: `fly config validate` passes, the machine boots, the process logs that it is
+ * listening, and every report link times out because the proxy is knocking on a different door.
+ *
+ * Reads `fly.toml` as text, so no environment can answer it favourably.
+ */
+describe('the deployed port', () => {
+  const fly = readFileSync('apps/worker/fly.toml', 'utf8');
+
+  it('matches internal_port in fly.toml', () => {
+    const declared = fly.match(/^\s*internal_port\s*=\s*(\d+)/m)?.[1];
+
+    expect(declared, 'fly.toml declares no internal_port').toBeDefined();
+    expect(Number(declared)).toBe(DEFAULT_REPORT_PORT);
+  });
+
+  it('names the process the service belongs to', () => {
+    /*
+      Fly refuses to infer this when the app defines a named process: `fly config validate` fails
+      with "Service has no processes set but app has 1 processes defined". Asserted because the
+      block is easy to edit and the error arrives at deploy time, not here.
+    */
+    expect(fly).toMatch(/processes\s*=\s*\["worker"\]/);
   });
 });
