@@ -496,7 +496,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Eight findings from building this, all worth keeping
+#### Nine findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -704,6 +704,35 @@ correct and an environment that does not agree** — after build order, PATH, bu
 reachability. It is also the one the *verify-against-live* instruction was written for, and the
 only reason the wrong value never shipped is that it was left deferred rather than guessed at when
 it was first drafted. Deferring a value you cannot check is cheaper than shipping one you assumed.
+
+**The render audit was sound, and scoped to the wrong boundary.** When the attachment came out of
+`send.ts`, every caller of the PDF render was traced, and the conclusion was reported plainly: no
+delivery path renders a PDF. That was true, and it is still true.
+
+It was also the wrong question. **The email has two authors.** The worker writes most of it; the
+analyst writes the note — and the note is stored on the `send_requests` row, read by the worker, and
+placed *first in the body*, above the line saying the report is a link. `SendModal` defaulted that
+note to *"… Captures attached."*, and nothing in the render audit could have found it, because
+grepping for the code that **makes** an attachment does not find copy that **claims** one.
+
+A send would have delivered a message contradicting itself, in the analyst's voice, to IQwallet.
+The dialog also drew a `.pdf` row marked *pending*, which was merely cosmetic and still wrong: an
+operator should not be shown a delivery artifact the system will not produce.
+
+The general form: **"no path does X" was in fact "no path in the set I searched does X".** An audit
+is a claim about a boundary as much as about a property, and the boundary here was never drawn on
+purpose — it was inherited from the search term. The report of the audit named the property and
+not the boundary, which is what made it sound stronger than it was.
+
+Same shape as the environment findings, one level up. There the check was correct inside an
+environment nobody had chosen; here it was correct inside a search nobody had scoped. **State what
+an audit covered, not only what it found** — and when a thing has two producers, say which one you
+looked at.
+
+The copy path is now audited too, and `apps/web/test/sendCopy.test.ts` holds it: no attachment
+claim in the send dialog, the note defaulting to empty because a default is sent and a placeholder
+is not, and a **control asserting `DocumentsSendModal` still shows its attachment** — that send
+genuinely carries a file, and a guard that failed it would have learned the wrong rule.
 
 **The tree had already written this lesson down, and nobody read it.**
 `packages/ruleset/tsconfig.json` carries a comment, from an earlier deploy failure, saying that a

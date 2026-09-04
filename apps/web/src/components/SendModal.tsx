@@ -12,7 +12,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   auditAnalystNote,
   describeNoteWarning,
-  STATE_LABEL_LOWER,
   type EyeTestRecord,
   type ScreeningReport,
 } from '@mintro/engine';
@@ -34,9 +33,19 @@ interface Props {
 
 export function SendModal({ report, eyeTest = null, queue, onCancel, onSent }: Props): JSX.Element {
   const [to, setTo] = useState('underwriting@iqwallet.com');
-  const [note, setNote] = useState(
-    `${report.counts.fail} ${STATE_LABEL_LOWER.fail}, ${report.counts.review} ${STATE_LABEL_LOWER.review}, ${report.counts.not_evaluable} ${STATE_LABEL_LOWER.not_evaluable}. Captures attached.`,
-  );
+  /*
+    Empty, and it must stay something that is still true above a link (D-255).
+
+    This defaulted to the counts followed by "Captures attached." — and the note is not a caption
+    on this screen. It is stored on the queue row, read by the worker, and placed **first in the
+    email body**, above the line that says the report is a link. The default would have delivered a
+    self-contradicting message to IQwallet, in the analyst's voice.
+
+    The body already states the counts, what the report is, and where it lives. Nothing is left for
+    a default to say, so it says nothing: this is the analyst's optional message, not a description
+    of how the report is delivered.
+  */
+  const [note, setNote] = useState('');
 
   /**
    * D-029: the analyst's note is audited as they type.
@@ -143,6 +152,8 @@ export function SendModal({ report, eyeTest = null, queue, onCancel, onSent }: P
               className="input"
               id="msg"
               style={{ fontFamily: 'Inter, sans-serif' }}
+              // A prompt, never a value. A placeholder is not sent; a default is.
+              placeholder="Optional message to IQwallet"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -176,14 +187,17 @@ export function SendModal({ report, eyeTest = null, queue, onCancel, onSent }: P
             </p>
           )}
 
-          <div className="attach">
-            <span>▤</span>
-            <span className="fname">
-              {report.merchantDomain}-{report.finishedAt.slice(0, 10)}.pdf
-            </span>
-            {/* The worker renders it as part of the send, so the size is not known here. */}
-            <span className="fsize">{busy ? 'rendering' : 'pending'}</span>
-          </div>
+          {/*
+            No attachment row.
+
+            This showed a filename and a "pending" status for a PDF the worker rendered during the
+            send. Nothing renders one now (D-255): the email carries a link to the report captured
+            at assembly. A row describing a delivery artifact the system will not produce is a
+            promise to an operator that the send cannot keep.
+
+            `DocumentsSendModal` keeps its `.attach` row, and correctly — the Documents Check report
+            is a different artifact and is still sent as a file.
+          */}
 
           {problem !== null && (
             <div className="err" style={{ marginTop: 13 }}>
