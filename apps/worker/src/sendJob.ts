@@ -21,7 +21,7 @@
 
 import type { Browser } from 'playwright';
 import type { ScreeningReport } from '@mintro/engine';
-import { renderRunPdf } from './pdfJob.js';
+import { reportLinkForKey } from '@mintro/engine';
 import { sendReport, type Mailer, type SendLog, type SendRecord } from './send.js';
 import type { WorkerSupabase } from './store/supabase.js';
 
@@ -34,14 +34,23 @@ export interface SendJobInput {
   readonly requestedBy: string;
   readonly from: string;
   readonly replyTo: string;
-  readonly webRoot: string;
+  /**
+   * The origin the delivered link is on, e.g. `https://screener.gomintro.com`.
+   *
+   * The same origin the comment link uses. The reader is sent to a Mintro address, which the
+   * Netlify rewrite proxies to the worker's route — never to storage, which serves this document
+   * as `text/plain` under a sandbox CSP whatever mimetype is stored.
+   */
+  readonly origin: string;
 }
 
 export interface SendJobResult {
   readonly record: SendRecord;
   readonly sendId: string;
+  /** The captured report's object key, as recorded at capture. */
   readonly storageKey: string;
-  readonly pages: number;
+  /** The link that was sent. */
+  readonly reportUrl: string;
 }
 
 /**
@@ -77,18 +86,22 @@ export async function sendRunReport(
   mailer: Mailer,
   input: SendJobInput,
 ): Promise<SendJobResult> {
-  const rendered = await renderRunPdf(supabase, browser, {
-    runId: input.runId,
-    requestId: input.requestId,
-    webRoot: input.webRoot,
-  });
+  /*
+    The captured report, not a fresh render (D-255).
+
+    Nothing is rendered at send. The document was captured once at assembly and is immutable; a
+    render here would produce a second artifact under whatever bundle is deployed today, which is
+    the drift the capture exists to prevent.
+  */
+  const capture = await latestCapture(supabase, input.runId);
+  const reportUrl = reportLinkForKey(input.origin, capture.storageKey);
 
   const report = await loadReport(supabase, input.runId);
   const log = createSupabaseSendLog(supabase);
 
   const request = {
     report,
-    pdf: rendered.pdf,
+    reportUrl,
     to: input.toEmail,
     from: input.from,
     replyTo: input.replyTo,
@@ -131,7 +144,7 @@ export async function sendRunReport(
     );
   }
 
-  return { record, sendId, storageKey: rendered.storageKey, pages: rendered.pages };
+  return { record, sendId, storageKey: capture.storageKey, reportUrl };
 }
 
 /**
@@ -164,6 +177,9 @@ export function sendRowFor(entry: SendRecord): Record<string, unknown> {
     outcome: entry.outcome,
     error: entry.error ?? null,
     attachment_bytes: entry.attachmentBytes,
+    // What was actually delivered (D-255). The send log is the only record of what went out, and
+    // what goes out is a link. Null on rows that predate the ruling, which carried a file.
+    report_url: entry.reportUrl ?? null,
     note: entry.note,
     note_flagged: entry.noteFlagged,
     note_warning_acknowledged: entry.noteWarningAcknowledged,
@@ -255,4 +271,42 @@ async function loadReport(supabase: WorkerSupabase, runId: string): Promise<Scre
     throw new Error(`run ${runId} has no stored report, so there is nothing to send.`);
   }
   return report;
+}
+
+/**
+ * The run's most recent captured report.
+ *
+ * **Throws when there is none, and that is the point.** A send with no capture would be an email
+ * announcing a screening report and carrying no way to read one. Failing here leaves the queue row
+ * failed and the analyst told, which is recoverable; sending is not.
+ *
+ * The newest of several: a re-capture writes a new object rather than replacing one already
+ * delivered (D-002), and the newest is the current document. The older rows stay because they
+ * record what was delivered before.
+ */
+async function latestCapture(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<{ readonly storageKey: string }> {
+  const { data, error } = await supabase.client
+    .from('report_captures')
+    .select('storage_key, captured_at')
+    .eq('run_id', runId)
+    .order('captured_at', { ascending: false })
+    .limit(1);
+
+  if (error !== null) {
+    // Not "there is no capture" — a different answer, and conflating them is D-036.
+    throw new Error(`could not read the captured reports for run ${runId}: ${error.message}`);
+  }
+
+  const row = (data ?? [])[0] as { storage_key: string } | undefined;
+  if (row === undefined) {
+    throw new Error(
+      `run ${runId} has no captured report, so there is no link to send. Runs screened before ` +
+        'the capture step shipped have none and are not back-filled (D-002).',
+    );
+  }
+
+  return { storageKey: row.storage_key };
 }

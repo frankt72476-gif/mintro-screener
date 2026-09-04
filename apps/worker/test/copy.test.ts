@@ -32,7 +32,11 @@ import {
   STATE_LABEL,
   STATE_LABEL_LOWER,
 } from '@mintro/engine';
-import { bodyFor, subjectFor, attachmentName } from '../src/send.js';
+import { bodyFor, subjectFor } from '../src/send.js';
+
+/** A delivered link, in the shape `reportLinkFor` builds. */
+const REPORT_LINK =
+  'https://screener.gomintro.com/r/11111111-2222-4333-8444-555555555555/x7Qp-_9aB3cD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4';
 
 /**
  * The audited vocabulary lives in `@mintro/engine` (D-029), not here.
@@ -559,7 +563,7 @@ describe('the covering email', () => {
     (_domain, report) => {
       // Dropped from the subject, not from the message. Three failures out of ninety-seven
       // evaluable findings is a different fact from three out of five.
-      const body = bodyFor(report, 'Captures attached.');
+      const body = bodyFor(report, 'Captures attached.', REPORT_LINK);
       // Read from the shared set, so this cannot go on asserting a word the report stopped using
       // — which is how the mail and the document it announces came to name states differently
       // in the first place (D-175).
@@ -574,7 +578,7 @@ describe('the covering email', () => {
       // D-065, extended to this audience: IQwallet knowing who Mintro is removes the need to
       // verify the sender, not the need to reach a person. An underwriter with a question about a
       // capture is mid-decision on a merchant, and the reply-to here is a no-reply address.
-      expect(bodyFor(report, 'Captures attached.')).toContain(REPORT_CONTACT_LINE);
+      expect(bodyFor(report, 'Captures attached.', REPORT_LINK)).toContain(REPORT_CONTACT_LINE);
       expect(isPointerContactLine(REPORT_CONTACT_LINE)).toBe(true);
     },
   );
@@ -582,7 +586,7 @@ describe('the covering email', () => {
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(
     'body for %s states counts without instructing',
     (_domain, report) => {
-      expect(offending(bodyFor(report, 'Captures attached.'))).toEqual([]);
+      expect(offending(bodyFor(report, 'Captures attached.', REPORT_LINK))).toEqual([]);
     },
   );
 
@@ -590,7 +594,7 @@ describe('the covering email', () => {
     const report = reports[0];
     if (report === undefined) return;
     // The posture stated plainly in the one place a recipient definitely reads.
-    expect(bodyFor(report, '')).toContain('not compliance determinations');
+    expect(bodyFor(report, '', REPORT_LINK)).toContain('not compliance determinations');
   });
 
   it('does not let an analyst note bypass the audit unnoticed', () => {
@@ -598,14 +602,40 @@ describe('the covering email', () => {
     if (report === undefined) return;
     // The note is analyst-supplied and travels into the email. If one day it is audited too,
     // this is where that is decided — for now it is passed through and this records that.
-    const body = bodyFor(report, 'You should reject this merchant.');
+    const body = bodyFor(report, 'You should reject this merchant.', REPORT_LINK);
     expect(offending(body)).toContain('should');
   });
 
-  it('names the attachment after the merchant and the run date', () => {
+  it('carries the report link, and says who serves it', () => {
+    /*
+      Nothing is attached any more (D-255). The email states where the report is and that Mintro
+      serves it, and does not explain that the format changed or why: the reader is here to read a
+      report, not to hear about a delivery decision.
+    */
     const report = reports[0];
     if (report === undefined) return;
-    expect(attachmentName(report)).toMatch(/^[a-z0-9.-]+-\d{4}-\d{2}-\d{2}\.pdf$/);
+    const body = bodyFor(report, 'Captures attached.', REPORT_LINK);
+
+    expect(body).toContain(REPORT_LINK);
+    expect(body).toContain('served by Mintro');
+    expect(body).not.toContain('attached report');
+    expect(body).not.toMatch(/\.pdf\b/);
+  });
+
+  it('says the link is live and that a copy can be saved', () => {
+    /*
+      The property chosen when serving was chosen over attaching, said plainly and without alarm.
+      IQwallet learns it from us on the day the report arrives rather than from a link that does
+      not answer one afternoon.
+    */
+    const report = reports[0];
+    if (report === undefined) return;
+    const body = bodyFor(report, '', REPORT_LINK);
+
+    expect(body).toContain('live link rather than a file you now hold');
+    expect(body).toContain('save the page');
+    // Frank's ruling: no em dashes in this copy.
+    expect(body).not.toContain('\u2014');
   });
 });
 

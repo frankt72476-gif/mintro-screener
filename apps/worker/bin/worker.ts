@@ -113,6 +113,23 @@ const WEB_ROOT = process.env['WEB_ROOT'] ?? 'apps/web/dist';
  */
 const WEB_ORIGIN = process.env['WEB_ORIGIN'];
 
+/**
+ * `WEB_ORIGIN`, or a refusal.
+ *
+ * Invitations already fail loudly without it. A report send now needs it too, and it must fail the
+ * same way: a link composed against a guessed origin is one an underwriter cannot open, and it
+ * would be sent looking perfectly well-formed.
+ */
+function requireWebOrigin(): string {
+  if (WEB_ORIGIN === undefined || WEB_ORIGIN === '') {
+    throw new Error(
+      'WEB_ORIGIN is not set, so there is no origin to compose the report link against. ' +
+        'Nothing was sent.',
+    );
+  }
+  return WEB_ORIGIN;
+}
+
 /*
   Who Mintro's mail comes from is resolved in `main`, not here.
 
@@ -1263,7 +1280,13 @@ async function handleSend(
       requestedBy: request.requested_by,
       from: addresses.reportFrom,
       replyTo: addresses.reportReplyTo,
-      webRoot: WEB_ROOT,
+      /*
+        The origin the delivered link sits on (D-255).
+
+        The same one invitations use. Refused rather than defaulted: a report link composed against
+        a guessed origin is a link an underwriter cannot open, and it would go out looking correct.
+      */
+      origin: requireWebOrigin(),
     });
 
     const { error } = await supabase.client
@@ -1294,8 +1317,7 @@ async function handleSend(
 
     console.log(
       `  ${result.record.outcome} · ${mailer.description} · provider id ${result.record.resendId ?? 'none'} · ` +
-        `${result.pages} page(s), ${(result.record.attachmentBytes / 1024 / 1024).toFixed(2)} MB in ` +
-        `${Math.round((Date.now() - started) / 1000)}s`,
+        `link ${result.reportUrl} in ${Math.round((Date.now() - started) / 1000)}s`,
     );
     if (result.record.error !== undefined) console.error(`  provider said: ${result.record.error}`);
     if (result.record.noteFlagged.length > 0) {

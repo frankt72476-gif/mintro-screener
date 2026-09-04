@@ -4,7 +4,7 @@
  *     npm run pdf -- 74eefa47                              # by run id
  *     npm run pdf -- swisschems.is                         # by domain, where it names one run
  *     npm run pdf -- c268f8d7 --report-dir fixtures/reports
- *     npm run pdf -- 74eefa47 --send underwriting@iqwallet.com
+ *     npm run pdf -- 74eefa47 --send underwriting@iqwallet.com --report-url https://...
  *
  * **The run id is the key.** This read `reports/<domain>.json`, which was fine while one storefront
  * meant one file and wrong as soon as it did not: `fixtures/reports/` holds two runs of
@@ -31,7 +31,6 @@ import {
   createMemorySendLog,
   mailersFor,
   sendReport,
-  attachmentName,
   subjectFor,
   bodyFor,
 } from '../src/send.js';
@@ -116,7 +115,9 @@ async function main(argv: readonly string[]): Promise<number> {
       inject: { report, evidence, ...(attestations === undefined ? {} : { attestations }) },
     });
 
-    const path = resolve(outDir, attachmentName(report));
+    // Named here rather than by `send.ts`, which no longer names attachments because sends no
+    // longer carry one (D-255). This is a local dev render, not a delivered artifact.
+    const path = resolve(outDir, `${report.merchantDomain}-${report.finishedAt.slice(0, 10)}.pdf`);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, pdf.bytes);
 
@@ -127,6 +128,24 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log(`  written     ${path}`);
 
     if (recipient !== null) {
+      /*
+        The link is supplied, never invented.
+
+        A send now carries a URL rather than a file, and this tool has no captured report to point
+        at: it renders a PDF locally, which is not the delivered artifact. Composing a plausible
+        link here would put a URL that resolves to nothing into a real email, because `mailersFor`
+        returns the live mailer as soon as `RESEND_API_KEY` is set.
+      */
+      const reportUrl = flagValue(argv, '--report-url', '');
+      if (reportUrl === '') {
+        console.error(
+          '  --send needs --report-url <link>. A report send carries a link to a captured report ' +
+            '(D-255), and this tool renders a PDF rather than capturing one, so it has no link of ' +
+            'its own to offer. Nothing was sent.',
+        );
+        return 1;
+      }
+
       // One selector for both sends, so verifying the domain turns both on together (D-063).
       const { mailer } = mailersFor();
       const log = createMemorySendLog();
@@ -137,7 +156,7 @@ async function main(argv: readonly string[]): Promise<number> {
       // D-001: no confirmation, no check on the fail count. The report goes.
       const entry = await sendReport(mailer, log, {
         report,
-        pdf: pdf.bytes,
+        reportUrl,
         to: recipient,
         from: 'reports@mintro.com',
         note: `${report.counts.fail} failed, ${report.counts.review} for review, ${report.counts.not_evaluable} not evaluable. Captures attached.`,
@@ -150,7 +169,7 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       console.log('\n  covering email:');
-      for (const line of bodyFor(report, 'Captures attached.').split('\n')) {
+      for (const line of bodyFor(report, 'Captures attached.', reportUrl).split('\n')) {
         console.log(`    ${line}`);
       }
     }

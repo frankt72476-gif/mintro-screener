@@ -5,6 +5,10 @@
  * of what went out and when — which makes the log the part these tests are really about.
  */
 
+/** A delivered link, in the shape `reportLinkFor` builds. */
+const REPORT_LINK =
+  'https://screener.gomintro.com/r/11111111-2222-4333-8444-555555555555/x7Qp-_9aB3cD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4';
+
 import { describe, expect, it } from 'vitest';
 import { loadRulesetFile } from '@mintro/ruleset';
 import { assembleReport, type Finding, type ScreeningReport } from '@mintro/engine';
@@ -45,7 +49,7 @@ function reportWith(fails: number): ScreeningReport {
 
 const request = (report: ScreeningReport) => ({
   report,
-  pdf: Buffer.from('%PDF-1.4 fixture'),
+    reportUrl: REPORT_LINK,
   to: 'underwriting@iqwallet.com',
   from: 'reports@mintro.com',
   note: 'Captures attached.',
@@ -107,9 +111,14 @@ describe('the send log', () => {
     expect(await log.all()).toHaveLength(1);
   });
 
-  it('records the attachment size, so a truncated PDF is visible after the fact', async () => {
+  it('records what was delivered: no attachment, and the link that went out', async () => {
     const entry = await sendReport(createDryRunMailer(), createMemorySendLog(), request(reportWith(1)));
-    expect(entry.attachmentBytes).toBe(16);
+    /*
+      Zero on every send from D-255 onward, because nothing is attached. The column stays for the
+      rows that predate the ruling, and a zero beside a `reportUrl` reads unambiguously.
+    */
+    expect(entry.attachmentBytes).toBe(0);
+    expect(entry.reportUrl).toBe(REPORT_LINK);
   });
 
   it('records every send, not just the first', async () => {
@@ -135,7 +144,8 @@ describe('the dry-run mailer', () => {
     const mailer = createDryRunMailer();
     await sendReport(mailer, createMemorySendLog(), request(reportWith(3)));
 
-    expect(mailer.outbox[0]?.pdf.byteLength).toBeGreaterThan(0);
+    // A link, not bytes (D-255). Nothing is attached to a report send.
+    expect(mailer.outbox[0]?.reportUrl).toBe(REPORT_LINK);
     expect(mailer.outbox[0]?.to).toBe('underwriting@iqwallet.com');
   });
 });

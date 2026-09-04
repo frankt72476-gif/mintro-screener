@@ -73,9 +73,13 @@ const SUPABASE_STUBS = `
   $$;
 
   create table if not exists storage.buckets (
-    id     text primary key,
-    name   text not null,
-    public boolean not null default false
+    id                 text primary key,
+    name               text not null,
+    public             boolean not null default false,
+    -- Real Supabase columns, added when 0074 began constraining the reports bucket. Still the
+    -- minimum the migrations touch: modelling the rest would be testing the model.
+    allowed_mime_types text[],
+    file_size_limit    bigint
   );
 
   create table if not exists storage.objects (

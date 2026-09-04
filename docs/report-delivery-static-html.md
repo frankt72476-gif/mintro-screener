@@ -496,7 +496,7 @@ The useful assertions here are about the captured bytes, not the render path.
 - No test asserts the captured HTML equals a current render. That is the D-002 trap the fixture
   work already hit: comparing a snapshot to live output asserts something the system says is false.
 
-#### Seven findings from building this, all worth keeping
+#### Eight findings from building this, all worth keeping
 
 **A guard can pass for the wrong reason, and then it guards nothing.** The count assertion — the
 file inlines as many images as the page displayed — was first tested by leaving a marker
@@ -682,6 +682,28 @@ after the edit, check the count of matches before replacing.
 
 Weakening a correct guard because a broken experiment said it was weak is the worst available
 outcome here, and instance 3 came one step from it.
+
+**The obvious constraint value would have rejected every capture.** `allowed_mime_types` was
+deferred from `0071` for five steps because the question could not be answered from here: does
+Supabase match the **base** type or the **whole** content-type header? The uploader sends
+`text/html; charset=utf-8`. The natural constraint to write is `['text/html']`.
+
+Probed against the live project, on a throwaway bucket:
+
+    allowed_mime_types = ['text/html']                 upload REJECTED
+      "mime type text/html; charset=utf-8 is not supported"
+    allowed_mime_types = ['text/html; charset=utf-8']  upload accepted
+
+**It compares the whole string.** `['text/html']` would have rejected every report at upload, and
+the failure would have arrived at capture time on a real run, long after the migration read as
+obviously correct in review. Nothing local could have told anyone: PGlite has no storage API, and
+the constraint is enforced by a service this repository does not run.
+
+That is the fifth instance of the shape this deploy kept producing — **a configuration that looks
+correct and an environment that does not agree** — after build order, PATH, build scope and
+reachability. It is also the one the *verify-against-live* instruction was written for, and the
+only reason the wrong value never shipped is that it was left deferred rather than guessed at when
+it was first drafted. Deferring a value you cannot check is cheaper than shipping one you assumed.
 
 **The tree had already written this lesson down, and nobody read it.**
 `packages/ruleset/tsconfig.json` carries a comment, from an earlier deploy failure, saying that a

@@ -39,7 +39,21 @@ export interface SendRecord {
   /** Whether the provider accepted it, and why not when it did not. */
   readonly outcome: 'accepted' | 'rejected';
   readonly error?: string;
+  /**
+   * Zero on every send from D-255 onward, because nothing is attached.
+   *
+   * The column stays because the rows that predate the ruling carry real byte counts and the send
+   * log is append-only history. A zero here alongside a `reportUrl` reads unambiguously: no
+   * attachment, and the artifact is at that address.
+   */
   readonly attachmentBytes: number;
+  /**
+   * The link that was sent.
+   *
+   * The send log is the only record of what went out and to whom, and what goes out is now a URL.
+   * Without this the log could say a report was delivered and not which one.
+   */
+  readonly reportUrl?: string;
   /**
    * The analyst's covering note, as sent.
    *
@@ -74,7 +88,15 @@ export function createMemorySendLog(): SendLog {
 
 export interface SendRequest {
   readonly report: ScreeningReport;
-  readonly pdf: Buffer;
+  /**
+   * Where the captured report lives (D-255).
+   *
+   * A link, not a file. The report is captured once at assembly and served by Mintro; nothing is
+   * attached to this message. A send with no capture to point at does not happen — `sendJob`
+   * refuses before composing, because an email announcing a report and carrying no way to read one
+   * is worse than a send that failed.
+   */
+  readonly reportUrl: string;
   readonly to: string;
   readonly from: string;
   /**
@@ -185,10 +207,7 @@ export function createResendMailer(apiKey: string): Mailer {
         from: request.from,
         to: [request.to],
         subject: subjectFor(request.report),
-        text: bodyFor(request.report, request.note),
-        attachments: [
-          { filename: attachmentName(request.report), content: request.pdf.toString('base64') },
-        ],
+        text: bodyFor(request.report, request.note, request.reportUrl),
         ...(request.replyTo === undefined ? {} : { reply_to: [request.replyTo] }),
       });
     },
@@ -249,7 +268,8 @@ export async function sendReport(
     merchantDomain: request.report.merchantDomain,
     outcome: outcome.accepted ? 'accepted' : 'rejected',
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
-    attachmentBytes: request.pdf.byteLength,
+    attachmentBytes: 0,
+    reportUrl: request.reportUrl,
     note: request.note,
     noteFlagged: noteAudit.flagged,
     noteWarningAcknowledged: request.noteWarningAcknowledged ?? false,
@@ -287,12 +307,22 @@ export function subjectFor(report: ScreeningReport): string {
   return `Screening report — ${report.merchantDomain}`;
 }
 
-export function bodyFor(report: ScreeningReport, note: string): string {
+export function bodyFor(report: ScreeningReport, note: string, reportUrl: string): string {
   const { counts, coverage } = report;
 
+  /*
+    Blank lines are structure, not filler.
+
+    This used to end in `.filter((line) => line !== '')`, which existed to drop the optional
+    not-reachable line when there was nothing to say — and took every deliberate blank line with
+    it, so the email rendered as one dense block. That was survivable while the body was prose. It
+    is not survivable now that the body's job is to hand someone a URL: a link with no space around
+    it reads as part of the sentence before it.
+
+    So the optional lines are spread conditionally and the spacers stay.
+  */
   return [
-    note.trim(),
-    '',
+    ...(note.trim() === '' ? [] : [note.trim(), '']),
     `Merchant:  ${report.merchantDomain}`,
     `Run:       ${report.runId}`,
     `Rule set:  v${report.rulesetVersion}, effective ${report.rulesetEffective}`,
@@ -302,30 +332,38 @@ export function bodyFor(report: ScreeningReport, note: string): string {
     // the document it announces named the four states in different words for as long as both existed.
     describeCounts(counts),
     `${coverage.evaluable} of ${coverage.total} findings were evaluable from this crawl.`,
-    coverage.notReachable > 0
-      ? `${coverage.notReachable} require a surface no crawl reaches and are reported as not evaluable.`
-      : '',
+    ...(coverage.notReachable > 0
+      ? [`${coverage.notReachable} require a surface no crawl reaches and are reported as not evaluable.`]
+      : []),
     '',
-    'The attached report carries a capture behind every finding.',
+    // Where it is, and who serves it. Not why the format changed: that is Mintro's business and
+    // the reader is here to read a report.
+    'The report is a link, served by Mintro:',
+    reportUrl,
+    '',
+    'It carries a capture behind every finding.',
     'Findings state what was observed. They are not compliance determinations.',
+    '',
+    /*
+      The property we chose when we chose serving over attaching, said plainly and without alarm.
+
+      A link is not a file they hold. Saying so here means IQwallet learns it from us, on the day
+      the report arrives, rather than from a link that does not answer one afternoon.
+    */
+    'This is a live link rather than a file you now hold. If you would like your own copy, ' +
+      'save the page from your browser.',
     '',
     // D-065, extended to this audience on Frank's ruling. IQwallet knowing who Mintro is removes
     // the need to verify the sender, not the need to reach a person: an underwriter with a question
     // about a capture is mid-decision on a merchant, and the reply-to here is a no-reply address.
     REPORT_CONTACT_LINE,
-  ]
-    .filter((line) => line !== '')
-    .join('\n');
-}
-
-export function attachmentName(report: ScreeningReport): string {
-  return `${report.merchantDomain}-${report.finishedAt.slice(0, 10)}.pdf`;
+  ].join('\n');
 }
 
 /* -------------------------------------------------------------------------------------------
  * Plain messages
  *
- * The report send carries a PDF and is shaped around a `ScreeningReport`. The merchant invitation
+ * The report send carries a link and is shaped around a `ScreeningReport`. The merchant invitation
  * (D-063) is a plain message with a link in it, and it must reach Resend through the **same gate**:
  * the moment `RESEND_API_KEY` is set, both sends work with no further code.
  * ----------------------------------------------------------------------------------------- */

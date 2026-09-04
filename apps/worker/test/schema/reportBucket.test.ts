@@ -20,6 +20,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createSchema, type SchemaFixture } from './harness.js';
 
 let schema: SchemaFixture;
@@ -85,5 +86,49 @@ describe('the reports bucket', () => {
     );
 
     expect(evidence!.public).toBe(false);
+  });
+});
+
+/**
+ * The limits, and the one number that must not drift (0074).
+ *
+ * `allowed_mime_types` was deferred from 0071 until it could be checked against the live project,
+ * because Supabase compares the **whole** content-type string: `['text/html']` rejects an upload
+ * sent as `text/html; charset=utf-8`, with *"mime type text/html; charset=utf-8 is not
+ * supported"*. The obvious spelling would have failed every capture.
+ *
+ * So the constraint and the uploader's content type are the same string in two files, and the
+ * ceiling and the bucket's size limit are the same number in two files. Both are coincidences
+ * until something checks them.
+ */
+describe('the reports bucket limits', () => {
+  it('allows exactly the content type the uploader sends', async () => {
+    const [row] = await schema.query<{ allowed_mime_types: string[] | null }>(
+      `select allowed_mime_types from storage.buckets where id = 'reports'`,
+    );
+
+    expect(row!.allowed_mime_types).toEqual(['text/html; charset=utf-8']);
+
+    // The uploader's side of the pair, read from source rather than restated here.
+    const uploader = readFileSync('apps/worker/src/reportCaptureStore.ts', 'utf8');
+    expect(uploader).toContain("contentType: 'text/html; charset=utf-8'");
+  });
+
+  it('caps objects at the capture ceiling, and at the same number', async () => {
+    /*
+      The capture refuses an oversized document before uploading; this is the backstop for a writer
+      that does not. If they disagree, one of them is not doing the job it claims to.
+    */
+    const [row] = await schema.query<{ file_size_limit: string | null }>(
+      `select file_size_limit from storage.buckets where id = 'reports'`,
+    );
+
+    const source = readFileSync('apps/worker/src/capture/document.ts', 'utf8');
+    const ceiling = source.match(/CAPTURE_SIZE_CEILING_BYTES\s*=\s*([\d\s*]+);/)?.[1];
+    expect(ceiling, 'could not read the ceiling from source').toBeDefined();
+
+    // eslint-disable-next-line no-eval -- a literal arithmetic expression from our own source.
+    const expected = Number(eval(ceiling!));
+    expect(Number(row!.file_size_limit)).toBe(expected);
   });
 });
