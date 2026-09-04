@@ -407,7 +407,31 @@ That step exists because the build once reached for a compiler, was handed an un
 called `tsc` from the registry, and could not tell. The frontend is in the image because the PDF is `page.pdf()` against the report route:
 the same React component an analyst sees, so the export cannot drift from the report (D-040).
 
-### 3.6 Confirm it is running
+### 3.6 Allocate the public IPs — **once per app, and easy to miss**
+
+The worker serves captured reports at `/r/<runId>/<token>` (D-255), so it needs to be reachable
+from the internet. A Fly app does not get a public address just because `fly.toml` declares an
+`[http_service]`.
+
+    fly ips list --app mintro-screener-worker
+
+If that is empty, allocate:
+
+    fly ips allocate-v4 --app mintro-screener-worker
+    fly ips allocate-v6 --app mintro-screener-worker
+
+**The failure this prevents looks like success everywhere else.** `fly config validate` passes,
+`fly deploy` completes, the machine boots, `fly logs` shows the route listening on its port — and
+the hostname does not resolve, because nothing has been routed to it. Every local signal says the
+deploy worked. It happened on the first deploy of this route.
+
+No local check can catch it: an IP allocation is a fact about the deployed environment, not a
+property of the configuration that asks for traffic. The config can only be well-formed.
+
+**The IPs are allocated for the current app.** You need this step again for a fresh environment —
+a new app, a rebuild after a delete, another region.
+
+### 3.7 Confirm it is running
 
     fly logs --app mintro-screener-worker
 
@@ -424,7 +448,7 @@ configuration it cannot write to and then fails every job individually is much h
     fly status --app mintro-screener-worker      # one machine, started
     fly machine restart <id> --app mintro-screener-worker
 
-### 3.7 Things that will each cost you an afternoon
+### 3.8 Things that will each cost you an afternoon
 
 - **Do not enable auto-stop.** There is no `[http_service]` block, so Fly keeps the machine
   running. If you add one, machines sleep, and a sleeping worker silently stops picking up scans.

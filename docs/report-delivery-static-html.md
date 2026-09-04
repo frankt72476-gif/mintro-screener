@@ -376,14 +376,31 @@ route.** Full-resolution merchant screenshots are inlined in that object. This i
 trade of confidentiality against availability, not an oversight, and it should be revisited if the
 worker ever stops being a single machine.
 
-#### Unverified until deployed
+#### The IP allocation gap
 
-**Fly routing traffic to the new listener, and Netlify proxying to it, are unverified.** They
-cannot be checked locally and are not described here as working. The route itself is verified
-locally — started, requested, and asserted on status, headers, bytes and the four constraints. The
-CSP is written to permit exactly what the document contains (inline styles, `data:` images, `data:`
-fonts) and **has not been checked against a real browser**; if it is wrong the report renders
-unstyled, which is the failure being fixed, so it is the first thing to look at on a deployed link.
+`fly deploy` validated, the machine booted, and the process served the route on its own port — and
+the hostname did not resolve, because **no public IP had been allocated**. Nothing between *"config
+valid"* and *"actually reachable"* catches that, and **no local check could**: an IP allocation is
+a fact about the deployed environment, not a property of the configuration that asks for traffic to
+be routed there. `fly config validate` can only say the request is well-formed.
+
+Same family as the findings below. The configuration was internally consistent and correct, and the
+environment had not done the thing the configuration assumes — which is the shape that has now
+appeared at every layer of this deploy: build order, PATH, build scope, and now reachability.
+
+**The IPs are now allocated.** A fresh environment needs them again — a new Fly app, a rebuild
+after a delete, a second region — and it will present as a hostname that does not resolve while
+every local signal says the deploy succeeded. `docs/DEPLOY.md` is where a person will look for that.
+
+**Verified 2026-09-04.** A delivered link resolves and renders through the Netlify proxy:
+styled, every capture present, `text/html; charset=utf-8`, and the CSP holding against a real
+renderer. Fly routes to the listener, Netlify proxies to it, and the policy permits what the
+document contains.
+
+Until that link was opened, none of it could be checked locally, and this section said so
+rather than describing them as working. The route itself was verified locally throughout —
+started, requested, and asserted on status, headers, bytes and the four constraints — and that
+was never the same claim as *the delivered link works*.
 
 ### 5. Netlify fronting
 
@@ -727,6 +744,27 @@ is a dependency someone reading the code six months out would otherwise have to 
   without invalidating issued links and no partner is handed the project ref.
 
 ---
+
+## Observed in production, not part of this work
+
+**A 30-second extraction timeout on one product page put three rules into `not_assessed`.**
+Observed on a real run, 2026-09-04.
+
+The behaviour is **correct**. A page that could not be read is a page the system did not observe,
+and three rules that depended on it report as unassessed rather than as passing — which is hard
+constraint 2 doing exactly what it exists for. Nothing here is a defect to fix.
+
+It is recorded because two questions sit behind it and neither is answered:
+
+- **Is the timeout transient or systematic?** One slow storefront on one run is an instance, not a
+  class. A measurement is evidence about the thing measured until the instance count earns the
+  generalisation, and one run does not.
+- **Should one slow page cap three rules?** That is a question about how coverage degrades, not
+  about the timeout. Three unassessed rules from a single unread page may be the honest answer, or
+  it may be a coupling worth loosening. Either way it is a ruling about the engine's sampling and
+  reporting, and it belongs nowhere near report delivery.
+
+**Not this change, and not a bug.** Looked at separately.
 
 ## Order of work
 
