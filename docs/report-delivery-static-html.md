@@ -474,13 +474,52 @@ deployed, every `/r/` link in the app is dead, and an analyst clicking a dead li
 
 Attachment comes out, link goes in, in every path that currently sends a report.
 
-`apps/worker/src/invite.ts` composes `body` as an array joined with `\n`. The last pass through
-this file shifted every index after the edit and had to renumber. Expect the same. Check
-`apps/worker/test/inviteJob.test.ts`, which asserts on the composed body.
+**The array is `bodyFor` in `send.ts`, not `invite.ts`.** The spec named `invite.ts` for the
+shifting-index hazard, and that was carried forward from an earlier draft: `invite.ts` composes the
+*merchant comment* invitation, which never carried an attachment. The array joined with `\n` whose
+indices shift is `bodyFor`, and that is where the edit landed. `inviteJob.test.ts` is untouched and
+passing.
 
-Copy: state that the report is a link and that the link does not expire. Do not editorialize about
-the format change. Operator identity enforcement is unchanged and already correct at the payload
-level (D-233) — the link and the surrounding copy carry no operator identity.
+Copy: state that the report is a link and that Mintro serves it. Do not editorialize about the
+format change. Operator identity enforcement is unchanged and already correct at the payload level
+(D-233): the link and the surrounding copy carry no operator identity.
+
+One line was added on Frank's ruling, plainly and without alarm: **the report is a live link rather
+than a file the reader now holds, and they can save the page if they want their own copy.** That is
+the property chosen when serving was chosen over attaching, and stating it means IQwallet learns it
+from us on the day the report arrives rather than from a link that does not answer one afternoon.
+
+#### The subject line
+
+    Mintro screening report: www.comopeptides.com, 3 Sept 2026
+
+Leads with Mintro, because the sender is a company an underwriter may not have in mind when a
+notification arrives. Carries the completed date, because two reports on one merchant are otherwise
+indistinguishable in a thread. Still carries **no counts** — that ruling is unchanged, and the test
+now asserts it as *no counts* rather than as *no digits*, which was a proxy that stopped being true
+the moment a date appeared.
+
+The date is `formatReportDay(report.finishedAt)` from `@mintro/engine` — **the masthead's own
+formatter**, moved there from `apps/web` so the worker can reach it, with `formatReportDate`
+composed from it. The document and the message announcing it state the same completed date because
+they compute it once, not because two derivations agree today.
+
+A colon, not an em dash. No external-facing copy carries one.
+
+#### The send dialog shows no counts, deliberately
+
+`SendModal` defaulted its note to the counts followed by *"Captures attached."*, and that default
+was removed because the note is not a caption on that screen: it is stored, read by the worker, and
+placed first in the email body, above the line saying the report is a link.
+
+The counts went with it, and **they do not come back.** They were fragile precisely because they
+lived inside a composed string that had to stay true above a link. A read-only line in the dialog
+would be safer than a default, but it is one more surface stating numbers the email body already
+carries and the report is one click from. **Fewer places saying the same thing is the posture, not
+more.**
+
+So an operator sends from three things: To, Note, and the eye-test line. The counts live in the
+email and in the report, which is where they belong.
 
 ### 7. Tests
 

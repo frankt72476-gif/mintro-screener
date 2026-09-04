@@ -32,6 +32,7 @@ import {
   STATE_LABEL,
   STATE_LABEL_LOWER,
 } from '@mintro/engine';
+import { formatReportDay } from '@mintro/engine';
 import { bodyFor, subjectFor } from '../src/send.js';
 
 /** A delivered link, in the shape `reportLinkFor` builds. */
@@ -548,8 +549,29 @@ describe('the covering email', () => {
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(
     'subject for %s carries no counts',
     (_domain, report) => {
-      expect(subjectFor(report)).toBe(`Screening report — ${report.merchantDomain}`);
-      expect(subjectFor(report)).not.toMatch(/\d/);
+      expect(subjectFor(report)).toBe(
+        `Mintro screening report: ${report.merchantDomain}, ${formatReportDay(report.finishedAt)}`,
+      );
+
+      /*
+        No counts, asserted as *no counts* rather than as "no digits".
+
+        This was `not.toMatch(/\d/)`, which was a fair proxy while the subject held only a domain
+        and became wrong the moment it carried a date. Strip the two things that legitimately
+        contain digits — the merchant's domain and the completed date — and nothing numeric may
+        remain.
+      */
+      const withoutData = subjectFor(report)
+        .replace(report.merchantDomain, '')
+        .replace(formatReportDay(report.finishedAt), '');
+      expect(withoutData).not.toMatch(/\d/);
+
+      // The date is the masthead's, from the one formatter, so the message and the document it
+      // announces cannot disagree about when the run completed.
+      expect(subjectFor(report)).toContain(formatReportDay(report.finishedAt));
+
+      // External-facing copy carries no em dash.
+      expect(subjectFor(report)).not.toContain('\u2014');
       // The current vocabulary, not the retired one. A guard listing words nothing renders is a
       // guard that cannot fire (D-175).
       for (const label of Object.values(STATE_LABEL)) {

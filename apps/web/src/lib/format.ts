@@ -21,23 +21,15 @@ export function stateClass(state: State): 'fail' | 'review' | 'pass' | 'na' {
 */
 export { STATE_LABEL, STATE_LABEL_LOWER, STATE_ORDER } from '@mintro/engine';
 
-/** `20 Aug 2026, 10:42 ET`, matching the demo's report header. */
-export function formatReportDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
+/*
+  Re-exported, not defined here (D-034).
 
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/New_York',
-  }).format(date);
-
-  return `${parts} ET`;
-}
+  The report email's subject line states the completed date and the masthead states it too, and the
+  worker cannot import from this app. So the formatter moved to `@mintro/engine` and both sides read
+  the one implementation — the alternative is two derivations of the same date, which is the shape
+  that has already produced a URL stated in two places.
+*/
+export { formatReportDay, formatReportDate } from '@mintro/engine';
 
 /** `2026-08-20 10:42:11 ET`, for an evidence stamp. */
 export function formatStamp(iso: string): string {

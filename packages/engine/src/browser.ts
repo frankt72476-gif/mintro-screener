@@ -61,6 +61,8 @@ export {
   STATE_LABEL_LOWER,
   STATE_ORDER,
   describeCounts,
+  formatReportDay,
+  formatReportDate,
 } from './stateLabel.js';
 
 export {

@@ -12,7 +12,12 @@
  */
 
 import { createHash } from 'node:crypto';
-import { auditAnalystNote, describeCounts, type ScreeningReport } from '@mintro/engine';
+import {
+  auditAnalystNote,
+  describeCounts,
+  formatReportDay,
+  type ScreeningReport,
+} from '@mintro/engine';
 import { REPORT_CONTACT_LINE } from './contactLine.js';
 
 /** A row in the `sends` table (docs/ARCHITECTURE.md § Data model). */
@@ -304,7 +309,21 @@ export async function sendReport(
  * today. That is a real loss and it was accepted deliberately.
  */
 export function subjectFor(report: ScreeningReport): string {
-  return `Screening report — ${report.merchantDomain}`;
+  /*
+    Leads with Mintro, and carries the date the report was completed.
+
+    The sender is a company an underwriter may not have in mind when the notification arrives, and
+    a subject beginning "Screening report" says what it is without saying whose. The date makes two
+    reports on one merchant distinguishable in a thread, which is the one piece of triage the
+    no-counts ruling above leaves available.
+
+    `formatReportDay` is the masthead's own formatter, from `@mintro/engine`. The document and the
+    message announcing it state the same completed date because they compute it once — not because
+    two derivations happen to agree today.
+
+    A colon, not an em dash: no external-facing copy carries one.
+  */
+  return `Mintro screening report: ${report.merchantDomain}, ${formatReportDay(report.finishedAt)}`;
 }
 
 export function bodyFor(report: ScreeningReport, note: string, reportUrl: string): string {

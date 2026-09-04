@@ -68,3 +68,49 @@ export const STATE_ORDER: readonly State[] = ['fail', 'review', 'pass', 'not_eva
 export function describeCounts(counts: Readonly<Record<State, number>>): string {
   return STATE_ORDER.map((state) => `${counts[state]} ${STATE_LABEL_LOWER[state]}`).join(' · ');
 }
+
+/*
+  The report's dates, formatted once.
+
+  These lived in `apps/web/src/lib/format.ts`, which the worker cannot import across the app
+  boundary. The subject line of the report email states the completed date, and the report's own
+  masthead states it too — so a second derivation here would be a date that could disagree with
+  the document it announces.
+
+  `formatReportDate` is composed from `formatReportDay` rather than repeating the field list, so
+  the day, month and year in the subject are literally the same computation as the one in the
+  masthead.
+
+  `en-GB` with `month: 'short'` renders September as `Sept`, which is what the masthead shows.
+  America/New_York because that is the clock every other report surface is stamped in.
+*/
+
+const REPORT_DATE_ZONE = 'America/New_York';
+
+/** `3 Sept 2026` — the date the masthead shows, without the time. */
+export function formatReportDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: REPORT_DATE_ZONE,
+  }).format(date);
+}
+
+/** `3 Sept 2026, 14:59 ET` — the masthead's stamp. */
+export function formatReportDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+
+  const time = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: REPORT_DATE_ZONE,
+  }).format(date);
+
+  return `${formatReportDay(iso)}, ${time} ET`;
+}
