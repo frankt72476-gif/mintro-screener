@@ -16259,3 +16259,113 @@ for one highlight and got two.
 Autosave writes on blur only when there is text and it has changed. An empty box must never become a
 row: it resolves to `unanswered` either way, and a row would differ only in claiming somebody decided
 something.
+
+---
+
+## D-255 — The report handoff artifact is an immutable HTML capture, delivered as a Mintro-served link
+**2026-09-04 · business owner · `apps/worker/src/capture/`, `capture.ts`, `captureJob.ts`, `reportRoute.ts`, `reportCaptureStore.ts`, `send.ts`, migrations 0071–0074**
+
+No PDF is generated. No file is attached to any outbound report email. The report is rendered once
+at assembly, captured as a self-contained HTML file, written to storage as an immutable object, and
+delivered as a link on a Mintro origin.
+
+**Reasoning.** The artifact format was never specified by IQwallet. Mintro has no contractual
+relationship with the sponsoring bank and is not responsible for producing anything a bank consumes;
+IQwallet does its own underwriting and produces its own documents. The screener's obligation ends at
+showing IQwallet that the screening was performed and what it observed, and a link discharges that as
+well as an attachment does.
+
+### Why a captured file and not a live route
+
+This is the part that matters and it is not obvious. Run data is immutable (D-002) and clauses
+snapshot onto findings at assembly, so the report's *content* was already frozen. The *render* was
+not: section headings are constants in `copy.ts`, report components change, and the rule set has been
+re-based once (D-139). A live route serves whatever bundle is deployed the day it is opened, so a run
+from today reopened next spring is a different document at the same URL, with nothing announcing that
+it changed.
+
+The report is a dated record of a commercially reasonable effort. Its whole value is that it says the
+same thing later that it said when it was sent. Frozen bytes preserve that; a live route does not.
+
+### The capture is self-contained, and that is a hard requirement
+
+It renders correctly with no network access, forever. CSS inlined; no scripts, and no `<noscript>`,
+whose content would be *shown* in a file that has no scripts by construction; fonts vendored into the
+repository and inlined as data URIs, so no CDN can change what the document looks like in 2029; and
+**evidence images inlined as data URIs at full fidelity**.
+
+The evidence images were ruled rather than assumed. The objects are as stable as they could be —
+content-addressed keys, append-only, nothing resizing them — but the report reaches them through
+five-minute signed URLs, and the only route to a stable URL would be a public evidence bucket, which
+`0008` refuses. A frozen file pointing at assets that expire is not frozen. Measured cost: 0.2–14.4 MB
+inlined across the stored reports, against a 40 MB ceiling asserted at capture that **fails the job**
+rather than warning.
+
+The 23 `@media print` blocks are hoisted to unconditional CSS **in place**, because a media query adds
+no specificity and the cascade decides ties by document order; relocating them would silently change
+which rule wins.
+
+### The worker serves it, not Supabase
+
+**Supabase serves public HTML as `text/plain`, with `nosniff` and a sandbox CSP, whatever mimetype is
+stored.** Confirmed against both the proxy and the direct storage URL with `text/html; charset=utf-8`
+recorded on the object. The sandbox strips inline styles and inline image data, so the document would
+arrive unstyled with no captures. A self-contained report that a sandbox strips is not delivered, and
+the document is not weakened to fit a header.
+
+So the bytes are served by a read-only route on the worker at `/r/<runId>/<token>`, fronted by a
+Netlify rewrite from `screener.gomintro.com`. The link is on a Mintro origin so that storage can move
+without invalidating links already issued, and so no underwriting partner is handed the Supabase
+project ref.
+
+### The bucket stays public, and what that trades
+
+The path is no longer the credential for the primary route — the route checks it. Making the bucket
+private would remove the public object entirely, which is better for merchant screenshots, and
+nothing depends on public read once the route exists.
+
+It stays public anyway. **The fallback it would remove matters more than the exposure it would
+close**: one machine running Chromium on 1 GB, where the config says crashes are usually OOM, is the
+wrong single point of failure for an artifact whose entire purpose is durability. A storage URL that
+still resolves — even served as `text/plain`, where the bytes can be saved and opened locally — is an
+ugly fallback that beats no fallback.
+
+The trade, recorded honestly: **the object remains publicly readable by anyone holding the path**,
+full-resolution merchant screenshots included, and that path is the credential for the fallback even
+though it is no longer the credential for the primary route. Revisit if the worker stops being a
+single machine.
+
+### Two consequences that are not incidental
+
+**The worker now has a public HTTP surface, and it holds `SUPABASE_SERVICE_KEY`.** Until this shipped
+it served no traffic at all. That key carries `BYPASSRLS` and can read and write every merchant's
+evidence, which is why the route's constraints are load-bearing rather than stylistic: read-only,
+validate before reading, no listing, no enumeration, and one byte-identical refusal for every miss —
+a 400 for a malformed token and a 404 for a missing one would make the route a probing oracle.
+
+**Report delivery now inherits the worker's availability.** One machine, so a deploy restart takes
+every delivered link down with it, and crawling and serving share a memory budget where an OOM used to
+cost only a scan. Named rather than designed around; the public storage URL is the fallback that
+decision rests on.
+
+### Scope
+
+Capture happens at **report assembly**, not at send, so the blocked-package path and the IQwallet path
+get a link to the same artifact — delivery differs, the document does not. The merchant comment pane
+stays a live route: it takes input and cannot be a static capture. **No back-fill**: runs that
+produced a PDF keep it, and a run with no capture refuses to send rather than sending a link to
+nothing.
+
+**Documents Check is untouched and remains PDF-based.** Its report is a different artifact with its
+own send path, its own attachment, and its own package export that re-renders it. Its send dialog
+still shows an attachment row, correctly, and the copy guard asserts that it does — the rule is *do
+not claim a file this send will not carry*, not *never say attachment*.
+
+### Process findings
+
+Nine of them, recorded in `docs/report-delivery-static-html.md` under *"Nine findings from building
+this"*, and not restated here. They are worth reading before the next deploy-shaped piece of work:
+guards that pass for the wrong reason, fixtures that inherit the code's blind spot, four consecutive
+deploy failures where a configuration was internally correct and the environment did not agree, an
+audit that was sound and scoped to a boundary nobody drew, and the standing rule those produced —
+**a deploy-environment failure gets a clean-room reproduction before a fix is proposed.**

@@ -1,6 +1,6 @@
 ---
 purpose: Decision record and implementation spec for replacing the report PDF with an immutable static HTML capture delivered as a link. Read before touching report delivery, the worker's render step, or outbound email bodies.
-status: specced 2026-09-03; step 1 (bucket, path scheme, token) landed 2026-09-03
+status: implemented 2026-09-04, D-255 written. Serving path proven end to end on a deployed link. NOT yet deployed as of this line: migrations 0073-0074, the worker, the frontend.
 ---
 
 # Report delivery — static HTML replaces the PDF
@@ -9,9 +9,14 @@ status: specced 2026-09-03; step 1 (bucket, path scheme, token) landed 2026-09-0
 
 **D-255 — the report handoff artifact is an immutable HTML capture, delivered as a link.**
 
-Confirmed against `docs/DECISIONS.md` on 2026-09-03. This was specced as D-239, which is taken —
-it is the access-log record. The highest record is D-254, so D-255 is the number. Do not cite it
-in code until the record exists.
+**Written to `docs/DECISIONS.md` on 2026-09-04.** This was specced as D-239, which is taken — it is
+the access-log record — so the number was confirmed against the file and became D-255.
+
+The instruction here was *do not cite it in code until the record exists*, and that was not
+followed: `D-255` appears in fifteen comments across the worker, the app and two migrations, all
+written before the record. The citations are correct now, and were dangling for a day. The sequence
+existed so that a number in code always resolves to something a reader can look up, and writing the
+record last is what made that briefly untrue.
 
 ### Decision
 
@@ -820,7 +825,7 @@ still contains no external references. This is the check that catches an asset p
 reaching backwards into old reports. It belongs in CI because it needs network and because a
 validator that requires touching the engine to add a rule violates hard constraint 1.
 
-### 9. Decision record
+### 9. Decision record — **written 2026-09-04**
 
 Write D-255 as above. Three things belong in the record rather than in a code comment, because each
 is a dependency someone reading the code six months out would otherwise have to rediscover:
@@ -866,7 +871,7 @@ It is recorded because two questions sit behind it and neither is answered:
 5. Netlify fronting: the `/r/*` rewrite pointed at the worker. Commit, review.
 6. Email bodies and index renumbering. Commit, review.
 7. Tests and CI tripwire. Commit, review.
-8. Decision record.
+8. Decision record. **Done 2026-09-04.**
 
 Run-scoped **evidence** purge is not on this list. It does not exist, it is not created by this
 work, and it is ruled separately — see step 3.
