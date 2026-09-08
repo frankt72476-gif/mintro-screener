@@ -20,7 +20,7 @@ and the received document verified against what the merchant actually did.
 | **Documents Check** | **M0 through M6 built and verified live against the test project.** Extraction, ingest, the check engine (38 checks in four families), persistence, the report, the PDF, send-to-agent, and package creation. Migrations `0019`–`0034`. The three creation answers accept **not known yet** and are recorded on the package (D-129, `0034`) — applied to production 2026-08-24, frontend deployed behind it, verified 13/13. Eight items are carried rather than done — see below; the last is a correctness question about the default document set rather than a build task. |
 | **Retention** | **P0 through P7 built** (D-130, D-132). The clock starts, the gate refuses, the export is queued and built and reconciled against the database, verification checks every member, the purge is planned and refused before it is ever run, and a purged package's report says so in the masthead. Migrations `0035`–`0043`, all on production; the panel is live. The staged archive is discarded on a verified copy and swept from the bucket after a day, and the download link is nulled once it lapses. **Nobody holds `purge_approver`, so no purge can be approved**, and the executor has never run outside a dry run. |
 
-D-256 architecture ratified; cluster 1 (rule tiering) done; cluster 2 must read PROD-013/014 against PROD-016 before any patterns land.
+D-256 architecture ratified; cluster 1 (rule tiering) done; cluster 2 must read PROD-013/014 against PROD-016 before any patterns land. Cluster 2 in progress: angles.json 1.0.0, generator built, no real run yet.
 
 ### Expect one thing to look wrong on any run screened before 2026-08-29
 

@@ -34,7 +34,8 @@
     "print-check": "npm run web:build --silent && tsc --build && node apps/worker/dist/bin/print-check.js",
     "loop-check": "npm run web:build --silent && tsc --build && node --env-file=.env apps/worker/dist/bin/loop-check.js",
     "page-budget": "npm run web:build --silent && tsc --build && node --env-file=.env apps/worker/dist/bin/page-budget.js",
-    "compose-check": "npm run web:build --silent && tsc --build && node apps/worker/dist/bin/compose-check.js"
+    "compose-check": "npm run web:build --silent && tsc --build && node apps/worker/dist/bin/compose-check.js",
+    "evaluate": "tsc --build && node --env-file=.env apps/worker/dist/bin/evaluate.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
