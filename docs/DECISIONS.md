@@ -24,6 +24,8 @@ all report copy — findings describe what was observed, never what should happe
 An analyst may still choose to work with a merchant before sending. That's a workflow
 decision they make outside the tool, not a state the tool enforces.
 
+Superseded in part by D-256 (2026-09-08).
+
 ---
 
 ## D-002 — No scheduled re-scans in v1
@@ -16369,3 +16371,97 @@ guards that pass for the wrong reason, fixtures that inherit the code's blind sp
 deploy failures where a configuration was internally correct and the environment did not agree, an
 audit that was sound and scoped to a boundary nobody drew, and the standing rule those produced —
 **a deploy-environment failure gets a clean-room reproduction before a fix is proposed.**
+
+---
+
+## D-256 — The screener evaluates what a business is, then routes it
+**2026-09-08 · business owner**
+**Supersedes:** D-001 (observations, not determinations), in part. See "What this rewrites."
+
+### Why
+
+The screener quoted a checklist and led with a count of failures. Conversations with IQwallet made
+the underwriting question plain: not "how many items does this site miss" but "what is this
+business, actually." A checklist cannot tell a genuine research supplier with a missing
+registration gate apart from a consumer retailer that has added the right disclaimers. Only a
+reading of the whole site can. The checklist stays, as evidence. It no longer leads.
+
+### The model
+
+**Layer 1: Legality.** A short list of law, regulation and card-network violations. Any one
+observed means Mintro will not work with the merchant. Binary. No narrative. This list is smaller
+than the current auto_fail set; items that are program or solution conditions rather than legal
+ones move to Layer 2 or to routing.
+
+**Layer 2: Evaluation.** Angles lead. An angle is a question about the business together with the
+reasoning for why a research-only supplier and a consumer retailer would answer it differently
+(example: "call us for wholesale rates" implies the posted rates are retail). The AI reasons
+through each angle against the whole site, citing evidence: standards items, observations not
+bound to any rule, and inference. The result is a placement on a spectrum from consumer retail to
+unmistakable research supplier, with a reasoned position in between. Not a score, not a binary.
+
+**Outcome.** A recommendation with a path, in three parts:
+
+1. Where the business sits on the spectrum, and why.
+2. Where Mintro is comfortable placing it today: referred out (obviously not research-only;
+   Mintro will not board), international, or domestic.
+3. What would move it, in two labeled kinds:
+   - **Routing changes.** The specific solution conditions standing between this merchant and
+     domestic. Initial domestic conditions: customer registration gate; no bacteriostatic water,
+     needles or syringes; $150 minimum order; $70k or above; one further condition to be added.
+     International is more forgiving on these.
+   - **Shore-ups.** Changes that would make the business read stronger on either solution.
+     Judgment-heavy; the operator's hand matters most here.
+
+Routing conditions are called out plainly. A merchant who is obviously consumer retail gets the
+same memo, stated honestly: no shore-up moves them, and they should talk to someone else.
+
+**Pricing is never in the report.** No mention of cost differences between solutions. This is site
+evaluation, not a pricing conversation. Domestic conditions are presented as conditions, not as an
+offer.
+
+**Authorship.** The AI drafts. A Mintro operator reviews, edits and finalizes before anything
+leaves. Nothing reaches IQwallet or an agent unreviewed.
+
+**Audience.** The report goes to IQwallet or to the agent; the agent decides what reaches the
+merchant. Frank holds the IQwallet send until he is comfortable the merchant can be slotted
+domestic or international.
+
+### The line the AI must not cross
+
+Telling a research-leaning merchant which real solution conditions they are missing is legitimate.
+Telling a consumer-retail site how to look like a research supplier is not. The spectrum placement
+is what lets the system tell those two situations apart, and the routing/shore-up split must be
+applied only to merchants placed on the research side of the line.
+
+### What this rewrites
+
+D-001 held that Mintro observes and never determines. Under this record Mintro makes a
+determination, on business type, and owns it. Findings still describe what was observed; they now
+serve a conclusion instead of standing in for one. Copy that says Mintro "does not decide the
+outcome" is superseded and will be revised at design time.
+
+### What stays
+
+Multi-organization tenancy, the send path, hosted HTML report captures, the standards document
+(v1.1) and rule set 3.1.0 as the evidence vocabulary, and Documents Check. Rule set version, D-002
+run immutability and D-041 clause fidelity are untouched.
+
+### What goes dormant
+
+The merchant attestation and comment loop. It existed because manual rules needed merchant answers.
+Under angles, an unobservable item is either not evaluated or is a routing question the agent
+answers. The invitation flow, tokenized merchant links and attestation form are retained but leave
+the process. Removal is a separate decision.
+
+### Open inputs (Frank)
+
+- Fifth domestic condition.
+- Whether "$70k or above" is monthly volume.
+- Stefan's read on affiliate marketing: the standards prohibit it outright (§6, OFFS-001/007);
+  IQwallet's working description treats it as a signal. Decides whether the standards need a v1.2.
+
+### Next
+
+Sort the current 16 auto_fail rules into Layer 1, Layer 2 evidence, and routing (Claude drafts,
+Frank ratifies). Then design the angle set. Then design the report.
