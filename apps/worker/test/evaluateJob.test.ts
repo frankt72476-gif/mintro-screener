@@ -553,3 +553,53 @@ describe('token usage is carried off the response', () => {
   });
 });
 
+describe('a rejected draft reports what it cost', () => {
+  /*
+    The first real generation against run 9011b2d7 was rejected twice and the row recorded no
+    spend, so "what did this run cost" had no answer. Two full generations is not free, and a
+    refusal that hides the bill is the same shape as an outcome that hides its reason.
+  */
+  it('carries the usage from the last answer', async () => {
+    const bad = validDraft();
+    const invalid = { ...bad, placement: { ...bad.placement, citations: [] } };
+    let call = 0;
+    const impl = (async () => {
+      call += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 21_000, output_tokens: 1_000 * call },
+          content: [{ type: 'text', text: JSON.stringify(invalid) }],
+        }),
+        text: async () => '',
+      };
+    }) as unknown as typeof fetch;
+
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+    expect(result.status).toBe('rejected');
+    // The second attempt's usage, not the first: what it cost last is what the row should say.
+    expect(result.usage).toEqual({ inputTokens: 21_000, outputTokens: 2_000 });
+  });
+
+  it('carries usage onto a cut-off too, with the effort that produced it', async () => {
+    const impl = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        stop_reason: 'max_tokens',
+        usage: { input_tokens: 20_000, output_tokens: 32_000 },
+        content: [{ type: 'text', text: '{"placement"' }],
+      }),
+      text: async () => '',
+    })) as unknown as typeof fetch;
+
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+    expect(result.status).toBe('failed');
+    expect(result.usage).toEqual({ inputTokens: 20_000, outputTokens: 32_000 });
+    expect(result.message).toContain('output tokens spent');
+    expect(result.message).toContain('effort');
+  });
+});
+

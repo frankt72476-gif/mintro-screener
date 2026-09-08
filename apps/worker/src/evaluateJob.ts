@@ -51,8 +51,47 @@ import {
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
-const MAX_ANSWER_TOKENS = 8_000;
-const TIMEOUT_MS = 180_000;
+/**
+ * Room for the document **and the thinking that precedes it**.
+ *
+ * Two cut-offs at 8,000 and then 16,000 tokens looked like a ceiling problem and were not.
+ * `claude-opus-5` runs **adaptive thinking by default** — unlike Opus 4.8 and 4.7, omitting the
+ * `thinking` parameter does not mean thinking is off — and those tokens count against `max_tokens`
+ * while coming back as blocks whose text is empty (`display` defaults to `omitted`). So the budget
+ * was being spent on reasoning before the answer began, and raising it without lowering `effort`
+ * would have bought more reasoning rather than more document.
+ *
+ * The document itself is a few thousand tokens: seven angle paragraphs, five routing rows, a
+ * placement, a legality block, any shore-ups, and citation arrays that are verbose in a way prose
+ * is not. The rest of this is headroom for the reasoning.
+ */
+const MAX_ANSWER_TOKENS = 32_000;
+
+/**
+ * How hard the model thinks before writing.
+ *
+ * Default is `high`. Lowered here because the reasoning this task needs is *reading* — weighing
+ * evidence that is already laid out under each angle — rather than the open-ended search `high`
+ * exists for, and at `high` the thinking was consuming the whole answer budget.
+ *
+ * **Not** `thinking: {type: 'disabled'}`. Turning thinking off on this model is documented to leak
+ * `<thinking>` tags into the visible response and to write tool calls into text; lowering effort
+ * gets the same saving without either. The trade is recorded rather than tuned by feel: if drafts
+ * come back thin, this moves before `max_tokens` does.
+ */
+const ANSWER_EFFORT = 'medium';
+/**
+ * How long one call may take, measured rather than guessed.
+ *
+ * 180s was the first guess and it was too short: the first generation with room for the whole
+ * document was aborted mid-answer. Seven reasoned paragraphs over twenty-odd pages of page text is
+ * minutes of work, not seconds — the eye test's 22-second read is a poor guide to it, because that
+ * one answers fourteen closed questions and this one writes an argument.
+ *
+ * The abort is not free either way: it costs the whole call and stores nothing. A generous ceiling
+ * risks a slow call; a tight one guarantees a wasted one.
+ */
+const TIMEOUT_MS = 540_000;
 
 /** One retry, and only one. A second rejection is an answer about the draft, not a transient fault. */
 export const MAX_ATTEMPTS = 2;
@@ -306,6 +345,14 @@ export async function generateDraft(
 
   let retry: string | undefined;
   let lastMessage = '';
+  /*
+    The usage from the most recent answer, carried out of the loop.
+
+    A rejected draft cost real tokens — two full generations, in the case that produced this
+    comment — and a row that records the refusal without the spend cannot answer "what did this
+    run cost". Attached to every terminal result that had an answer, not just the accepted one.
+  */
+  let lastUsage: EvaluateResult['usage'];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const prompt = promptFor(angles, ruleset, inputs, retry);
@@ -325,6 +372,12 @@ export async function generateDraft(
         body: JSON.stringify({
           model,
           max_tokens: MAX_ANSWER_TOKENS,
+          /*
+            Effort, not a thinking budget. `budget_tokens` is rejected outright on this model
+            family, and `output_config.effort` is the control that replaced it. Sent explicitly
+            because the default is `high` and the default is what exhausted two answer budgets.
+          */
+          output_config: { effort: ANSWER_EFFORT },
           messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         }),
       });
@@ -350,13 +403,37 @@ export async function generateDraft(
       clearTimeout(timer);
     }
 
+    const reportedUsage = (payload as {
+      usage?: { input_tokens?: number; output_tokens?: number };
+    }).usage;
+    const usage =
+      reportedUsage === undefined
+        ? undefined
+        : {
+            inputTokens: reportedUsage.input_tokens ?? 0,
+            outputTokens: reportedUsage.output_tokens ?? 0,
+          };
+
+    if (usage !== undefined) lastUsage = usage;
+
     const stopReason = (payload as { stop_reason?: unknown }).stop_reason;
     if (stopReason === 'max_tokens') {
+      /*
+        The usage travels with the refusal, deliberately.
+
+        Two cut-offs were diagnosed as a ceiling that was too low when the real cause was thinking
+        eating the budget at the default effort. A failure that says how many output tokens were
+        spent is the difference between reading that and guessing at it.
+      */
       return {
         ...base,
         status: 'failed',
         attempts: attempt,
-        message: `the answer was cut off at ${MAX_ANSWER_TOKENS} tokens before the document was complete`,
+        message:
+          `the answer was cut off at ${MAX_ANSWER_TOKENS} tokens before the document was complete ` +
+          `(effort ${ANSWER_EFFORT}` +
+          (usage === undefined ? ')' : `, ${usage.outputTokens} output tokens spent)`),
+        ...(usage === undefined ? {} : { usage }),
       };
     }
 
@@ -369,28 +446,20 @@ export async function generateDraft(
 
     const validation = validateDraft(draft, run);
     if (validation.ok) {
-      const reported = (payload as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
-      return {
-        ...base,
-        status: 'ok',
-        attempts: attempt,
-        draft,
-        ...(reported === undefined
-          ? {}
-          : {
-              usage: {
-                inputTokens: reported.input_tokens ?? 0,
-                outputTokens: reported.output_tokens ?? 0,
-              },
-            }),
-      };
+      return { ...base, status: 'ok', attempts: attempt, draft, ...(usage === undefined ? {} : { usage }) };
     }
 
     lastMessage = rejectionMessage(validation.rejections);
     retry = lastMessage;
   }
 
-  return { ...base, status: 'rejected', attempts: MAX_ATTEMPTS, message: lastMessage };
+  return {
+    ...base,
+    status: 'rejected',
+    attempts: MAX_ATTEMPTS,
+    message: lastMessage,
+    ...(lastUsage === undefined ? {} : { usage: lastUsage }),
+  };
 }
 
 /**
