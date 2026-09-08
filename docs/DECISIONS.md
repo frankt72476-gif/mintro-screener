@@ -16851,3 +16851,80 @@ uncited-sentence rule every sentence of it had to be bracketed — a fully marke
 badly and blunts the marker, whose whole value is telling marked from unmarked. The angle citation
 is the fix: it gives the placement real backing rather than an exemption, and it is the thing the
 memo asked for in the first place. Nothing here is deferred.
+
+### Amendment — the price scope was drawn in the wrong place, and citations are constrained rather than checked
+**2026-09-09 · business owner**
+
+Both changes come from the first generation that ran far enough to produce a document. Neither was
+visible from the tests, because both are about what a real model does with a real run.
+
+#### The price rule refused a legitimate shore-up
+
+The draft proposed removing the merchant's bundle discounts. The validator refused it for the word
+`discount`, and refused it again on the retry.
+
+That is the rule working against its own purpose. **A shore-up is by definition a change to the
+merchant's own commerce** — "remove the bundle discounts", "raise the minimum order" — so it needs
+exactly the vocabulary angle 3 was already exempted for. What D-256 forbids is the cost of Mintro's
+solutions travelling in a site evaluation, and a merchant's own discount is not that.
+
+The list splits in two:
+
+- **`MINTRO_COST_WORDS`** — price, pricing, cost, costs, fee, fees, basis point, basis points, bps,
+  cheaper, expensive. Refused in `placement`, `routing` **and** `shoreUps`. No section has a
+  legitimate use for what Mintro charges.
+- **`MERCHANT_COMMERCE_WORDS`** — rate, rates, discount. Refused in `placement` and `routing` only.
+  Those two say where Mintro will place a merchant, and a stray "discount" there is far more likely
+  to be about a solution than about a storefront. Permitted in `shoreUps` and in angle paragraphs,
+  where the subject is the storefront.
+
+The refusal message now names which of the two applies, so a retry can act on the difference rather
+than removing the word and hoping.
+
+#### A fabricated citation is now unrepresentable, not merely refused
+
+The same draft cited finding `fdd0000-0000`. That is not a truncated id or a near-miss — it is a
+made-up string in the shape of one, and the model produced it again on the retry after being told
+in plain words that it did not exist.
+
+`validateDraft` caught it both times, which is the system working as designed. But catching a
+fabrication twice costs two full generations and ends with no draft, and no prose instruction is
+going to fix it: the model is not disobeying, it is confabulating an identifier.
+
+**The answer schema is now built from the run.** `output_config.format` carries a JSON schema whose
+citation `ref` fields are **enums of the ids this run actually holds** — finding ids, evidence keys,
+eye-test item ids, and (placement only) angle ids. A fabricated id is not a rejected answer; it is
+not an expressible one.
+
+Also carried by the schema: exactly the angles and routing conditions the angle set declares, at
+most **six** shore-ups, a `~120 word` paragraph guidance, and `additionalProperties: false`
+throughout so an invented field is refused rather than ignored.
+
+**An empty list is omitted, never emitted as an empty enum.** `enum: []` matches nothing, so a run
+with no eye test would make every citation of that kind impossible to express *and* impossible to
+explain. Each branch is dropped when its list is empty. (This trap was written into the module's own
+docblock and then left in its legality block; a test that looked for empty enums *everywhere* rather
+than only where one was expected found it.)
+
+#### `validateDraft` stays, and the division is the point
+
+The schema constrains **shape**. The validator enforces **meaning**, and nothing in JSON Schema can
+state:
+
+- that a placement must name two **distinct** angles;
+- that shore-ups are forbidden on a consumer-side placement;
+- that legality failing fixes the recommendation at `referred_out`;
+- that a paragraph citing nothing must be inference-marked;
+- that a price word belongs to one scope and not another.
+
+Those are relations between fields, and facts about the run. They are what make the document honest
+rather than merely well-formed. Two guards, and the cheap one runs first.
+
+#### A note on the model, recorded because it cost three runs
+
+`claude-opus-5` runs **adaptive thinking by default** — omitting the `thinking` parameter does not
+mean thinking is off, as it did on Opus 4.8 and 4.7 — and those tokens count against `max_tokens`
+while returning as blocks whose text is empty. Two generations were cut off and diagnosed as a
+ceiling that was too low; raising it bought more reasoning, not more document. The fix is
+`output_config.effort`, not `max_tokens`, and every terminal outcome now records its token spend so
+the next reader of a cut-off can see where the budget went instead of guessing.

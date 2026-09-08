@@ -40,6 +40,7 @@ import {
   type PromptFinding,
   type PromptInputs,
 } from './evaluationPrompt.js';
+import { draftSchema } from './evaluationSchema.js';
 import {
   orderPages,
   readPages,
@@ -340,6 +341,8 @@ export async function generateDraft(
 
   const model = options.model ?? angles.model;
   const run = runContextFor(angles, inputs);
+  const spectrum = angles.spectrum.map((entry) => entry.id);
+  const placements = [...angles.placements];
   const doFetch = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
 
@@ -377,7 +380,16 @@ export async function generateDraft(
             family, and `output_config.effort` is the control that replaced it. Sent explicitly
             because the default is `high` and the default is what exhausted two answer budgets.
           */
-          output_config: { effort: ANSWER_EFFORT },
+          output_config: {
+            effort: ANSWER_EFFORT,
+            /*
+              The ids a citation may carry are enums of what this run holds, so a fabricated one is
+              unrepresentable rather than refused after the fact. `validateDraft` still runs: this
+              constrains shape, that enforces meaning, and only the second can say a shore-up does
+              not belong on a consumer-side placement.
+            */
+            format: { type: 'json_schema', schema: draftSchema(run, spectrum, placements) },
+          },
           messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         }),
       });

@@ -10,6 +10,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  MERCHANT_COMMERCE_WORDS,
+  MINTRO_COST_WORDS,
+  PRICE_SCOPES,
+  PRICE_WORDS,
   rejectionMessage,
   sentencesOf,
   hasInferenceMarker,
@@ -444,6 +448,74 @@ describe('price_word', () => {
       shoreUps: [{ text: 'A corporate entity statement would help.', citation: cite('f-001') }],
     }));
     expect(rejectionRules(draft)).not.toContain('price_word');
+  });
+
+  /*
+    The correction D-260's amendment makes. A shore-up is by definition a change to the merchant's
+    own commerce, so it needs that vocabulary — the first real generation drafted exactly this
+    sentence and the validator refused it for the word `discount`.
+  */
+  it("lets a shore-up name the merchant's own commerce", () => {
+    for (const text of [
+      'Removing the bundle discounts would read less like a consumer storefront.',
+      'A published chargeback rate would help.',
+      'The tiered discount rates are the clearest consumer signal on the site.',
+    ]) {
+      const draft = mutate((d) => ({ ...d, shoreUps: [{ text, citation: cite('f-001') }] }));
+      expect(rejectionRules(draft), text).not.toContain('price_word');
+    }
+  });
+
+  it("still refuses Mintro's own costs in a shore-up", () => {
+    for (const text of [
+      'The domestic solution costs less than the international one.',
+      'This would lower the fees on the account.',
+      'Domestic is cheaper once the gate is in place.',
+      'Worth about 40 basis points.',
+    ]) {
+      const draft = mutate((d) => ({ ...d, shoreUps: [{ text, citation: cite('f-001') }] }));
+      expect(rejectionRules(draft), text).toContain('price_word');
+    }
+  });
+
+  /*
+    Placement and routing keep both lists. They say where Mintro will place a merchant, and there a
+    stray "discount" is far more likely to be about a solution than about a storefront.
+  */
+  it("refuses the merchant's own commerce words in the placement", () => {
+    const draft = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, paragraph: 'The bundle discount structure decides this.' },
+    }));
+    expect(rejectionRules(draft)).toContain('price_word');
+  });
+
+  it('says which rule refused it, so a retry can act on the difference', () => {
+    const shoreUp = mutate((d) => ({
+      ...d,
+      shoreUps: [{ text: 'The domestic solution costs less.', citation: cite('f-001') }],
+    }));
+    const result = validateDraft(shoreUp, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections[0]?.message).toContain('what Mintro charges is never in the report');
+
+    const placement = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, paragraph: 'A discount decides this.' },
+    }));
+    const other = validateDraft(placement, RUN);
+    expect(other.ok).toBe(false);
+    if (other.ok) return;
+    expect(other.rejections[0]?.message).toContain('where Mintro will place a merchant');
+  });
+
+  it('keeps the two lists disjoint and their union whole', () => {
+    const overlap = MINTRO_COST_WORDS.filter((w) => (MERCHANT_COMMERCE_WORDS as readonly string[]).includes(w));
+    expect(overlap).toEqual([]);
+    expect(PRICE_WORDS).toHaveLength(MINTRO_COST_WORDS.length + MERCHANT_COMMERCE_WORDS.length);
+    expect(PRICE_SCOPES.shoreUps).toEqual(MINTRO_COST_WORDS);
+    expect(PRICE_SCOPES.placement).toEqual(PRICE_WORDS);
   });
 });
 

@@ -106,11 +106,18 @@ function validDraft(): EvaluationDraft {
 }
 
 /** A fake Messages API returning the given bodies in order. */
-function fakeFetch(bodies: readonly unknown[]): { impl: typeof fetch; calls: string[] } {
+function fakeFetch(bodies: readonly unknown[]): {
+  impl: typeof fetch;
+  calls: string[];
+  requests: Record<string, any>[];
+} {
   const calls: string[] = [];
+  const requests: Record<string, any>[] = [];
   let index = 0;
   const impl = (async (_url: string, init?: { body?: string }) => {
-    calls.push(JSON.parse(init?.body ?? '{}').messages?.[0]?.content?.[0]?.text ?? '');
+    const sent = JSON.parse(init?.body ?? '{}');
+    requests.push(sent);
+    calls.push(sent.messages?.[0]?.content?.[0]?.text ?? '');
     const body = bodies[Math.min(index, bodies.length - 1)];
     index += 1;
     return {
@@ -123,7 +130,7 @@ function fakeFetch(bodies: readonly unknown[]): { impl: typeof fetch; calls: str
       text: async () => '',
     };
   }) as unknown as typeof fetch;
-  return { impl, calls };
+  return { impl, calls, requests };
 }
 
 describe('the prompt', () => {
@@ -600,6 +607,83 @@ describe('a rejected draft reports what it cost', () => {
     expect(result.usage).toEqual({ inputTokens: 20_000, outputTokens: 32_000 });
     expect(result.message).toContain('output tokens spent');
     expect(result.message).toContain('effort');
+  });
+});
+
+describe('the request carries the run-scoped schema', () => {
+  it('sends effort and a json_schema format together', async () => {
+    const { impl, requests } = fakeFetch([validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const config = requests[0]!['output_config'];
+    expect(config.effort).toBe('medium');
+    expect(config.format.type).toBe('json_schema');
+    expect(config.format.schema.type).toBe('object');
+  });
+
+  /*
+    The point of the whole change. The first real generation invented finding `fdd0000-0000` twice;
+    an enum of the run's own ids makes that unrepresentable rather than merely refused.
+  */
+  it('constrains citations to the ids this run holds', async () => {
+    const { impl, requests } = fakeFetch([validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const schema = requests[0]!['output_config'].format.schema;
+    const branches = schema.properties.angles.items.properties.citations.items.oneOf;
+    const finding = branches.find((b: any) => b.properties.kind.const === 'finding');
+    expect(finding.properties.ref.enum).toEqual(['f-001', 'f-002']);
+    expect(JSON.stringify(schema)).not.toContain('fdd0000-0000');
+  });
+
+  it('offers the angle citation on the placement and nowhere else', async () => {
+    const { impl, requests } = fakeFetch([validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const schema = requests[0]!['output_config'].format.schema;
+    const kinds = (node: any) => node.oneOf.map((b: any) => b.properties.kind.const);
+    expect(kinds(schema.properties.placement.properties.citations.items)).toContain('angle');
+    expect(kinds(schema.properties.angles.items.properties.citations.items)).not.toContain('angle');
+  });
+
+  it('caps shore-ups at six and fixes the seven angles', async () => {
+    const { impl, requests } = fakeFetch([validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const schema = requests[0]!['output_config'].format.schema;
+    expect(schema.properties.shoreUps.maxItems).toBe(6);
+    expect(schema.properties.angles.minItems).toBe(7);
+    expect(schema.properties.routing.minItems).toBe(5);
+  });
+
+  it('sends the same schema on the retry, so a rejection cannot widen it', async () => {
+    const bad = validDraft();
+    const invalid = { ...bad, placement: { ...bad.placement, citations: [] } };
+    const { impl, requests } = fakeFetch([invalid, validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(requests).toHaveLength(2);
+    expect(JSON.stringify(requests[1]!['output_config'])).toBe(
+      JSON.stringify(requests[0]!['output_config']),
+    );
+  });
+
+  /*
+    The schema is the cheap guard, not the only one. A model that returned a shape the schema
+    somehow admitted still meets the validator — here, shore-ups on a consumer placement.
+  */
+  it('still runs validateDraft over whatever comes back', async () => {
+    const bad = validDraft();
+    const consumerSide = {
+      ...bad,
+      placement: { ...bad.placement, spectrum: 'consumer_retail' },
+      shoreUps: [{ text: 'Add a gate.', citation: { kind: 'finding', ref: 'f-001' } }],
+    };
+    const { impl } = fakeFetch([consumerSide, consumerSide]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('rejected');
+    expect(result.message).toContain('consumer side');
   });
 });
 

@@ -22,10 +22,20 @@
  * subscriptions. What D-256 forbids is Mintro's cost of its own solutions travelling in a document
  * that is meant to be a site evaluation.
  *
- * So the word list is refused in `placement`, `routing` and `shoreUps` — the three sections that
- * describe what Mintro will do — and permitted inside an angle paragraph. A global ban would have
- * made angle 3 unwritable and the model would have worked around it in vaguer words, which is worse
- * than the thing the ban is for.
+ * So the rule is scoped by section, and by which vocabulary is at stake:
+ *
+ *   - **`placement` and `routing`** refuse both lists. These say where Mintro will place a
+ *     merchant, and a stray "discount" there is far more likely to be about a solution than about
+ *     a storefront.
+ *   - **`shoreUps`** refuses only what Mintro charges. A shore-up is by definition a change to the
+ *     merchant's own commerce — "remove the bundle discounts" is the whole point of one.
+ *   - **Angle paragraphs** refuse nothing. Angle 3's entire subject is the merchant's pricing
+ *     posture.
+ *
+ * A global ban would have made angle 3 unwritable and shore-ups toothless, and the model would have
+ * worked around it in vaguer words — worse than the thing the ban exists for. The shore-up half of
+ * this was learned the hard way: the first real generation drafted a shore-up naming the merchant's
+ * bundle discounts and the validator refused it (D-260, amended).
  */
 
 import type { PlacementId, SpectrumId } from '@mintro/ruleset';
@@ -167,13 +177,12 @@ export const INFERENCE_OPEN = '[inference:';
 const INFERENCE_PATTERN = /\[inference:[^\]]*\]/g;
 
 /**
- * Words that may not appear in the sections describing what Mintro will do.
+ * What Mintro's own solutions cost. Refused in every section that has one.
  *
- * `rate`, `rates` and `discount` are the three that carry an ordinary non-pricing sense — a
- * chargeback rate, a discount a merchant offers its own customers — which is exactly why the list
- * is scoped rather than global. See the file docblock.
+ * This is what D-256 actually forbids: the cost of one Mintro solution against another, travelling
+ * in a document meant to be a site evaluation. No section has a legitimate use for it.
  */
-export const PRICE_WORDS = [
+export const MINTRO_COST_WORDS = [
   'price',
   'pricing',
   'cost',
@@ -185,12 +194,39 @@ export const PRICE_WORDS = [
   'bps',
   'cheaper',
   'expensive',
-  'rate',
-  'rates',
-  'discount',
 ] as const;
 
-/** The sections the price rule applies to. Angle paragraphs are deliberately absent (D-256). */
+/**
+ * Words about the **merchant's own** commerce, which are a different thing (D-260, amended).
+ *
+ * A chargeback rate and a discount a merchant offers its customers are observations about the
+ * business, not statements about what Mintro charges.
+ *
+ * **The correction this encodes.** The first real generation drafted a shore-up naming the
+ * merchant's bundle discounts, and the validator refused it for the word `discount`. That is the
+ * rule working against its own purpose: a shore-up is by definition a change to the merchant's own
+ * commerce, so it needs this vocabulary for the same reason angle 3 does. They stay refused in
+ * `placement` and `routing`, where the subject is where Mintro will put a merchant and a stray
+ * "discount" is far more likely to be about a solution than about a storefront.
+ */
+export const MERCHANT_COMMERCE_WORDS = ['rate', 'rates', 'discount'] as const;
+
+/** Every refused word, for callers that want the union. */
+export const PRICE_WORDS = [...MINTRO_COST_WORDS, ...MERCHANT_COMMERCE_WORDS] as const;
+
+/**
+ * What each section may not say. Angle paragraphs are absent entirely (D-256).
+ *
+ *   `placement`, `routing` — both lists. These state where Mintro will place a merchant.
+ *   `shoreUps`             — Mintro's costs only. The merchant's own commerce is the subject.
+ */
+export const PRICE_SCOPES = {
+  placement: PRICE_WORDS,
+  routing: PRICE_WORDS,
+  shoreUps: MINTRO_COST_WORDS,
+} as const satisfies Record<string, readonly string[]>;
+
+/** The sections the price rule applies to at all. */
 export const PRICE_SCOPED_SECTIONS = ['placement', 'routing', 'shoreUps'] as const;
 
 export interface DraftRejection {
@@ -248,9 +284,9 @@ function citationExists(citation: Citation, run: RunContext): boolean {
   return run.eyeTestItemIds.has(citation.ref);
 }
 
-function priceWordsIn(text: string): readonly string[] {
+function priceWordsIn(text: string, words: readonly string[]): readonly string[] {
   const lower = text.toLowerCase();
-  return PRICE_WORDS.filter((word) => new RegExp(`\\b${word}\\b`, 'i').test(lower));
+  return words.filter((word) => new RegExp(`\\b${word}\\b`, 'i').test(lower));
 }
 
 /**
@@ -323,14 +359,18 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     );
   };
 
-  const checkPrice = (text: string, at: string): void => {
-    const found = priceWordsIn(text);
+  const checkPrice = (text: string, at: string, section: keyof typeof PRICE_SCOPES): void => {
+    const found = priceWordsIn(text, PRICE_SCOPES[section]);
     if (found.length === 0) return;
+    const why =
+      section === 'shoreUps'
+        ? "what Mintro charges is never in the report, though the merchant's own commerce may be named here"
+        : "this section says where Mintro will place a merchant, so neither Mintro's costs nor the merchant's own belong in it";
     reject(
       'price_word',
       at,
       `mentions ${found.map((w) => `'${w}'`).join(', ')}. This is a site evaluation, not a pricing ` +
-        'conversation (D-256); the price words are refused in placement, routing and shoreUps.',
+        `conversation (D-256): ${why}.`,
     );
   };
 
@@ -366,7 +406,7 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     paragraph that read badly and blunted the marker, whose value is telling marked from unmarked.
   */
   checkParagraph(draft.placement.paragraph, draft.placement.citations, 'placement.paragraph');
-  checkPrice(draft.placement.paragraph, 'placement.paragraph');
+  checkPrice(draft.placement.paragraph, 'placement.paragraph', 'placement');
 
   /*
     Legality overrides the recommendation, and the draft is still written.
@@ -445,7 +485,7 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
   draft.shoreUps.forEach((shoreUp, index) => {
     const at = `shoreUps[${index}]`;
     checkCitations([shoreUp.citation], `${at}.citation`);
-    checkPrice(shoreUp.text, `${at}.text`);
+    checkPrice(shoreUp.text, `${at}.text`, 'shoreUps');
   });
 
   /*
