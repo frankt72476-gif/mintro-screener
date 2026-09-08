@@ -16608,3 +16608,100 @@ carries one; the legality set is exactly the six ids above; the routing set is e
 The two closed sets are pinned in the validator rather than left to the data because they are the
 ratified lists, not a shape — a seventh legality rule arriving by edit is a business decision, and
 it should fail the build until it has a decision number.
+
+### Amendment — the IQwallet blocking flags are superseded, and routing is weighted
+**2026-09-09 · business owner**
+
+Ruleset `3.8.0` → `3.9.0`, `effective` unchanged. Cluster 2, before the draft generator reads the
+file.
+
+**The `blocking` flags are superseded.** Eight rules were flagged `blocking: true` with
+`blocking_source: {authority: "IQwallet", ruled_on: "2026-08-28"}` under D-161, and GATE-003 under
+D-178 on 2026-08-29. Frank's September conversations with IQwallet supersede both dates. Syringes
+(CATG-001), alcohol wipes (CATG-002), guest checkout (GATE-003) and therapeutic categories
+(NAME-001) are **heavy** — they weigh more than an ordinary observation and they are the difference
+between a catalogue that reads consumer and one that does not — but they are **not disqualifying**.
+None of them ends an evaluation. The first three are routing conditions, carrying `weight: heavy`
+under the change below; NAME-001 is evidence and was already heavy.
+
+**`blocking` and `blocking_source` stay in the data, as history.** They are not deleted and not
+edited. They record what IQwallet said in August and when, which is the kind of thing that must
+survive being overtaken — a flag removed leaves no trace that it was ever set, and the August
+position is part of how the September one is understood. **The evaluation model does not read
+either field.** Nothing in the draft generator, the angle set or the placement may consult them;
+what a rule contributes is decided by `evaluation_tier` and `weight` and by nothing else. The
+existing report's stopping-conditions panel is unaffected and keeps reading them, because that is
+a different document answering a different question.
+
+**Routing-tier rules carry a weight.** The original record put `weight` on evidence alone, reasoning
+that a routing rule "names a condition" and so is not weighed. That was wrong in the direction that
+matters: the seven routing conditions are not equally consequential, and flattening them lost the
+difference between a catalogue selling syringes and a site whose affiliate page is untidy. Both are
+conditions; only one moves where a merchant can be placed.
+
+- **routing, heavy** — CATG-001, CATG-002, GATE-003.
+- **routing, ordinary** — GATE-002, CATG-005, OFFS-001, OFFS-007.
+
+Legality stays bare. A legality item observed ends the evaluation, so there is nothing for a weight
+to modulate and a number there would be one nothing reads. The validator refuses it.
+
+**Three evidence rules become heavy**: PROD-011 (benefit claims in body copy), PROD-013 (body copy
+addressing a human user), CATG-008 (GLP-1 receptor agonists). All three were `ordinary` by the
+catch-all rather than by a decision.
+
+**$70k is monthly volume.** D-256 left this open. The domestic condition reads as monthly
+processing volume, not annual.
+
+### The PROD-008 term split
+
+PROD-008 is the only `legality` rule with a text matcher, so what it matches is what ends an
+evaluation. It keeps **treat, cure, prevent, disease, diagnose** and the matcher's derived forms.
+`diagnose` is added because the standards sentence PROD-008 quotes names diagnosis and no term
+reached it.
+
+Six terms — **heal, recovery, therapy, therapeutic, symptom, injury** — move to a new rule.
+
+**PROD-017 — Implied therapeutic language.** `source: mintro`, `text_match`, `evidence` / `heavy`,
+`tier: review_only`, `sev: major`, `cat: product`, `layer: 2`. Same `surface: all_sampled` and
+`word_boundary: true` as PROD-008, because only the reader changed, not the terms. Clause,
+Mintro-authored:
+
+> Body copy that frames a compound in terms of healing, recovery, therapy or injury implies a
+> therapeutic purpose without stating a disease.
+
+`review_only` and heavy together: a research storefront writes *recovery* about a sample and
+*therapy* about a citation, so this is a sentence a person reads rather than a state a check
+decides — and a cluster of these is what a consumer-facing site looks like, which is more than an
+ordinary observation carries.
+
+**PROD-012 loses `recovery`**, leaving `performance` and `longevity`. It asked whether the
+vocabulary was ambiguous; PROD-017 answers that question for this word, and listing it in both
+would report one sentence twice under two headings.
+
+**No `source: programme` clause changed.** PROD-008 keeps the sentence it quotes byte for byte and
+loses only terms, so the corpus stays at 53 lines against 52 programme rules and D-041 is untouched.
+This is what D-259 deferred to cluster 2, now done with the standards sentence in hand.
+
+**A limit of the matcher, recorded rather than assumed.** `diagnose` ends in a silent `e`, so
+`termPattern` takes it to *diagnoses*, *diagnosed* and *diagnosing* — and **not** to *diagnosis* or
+*diagnostic*. No suffix in `INFLECTIONS` or `ELIDED` produces either. GATE-007 reaches them with the
+stem `diagnos`; PROD-008 does not, and whether it should is a separate ruling.
+
+### bacteriostatic-water leaves the benign sampling list
+
+`sampling.benign_compounds.from_ruleset` drops `bacteriostatic-water`, leaving `bpc-157` and
+`tb-500`.
+
+CATG-005 is a routing rule, and **a routing condition cannot be observed on a page the sampler
+declined to render**. Being recognised as an ordinary compound is exactly what was sending that page
+to the bottom of the sample under D-223 — so the one page the routing tier needs looked at was the
+one page guaranteed not to be. This does not weaken D-223: an unrecognised slug is still sampled
+ahead of a recognised one, and the list is one entry shorter, which costs a render and never a
+blind spot.
+
+### The validator, amended
+
+`weight` is now required on `evidence` **and** `routing`, and refused on `legality`. The rule is
+stated once as `WEIGHTED_TIERS` in `vocabulary.ts` so the two invariants cannot drift into
+disagreeing about it. The ratified legality and routing **membership** is unchanged — six and seven,
+the same ids — so `ratified.ts` needs no edit; PROD-017 is evidence and joins neither closed set.

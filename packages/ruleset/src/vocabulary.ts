@@ -55,14 +55,33 @@ export const EVALUATION_TIERS = ['legality', 'routing', 'evidence'] as const;
 export type EvaluationTier = (typeof EVALUATION_TIERS)[number];
 
 /**
- * How much an evidence rule carries when an angle cites it (D-259).
+ * How much a rule carries when an angle cites it (D-259, amended 2026-09-09).
  *
- * Evidence-tier rules only. A `legality` or `routing` rule carries no weight because neither is
- * weighed — the first ends the evaluation and the second names a condition — so a weight on one
- * would be a number nothing reads, and `invariants.ts` refuses it.
+ * **Evidence and routing tiers. Never legality.** The original ruling put weight on evidence
+ * alone, on the reasoning that a routing rule "names a condition" and so is not weighed. The
+ * amendment found that wrong in the direction that matters: the routing conditions are not equally
+ * consequential, and flattening them lost the difference between a catalogue selling syringes and
+ * one whose affiliate page is untidy. Both are conditions; only one changes where a merchant can
+ * be placed.
+ *
+ * Legality stays bare, and that is not symmetry for its own sake. A legality item observed ends
+ * the evaluation — there is nothing for a weight to modulate, so a number there would be one
+ * nothing reads, and `invariants.ts` refuses it.
  */
 export const RULE_WEIGHTS = ['heavy', 'ordinary'] as const;
 export type RuleWeight = (typeof RULE_WEIGHTS)[number];
+
+/**
+ * The tiers that carry a weight. The complement of this is exactly `legality`.
+ *
+ * Named rather than written as `!== 'legality'` at each site, so the rule is stated once and the
+ * two invariants below cannot drift into disagreeing about it.
+ */
+export const WEIGHTED_TIERS = ['evidence', 'routing'] as const;
+
+export function tierCarriesWeight(tier: EvaluationTier): boolean {
+  return (WEIGHTED_TIERS as readonly string[]).includes(tier);
+}
 
 /**
  * The ratified legality and routing sets, pinned here rather than left to the data (D-259).

@@ -1,5 +1,5 @@
 {
-  "version": "3.8.0",
+  "version": "3.9.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -237,6 +237,7 @@
       "type": "http_probe",
       "tier": "auto_fail",
       "evaluation_tier": "routing",
+      "weight": "ordinary",
       "title": "Products hidden until an account exists",
       "clause": "Before shopping for or purchasing any product, a visitor must set up an account, provide the institution they are affiliated with, and electronically acknowledge that everything sold on the site is intended for research use.",
       "subject": "products are hidden until an account exists",
@@ -265,6 +266,7 @@
       "type": "flow_probe",
       "tier": "auto_fail",
       "evaluation_tier": "routing",
+      "weight": "heavy",
       "title": "Guest checkout disabled",
       "clause": "There is no anonymous path to purchase. Guest checkout must be turned off entirely.",
       "subject": "guest checkout is disabled",
@@ -656,16 +658,11 @@
           "treat",
           "cure",
           "prevent",
-          "heal",
-          "recovery",
-          "therapy",
-          "therapeutic",
-          "symptom",
-          "injury",
-          "disease"
+          "disease",
+          "diagnose"
         ],
         "expect": "absent",
-        "note": "High false-positive rate. Review only. 'condition' was removed in D-159: it is a disease word and a legal-boilerplate word, and every storefront's footer carries 'Terms & Conditions'. A real claim about a condition is caught by 'treat' or 'cure' in the same sentence.",
+        "note": "Explicit disease claims only, since D-259's amendment. 'heal', 'recovery', 'therapy', 'therapeutic', 'symptom' and 'injury' moved to PROD-017 so that the legality tier matches explicit claims and nothing else — a legality item ends an evaluation, and implied therapeutic framing is not the kind of thing that should. 'diagnose' joins here because the standards sentence names diagnosis and no term reached it. Note the matcher takes 'diagnose' to 'diagnoses', 'diagnosed' and 'diagnosing' by the silent-e rule, and does NOT reach 'diagnosis' or 'diagnostic': no suffix in INFLECTIONS or ELIDED produces them. 'condition' was removed in D-159: it is a disease word and a legal-boilerplate word, and every storefront's footer carries 'Terms & Conditions'. A real claim about a condition is caught by 'treat' or 'cure' in the same sentence.",
         "word_boundary": true
       }
     },
@@ -816,6 +813,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "evaluation_tier": "routing",
+      "weight": "heavy",
       "title": "No needles or syringes",
       "clause": "Offering injection supplies next to peptides is itself evidence of intended injection.",
       "subject": "the catalogue offers needles or syringes",
@@ -844,6 +842,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "evaluation_tier": "routing",
+      "weight": "heavy",
       "title": "No alcohol wipes",
       "clause": "Their obvious purpose is preparing an injection site, which places the sale in a human-injection context.",
       "subject": "the catalogue offers alcohol wipes",
@@ -931,6 +930,7 @@
       "type": "text_match",
       "tier": "review_only",
       "evaluation_tier": "routing",
+      "weight": "ordinary",
       "title": "Reconstitution solution labelling",
       "clause": "Bacteriostatic water is permitted when it carries the label “Reconstitution Solution for Laboratory Use.” Keep injection language off the listing, and attach no pharmaceutical brand names such as Pfizer or Hospira.",
       "subject": "bacteriostatic water is labelled as a reconstitution solution for laboratory use",
@@ -1044,7 +1044,7 @@
       "type": "url_pattern",
       "tier": "review_only",
       "evaluation_tier": "evidence",
-      "weight": "ordinary",
+      "weight": "heavy",
       "title": "GLP-1 receptor agonists in the catalogue",
       "clause": "IQwallet has stated that GLP-1 receptor agonists are a boarding blocker for this programme. The published standards do not name them. This rule reports which of them the catalogue lists and names each one, matching both the chemical names and the coded slugs merchants use in their place.",
       "subject": "the catalogue lists GLP-1 receptor agonists",
@@ -1294,6 +1294,7 @@
       "type": "url_pattern",
       "tier": "auto_fail",
       "evaluation_tier": "routing",
+      "weight": "ordinary",
       "title": "No affiliate or referral program URLs",
       "clause": "Do not operate an affiliate or referral program.",
       "subject": "the site carries affiliate or referral program URLs",
@@ -1391,6 +1392,7 @@
       "type": "dom_assert",
       "tier": "review_only",
       "evaluation_tier": "routing",
+      "weight": "ordinary",
       "title": "Affiliate program linked from the homepage",
       "clause": "Do not operate an affiliate or referral program.",
       "subject": "the homepage links to an affiliate program",
@@ -1576,7 +1578,7 @@
       "type": "text_match",
       "tier": "auto_fail",
       "evaluation_tier": "evidence",
-      "weight": "ordinary",
+      "weight": "heavy",
       "title": "Benefit claims in product body copy",
       "clause": "Body copy on a product page describes an outcome a buyer would experience. NAME-001 and NAME-002 report the same claim types in product names and category names; this reports them in the prose.",
       "subject": "product body copy makes benefit claims",
@@ -1613,13 +1615,12 @@
       "params": {
         "surface": "all_sampled",
         "terms": [
-          "recovery",
           "performance",
           "longevity"
         ],
         "expect": "absent",
         "word_boundary": true,
-        "note": "Split from PROD-011 rather than weakening it (D-177). Each of these has a routine non-claim use on a research storefront — assay performance, sample recovery, reagent longevity — so a hit is a sentence somebody reads, never a state this rule decides. Constraint 4: the tier is the whole reason the split exists."
+        "note": "Split from PROD-011 rather than weakening it (D-177). Each of these has a routine non-claim use on a research storefront — assay performance, reagent longevity — so a hit is a sentence somebody reads, never a state this rule decides. Constraint 4: the tier is the whole reason the split exists. 'recovery' left this list under D-259's amendment and is now PROD-017's, which reports the same word against a different question: not whether the vocabulary is ambiguous, but whether the copy frames the compound therapeutically. Listing it in both would report one sentence twice under two headings."
       }
     },
     {
@@ -1630,7 +1631,7 @@
       "type": "text_match",
       "tier": "auto_fail",
       "evaluation_tier": "evidence",
-      "weight": "ordinary",
+      "weight": "heavy",
       "title": "Body copy addressing a human user",
       "clause": "Body copy addresses the reader as the person who will take the product. Distinct from dosing information (PROD-005) and disease claims (PROD-008), neither of which reaches this wording.",
       "subject": "product body copy addresses a human user",
@@ -1736,15 +1737,42 @@
       "params": {
         "reason": "Detected by text patterns in cluster 2; manual until then."
       }
+    },
+    {
+      "id": "PROD-017",
+      "cat": "product",
+      "layer": 2,
+      "sev": "major",
+      "type": "text_match",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "heavy",
+      "title": "Implied therapeutic language",
+      "clause": "Body copy that frames a compound in terms of healing, recovery, therapy or injury implies a therapeutic purpose without stating a disease.",
+      "subject": "product body copy implies a therapeutic purpose",
+      "source": "mintro",
+      "params": {
+        "surface": "all_sampled",
+        "terms": [
+          "heal",
+          "recovery",
+          "therapy",
+          "therapeutic",
+          "symptom",
+          "injury"
+        ],
+        "expect": "absent",
+        "word_boundary": true,
+        "note": "These six terms left PROD-008 under D-259's amendment so that the legality tier matches explicit claims only. They are the same words, read against a different question — PROD-008 asks whether a disease is claimed, this asks whether the copy reads as therapeutic without naming one. review_only and heavy: a research storefront writes 'recovery' about a sample and 'therapy' about a citation, so this is a sentence a person reads rather than a state a check decides, and it carries more than an ordinary observation because a cluster of these is what a consumer-facing site looks like. 'recovery' also left PROD-012, which asked whether the vocabulary was ambiguous; that question is answered here. Surface and word_boundary match PROD-008 deliberately: the terms did not change, only which rule reads them."
+      }
     }
   ],
   "sampling": {
     "benign_compounds": {
-      "note": "Slugs positively recognised as ordinary research compounds, and the ONLY category the sampler is allowed to skip. Everything else — including anything this list does not recognise — is sampled ahead of these, because 'we do not know what this is' is itself a reason to look (D-223). An incomplete list therefore costs a few extra renders and never costs a blind spot, which is why it is short and why it is only ever extended from evidence. Two grounded sources, and no third: compound names the rule set itself already names without prohibiting (NAME-003's map, CATG-005's subject), and plain single-compound slugs observed in a stored catalogue. Nothing here is recalled from general knowledge of peptide names — an entry nobody can trace is a page that silently stops being looked at. GLP-1 terms are excluded by construction and a test asserts it: CATG-008's vocabulary is the opposite of benign, and tz, rt and klow are the coined slugs that started this.",
+      "note": "Slugs positively recognised as ordinary research compounds, and the ONLY category the sampler is allowed to skip. Everything else — including anything this list does not recognise — is sampled ahead of these, because 'we do not know what this is' is itself a reason to look (D-223). An incomplete list therefore costs a few extra renders and never costs a blind spot, which is why it is short and why it is only ever extended from evidence. Two grounded sources, and no third: compound names the rule set itself already names without prohibiting (NAME-003's map, CATG-005's subject), and plain single-compound slugs observed in a stored catalogue. Nothing here is recalled from general knowledge of peptide names — an entry nobody can trace is a page that silently stops being looked at. GLP-1 terms are excluded by construction and a test asserts it: CATG-008's vocabulary is the opposite of benign, and tz, rt and klow are the coined slugs that started this. bacteriostatic-water was removed under D-259's amendment: CATG-005 is a routing rule, and a routing condition cannot be observed on a page the sampler declined to render. Being recognised as an ordinary compound is exactly what was sending it to the bottom of the sample, so the one entry the routing tier needs looked at was the one entry guaranteed not to be. from_ruleset is now grounded in NAME-003's map alone.",
       "from_ruleset": [
         "bpc-157",
-        "tb-500",
-        "bacteriostatic-water"
+        "tb-500"
       ],
       "from_catalogue": [
         "5-amino-1mq",

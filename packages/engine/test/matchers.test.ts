@@ -201,10 +201,51 @@ describe('PROD-008 — disease claims', () => {
   });
 
   it('quoted literature is neither a claim nor a clean result', () => {
+    /*
+      The citation this was written against — "Therapeutic potential of BPC-157 in injury models" —
+      carries no PROD-008 term since D-259's amendment: `therapeutic` and `injury` are PROD-017's.
+      The property under test is attribution scoping, not which rule owns which word, so the
+      sentence is restated with terms PROD-008 still reads. The original sentence is exercised
+      against PROD-017 below, where it now belongs.
+    */
+    const cited = 'Sikiric P, et al. BPC-157 was reported to prevent lesions in a disease model. J. Biol. Chem. (2019).';
+    const scoped = scopeTerms(cited, terms, wb);
+    expect(termsAt(scoped, 'claim')).toEqual([]);
+    expect(termsAt(scoped, 'attributed').length).toBeGreaterThan(0);
+  });
+
+  it('no longer reads the six terms that moved to PROD-017', () => {
+    // The split is the point: a legality rule matches explicit claims only (D-259, amended).
+    for (const moved of ['heal', 'recovery', 'therapy', 'therapeutic', 'symptom', 'injury']) {
+      expect(terms, `${moved} is still on PROD-008`).not.toContain(moved);
+    }
+    expect(claimed('Supports recovery from injury and speeds healing.')).toEqual([]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   PROD-017 — the six terms that left PROD-008 (D-259, amended 2026-09-09)
+   ──────────────────────────────────────────────────────────────────────────────────────────── */
+describe('PROD-017 — implied therapeutic language', () => {
+  const rule = ruleFor('PROD-017') as RuleOfType<'text_match'>;
+  const terms = rule.params.terms ?? [];
+  const wb = rule.params.word_boundary === true;
+  const claimed = (text: string): string[] => termsAt(scopeTerms(text, terms, wb), 'claim');
+
+  it('reads the framing PROD-008 no longer does', () => {
+    expect(claimed('Supports recovery from injury and speeds healing.').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the attribution scoping the terms had on PROD-008', () => {
+    // The exact sentence this case was written for, now read by the rule that owns those words.
     const cited = 'Sikiric P, et al. Therapeutic potential of BPC-157 in injury models. J. Biol. Chem. (2019).';
     const scoped = scopeTerms(cited, terms, wb);
     expect(termsAt(scoped, 'claim')).toEqual([]);
     expect(termsAt(scoped, 'attributed').length).toBeGreaterThan(0);
+  });
+
+  it('is review_only, because a research storefront writes these words legitimately', () => {
+    expect(rule.tier).toBe('review_only');
   });
 });
 

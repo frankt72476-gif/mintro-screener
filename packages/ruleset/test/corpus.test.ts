@@ -134,6 +134,9 @@ describe('the committed rule set and the committed corpus', () => {
       // outcomes or lifestyle association — so the corpus stays at 53 lines and 52 programme rules.
       'PROD-015',
       'PROD-016',
+      // D-259's amendment. PROD-017 carries the six terms that left PROD-008; its clause is
+      // Mintro's own sentence about implied framing, which the standards do not contain.
+      'PROD-017',
     ]);
     for (const rule of mintro) expect(text).not.toContain(rule.clause);
   });

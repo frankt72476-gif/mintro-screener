@@ -14,6 +14,7 @@
 
 import type { Category, Rule, Ruleset } from './schema.js';
 import type { RulesetDefect } from './errors.js';
+import { WEIGHTED_TIERS, tierCarriesWeight } from './vocabulary.js';
 
 /** Check types that may never auto-fail, whatever the rule says. */
 const ALWAYS_REVIEW_ONLY = {
@@ -155,30 +156,34 @@ function checkRule(
     );
   }
 
-  // `weight` belongs to the evidence tier and to nothing else (D-259).
+  // `weight` belongs to the weighted tiers and to nothing else (D-259, amended 2026-09-09).
   //
-  // Both directions are defects, and neither is cosmetic. An evidence rule with no weight is a
+  // Both directions are defects, and neither is cosmetic. A weighted-tier rule with no weight is a
   // rule an angle cannot weigh, so it would be cited as though it were ordinary and nobody would
   // be told the difference — the heavy set is exactly the rules that must not be flattened. A
-  // legality or routing rule carrying a weight is the opposite error: it implies those tiers are
-  // weighed, when the first ends an evaluation outright and the second names a condition. A
-  // number nothing reads is worse than no number, because a later reader assumes something reads
-  // it.
-  if (rule.evaluation_tier === 'evidence' && rule.weight === undefined) {
+  // legality rule carrying a weight is the opposite error: it implies the tier is weighed, when a
+  // legality item observed ends the evaluation outright and there is nothing for a number to
+  // modulate. A number nothing reads is worse than no number, because a later reader assumes
+  // something reads it.
+  //
+  // Routing moved from the second case to the first in the amendment. The conditions are not
+  // equally consequential and flattening them lost the difference between a catalogue selling
+  // syringes and an untidy affiliate page.
+  if (tierCarriesWeight(rule.evaluation_tier) && rule.weight === undefined) {
     defects.push(
       defect(
         rule.id,
         at('weight'),
-        'an evidence rule must declare a weight (heavy | ordinary); an unweighted one would be cited as ordinary with nothing saying so',
+        `a ${rule.evaluation_tier} rule must declare a weight (heavy | ordinary); an unweighted one would be cited as ordinary with nothing saying so`,
       ),
     );
   }
-  if (rule.evaluation_tier !== 'evidence' && rule.weight !== undefined) {
+  if (!tierCarriesWeight(rule.evaluation_tier) && rule.weight !== undefined) {
     defects.push(
       defect(
         rule.id,
         at('weight'),
-        `weight is for the evidence tier only; a ${rule.evaluation_tier} rule is not weighed, found '${rule.weight}'`,
+        `weight is for the ${WEIGHTED_TIERS.join(' and ')} tiers only; a ${rule.evaluation_tier} rule is not weighed, found '${rule.weight}'`,
       ),
     );
   }

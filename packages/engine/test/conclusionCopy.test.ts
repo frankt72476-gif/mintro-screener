@@ -96,10 +96,18 @@ describe('the footer scored below a threshold, and the finding says so', () => {
   });
 });
 
-describe('three rules reading one page for different things say so', () => {
+describe('one page, and the rules that read it for different things', () => {
   /*
     All three matched `recovery` on `/shop/semax/` and all three said `Observed: 'recovery'.` — one
-    sentence, three questions, and a reader could only read it as one check disagreeing with itself.
+    sentence, three questions, and a reader could only read it as one check disagreeing with itself
+    (D-217).
+
+    D-259's amendment settles the overlap at the data rather than the copy. `recovery` and `injury`
+    are PROD-017's now: they left PROD-008 so the legality tier matches explicit claims only, and
+    `recovery` left PROD-012 because "is this vocabulary ambiguous" is the question PROD-017
+    already answers. So this body is read by one rule, and the other two correctly find nothing —
+    which is the outcome, not a gap. The D-217 property still has a subject: the rule that matches
+    names the question it asked.
   */
   const BODY =
     'Semax is studied in models of recovery following injury. ' +
@@ -107,23 +115,27 @@ describe('three rules reading one page for different things say so', () => {
 
   const noteOf = (id: string): string => checkTextMatch(ruleOf(id, 'text_match'), page(BODY)).note;
 
-  it('each names the question it asked', () => {
-    const notes = ['PROD-008', 'PROD-012'].map(noteOf);
-
-    for (const note of notes) expect(note).toContain('Read for whether ');
-    expect(new Set(notes).size).toBe(notes.length);
+  it('the rule that owns these words names the question it asked', () => {
+    expect(noteOf('PROD-017')).toContain('Read for whether ');
   });
 
   it('and still says what it observed', () => {
-    expect(noteOf('PROD-012')).toContain("Observed: 'recovery'");
+    expect(noteOf('PROD-017')).toContain("Observed: 'recovery'");
+  });
+
+  it('leaves PROD-008 and PROD-012 with nothing to report on this sentence', () => {
+    for (const id of ['PROD-008', 'PROD-012']) {
+      expect(noteOf(id), id).not.toContain("Observed: 'recovery'");
+    }
   });
 
   it('none of them reads as a conclusion', () => {
-    for (const id of ['PROD-008', 'PROD-012']) {
+    for (const id of ['PROD-008', 'PROD-012', 'PROD-017']) {
       expect(auditCopy(noteOf(id), FINDING_TERMS).clean, id).toBe(true);
     }
   });
 });
+
 
 describe('GATE-007 names its clauses, not its stems', () => {
   const TERMS = 'This site is for research use only. Products are not for human consumption.';

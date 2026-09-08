@@ -86,9 +86,18 @@ describe('rules/ruleset.json', () => {
       is metadata about what the evaluation does with a rule, not a restatement of what the rule
       requires. Two new clauses are Mintro's own, so the corpus is untouched at 53 lines.
     */
-    expect(ruleset.version).toBe('3.8.0');
+    /*
+      3.9.0 is D-259's amendment (2026-09-09): weight extends to the routing tier, three routing
+      conditions and three evidence rules become heavy, PROD-008's six implied-therapeutic terms
+      move to the new PROD-017, and bacteriostatic-water leaves the benign sampling list.
+
+      `effective` still does not move, and no `source: programme` clause changed — PROD-008 keeps
+      the sentence it quotes and loses only terms, so the corpus stays at 53 lines and 52
+      programme rules.
+    */
+    expect(ruleset.version).toBe('3.9.0');
     expect(ruleset.effective).toBe('2026-08-26');
-    expect(ruleset.rules).toHaveLength(61);
+    expect(ruleset.rules).toHaveLength(62);
     expect(ruleset.attestations).toHaveLength(20);
     expect(ruleset.categories).toHaveLength(10);
   });

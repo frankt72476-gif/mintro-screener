@@ -49,7 +49,9 @@ describe('the split, as the rule set actually stands', () => {
     // 26 without, since PAY-002 left the rule set for the questions (D-226). 28 since D-259 added
     // PROD-015 and PROD-016: both are `manual`, and a manual rule declares no `expect`, so neither
     // has a boundary to name. They lead in plain English by the same path the other 26 do.
-    expect(WITH_POLARITY).toHaveLength(33);
+    // 34 with, since D-259's amendment added PROD-017 — a text_match rule, so it declares
+    // `expect: absent` and does have a boundary to name.
+    expect(WITH_POLARITY).toHaveLength(34);
     expect(WITHOUT_POLARITY).toHaveLength(28);
     expect(WITH_POLARITY.length + WITHOUT_POLARITY.length).toBe(ruleset.rules.length);
   });

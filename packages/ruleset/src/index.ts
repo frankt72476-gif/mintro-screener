@@ -80,6 +80,8 @@ export {
   THRESHOLDS,
   TIERS,
   URL_SCOPES,
+  WEIGHTED_TIERS,
+  tierCarriesWeight,
   type CheckType,
   type CoaField,
   type DocExtract,

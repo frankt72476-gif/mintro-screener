@@ -71,8 +71,8 @@ const ruleCommon = {
    */
   evaluation_tier: z.enum(EVALUATION_TIERS),
   /**
-   * How much an evidence rule carries. Evidence tier only — `checkRule` in `invariants.ts`
-   * refuses it on a legality or routing rule and requires it on an evidence one.
+   * How much a rule carries. Evidence and routing tiers — `checkRule` in `invariants.ts` requires
+   * it on those two and refuses it on a legality rule (D-259, amended 2026-09-09).
    *
    * Optional here and required there, because the requirement is conditional on another field and
    * that is what the invariants pass is for.
