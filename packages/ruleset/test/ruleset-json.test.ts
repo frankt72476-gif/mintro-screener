@@ -77,9 +77,18 @@ describe('rules/ruleset.json', () => {
 
       One fewer rule, one more question. `effective` does not move: the standards did not change.
     */
-    expect(ruleset.version).toBe('3.7.0');
+    /*
+      3.8.0 adds the evaluation tiering (D-259): `evaluation_tier` on every rule, `weight` on the
+      evidence ones, and two Mintro rules — PROD-015 explicit outcome claims, PROD-016 suggestive
+      lifestyle claims. Both are `manual` and settle nothing yet; cluster 2 gives them patterns.
+
+      `effective` does not move. The standards did not change, and neither did any clause: tiering
+      is metadata about what the evaluation does with a rule, not a restatement of what the rule
+      requires. Two new clauses are Mintro's own, so the corpus is untouched at 53 lines.
+    */
+    expect(ruleset.version).toBe('3.8.0');
     expect(ruleset.effective).toBe('2026-08-26');
-    expect(ruleset.rules).toHaveLength(59);
+    expect(ruleset.rules).toHaveLength(61);
     expect(ruleset.attestations).toHaveLength(20);
     expect(ruleset.categories).toHaveLength(10);
   });
@@ -91,9 +100,10 @@ describe('rules/ruleset.json', () => {
    * kind of number that drifts unremarked — a rule quietly added back would restore them.
    */
   it('holds the category and manual-rule counts D-142 left', () => {
-    // Two payment rules and ten manual ones since PAY-002 became a question (D-226): it was both.
+    // Two payment rules since PAY-002 became a question (D-226): it was both.
     expect(ruleset.rules.filter((rule) => rule.cat === 'payment')).toHaveLength(2);
-    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(10);
+    // Ten, plus PROD-015 and PROD-016 which are manual until cluster 2 gives them patterns (D-259).
+    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(12);
     expect(ruleset.rules.map((rule) => rule.id)).not.toContain('PAY-004');
   });
 

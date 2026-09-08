@@ -130,6 +130,10 @@ describe('the committed rule set and the committed corpus', () => {
       'PROD-012',
       'PROD-013',
       'PROD-014',
+      // D-259's two. Their clauses are Mintro-authored — the standards say nothing about promised
+      // outcomes or lifestyle association — so the corpus stays at 53 lines and 52 programme rules.
+      'PROD-015',
+      'PROD-016',
     ]);
     for (const rule of mintro) expect(text).not.toContain(rule.clause);
   });

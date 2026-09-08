@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import {
   CORPUS_PATH,
   checkAgainstCorpusFile,
+  checkRatifiedTiers,
   corpusClauseLines,
   tryLoadRulesetFile,
 } from '../src/index.js';
@@ -36,6 +37,19 @@ function main(argv: readonly string[]): number {
   const manual = ruleset.rules.filter((rule) => rule.type === 'manual').length;
   const autoFail = ruleset.rules.filter((rule) => rule.tier === 'auto_fail').length;
   const programme = ruleset.rules.filter((rule) => rule.source === 'programme').length;
+  const byTier = (tier: string): number =>
+    ruleset.rules.filter((rule) => rule.evaluation_tier === tier).length;
+  const heavy = ruleset.rules.filter((rule) => rule.weight === 'heavy').length;
+
+  /*
+    The ratified evaluation tiers (D-259).
+
+    Here rather than in `parseRuleset`, for the same reason the corpus check is here: it is a fact
+    about the file this repository ships, not a property of the schema. A two-rule fixture in a
+    test is a perfectly well-formed rule set and holds none of the ratified ids — a loader that
+    refused it would be asserting that every rule set in the world is Mintro's.
+  */
+  const ratifiedDefects = checkRatifiedTiers(ruleset.rules);
 
   /*
     The corpus check (D-139).
@@ -51,6 +65,20 @@ function main(argv: readonly string[]): number {
   console.log(`  rules      ${ruleset.rules.length} across ${ruleset.categories.length} categories`);
   console.log(`  tiers      ${autoFail} auto_fail, ${ruleset.rules.length - autoFail} review_only`);
   console.log(`  manual     ${manual} not evaluable from the crawled surface`);
+  console.log(
+    `  evaluation ${byTier('legality')} legality, ${byTier('routing')} routing, ` +
+      `${byTier('evidence')} evidence (${heavy} heavy)`,
+  );
+
+  if (ratifiedDefects.length > 0) {
+    console.error(
+      `\nRule set at ${target} does not match the ratified evaluation tiers (D-259) — ${ratifiedDefects.length} defect(s):`,
+    );
+    for (const defect of ratifiedDefects) {
+      console.error(`  • ${defect.ruleId} (${defect.path}): ${defect.message}`);
+    }
+    return 1;
+  }
 
   if (corpusDefects.length > 0) {
     console.error(`\nRule set at ${target} does not agree with ${CORPUS_PATH} — ${corpusDefects.length} defect(s):`);

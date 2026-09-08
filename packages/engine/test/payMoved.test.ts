@@ -48,15 +48,19 @@ describe('PAY-002 has left the crawl set', () => {
 
   it('leaves no rule whose only answer is to ask the merchant', () => {
     /*
-      The shape that made this a question. Ten `manual` rules remain and each names something a
+      The shape that made this a question. Twelve `manual` rules remain and each names something a
       crawl cannot reach — but PAY-002's reason said "requires merchant attestation" while an
       attestation section sat in the same report, which is the duplication this closes.
+
+      Ten of the twelve are the standing set. PROD-015 and PROD-016 are the two D-259 added, manual
+      for a different reason: not unreachable, just not yet given patterns. Cluster 2 gives them
+      some, and this count drops back to ten.
 
       The others stay rules for now; whether any follows is a separate ruling, and this asserts only
       that PAY-002 is not among them.
     */
     const manual = ruleset.rules.filter((rule) => rule.type === 'manual');
-    expect(manual).toHaveLength(10);
+    expect(manual).toHaveLength(12);
     expect(manual.map((rule) => rule.id)).not.toContain('PAY-002');
   });
 });

@@ -155,6 +155,34 @@ function checkRule(
     );
   }
 
+  // `weight` belongs to the evidence tier and to nothing else (D-259).
+  //
+  // Both directions are defects, and neither is cosmetic. An evidence rule with no weight is a
+  // rule an angle cannot weigh, so it would be cited as though it were ordinary and nobody would
+  // be told the difference — the heavy set is exactly the rules that must not be flattened. A
+  // legality or routing rule carrying a weight is the opposite error: it implies those tiers are
+  // weighed, when the first ends an evaluation outright and the second names a condition. A
+  // number nothing reads is worse than no number, because a later reader assumes something reads
+  // it.
+  if (rule.evaluation_tier === 'evidence' && rule.weight === undefined) {
+    defects.push(
+      defect(
+        rule.id,
+        at('weight'),
+        'an evidence rule must declare a weight (heavy | ordinary); an unweighted one would be cited as ordinary with nothing saying so',
+      ),
+    );
+  }
+  if (rule.evaluation_tier !== 'evidence' && rule.weight !== undefined) {
+    defects.push(
+      defect(
+        rule.id,
+        at('weight'),
+        `weight is for the evidence tier only; a ${rule.evaluation_tier} rule is not weighed, found '${rule.weight}'`,
+      ),
+    );
+  }
+
   // A collecting rule gathers an observation and settles nothing, so its finding is always
   // `review` (D-133). `stateForViolation` would turn that into `fail` on an auto_fail rule, which
   // would auto-fail every merchant who links a social account. The tier is the guard, so it is

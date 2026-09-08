@@ -45,6 +45,10 @@ export {
 
 export { checkInvariants, checkInvariantsOn, type IndexedRule } from './invariants.js';
 
+// The two closed evaluation tiers (D-259). Its own module because it is the one check keyed on
+// rule ids, and `invariants.ts` promises none of its own are.
+export { checkRatifiedTiers, ratifiedTierFor } from './ratified.js';
+
 /**
  * The standards corpus check (D-139). Node only — `checkAgainstCorpusFile` reads the corpus, and
  * the pure half is exported beside it so a caller holding the text does not need the filesystem.
@@ -61,11 +65,15 @@ export {
   DOC_EXTRACTS,
   DOM_COLLECTS,
   DOM_DETECTS,
+  EVALUATION_TIERS,
   EXPECTATIONS,
   FLOWS,
   FLOW_FAILURES,
   LAYERS,
+  LEGALITY_RULE_IDS,
+  ROUTING_RULE_IDS,
   RULE_ID_PATTERN,
+  RULE_WEIGHTS,
   SEVERITIES,
   STATES,
   SURFACES,
@@ -75,10 +83,12 @@ export {
   type CheckType,
   type CoaField,
   type DocExtract,
+  type EvaluationTier,
   type Expectation,
   type Flow,
   type FlowFailure,
   type Layer,
+  type RuleWeight,
   type Severity,
   type State,
   type Surface,

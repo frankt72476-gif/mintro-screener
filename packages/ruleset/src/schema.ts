@@ -12,8 +12,10 @@ import {
   CATEGORY_PREFIX_PATTERN,
   CHECK_TYPES,
   type CheckType,
+  EVALUATION_TIERS,
   LAYERS,
   RULE_ID_PATTERN,
+  RULE_WEIGHTS,
   SEVERITIES,
   STATES,
   TIERS,
@@ -58,6 +60,24 @@ const ruleCommon = {
   layer: layerSchema,
   sev: z.enum(SEVERITIES),
   tier: z.enum(TIERS),
+  /**
+   * What the evaluation does with this rule (D-259).
+   *
+   * **Required, with no default.** A default would file an unsorted rule under `evidence`
+   * silently, and the one tier that must never be reached by accident is `legality` — but the
+   * failure runs the other way too: a legality rule that defaulted to evidence would stop ending
+   * an evaluation and nothing would say so. `invariants.ts` additionally pins the legality and
+   * routing sets to the ratified lists.
+   */
+  evaluation_tier: z.enum(EVALUATION_TIERS),
+  /**
+   * How much an evidence rule carries. Evidence tier only — `checkRule` in `invariants.ts`
+   * refuses it on a legality or routing rule and requires it on an evidence one.
+   *
+   * Optional here and required there, because the requirement is conditional on another field and
+   * that is what the invariants pass is for.
+   */
+  weight: z.enum(RULE_WEIGHTS).optional(),
   title: z.string().min(1),
   clause: z.string().min(1),
   /**

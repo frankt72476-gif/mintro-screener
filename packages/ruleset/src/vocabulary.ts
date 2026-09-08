@@ -37,6 +37,61 @@ export const TIERS = ['auto_fail', 'review_only'] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
+ * What the evaluation does with a rule (D-259). A separate axis from `tier`.
+ *
+ * `tier` answers *"what state does a violation produce"* and feeds `stateForViolation`. This
+ * answers *"what part does this rule play when the site is read as a business"*:
+ *
+ *   `legality` — a law, regulation or card-network violation. Any one observed ends it.
+ *   `routing`  — a solution condition. It decides where a merchant can be placed, not whether.
+ *   `evidence` — everything else. Cited under an angle, never decisive on its own.
+ *
+ * **Deliberately not called `tier`.** That name is taken by the auto_fail/review_only axis above,
+ * which `packages/engine/src/report.ts` writes into every assembled report — and those reports are
+ * frozen under D-002. Reusing the key would leave it meaning one thing in every run to date and
+ * another in every run after, inside immutable documents. See D-259.
+ */
+export const EVALUATION_TIERS = ['legality', 'routing', 'evidence'] as const;
+export type EvaluationTier = (typeof EVALUATION_TIERS)[number];
+
+/**
+ * How much an evidence rule carries when an angle cites it (D-259).
+ *
+ * Evidence-tier rules only. A `legality` or `routing` rule carries no weight because neither is
+ * weighed — the first ends the evaluation and the second names a condition — so a weight on one
+ * would be a number nothing reads, and `invariants.ts` refuses it.
+ */
+export const RULE_WEIGHTS = ['heavy', 'ordinary'] as const;
+export type RuleWeight = (typeof RULE_WEIGHTS)[number];
+
+/**
+ * The ratified legality and routing sets, pinned here rather than left to the data (D-259).
+ *
+ * These are closed lists Frank ratified, not a shape the data may grow into. A seventh legality
+ * rule arriving by edit is a business decision that needs a decision number, and until it has one
+ * the file should be refused. Every other rule is `evidence` by the catch-all, so only these two
+ * need naming.
+ */
+export const LEGALITY_RULE_IDS = [
+  'CATG-003',
+  'CATG-004',
+  'PAY-001',
+  'PROD-006',
+  'PROD-008',
+  'PROD-015',
+] as const;
+
+export const ROUTING_RULE_IDS = [
+  'GATE-002',
+  'GATE-003',
+  'CATG-001',
+  'CATG-002',
+  'CATG-005',
+  'OFFS-001',
+  'OFFS-007',
+] as const;
+
+/**
  * Severity drives report ordering only. It never affects state — see D-009. It is
  * deliberately not consulted anywhere in this package beyond validating its value.
  */

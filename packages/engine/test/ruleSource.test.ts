@@ -87,9 +87,10 @@ describe('every rule states whose requirement it is', () => {
    */
   it('everything quoting the published standards says so, and the Mintro observations are named', () => {
     /*
-      The list grew from one to six with D-177. It is pinned rather than counted because *which*
-      rules claim no published authority is the fact worth being asked about — a rule drifting into
-      `mintro` to escape the clause corpus would otherwise pass unremarked.
+      The list grew from one to six with D-177, and to nine with D-259. It is pinned rather than
+      counted because *which* rules claim no published authority is the fact worth being asked
+      about — a rule drifting into `mintro` to escape the clause corpus would otherwise pass
+      unremarked.
     */
     const mintro = ruleset.rules.filter((r) => r.source === 'mintro').map((r) => r.id);
     expect([...mintro].sort()).toEqual([
@@ -103,6 +104,11 @@ describe('every rule states whose requirement it is', () => {
       'PROD-012',
       'PROD-013',
       'PROD-014',
+      // D-259's two. Neither quotes the standards — the published document says nothing about a
+      // promised measurable result or about lifestyle association — so both are Mintro's own
+      // statement and print under the Mintro heading (D-138).
+      'PROD-015',
+      'PROD-016',
     ]);
     expect(ruleset.rules.filter((r) => r.source === 'programme')).toHaveLength(
       ruleset.rules.length - mintro.length,

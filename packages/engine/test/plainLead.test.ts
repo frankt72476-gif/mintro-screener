@@ -46,9 +46,11 @@ const findingFor = (rule: (typeof ruleset.rules)[number], state: 'fail' | 'revie
 
 describe('the split, as the rule set actually stands', () => {
   it('is 33 with a declarable boundary and 27 without', () => {
-    // 26 without, since PAY-002 left the rule set for the questions (D-226).
+    // 26 without, since PAY-002 left the rule set for the questions (D-226). 28 since D-259 added
+    // PROD-015 and PROD-016: both are `manual`, and a manual rule declares no `expect`, so neither
+    // has a boundary to name. They lead in plain English by the same path the other 26 do.
     expect(WITH_POLARITY).toHaveLength(33);
-    expect(WITHOUT_POLARITY).toHaveLength(26);
+    expect(WITHOUT_POLARITY).toHaveLength(28);
     expect(WITH_POLARITY.length + WITHOUT_POLARITY.length).toBe(ruleset.rules.length);
   });
 });
