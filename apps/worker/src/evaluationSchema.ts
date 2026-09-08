@@ -32,6 +32,16 @@
  * citation of that kind impossible to express *and* impossible to explain. Each citation branch is
  * therefore omitted when its list is empty, so the model is offered exactly the kinds this run can
  * support.
+ *
+ * ## What structured outputs will not accept
+ *
+ * `minItems` may only be 0 or 1. A schema asking for exactly seven angles or at least two placement
+ * citations is a 400 before a token is spent — learned by sending one. So the *floors* live in
+ * `validateDraft` and in the field descriptions; only the *ceilings* (`maxItems`) are the schema's.
+ *
+ * That lands the division in the same place it already was for a different reason: the validator
+ * was always going to have to count distinct angles and check that every angle is present, because
+ * neither is a shape a JSON Schema keyword can describe.
  */
 
 import type { RunContext } from '@mintro/engine';
@@ -103,11 +113,17 @@ export function draftSchema(
           spectrum: { enum: [...spectrum] },
           recommended: { enum: [...placements] },
           paragraph: paragraph('Where this business sits and what put it there.'),
+          /*
+            No `minItems: 2` here, and not for want of trying.
+
+            Structured outputs accept `minItems` of 0 or 1 only — a schema asking for two is a 400
+            before a token is spent. So "at least two distinct angles" is stated in the description
+            and enforced by `validateDraft`, which is where it was always going to end up: the
+            *distinctness* half was never expressible in JSON Schema either.
+          */
           citations: {
             type: 'array',
-            // At least two, and `validateDraft` additionally requires that two be *distinct*
-            // angles — a thing no JSON Schema keyword can say.
-            minItems: 2,
+            minItems: 1,
             items: citeWithAngles,
             description:
               'Name at least two different angles that drove the placement. Captures may accompany them.',
@@ -152,7 +168,8 @@ export function draftSchema(
       },
       routing: {
         type: 'array',
-        minItems: run.routingConditionIds.length,
+        // `maxItems` is accepted; a matching `minItems` is not (0 or 1 only), so completeness is
+        // the validator's `incomplete_coverage` rule rather than the schema's.
         maxItems: run.routingConditionIds.length,
         items: {
           type: 'object',
@@ -168,7 +185,6 @@ export function draftSchema(
       },
       angles: {
         type: 'array',
-        minItems: run.angleIds.length,
         maxItems: run.angleIds.length,
         items: {
           type: 'object',

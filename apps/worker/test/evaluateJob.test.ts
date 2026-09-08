@@ -646,14 +646,14 @@ describe('the request carries the run-scoped schema', () => {
     expect(kinds(schema.properties.angles.items.properties.citations.items)).not.toContain('angle');
   });
 
-  it('caps shore-ups at six and fixes the seven angles', async () => {
+  it('caps shore-ups at six and the angles at seven', async () => {
     const { impl, requests } = fakeFetch([validDraft()]);
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
     expect(schema.properties.shoreUps.maxItems).toBe(6);
-    expect(schema.properties.angles.minItems).toBe(7);
-    expect(schema.properties.routing.minItems).toBe(5);
+    expect(schema.properties.angles.maxItems).toBe(7);
+    expect(schema.properties.routing.maxItems).toBe(5);
   });
 
   it('sends the same schema on the retry, so a rejection cannot widen it', async () => {

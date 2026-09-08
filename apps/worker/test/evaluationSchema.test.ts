@@ -128,15 +128,34 @@ describe('the shape rules the schema can carry', () => {
     expect(MAX_SHORE_UPS).toBe(6);
   });
 
-  it('fixes the angle and routing arrays at the run’s own counts', () => {
-    expect(props['angles'].minItems).toBe(3);
+  it('caps the angle and routing arrays at the run’s own counts', () => {
     expect(props['angles'].maxItems).toBe(3);
-    expect(props['routing'].minItems).toBe(2);
     expect(props['routing'].maxItems).toBe(2);
   });
 
-  it('asks for at least two placement citations', () => {
-    expect(props['placement'].properties.citations.minItems).toBe(2);
+  /*
+    Structured outputs accept `minItems` of 0 or 1 only — anything else is a 400 before a token is
+    spent. The floors are therefore the validator's, and this asserts the schema does not try to
+    carry one, because sending a schema the API refuses costs a whole call.
+  */
+  it('never asks for a minItems the API will refuse', () => {
+    const mins: { path: string; value: number }[] = [];
+    const walk = (node: unknown, path = ''): void => {
+      if (node === null || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        const here = path === '' ? key : `${path}.${key}`;
+        if (key === 'minItems' && typeof value === 'number') mins.push({ path: here, value });
+        else walk(value, here);
+      }
+    };
+    walk(schema);
+    for (const { path, value } of mins) {
+      expect(value, `${path} asks for minItems ${value}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('asks for the two placement angles in words, since it cannot in schema', () => {
+    expect(props['placement'].properties.citations.description).toContain('at least two different angles');
   });
 
   it('states the paragraph length as guidance', () => {
