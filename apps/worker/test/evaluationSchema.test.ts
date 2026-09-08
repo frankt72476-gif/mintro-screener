@@ -43,13 +43,13 @@ function enumsIn(node: unknown, path = ''): { path: string; values: readonly unk
 
 describe('ids are enums of what the run holds', () => {
   it('constrains finding citations to this run', () => {
-    const branches = props['angles'].items.properties.citations.items.oneOf as Record<string, any>[];
+    const branches = props['angles'].items.properties.citations.items.anyOf as Record<string, any>[];
     const finding = branches.find((b) => b.properties.kind.const === 'finding')!;
     expect(finding.properties.ref.enum).toEqual(['f-001', 'f-002']);
   });
 
   it('constrains evidence and eye-test citations too', () => {
-    const branches = props['angles'].items.properties.citations.items.oneOf as Record<string, any>[];
+    const branches = props['angles'].items.properties.citations.items.anyOf as Record<string, any>[];
     expect(branches.find((b) => b.properties.kind.const === 'evidence')!.properties.ref.enum).toEqual([
       'run-1/layer1/abc.png',
     ]);
@@ -83,17 +83,17 @@ describe('ids are enums of what the run holds', () => {
 
 describe('the angle citation is placement-only, in the schema as well as the validator', () => {
   it('offers an angle branch on the placement', () => {
-    const branches = props['placement'].properties.citations.items.oneOf as Record<string, any>[];
+    const branches = props['placement'].properties.citations.items.anyOf as Record<string, any>[];
     const angle = branches.find((b) => b.properties.kind.const === 'angle')!;
     expect(angle.properties.ref.enum).toEqual(RUN.angleIds);
   });
 
   it('offers none anywhere else', () => {
     for (const path of ['angles', 'routing']) {
-      const branches = props[path].items.properties.citations.items.oneOf as Record<string, any>[];
+      const branches = props[path].items.properties.citations.items.anyOf as Record<string, any>[];
       expect(branches.map((b) => b.properties.kind.const), path).not.toContain('angle');
     }
-    const shoreUp = props['shoreUps'].items.properties.citation.oneOf as Record<string, any>[];
+    const shoreUp = props['shoreUps'].items.properties.citation.anyOf as Record<string, any>[];
     expect(shoreUp.map((b) => b.properties.kind.const)).not.toContain('angle');
   });
 });
@@ -106,8 +106,15 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
   */
   it('drops the eye-test branch when the run has no verdicts', () => {
     const blind = draftSchema({ ...RUN, eyeTestItemIds: new Set() }, SPECTRUM, PLACEMENTS) as Record<string, any>;
-    const branches = blind['properties'].angles.items.properties.citations.items.oneOf as Record<string, any>[];
+    const branches = blind['properties'].angles.items.properties.citations.items.anyOf as Record<string, any>[];
     expect(branches.map((b) => b.properties.kind.const)).toEqual(['finding', 'evidence']);
+  });
+
+  it('falls back to a plain string where an enum would be empty', () => {
+    const bare = draftSchema({ ...RUN, evidenceKeys: new Set() }, SPECTRUM, PLACEMENTS) as Record<string, any>;
+    const key = bare['properties'].legality.properties.items.items.properties.evidenceKey;
+    expect(key.enum).toBeUndefined();
+    expect(key.type).toBe('string');
   });
 
   it('emits no empty enum anywhere, for any run shape', () => {
@@ -123,14 +130,33 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
 });
 
 describe('the shape rules the schema can carry', () => {
-  it('caps shore-ups', () => {
-    expect(props['shoreUps'].maxItems).toBe(MAX_SHORE_UPS);
-    expect(MAX_SHORE_UPS).toBe(6);
+  /*
+    Every count is the validator's, because the supported subset has no `maxItems` at all and
+    `minItems` only up to 1. Two of these limits were learned by sending schemas the API refused;
+    the third was read from the docs before it could cost a third call. This asserts the whole
+    subset boundary in one place so none of them can come back.
+  */
+  it('uses only keywords the structured-output subset accepts', () => {
+    const banned = ['maxItems', 'oneOf', 'minLength', 'maxLength', 'minimum', 'maximum', 'uniqueItems'];
+    const walk = (node: unknown, path = ''): void => {
+      if (node === null || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        const here = path === '' ? key : `${path}.${key}`;
+        expect(banned, `${here} is outside the supported subset`).not.toContain(key);
+        walk(value, here);
+      }
+    };
+    walk(schema);
   });
 
-  it('caps the angle and routing arrays at the run’s own counts', () => {
-    expect(props['angles'].maxItems).toBe(3);
-    expect(props['routing'].maxItems).toBe(2);
+  it('unions with anyOf, which is supported, not oneOf, which is not', () => {
+    expect(props['angles'].items.properties.citations.items.anyOf).toBeDefined();
+    expect(props['placement'].properties.citations.items.anyOf).toBeDefined();
+  });
+
+  it('leaves the shore-up cap to the validator', () => {
+    expect(props['shoreUps'].maxItems).toBeUndefined();
+    expect(MAX_SHORE_UPS).toBe(6);
   });
 
   /*
@@ -183,8 +209,6 @@ describe('the shape rules the schema can carry', () => {
     are expressible here, which is why `validateDraft` stays.
   */
   it('does not attempt the rules only the validator can state', () => {
-    const text = JSON.stringify(schema);
-    expect(text).not.toContain('uniqueItems');
     expect(props['shoreUps'].minItems).toBeUndefined();
   });
 });

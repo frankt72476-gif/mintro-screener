@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_SHORE_UPS,
   MERCHANT_COMMERCE_WORDS,
   MINTRO_COST_WORDS,
   PRICE_SCOPES,
@@ -591,3 +592,69 @@ describe('the helpers the rules rest on', () => {
     expect(hasInferenceMarker('no marker here.')).toBe(false);
   });
 });
+
+describe('too_many_shore_ups', () => {
+  /*
+    The cap lives here because structured outputs support no `maxItems` at all — every count in this
+    document is the validator's for that reason.
+  */
+  it('accepts exactly the cap', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      shoreUps: Array.from({ length: MAX_SHORE_UPS }, (_, i) => ({
+        text: `A change worth making, number ${i}.`,
+        citation: cite('f-001'),
+      })),
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  it('refuses one more than the cap', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      shoreUps: Array.from({ length: MAX_SHORE_UPS + 1 }, (_, i) => ({
+        text: `A change worth making, number ${i}.`,
+        citation: cite('f-001'),
+      })),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('too_many_shore_ups');
+    expect(result.rejections.some((r) => r.message.includes(`at most ${MAX_SHORE_UPS}`))).toBe(true);
+  });
+});
+
+describe('unbacked_legality_item', () => {
+  /*
+    The one id in the document that nothing checked. A legality item fixes the recommendation at
+    `referred_out` — the most consequential thing a draft can say — so it was the last place an
+    unbacked citation should have been able to survive.
+  */
+  it('refuses a legality item whose capture this run does not hold', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-9/layer0/nope' }] },
+      placement: { ...d.placement, recommended: 'referred_out' as const },
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('unbacked_legality_item');
+    expect(result.rejections.some((r) => r.message.includes('CATG-003'))).toBe(true);
+  });
+
+  it('accepts one backed by a capture the run holds', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-1/layer0/def' }] },
+      placement: { ...d.placement, recommended: 'referred_out' as const },
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  it('says nothing about a clean legality block with no items', () => {
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+  });
+});
+

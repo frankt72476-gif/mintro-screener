@@ -630,7 +630,7 @@ describe('the request carries the run-scoped schema', () => {
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
-    const branches = schema.properties.angles.items.properties.citations.items.oneOf;
+    const branches = schema.properties.angles.items.properties.citations.items.anyOf;
     const finding = branches.find((b: any) => b.properties.kind.const === 'finding');
     expect(finding.properties.ref.enum).toEqual(['f-001', 'f-002']);
     expect(JSON.stringify(schema)).not.toContain('fdd0000-0000');
@@ -641,19 +641,20 @@ describe('the request carries the run-scoped schema', () => {
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
-    const kinds = (node: any) => node.oneOf.map((b: any) => b.properties.kind.const);
+    const kinds = (node: any) => node.anyOf.map((b: any) => b.properties.kind.const);
     expect(kinds(schema.properties.placement.properties.citations.items)).toContain('angle');
     expect(kinds(schema.properties.angles.items.properties.citations.items)).not.toContain('angle');
   });
 
-  it('caps shore-ups at six and the angles at seven', async () => {
+  it('sends no keyword outside the supported subset', async () => {
     const { impl, requests } = fakeFetch([validDraft()]);
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
-    const schema = requests[0]!['output_config'].format.schema;
-    expect(schema.properties.shoreUps.maxItems).toBe(6);
-    expect(schema.properties.angles.maxItems).toBe(7);
-    expect(schema.properties.routing.maxItems).toBe(5);
+    // Two 400s were spent learning this. The assertion is on the request actually sent.
+    const sent = JSON.stringify(requests[0]!['output_config'].format.schema);
+    for (const banned of ['"maxItems"', '"oneOf"', '"minLength"', '"minimum"']) {
+      expect(sent, `sends ${banned}`).not.toContain(banned);
+    }
   });
 
   it('sends the same schema on the retry, so a rejection cannot widen it', async () => {

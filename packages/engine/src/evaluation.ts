@@ -91,6 +91,15 @@ export const ANGLE_CITATION_SECTION = 'placement';
 /** How many distinct angles a placement must name. The memo's "two or three", as a floor. */
 export const PLACEMENT_MIN_ANGLE_CITATIONS = 2;
 
+/**
+ * The most shore-ups a draft may carry.
+ *
+ * Enforced here rather than in the answer schema because structured outputs do not support
+ * `maxItems` at all. Every count in this document is the validator's for that reason — the schema
+ * says which values are allowed, and nothing about how many.
+ */
+export const MAX_SHORE_UPS = 6;
+
 export interface Citation {
   readonly kind: CitationKind;
   readonly ref: string;
@@ -241,7 +250,9 @@ export interface DraftRejection {
     | 'unknown_condition'
     | 'incomplete_coverage'
     | 'angle_citation_outside_placement'
-    | 'placement_needs_two_angles';
+    | 'placement_needs_two_angles'
+    | 'too_many_shore_ups'
+    | 'unbacked_legality_item';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -425,6 +436,24 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     );
   }
 
+  /*
+    A legality item names the capture that backs it, and that capture has to exist.
+
+    This was a gap: `legality.items[].evidenceKey` was the one id in the document nothing checked.
+    A legality item is the single most consequential thing a draft can say — it fixes the
+    recommendation at `referred_out` — so an unbacked one is the last place a fabricated key should
+    have been able to survive.
+  */
+  draft.legality.items.forEach((item, index) => {
+    if (run.evidenceKeys.has(item.evidenceKey)) return;
+    reject(
+      'unbacked_legality_item',
+      `legality.items[${index}].evidenceKey`,
+      `'${item.ruleId}' cites capture '${item.evidenceKey}', which this run does not hold. A legality ` +
+        'item fixes the recommendation at referred_out; it is never carried on an unbacked citation.',
+    );
+  });
+
   // ── routing ──────────────────────────────────────────────────────────────────────────────────
   const seenConditions = new Set<string>();
   draft.routing.forEach((row, index) => {
@@ -482,6 +511,15 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
         'conditions are still listed, as facts, without a path.',
     );
   }
+  if (draft.shoreUps.length > MAX_SHORE_UPS) {
+    reject(
+      'too_many_shore_ups',
+      'shoreUps',
+      `${draft.shoreUps.length} shore-ups; at most ${MAX_SHORE_UPS}. A list an operator cannot ` +
+        'read through is a list nobody acts on.',
+    );
+  }
+
   draft.shoreUps.forEach((shoreUp, index) => {
     const at = `shoreUps[${index}]`;
     checkCitations([shoreUp.citation], `${at}.citation`);

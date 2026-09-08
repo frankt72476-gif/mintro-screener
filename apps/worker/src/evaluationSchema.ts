@@ -33,15 +33,22 @@
  * therefore omitted when its list is empty, so the model is offered exactly the kinds this run can
  * support.
  *
- * ## What structured outputs will not accept
+ * ## The supported subset, from the documentation rather than from failed calls
  *
- * `minItems` may only be 0 or 1. A schema asking for exactly seven angles or at least two placement
- * citations is a 400 before a token is spent — learned by sending one. So the *floors* live in
- * `validateDraft` and in the field descriptions; only the *ceilings* (`maxItems`) are the schema's.
+ * Structured outputs accept a **subset** of JSON Schema, and three of its limits shape this file.
+ * Two of them were discovered by sending schemas the API refused, which is the wrong way to learn
+ * them; the third was found by reading the docs afterwards, before it could cost a third call.
  *
- * That lands the division in the same place it already was for a different reason: the validator
- * was always going to have to count distinct angles and check that every angle is present, because
- * neither is a shape a JSON Schema keyword can describe.
+ *   - **`oneOf` is not supported. `anyOf` is.** The citation union uses `anyOf`.
+ *   - **`minItems` may only be 0 or 1.** No "exactly seven angles", no "at least two citations".
+ *   - **`maxItems` is not supported at all.** No shore-up cap, no array ceiling.
+ *
+ * Supported and used here: `enum`, `const`, `required`, `additionalProperties: false`, nested
+ * objects and arrays, and `description`.
+ *
+ * So **every count lives in `validateDraft`** — floors and ceilings alike — and the schema carries
+ * exactly one thing: which values are allowed where. That is the division this file's docblock
+ * already argued for, arrived at from the other direction.
  */
 
 import type { RunContext } from '@mintro/engine';
@@ -64,7 +71,7 @@ const paragraph = (subject: string): JsonSchema => ({
 });
 
 /**
- * The citation branches this run can support, as a `oneOf`.
+ * The citation branches this run can support, as an `anyOf`.
  *
  * `kind` is a const and `ref` is the enum that goes with it, so the pair is checked together — a
  * `finding` kind carrying an eye-test id cannot be expressed, which is the same discipline
@@ -88,7 +95,7 @@ function citation(run: RunContext, includeAngles: boolean): JsonSchema {
     ...(includeAngles ? [branch('angle', run.angleIds)] : []),
   ].filter((entry): entry is JsonSchema => entry !== null);
 
-  return { oneOf: branches };
+  return { anyOf: branches };
 }
 
 /** The whole document, with every id constrained to this run. */
@@ -114,12 +121,9 @@ export function draftSchema(
           recommended: { enum: [...placements] },
           paragraph: paragraph('Where this business sits and what put it there.'),
           /*
-            No `minItems: 2` here, and not for want of trying.
-
-            Structured outputs accept `minItems` of 0 or 1 only — a schema asking for two is a 400
-            before a token is spent. So "at least two distinct angles" is stated in the description
-            and enforced by `validateDraft`, which is where it was always going to end up: the
-            *distinctness* half was never expressible in JSON Schema either.
+            `minItems: 1` is the most the subset allows; "at least two, and distinct" is the
+            description's job and `validateDraft`'s. The distinctness half was never expressible
+            in JSON Schema anyway.
           */
           citations: {
             type: 'array',
@@ -137,40 +141,35 @@ export function draftSchema(
         properties: {
           clean: { type: 'boolean' },
           /*
-            A legality item names the capture that backs it, so a run that stored no evidence can
-            have none — and the array is capped at zero rather than given an empty `enum`, which
-            would match nothing and say nothing about why.
-
-            This is the trap this file's docblock describes, and it was in this file until a test
-            went looking for empty enums everywhere rather than only where one was expected.
+            A legality item names the capture that backs it. On a run that stored no evidence there
+            is no enum to give — `enum: []` matches nothing — and `maxItems: 0` is not in the
+            supported subset, so the field falls back to a plain string and `validateDraft` refuses
+            the item. The floor and the ceiling are both the validator's here, as everywhere else.
           */
-          items:
-            run.evidenceKeys.size === 0
-              ? {
-                  type: 'array',
-                  maxItems: 0,
-                  description:
-                    'This run stored no evidence, so no legality item can name the capture that backs it.',
-                }
-              : {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['ruleId', 'evidenceKey'],
-                    properties: {
-                      ruleId: { type: 'string' },
-                      evidenceKey: { enum: [...run.evidenceKeys] },
-                    },
-                  },
-                },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['ruleId', 'evidenceKey'],
+              properties: {
+                ruleId: { type: 'string' },
+                evidenceKey:
+                  run.evidenceKeys.size === 0
+                    ? {
+                        type: 'string',
+                        description: 'This run stored no evidence, so no legality item can be backed.',
+                      }
+                    : { enum: [...run.evidenceKeys] },
+              },
+            },
+          },
         },
       },
       routing: {
         type: 'array',
-        // `maxItems` is accepted; a matching `minItems` is not (0 or 1 only), so completeness is
-        // the validator's `incomplete_coverage` rule rather than the schema's.
-        maxItems: run.routingConditionIds.length,
+        // No count constraints: `maxItems` is unsupported and `minItems` may only be 0 or 1.
+        // Completeness is `validateDraft`'s `incomplete_coverage` rule.
         items: {
           type: 'object',
           additionalProperties: false,
@@ -185,7 +184,6 @@ export function draftSchema(
       },
       angles: {
         type: 'array',
-        maxItems: run.angleIds.length,
         items: {
           type: 'object',
           additionalProperties: false,
@@ -202,7 +200,7 @@ export function draftSchema(
       },
       shoreUps: {
         type: 'array',
-        maxItems: MAX_SHORE_UPS,
+        // The cap is `validateDraft`'s: `maxItems` is not in the supported subset.
         items: {
           type: 'object',
           additionalProperties: false,
