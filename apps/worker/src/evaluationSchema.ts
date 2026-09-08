@@ -71,31 +71,69 @@ const paragraph = (subject: string): JsonSchema => ({
 });
 
 /**
- * The citation branches this run can support, as an `anyOf`.
+ * The id enums and the citation branches that point at them, each written exactly once (`$defs`).
  *
- * `kind` is a const and `ref` is the enum that goes with it, so the pair is checked together — a
- * `finding` kind carrying an eye-test id cannot be expressed, which is the same discipline
+ * **Two levels of definition, and the second one earned its place.** The value enums come first
+ * (`findingId`, `evidenceKey`, ...), then the branch objects that pair a `kind` const with one of
+ * them. The split exists because `evidenceKey` is referenced from two unrelated places — the
+ * `evidence` citation branch, and the legality block's bare key — and inlining it in both put the
+ * same four kilobytes in the document twice.
+ *
+ * **This is not tidiness. An inline schema was refused outright.** A citation appears at five
+ * places in this document, and spelling the branches out at each one copied a 59-value finding
+ * enum and a 38-value evidence enum five times over. Evidence keys run ~112 characters each, so
+ * that enum alone is over four kilobytes per copy. The API answered:
+ *
+ *     Schema is too complex for compilation.
+ *
+ * Internal `$ref` and `$defs` are in the supported subset. The document the model must satisfy is
+ * unchanged; only its size is.
+ *
+ * A branch pairs `kind` as a const with the enum that kind allows, so the two are checked together
+ * — a `finding` kind carrying an eye-test id cannot be expressed. That is the same discipline
  * `validateDraft` applies when it checks against the declared kind rather than the shape of a ref.
  */
-function citation(run: RunContext, includeAngles: boolean): JsonSchema {
-  const branch = (kind: string, refs: readonly string[]): JsonSchema | null =>
-    refs.length === 0
-      ? null
-      : {
-          type: 'object',
-          additionalProperties: false,
-          required: ['kind', 'ref'],
-          properties: { kind: { const: kind }, ref: { enum: [...refs] } },
-        };
+interface Definitions {
+  readonly defs: Record<string, JsonSchema>;
+  /** Branch names this run can support, in citation order. */
+  readonly branches: readonly string[];
+}
 
-  const branches = [
-    branch('finding', [...run.findingIds]),
-    branch('evidence', [...run.evidenceKeys]),
-    branch('eye_test', [...run.eyeTestItemIds]),
-    ...(includeAngles ? [branch('angle', run.angleIds)] : []),
-  ].filter((entry): entry is JsonSchema => entry !== null);
+function definitions(run: RunContext): Definitions {
+  const values: [string, string, readonly string[]][] = [
+    ['findingId', 'finding', [...run.findingIds]],
+    ['evidenceKey', 'evidence', [...run.evidenceKeys]],
+    ['eyeTestItemId', 'eye_test', [...run.eyeTestItemIds]],
+    ['angleId', 'angle', run.angleIds],
+  ];
 
-  return { anyOf: branches };
+  const defs: Record<string, JsonSchema> = {};
+  const branches: string[] = [];
+
+  for (const [valueName, kind, refs] of values) {
+    if (refs.length === 0) continue;
+
+    // The enum, once.
+    defs[valueName] = { enum: [...refs] };
+
+    // The branch that carries it.
+    const branchName = `${kind === 'eye_test' ? 'eyeTest' : kind}Ref`;
+    defs[branchName] = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['kind', 'ref'],
+      properties: { kind: { const: kind }, ref: { $ref: `#/$defs/${valueName}` } },
+    };
+    branches.push(branchName);
+  }
+
+  return { defs, branches };
+}
+
+/** A citation, by reference. `angleRef` is offered to the placement and to nothing else. */
+function citationRef(branches: readonly string[], includeAngles: boolean): JsonSchema {
+  const wanted = branches.filter((name) => includeAngles || name !== 'angleRef');
+  return { anyOf: wanted.map((name) => ({ $ref: `#/$defs/${name}` })) };
 }
 
 /** The whole document, with every id constrained to this run. */
@@ -104,12 +142,14 @@ export function draftSchema(
   spectrum: readonly string[],
   placements: readonly string[],
 ): JsonSchema {
-  const cite = citation(run, false);
-  const citeWithAngles = citation(run, true);
+  const { defs, branches } = definitions(run);
+  const cite = citationRef(branches, false);
+  const citeWithAngles = citationRef(branches, true);
 
   return {
     type: 'object',
     additionalProperties: false,
+    $defs: defs,
     required: ['placement', 'legality', 'routing', 'angles', 'shoreUps'],
     properties: {
       placement: {
@@ -160,7 +200,7 @@ export function draftSchema(
                         type: 'string',
                         description: 'This run stored no evidence, so no legality item can be backed.',
                       }
-                    : { enum: [...run.evidenceKeys] },
+                    : { $ref: '#/$defs/evidenceKey' },
               },
             },
           },

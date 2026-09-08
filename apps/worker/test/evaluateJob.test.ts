@@ -630,9 +630,7 @@ describe('the request carries the run-scoped schema', () => {
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
-    const branches = schema.properties.angles.items.properties.citations.items.anyOf;
-    const finding = branches.find((b: any) => b.properties.kind.const === 'finding');
-    expect(finding.properties.ref.enum).toEqual(['f-001', 'f-002']);
+    expect(schema.$defs.findingId.enum).toEqual(['f-001', 'f-002']);
     expect(JSON.stringify(schema)).not.toContain('fdd0000-0000');
   });
 
@@ -641,9 +639,11 @@ describe('the request carries the run-scoped schema', () => {
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
-    const kinds = (node: any) => node.anyOf.map((b: any) => b.properties.kind.const);
-    expect(kinds(schema.properties.placement.properties.citations.items)).toContain('angle');
-    expect(kinds(schema.properties.angles.items.properties.citations.items)).not.toContain('angle');
+    const refs = (node: any) => node.anyOf.map((e: any) => e.$ref);
+    expect(refs(schema.properties.placement.properties.citations.items)).toContain('#/$defs/angleRef');
+    expect(refs(schema.properties.angles.items.properties.citations.items)).not.toContain(
+      '#/$defs/angleRef',
+    );
   });
 
   it('sends no keyword outside the supported subset', async () => {

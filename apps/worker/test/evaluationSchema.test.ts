@@ -28,6 +28,12 @@ const PLACEMENTS = ['referred_out', 'international', 'domestic'];
 
 const schema = draftSchema(RUN, SPECTRUM, PLACEMENTS) as Record<string, any>;
 const props = schema['properties'] as Record<string, any>;
+const defs = schema['$defs'] as Record<string, any>;
+
+/** The branch definitions a citation site points at, resolved through `$defs`. */
+function branchesAt(node: any): Record<string, any>[] {
+  return node.anyOf.map((entry: any) => defs[String(entry.$ref).replace('#/$defs/', '')]);
+}
 
 /** Every `enum` in the schema, by the path it sits at. */
 function enumsIn(node: unknown, path = ''): { path: string; values: readonly unknown[] }[] {
@@ -43,20 +49,16 @@ function enumsIn(node: unknown, path = ''): { path: string; values: readonly unk
 
 describe('ids are enums of what the run holds', () => {
   it('constrains finding citations to this run', () => {
-    const branches = props['angles'].items.properties.citations.items.anyOf as Record<string, any>[];
+    const branches = branchesAt(props['angles'].items.properties.citations.items);
     const finding = branches.find((b) => b.properties.kind.const === 'finding')!;
-    expect(finding.properties.ref.enum).toEqual(['f-001', 'f-002']);
+    expect(finding.properties.ref.$ref).toBe('#/$defs/findingId');
+    expect(defs['findingId'].enum).toEqual(['f-001', 'f-002']);
   });
 
   it('constrains evidence and eye-test citations too', () => {
-    const branches = props['angles'].items.properties.citations.items.anyOf as Record<string, any>[];
-    expect(branches.find((b) => b.properties.kind.const === 'evidence')!.properties.ref.enum).toEqual([
-      'run-1/layer1/abc.png',
-    ]);
-    expect(branches.find((b) => b.properties.kind.const === 'eye_test')!.properties.ref.enum).toEqual([
-      'EYE-01',
-      'EYE-03',
-    ]);
+    const branches = branchesAt(props['angles'].items.properties.citations.items);
+    expect(defs['evidenceKey'].enum).toEqual(['run-1/layer1/abc.png']);
+    expect(defs['eyeTestItemId'].enum).toEqual(['EYE-01', 'EYE-03']);
   });
 
   /*
@@ -75,25 +77,29 @@ describe('ids are enums of what the run holds', () => {
   });
 
   it('constrains a legality item to an evidence key this run holds', () => {
-    expect(props['legality'].properties.items.items.properties.evidenceKey.enum).toEqual([
-      'run-1/layer1/abc.png',
-    ]);
+    expect(props['legality'].properties.items.items.properties.evidenceKey.$ref).toBe(
+      '#/$defs/evidenceKey',
+    );
+    expect(defs['evidenceKey'].enum).toEqual(['run-1/layer1/abc.png']);
   });
 });
 
 describe('the angle citation is placement-only, in the schema as well as the validator', () => {
   it('offers an angle branch on the placement', () => {
-    const branches = props['placement'].properties.citations.items.anyOf as Record<string, any>[];
+    const branches = branchesAt(props['placement'].properties.citations.items);
     const angle = branches.find((b) => b.properties.kind.const === 'angle')!;
-    expect(angle.properties.ref.enum).toEqual(RUN.angleIds);
+    expect(angle.properties.ref.$ref).toBe('#/$defs/angleId');
+    expect(defs['angleId'].enum).toEqual(RUN.angleIds);
   });
 
   it('offers none anywhere else', () => {
     for (const path of ['angles', 'routing']) {
-      const branches = props[path].items.properties.citations.items.anyOf as Record<string, any>[];
-      expect(branches.map((b) => b.properties.kind.const), path).not.toContain('angle');
+      const kinds = branchesAt(props[path].items.properties.citations.items).map(
+        (b) => b.properties.kind.const,
+      );
+      expect(kinds, path).not.toContain('angle');
     }
-    const shoreUp = props['shoreUps'].items.properties.citation.anyOf as Record<string, any>[];
+    const shoreUp = branchesAt(props['shoreUps'].items.properties.citation);
     expect(shoreUp.map((b) => b.properties.kind.const)).not.toContain('angle');
   });
 });
@@ -106,8 +112,12 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
   */
   it('drops the eye-test branch when the run has no verdicts', () => {
     const blind = draftSchema({ ...RUN, eyeTestItemIds: new Set() }, SPECTRUM, PLACEMENTS) as Record<string, any>;
-    const branches = blind['properties'].angles.items.properties.citations.items.anyOf as Record<string, any>[];
-    expect(branches.map((b) => b.properties.kind.const)).toEqual(['finding', 'evidence']);
+    expect(Object.keys(blind['$defs'])).not.toContain('eyeTestRef');
+    expect(Object.keys(blind['$defs'])).not.toContain('eyeTestItemId');
+    const refs = blind['properties'].angles.items.properties.citations.items.anyOf.map(
+      (e: any) => e.$ref,
+    );
+    expect(refs).toEqual(['#/$defs/findingRef', '#/$defs/evidenceRef']);
   });
 
   it('falls back to a plain string where an enum would be empty', () => {
@@ -152,6 +162,28 @@ describe('the shape rules the schema can carry', () => {
   it('unions with anyOf, which is supported, not oneOf, which is not', () => {
     expect(props['angles'].items.properties.citations.items.anyOf).toBeDefined();
     expect(props['placement'].properties.citations.items.anyOf).toBeDefined();
+  });
+
+  /*
+    Every enum written once. Spelling the branches out at each of the six citation sites copied a
+    59-value finding enum and a 38-value evidence enum - the latter over four kilobytes per copy -
+    and the API answered "Schema is too complex for compilation".
+  */
+  it('writes each id enum exactly once and points at it', () => {
+    const text = JSON.stringify(schema);
+    for (const id of ['f-001', 'run-1/layer1/abc.png', 'EYE-01']) {
+      const occurrences = text.split(JSON.stringify(id)).length - 1;
+      expect(occurrences, `${id} appears ${occurrences} times`).toBe(1);
+    }
+    expect(text).toContain('#/$defs/');
+  });
+
+  it('references only definitions it actually emitted', () => {
+    const text = JSON.stringify(schema);
+    const pattern = new RegExp('#/[$]defs/[a-zA-Z]+', 'g');
+    for (const ref of text.match(pattern) ?? []) {
+      expect(Object.keys(defs), ref).toContain(ref.replace('#/$defs/', ''));
+    }
   });
 
   it('leaves the shore-up cap to the validator', () => {
