@@ -55,6 +55,7 @@ import { containsTokenSequence, tokenizePath, type ScreeningReport } from '@mint
 import { extractPage } from './extract.js';
 import { storagePathForKey, type WorkerSupabase } from './store/supabase.js';
 import { gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 /** Per page. Enough for the model to read a storefront, short enough that 25 of them fit. */
 export const PAGE_TEXT_LIMIT = 3_000;
@@ -98,9 +99,14 @@ export const ALWAYS_INCLUDED_SURFACES = [
  * checkout, and angle 4 reads a login the same way it reads a registration form.
  */
 export const SURFACE_SLUGS: readonly (readonly [string, string])[] = [
-  ['terms', 'terms'],
-  ['policy', 'terms'],
-  ['policies', 'terms'],
+  /*
+    Specific first, general second, and the split is load-bearing rather than tidy.
+
+    `/pages/shipping-policy` carries both `shipping` and `policy`. With `policy` listed first it was
+    labelled `terms` — a shipping policy filed as the terms page, which is wrong twice: the terms
+    page then looks present when it is not, and the shipping policy angle 5 wants is filed
+    somewhere nobody looks for it. Seen on run 97bf366a.
+  */
   ['shipping', 'shipping_policy'],
   ['refund', 'shipping_policy'],
   ['return', 'shipping_policy'],
@@ -111,9 +117,14 @@ export const SURFACE_SLUGS: readonly (readonly [string, string])[] = [
   ['registration', 'register'],
   ['signup', 'register'],
   ['sign-up', 'register'],
-  ['account', 'register'],
   ['login', 'register'],
   ['faq', 'faq'],
+
+  // General. Reached only when no specific token matched the path.
+  ['policy', 'terms'],
+  ['policies', 'terms'],
+  ['terms', 'terms'],
+  ['account', 'register'],
 ];
 
 /**
@@ -166,6 +177,20 @@ export interface PageSelection {
   readonly pages: readonly EvaluationPage[];
   /** One line per page not read in full, plus one for any page dropped by the cap. */
   readonly truncations: readonly string[];
+  /**
+   * How many candidates were considered, before either deduplication.
+   *
+   * The denominator the storefront-not-seen guard needs. After text deduplication every kept page
+   * has text unique to it, so `pages.length` alone can never show that thirty URLs served one
+   * document — the fact is in the difference between the two numbers.
+   */
+  readonly selectedCount: number;
+  /** Kept pages whose text is not empty. Equal to the number of distinct texts read. */
+  readonly distinctTexts: number;
+  /** How many candidates the single most-repeated text accounted for. 1 when nothing repeated. */
+  readonly dominantTextCount: number;
+  /** The first 120 characters of that text, for a message a person can act on. */
+  readonly dominantTextSample: string;
 }
 
 /** A stored `evidence` row, narrowed to what this module reads. */
@@ -325,7 +350,9 @@ export async function readPages(
   );
 
   /*
-    Deduplication, by normalized URL, keeping the fuller capture.
+    Deduplication, twice over: by normalized URL, then by the text that came out.
+
+    **By URL**, keeping the fuller capture.
 
     A run can hold two DOM artifacts for one page — different bytes, so different sha256, so two
     rows. Run 9011b2d7 had two for the homepage, and both reached the prompt: three kilobytes of
@@ -337,28 +364,43 @@ export async function readPages(
     `truncations`, so a reader can fetch the capture that was not read rather than discovering later
     that a choice was made silently.
 
-    The cap counts *distinct* pages. A duplicate never costs a slot — the bug being fixed here would
-    otherwise be able to push a real page off the end.
+    **By extracted text**, keeping the first. Neither the URL nor the byte check can see the case
+    this exists for: run 97bf366a captured thirty artifacts at thirty different URLs with thirty
+    different sha256 values, and twenty-eight of them extracted to the same 677-character age-gate
+    interstitial. Different URLs, so the URL check passes them; the interstitial carries something
+    per-request, so the byte check passes them too. Only what came *out* of the extractor shows that
+    one document was captured twenty-eight times.
+
+    A collapsed group costs one slot, not twenty-eight, and every URL that collapsed is named in
+    `truncations` — a reader has to be able to see that a page was requested and served something
+    else, which is a fact about the crawl and not a tidying detail.
+
+    The cap counts *kept* pages, so neither kind of duplicate can push a real page off the end. That
+    means reading past the cap when duplicates are collapsing, which is the right trade: the budget
+    exists to bound the prompt, not the reads.
   */
   const pages: EvaluationPage[] = [];
   const truncations: string[] = [];
   const indexByUrl = new Map<string, number>();
+  const indexByText = new Map<string, number>();
+  const collapsedByText = new Map<string, string[]>();
   const shaOf = (key: string): string => key.split('/').pop()?.replace(/\.html$/, '') ?? key;
+  const textHash = (text: string): string => createHash('sha256').update(text).digest('hex');
 
   let dropped = 0;
-  const kept: { readonly surface: string; readonly sourceUrl: string; readonly domKey: string }[] = [];
+  let selectedCount = 0;
+
   for (const entry of ordered) {
     const normalized = normalizeUrl(entry.sourceUrl) ?? entry.sourceUrl;
-    if (!indexByUrl.has(normalized) && indexByUrl.size >= MAX_PAGES) {
+
+    // The cap counts kept pages. A page whose URL is already held is read anyway, so the fuller
+    // capture can win; a genuinely new URL is skipped once the budget is full.
+    if (!indexByUrl.has(normalized) && pages.length >= MAX_PAGES) {
       dropped += 1;
       continue;
     }
-    kept.push(entry);
-    if (!indexByUrl.has(normalized)) indexByUrl.set(normalized, -1);
-  }
-  indexByUrl.clear();
+    selectedCount += 1;
 
-  for (const entry of kept) {
     let text = '';
     let source: PageTextSource = 'none';
     let problem: string | undefined;
@@ -408,9 +450,24 @@ export async function readPages(
       ...(problem === undefined ? {} : { problem }),
     };
 
-    const normalized = normalizeUrl(entry.sourceUrl) ?? entry.sourceUrl;
     const seen = indexByUrl.get(normalized);
     if (seen === undefined) {
+      /*
+        A page whose text is one this run has already read. Different URL, different bytes, same
+        document — the age-gate case. It costs no slot and it is named, because a page that was
+        requested and served something else is a fact about the crawl.
+      */
+      if (candidate.text !== '') {
+        const digest = textHash(candidate.text);
+        const first = indexByText.get(digest);
+        if (first !== undefined) {
+          const group = collapsedByText.get(digest) ?? [];
+          group.push(entry.sourceUrl);
+          collapsedByText.set(digest, group);
+          continue;
+        }
+        indexByText.set(digest, pages.length);
+      }
       indexByUrl.set(normalized, pages.length);
       pages.push(candidate);
       continue;
@@ -428,6 +485,27 @@ export async function readPages(
     );
   }
 
+  /*
+    One line per collapsed group, naming the page whose text was kept and every URL that produced
+    the same thing. Long on a run that hit a gate, and that length is the point: it is the list of
+    pages nobody actually saw.
+  */
+  let dominantTextCount = 1;
+  let dominantTextSample = '';
+  for (const [digest, urls] of collapsedByText) {
+    const index = indexByText.get(digest)!;
+    const kept = pages[index]!;
+    const total = urls.length + 1;
+    if (total > dominantTextCount) {
+      dominantTextCount = total;
+      dominantTextSample = kept.text.slice(0, 120);
+    }
+    truncations.push(
+      `${total} pages extracted to the same text as ${kept.surface} ${kept.sourceUrl}; ` +
+        `the other ${urls.length} were not read separately: ${urls.join('; ')}`,
+    );
+  }
+
   if (dropped > 0) {
     truncations.push(
       `${dropped} rendered page(s) beyond the ${MAX_PAGES}-page cap were not read. ` +
@@ -435,7 +513,14 @@ export async function readPages(
     );
   }
 
-  return { pages, truncations };
+  return {
+    pages,
+    truncations,
+    selectedCount,
+    distinctTexts: pages.filter((page) => page.text !== '').length,
+    dominantTextCount,
+    dominantTextSample,
+  };
 }
 
 /**

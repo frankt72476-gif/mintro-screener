@@ -26,6 +26,7 @@ import {
   orderPages,
   readPages,
   normalizeUrl,
+  SURFACE_SLUGS,
   surfaceFromSlug,
   surfacesByUrl,
   type EvidenceRow,
@@ -238,7 +239,6 @@ describe('ordering', () => {
 describe('the slug locator, the second source', () => {
   it('reads a surface off the path', () => {
     expect(surfaceFromSlug('https://shop.example/pages/terms-of-service')).toBe('terms');
-    expect(surfaceFromSlug('https://shop.example/policies/refund-policy')).toBe('terms');
     expect(surfaceFromSlug('https://shop.example/shipping')).toBe('shipping_policy');
     expect(surfaceFromSlug('https://shop.example/returns/')).toBe('shipping_policy');
     expect(surfaceFromSlug('https://shop.example/checkout')).toBe('checkout');
@@ -267,6 +267,33 @@ describe('the slug locator, the second source', () => {
     expect(surfaceFromSlug('https://shop.example/shop/bpc-157')).toBeNull();
     expect(surfaceFromSlug('https://shop.example/')).toBeNull();
     expect(surfaceFromSlug('not a url')).toBeNull();
+  });
+
+  /*
+    Specific before general. `/pages/shipping-policy` carries both `shipping` and `policy`, and with
+    `policy` first it came through run 97bf366a labelled `terms` — a shipping policy filed as the
+    terms page, which makes the terms page look present when it is not.
+  */
+  it('prefers the specific token where a path carries both', () => {
+    expect(surfaceFromSlug('https://www.comopeptides.com/pages/shipping-policy')).toBe('shipping_policy');
+    expect(surfaceFromSlug('https://shop.example/policies/refund-policy')).toBe('shipping_policy');
+    expect(surfaceFromSlug('https://shop.example/policies/return-policy')).toBe('shipping_policy');
+    expect(surfaceFromSlug('https://shop.example/account/login')).toBe('register');
+    expect(surfaceFromSlug('https://shop.example/pages/faq-account')).toBe('faq');
+  });
+
+  it('still reaches the general tokens when no specific one matches', () => {
+    expect(surfaceFromSlug('https://shop.example/policies/privacy')).toBe('terms');
+    expect(surfaceFromSlug('https://shop.example/pages/terms-of-service')).toBe('terms');
+    expect(surfaceFromSlug('https://shop.example/my-account/')).toBe('register');
+  });
+
+  it('orders every specific slug ahead of every general one', () => {
+    const ids = SURFACE_SLUGS.map(([slug]) => slug);
+    const general = ['policy', 'policies', 'terms', 'account'];
+    const lastSpecific = Math.max(...ids.filter((s) => !general.includes(s)).map((s) => ids.indexOf(s)));
+    const firstGeneral = Math.min(...general.map((s) => ids.indexOf(s)));
+    expect(lastSpecific).toBeLessThan(firstGeneral);
   });
 
   it('places a slug-located page into the always-included band', () => {
@@ -386,7 +413,8 @@ describe('reading the text', () => {
       sourceUrl: `https://shop.example/p${i}`,
       domKey: `k-${i}`,
     }));
-    const html = Object.fromEntries(many.map((p) => [p.domKey, '<p>text</p>']));
+    // Distinct text per page: identical text would now collapse, which is a different rule.
+    const html = Object.fromEntries(many.map((p, i) => [p.domKey, `<p>page number ${i}</p>`]));
 
     const selection = await readPages(report([]), many, fakeLoader(html));
     expect(selection.pages).toHaveLength(MAX_PAGES);
@@ -515,12 +543,102 @@ describe('deduplication by normalized URL', () => {
       })),
       { surface: 'product', sourceUrl: 'https://shop.example/p0/', domKey: 'k-dup' },
     ];
-    const html = Object.fromEntries(entries.map((e) => [e.domKey, '<p>text</p>']));
+    // Distinct per page, and the duplicate URL carries the same text its twin does.
+    const html = Object.fromEntries(entries.map((e, i) => [e.domKey, `<p>page number ${i}</p>`]));
+    html['k-dup'] = '<p>page number 0</p>';
 
     const selection = await readPages(report([]), entries, fakeLoader(html));
     expect(selection.pages).toHaveLength(MAX_PAGES);
     // The duplicate was read and merged, not counted — so nothing was dropped by the cap.
     expect(selection.truncations.join(' ')).not.toContain('beyond the');
+  });
+});
+
+describe('deduplication by extracted text', () => {
+  /*
+    The case neither the URL check nor a byte check can see. Run 97bf366a captured thirty artifacts
+    at thirty URLs with thirty distinct sha256 values, and twenty-eight extracted to the same
+    age-gate interstitial.
+  */
+  const GATE = '<p>Site entry. You must be 21 or older to enter this site.</p>';
+
+  const entriesFor = (urls: readonly string[]) =>
+    urls.map((u, i) => ({ surface: 'product', sourceUrl: u, domKey: `k-${i}` }));
+
+  it('keeps one page where many URLs served the same document', async () => {
+    const urls = ['https://s.example/a', 'https://s.example/b', 'https://s.example/c'];
+    const entries = entriesFor(urls);
+    const selection = await readPages(
+      report([]),
+      entries,
+      fakeLoader(Object.fromEntries(entries.map((e) => [e.domKey, GATE]))),
+    );
+
+    expect(selection.pages).toHaveLength(1);
+    expect(selection.selectedCount).toBe(3);
+    expect(selection.distinctTexts).toBe(1);
+    expect(selection.dominantTextCount).toBe(3);
+  });
+
+  it('names every URL that collapsed', async () => {
+    const urls = ['https://s.example/a', 'https://s.example/b'];
+    const entries = entriesFor(urls);
+    const selection = await readPages(
+      report([]),
+      entries,
+      fakeLoader(Object.fromEntries(entries.map((e) => [e.domKey, GATE]))),
+    );
+
+    const line = selection.truncations.join(' | ');
+    expect(line).toContain('2 pages extracted to the same text');
+    expect(line).toContain('https://s.example/b');
+  });
+
+  it('reports the dominant text sample, for a message a person can act on', async () => {
+    const entries = entriesFor(['https://s.example/a', 'https://s.example/b']);
+    const selection = await readPages(
+      report([]),
+      entries,
+      fakeLoader(Object.fromEntries(entries.map((e) => [e.domKey, GATE]))),
+    );
+    expect(selection.dominantTextSample).toContain('21 or older');
+  });
+
+  it('leaves pages with genuinely different text alone', async () => {
+    const entries = entriesFor(['https://s.example/a', 'https://s.example/b']);
+    const selection = await readPages(
+      report([]),
+      entries,
+      fakeLoader({ 'k-0': '<p>one thing</p>', 'k-1': '<p>a different thing</p>' }),
+    );
+    expect(selection.pages).toHaveLength(2);
+    expect(selection.dominantTextCount).toBe(1);
+    expect(selection.truncations).toEqual([]);
+  });
+
+  /*
+    A collapsed group costs one slot, not N. Without this, twenty-eight copies of a gate would eat
+    the whole budget and push every real page off the end.
+  */
+  it('lets a real page through after a collapsed group', async () => {
+    const entries = [
+      ...entriesFor(Array.from({ length: MAX_PAGES + 5 }, (_, i) => `https://s.example/gate${i}`)),
+      { surface: 'product', sourceUrl: 'https://s.example/real', domKey: 'k-real' },
+    ];
+    const html = Object.fromEntries(entries.map((e) => [e.domKey, GATE]));
+    html['k-real'] = '<p>a genuinely different page</p>';
+
+    const selection = await readPages(report([]), entries, fakeLoader(html));
+    expect(selection.pages).toHaveLength(2);
+    expect(selection.pages.map((p) => p.sourceUrl)).toContain('https://s.example/real');
+  });
+
+  it('does not collapse pages that produced no text at all', async () => {
+    const entries = entriesFor(['https://s.example/a', 'https://s.example/b']);
+    const selection = await readPages(report([]), entries, fakeLoader({ 'k-0': null, 'k-1': null }));
+    // Both are `none` with a stated problem; empty is not a text they share.
+    expect(selection.pages).toHaveLength(2);
+    expect(selection.distinctTexts).toBe(0);
   });
 });
 

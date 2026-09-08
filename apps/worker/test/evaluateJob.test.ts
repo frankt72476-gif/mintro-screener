@@ -15,7 +15,9 @@ import { loadRulesetFile, loadAngleSetFile, ANGLES_PATH, PLACEMENT_IDS } from '@
 import { PRICE_WORDS, type EvaluationDraft } from '@mintro/engine';
 import {
   MAX_ATTEMPTS,
+  MIN_DISTINCT_TEXTS,
   generateDraft,
+  storefrontNotSeen,
   inputHash,
   parseDraft,
   promptFor,
@@ -71,6 +73,8 @@ const INPUTS: EvaluationInputs = {
   eyeTest: [{ id: 'EYE-01', question: 'Does the homepage read as a research supplier?', verdict: 'concern', saw: 'A bundle banner.' }],
   pages: [page('homepage', 'Peptides for research use only.'), page('terms', 'Terms and conditions.')],
   pageTruncations: ['product https://shop.example/p/1: 9000 characters cut to 3000'],
+  // A run that saw the storefront: several distinct texts, nothing dominating.
+  pageStats: { selectedCount: 6, distinctTexts: 6, dominantTextCount: 1, dominantTextSample: '' },
 };
 
 /** A draft that passes the validator against `INPUTS`. */
@@ -422,6 +426,130 @@ describe('the cross-cutting angle is not an empty one', () => {
     const other = prompt.slice(prompt.indexOf('`products_for`'), prompt.indexOf('### Angle 3'));
     expect(other).toContain('- finding ');
     expect(other).not.toContain('Draw on the angles above');
+  });
+});
+
+describe('the storefront-not-seen guard', () => {
+  const stats = (over: Partial<EvaluationInputs['pageStats']>): EvaluationInputs['pageStats'] => ({
+    selectedCount: 20,
+    distinctTexts: 18,
+    dominantTextCount: 2,
+    dominantTextSample: '',
+    ...over,
+  });
+
+  it('passes a run that saw a storefront', () => {
+    expect(storefrontNotSeen(stats({}))).toBeNull();
+  });
+
+  it('refuses a run with fewer than three distinct texts', () => {
+    const message = storefrontNotSeen(stats({ selectedCount: 2, distinctTexts: 2, dominantTextCount: 1 }));
+    expect(message).toContain('did not see the storefront');
+    expect(message).toContain('only 2 distinct page text(s)');
+  });
+
+  it('accepts exactly three, which is the floor', () => {
+    expect(
+      storefrontNotSeen(stats({ selectedCount: 6, distinctTexts: MIN_DISTINCT_TEXTS, dominantTextCount: 2 })),
+    ).toBeNull();
+  });
+
+  /*
+    Run 97bf366a in numbers: thirty pages selected, three distinct texts, twenty-eight of them the
+    same age-gate interstitial. The distinct-text floor alone would have let it through — three is
+    three — which is why the dominance condition exists.
+  */
+  it('refuses the shape run 97bf366a actually had', () => {
+    const message = storefrontNotSeen(
+      stats({
+        selectedCount: 30,
+        distinctTexts: 3,
+        dominantTextCount: 28,
+        dominantTextSample: 'CoMo Peptides Site entry Laboratory research materials supplier',
+      }),
+    );
+    expect(message).toContain('one text accounted for 28 of the 30 pages');
+    expect(message).toContain('CoMo Peptides Site entry');
+    expect(message).toContain('Re-scan the merchant');
+  });
+
+  it('draws the dominance line at exactly half', () => {
+    expect(storefrontNotSeen(stats({ selectedCount: 10, distinctTexts: 6, dominantTextCount: 5 }))).toBeNull();
+    expect(storefrontNotSeen(stats({ selectedCount: 10, distinctTexts: 6, dominantTextCount: 6 }))).not.toBeNull();
+  });
+
+  it('says so when no text was read at all', () => {
+    const message = storefrontNotSeen(stats({ selectedCount: 4, distinctTexts: 0, dominantTextCount: 1 }));
+    expect(message).toContain('(no text was read)');
+  });
+});
+
+describe('generateDraft refuses a run that did not see the storefront', () => {
+  const blind: EvaluationInputs = {
+    ...INPUTS,
+    pageStats: {
+      selectedCount: 30,
+      distinctTexts: 3,
+      dominantTextCount: 28,
+      dominantTextSample: 'CoMo Peptides Site entry Laboratory research materials supplier',
+    },
+  };
+
+  it('calls nothing and returns the dedicated status', async () => {
+    const { impl, calls } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, blind, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('run_did_not_see_storefront');
+    expect(result.attempts).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(result.draft).toBeUndefined();
+    expect(result.message).toContain('28 of the 30 pages');
+  });
+
+  /*
+    The guard runs before the key is looked for. A run that did not see the storefront is not a
+    configuration problem, and reporting it as one would send an operator to check an env var.
+  */
+  it('reports the run, not a missing key, when both are true', async () => {
+    const key = process.env['ANTHROPIC_API_KEY'];
+    delete process.env['ANTHROPIC_API_KEY'];
+    try {
+      const result = await generateDraft(angles, ruleset, blind, {});
+      expect(result.status).toBe('run_did_not_see_storefront');
+      expect(result.message).not.toContain('ANTHROPIC_API_KEY');
+    } finally {
+      if (key !== undefined) process.env['ANTHROPIC_API_KEY'] = key;
+    }
+  });
+
+  it('still carries the input hash, so the refusal is attributable to these inputs', async () => {
+    const { impl } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, blind, { apiKey: 'sk-test', fetchImpl: impl });
+    expect(result.inputSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('token usage is carried off the response', () => {
+  it('reports what the vendor said', async () => {
+    const impl = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 20_400, output_tokens: 1_850 },
+        content: [{ type: 'text', text: JSON.stringify(validDraft()) }],
+      }),
+      text: async () => '',
+    })) as unknown as typeof fetch;
+
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+    expect(result.usage).toEqual({ inputTokens: 20_400, outputTokens: 1_850 });
+  });
+
+  it('omits usage rather than inventing zeros when the response carries none', async () => {
+    const { impl } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+    expect(result.usage).toBeUndefined();
   });
 });
 

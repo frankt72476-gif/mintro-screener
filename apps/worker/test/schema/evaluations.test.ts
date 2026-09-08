@@ -236,3 +236,38 @@ describe('the run is untouched by either table', () => {
     await expect(schema.query(`delete from public.runs where id = $1`, [runId])).rejects.toThrow();
   });
 });
+
+describe('the fourth validator status (0077)', () => {
+  /*
+    `run_did_not_see_storefront` is not a shade of `failed`. Nothing broke — the crawl ran and the
+    artifacts stored — but the pages captured were one document repeated, so the generation was
+    refused before a token was spent. The operator re-scans; they do not retry. Filing it under
+    `failed` would put two different next actions behind one word.
+  */
+  it('accepts a draft that records the run never saw the storefront', async () => {
+    const runId = await finishedRun();
+    await expect(
+      insertDraft(runId, 'run_did_not_see_storefront', null, 'one text accounted for 28 of 30 pages'),
+    ).resolves.toBeDefined();
+  });
+
+  it('still requires a message on it, like every other refusal', async () => {
+    const runId = await finishedRun();
+    await expect(insertDraft(runId, 'run_did_not_see_storefront', null, null)).rejects.toThrow();
+  });
+
+  it('still refuses a status outside the four', async () => {
+    const runId = await finishedRun();
+    await expect(insertDraft(runId, 'gave_up', null, 'because')).rejects.toThrow();
+  });
+
+  it('leaves the original three working', async () => {
+    for (const status of ['ok', 'rejected', 'failed']) {
+      const runId = await finishedRun();
+      const content = status === 'ok' ? '{}' : null;
+      const message = status === 'ok' ? null : 'why';
+      await expect(insertDraft(runId, status, content, message)).resolves.toBeDefined();
+    }
+  });
+});
+

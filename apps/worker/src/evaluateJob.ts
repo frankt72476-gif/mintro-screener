@@ -57,7 +57,14 @@ const TIMEOUT_MS = 180_000;
 /** One retry, and only one. A second rejection is an answer about the draft, not a transient fault. */
 export const MAX_ATTEMPTS = 2;
 
-export type DraftStatus = 'ok' | 'rejected' | 'failed';
+/**
+ * How a generation ended.
+ *
+ * `run_did_not_see_storefront` is not a shade of `failed`. Nothing broke — the crawl ran and the
+ * artifacts were stored — but the pages it captured were one document repeated, so the generation
+ * was refused before a token was spent. The operator re-scans; they do not retry. See 0077.
+ */
+export type DraftStatus = 'ok' | 'rejected' | 'failed' | 'run_did_not_see_storefront';
 
 export interface EvaluateResult {
   readonly runId: string;
@@ -67,6 +74,8 @@ export interface EvaluateResult {
   readonly message?: string;
   readonly inputSha256: string;
   readonly truncations: readonly string[];
+  /** What the vendor reported for the accepted answer. Absent when no call was made. */
+  readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
 }
 
 export interface EvaluateOptions {
@@ -92,6 +101,18 @@ export interface EvaluationInputs {
   readonly eyeTestAbsence?: string;
   readonly pages: readonly EvaluationPage[];
   readonly pageTruncations: readonly string[];
+  /**
+   * What page selection saw before it deduplicated. The guard's denominator.
+   *
+   * Carried rather than recomputed from `pages`: after text deduplication every kept page has text
+   * unique to it, so nothing in `pages` can show that thirty URLs served one document.
+   */
+  readonly pageStats: {
+    readonly selectedCount: number;
+    readonly distinctTexts: number;
+    readonly dominantTextCount: number;
+    readonly dominantTextSample: string;
+  };
 }
 
 /**
@@ -165,6 +186,46 @@ function promptInputsFor(
   };
 }
 
+
+/** Below this many distinct page texts, a run has not shown anybody a storefront. */
+export const MIN_DISTINCT_TEXTS = 3;
+
+/**
+ * Whether the run actually saw the storefront, and the message when it did not.
+ *
+ * Two conditions, and they catch different shapes of the same failure:
+ *
+ *   - **Fewer than three distinct texts.** A storefront read as one or two documents is a gate, an
+ *     error page, or a crawl that never got in. Three is the floor at which an evaluation across
+ *     seven angles is even arguably possible.
+ *   - **One text over half the pages selected.** Run 97bf366a read thirty pages of which twenty-
+ *     eight were the same age-gate interstitial. The other two were real, so the first condition
+ *     alone would have let it through — and a model handed that would have written a confident
+ *     reading of a gate, in a document whose page list looks like broad coverage.
+ *
+ * Returns the message rather than a boolean, because the message is the artifact: it names the
+ * text and how many pages it covered, which is what tells an operator to re-scan rather than retry.
+ */
+export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string | null {
+  const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = stats;
+
+  if (distinctTexts >= MIN_DISTINCT_TEXTS && dominantTextCount * 2 <= selectedCount) return null;
+
+  const sample = dominantTextSample === '' ? '(no text was read)' : `"${dominantTextSample}"`;
+  const reason =
+    distinctTexts < MIN_DISTINCT_TEXTS
+      ? `only ${distinctTexts} distinct page text(s) were read`
+      : `one text accounted for ${dominantTextCount} of the ${selectedCount} pages selected`;
+
+  return (
+    `This run did not see the storefront: ${reason}. No prompt was sent. ` +
+    `The repeated text begins: ${sample}. ` +
+    'A crawl that captured one document at many URLs has met a gate or an error page, and a draft ' +
+    'reasoned from it would read as a confident account of a storefront nobody looked at. ' +
+    'Re-scan the merchant; retrying the generator over the same run cannot help.'
+  );
+}
+
 /** The prompt as it would be sent. Exposed for the dry run and for tests. */
 export function promptFor(
   angles: AngleSet,
@@ -218,6 +279,15 @@ export async function generateDraft(
   const sha = inputHash(angles, inputs);
   const truncations = inputs.pageTruncations;
   const base = { runId: inputs.report.runId, inputSha256: sha, truncations };
+
+  /*
+    The guard runs before the key is even looked for. A run that did not see the storefront is not
+    a configuration problem, and reporting it as one would send an operator to check an env var.
+  */
+  const notSeen = storefrontNotSeen(inputs.pageStats);
+  if (notSeen !== null) {
+    return { ...base, status: 'run_did_not_see_storefront', attempts: 0, message: notSeen };
+  }
 
   const apiKey = options.apiKey ?? process.env['ANTHROPIC_API_KEY'];
   if (apiKey === undefined || apiKey === '') {
@@ -299,7 +369,21 @@ export async function generateDraft(
 
     const validation = validateDraft(draft, run);
     if (validation.ok) {
-      return { ...base, status: 'ok', attempts: attempt, draft };
+      const reported = (payload as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+      return {
+        ...base,
+        status: 'ok',
+        attempts: attempt,
+        draft,
+        ...(reported === undefined
+          ? {}
+          : {
+              usage: {
+                inputTokens: reported.input_tokens ?? 0,
+                outputTokens: reported.output_tokens ?? 0,
+              },
+            }),
+      };
     }
 
     lastMessage = rejectionMessage(validation.rejections);

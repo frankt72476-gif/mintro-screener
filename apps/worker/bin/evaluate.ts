@@ -17,6 +17,7 @@ import {
   generateDraft,
   promptFor,
   storeDraft,
+  storefrontNotSeen,
   type EvaluationInputs,
 } from '../src/evaluateJob.js';
 import {
@@ -145,6 +146,12 @@ async function main(argv: readonly string[]): Promise<number> {
         ...(eyeAbsence === undefined ? {} : { eyeTestAbsence: eyeAbsence }),
         pages: selection.pages,
         pageTruncations: selection.truncations,
+        pageStats: {
+          selectedCount: selection.selectedCount,
+          distinctTexts: selection.distinctTexts,
+          dominantTextCount: selection.dominantTextCount,
+          dominantTextSample: selection.dominantTextSample,
+        },
       };
     } finally {
       await loader.close();
@@ -152,6 +159,12 @@ async function main(argv: readonly string[]): Promise<number> {
   } finally {
     await browser.close();
   }
+
+  /*
+    The guard, reported on both paths. A dry run that printed a clean prompt over a run nobody
+    could have read would be the most misleading output this tool produces.
+  */
+  const notSeen = storefrontNotSeen(inputs.pageStats);
 
   if (dryRun) {
     const prompt = promptFor(angles, ruleset, inputs);
@@ -185,6 +198,7 @@ async function main(argv: readonly string[]): Promise<number> {
         attempts: result.attempts,
         inputSha256: result.inputSha256,
         truncations: result.truncations,
+        ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.message === undefined ? {} : { message: result.message }),
         ...(result.draft === undefined ? {} : { draft: result.draft }),
       },
