@@ -16465,3 +16465,146 @@ the process. Removal is a separate decision.
 
 Sort the current 16 auto_fail rules into Layer 1, Layer 2 evidence, and routing (Claude drafts,
 Frank ratifies). Then design the angle set. Then design the report.
+
+---
+
+## D-257 — Eye test becomes draft input; its report panel is retired
+**2026-09-08 · architect**
+
+The eye test is not replaced and not extended. It becomes one input to the draft generator, its
+outcomes cited as evidence under angle 1 (who the site is talking to) and angle 7 (consistency).
+Its panel leaves the report. The rubric keeps running unchanged.
+
+**Reasoning.** The repo already has half of Layer 2. `packages/engine/src/eyetest.ts` asks a vision
+model — `claude-sonnet-5`, rubric `rules/eyetest.json` 2.2.0 — rubric questions over screenshots and
+page text, stores answers in `public.eye_tests` (0049), and renders them in `EyeTestPanel`
+(`ReportView.tsx:1173`). Its docblock says it produces observations, never findings, never a
+verdict. Its vocabulary is `clear | concern | cannot_tell`, and it deliberately carries no rule id.
+
+That is the angle model with the conclusion removed, built under D-001. D-256 puts the conclusion
+back. So what changes is not the layer but what sits on top of it: the same observations, now
+serving a placement instead of standing beside one.
+
+**What this does not change.** The rubric file, the model pinned in it, the request shape, the
+`eye_tests` table, and the absence-evidencing behaviour in `EyeTestOutcome`. A read that could not
+be taken still says which captures it wanted and what happened to each. The eye test still cannot
+move a state, a count, a coverage number, a stopping condition or a verdict — it now feeds a draft
+that a person edits and publishes, which is a different act from a finding.
+
+**What leaves.** `EyeTestPanel` and the eye-test rows in the rendered report. The observations do
+not disappear; they are cited inside the evaluation. A panel printing them a second time, beside a
+draft that already reasons from them, would show the same read twice under two authorities.
+
+Everything else in the D-256 architecture is new alongside the existing engine, not a rewrite of it.
+
+---
+
+## D-258 — Evaluation is a separate artifact: one mutable draft per run, append-only published versions, the run untouched
+**2026-09-08 · architect**
+
+Two tables, two migrations, following `NNNN_snake_case`:
+
+- **`0075_evaluation_drafts.sql`** — one row per run at a time. Columns: `run_id`,
+  `angles_version`, `ruleset_version`, `model`, `input_sha256`, `content jsonb`,
+  `validator_status`, `validator_message`, `created_at`, `edited_at`, `edited_by`. Mutable: the
+  operator edits it and regeneration replaces it. This is the one deliberately mutable object in
+  the system, and it is never rendered outside the operator UI.
+- **`0076_evaluations.sql`** — published versions. Columns: `run_id`, `version` (1..n),
+  `content jsonb`, `published_at`, `published_by`, `draft_input_sha256`. Append-only under the
+  existing `reject_mutation()` trigger, the same one `findings` and `evidence` carry. Publishing
+  copies the draft into a new row; the draft row is then deleted. Earlier versions remain readable.
+
+**D-002 is preserved, not relaxed.** The run row is untouched by any of this. The trigger
+`runs_are_immutable_once_finished` (`0004_runs.sql:73`) stays exactly as it is, and so do the
+append-only triggers on `findings` (`0005_findings.sql:58`) and `evidence` (`0006_evidence.sql:42`).
+Nothing here adds a write path to a finished run, and no migration in this cluster or the next one
+may weaken those triggers. The evaluation is a **separate artifact that cites into an immutable
+run** — a document about a run, stored beside it, never a column on it. Re-screening still creates a
+new run, and a new run has no evaluation until one is drafted for it.
+
+The mutable draft is the one exception in a system built on immutability, and it is bounded on
+purpose: it is a work-in-progress that never leaves the operator's screen, it holds no evidence of
+its own, and the moment it becomes a document anyone else can read it stops being a draft and
+becomes an append-only row. A draft is not a record of what Mintro said; the published version is.
+
+**No `observations` table in v1.** Unbound observations are produced inside the draft as cited or
+inference-marked sentences, which is what `docs/angle-set-design.md` asked for. An engine-side
+heuristic observation layer — shipping-scope statements, wholesale mentions, age mismatches — is a
+later cluster if the drafts show the model missing them.
+
+---
+
+## D-259 — Rules carry an evaluation tier (legality | routing | evidence) and evidence rules a weight (heavy | ordinary)
+**2026-09-08 · architect**
+
+`rules/ruleset.json` gains two fields per rule. Version `3.7.0` → `3.8.0`, `effective` unchanged.
+
+- **`evaluation_tier`**: `legality | routing | evidence`, on every rule.
+- **`weight`**: `heavy | ordinary`, on evidence-tier rules only, and on no others.
+
+**The field is not called `tier`, and the reason is not stylistic.** `tier` is taken: it holds
+`auto_fail | review_only` (`packages/ruleset/src/vocabulary.ts:36`), it is the subject of hard
+constraint 4, it is the sole input to `stateForViolation` in `packages/engine/src/findings.ts:143`
+(D-009), and `packages/engine/src/report.ts:437` writes it into every assembled report. Those
+reports are frozen under D-002. Repurposing the name would leave one key meaning `auto_fail` in
+every run to date and `legality` in every run after, inside immutable documents — the same key,
+two meanings, neither labelled. `docs/architecture-evaluation-model.md` calls the existing axis
+`enforcement`; no field by that name exists, and the memo is corrected here rather than followed.
+
+D-256 and the architecture memo both describe the rule set as 3.1.0 and count 16 auto_fail rules.
+Both are stale: the file is 3.7.0 with 59 rules and 18 auto_fail. The sort below governs.
+
+### The sort
+
+**legality** — CATG-003, CATG-004, PAY-001, PROD-006, PROD-008, PROD-015 (new).
+
+**routing** — GATE-002, GATE-003, CATG-001, CATG-002, CATG-005, OFFS-001, OFFS-007.
+
+**evidence, heavy** — PROD-005, PROD-007, PROD-009, NAME-001, OFFS-002, PROD-016 (new).
+
+**evidence, ordinary** — every other rule.
+
+The legality set is smaller than the current auto_fail set, as D-256 said it would be. Rules that
+auto-fail today and are not legality items — DISC-002, DISC-003, NAME-002, COA-002, COA-003,
+PROD-011, PROD-013 — keep `tier: auto_fail` and become evidence. `tier` still decides a finding's
+state; `evaluation_tier` decides what the evaluation does with it. They are different questions.
+
+### The two new rules
+
+Both `source: mintro`: they quote nothing in the standards, so they render under the Mintro heading
+per D-138 and are outside the corpus substring check, which filters `source === 'programme'`. Both
+`type: manual`, `tier: review_only`, `sev: major`, `cat: product`.
+
+- **PROD-015 — Explicit outcome claims.** Clause, Mintro-authored: *"Copy that promises a
+  measurable human result, such as an amount of weight lost or a number of days to a result, is a
+  health claim regardless of any disclaimer."* `evaluation_tier: legality`.
+- **PROD-016 — Suggestive lifestyle claims.** Clause: *"Language that associates a compound with
+  energy, vitality, an active lifestyle, appearance or wellbeing implies human use even where no
+  disease or result is named."* `evaluation_tier: evidence`, `weight: heavy`.
+
+Both carry `params.reason: "Detected by text patterns in cluster 2; manual until then."`
+
+**They are 015 and 016, not 011 and 012.** PROD-011 and PROD-012 already exist — *Benefit claims in
+product body copy* and *Benefit vocabulary with ordinary non-claim uses*, both added by D-177 — and
+rule ids are never reused. The existing pair takes `evidence` / `ordinary` under the catch-all.
+
+### The note that bounds this record
+
+Tier is metadata. No check's semantics change in this record. CATG-005's check reads
+bacteriostatic-water labeling; the routing condition it feeds needs presence, and cluster 2 maps
+that. PROD-008's check patterns are reviewed against real runs in cluster 2 to confirm they match
+explicit claims only.
+
+The memo's proposal to narrow PROD-008 and move its implied form to the lifestyle rule is
+**deferred to cluster 2** for that reason: it is a clause and pattern change, and D-041 clause
+fidelity means it needs the standards sentence in hand, not a tier assignment.
+
+### The validator
+
+`packages/ruleset` asserts, and refuses the file otherwise: every rule carries an
+`evaluation_tier` from the enum; every evidence rule carries a `weight`; no non-evidence rule
+carries one; the legality set is exactly the six ids above; the routing set is exactly the seven.
+
+The two closed sets are pinned in the validator rather than left to the data because they are the
+ratified lists, not a shape — a seventh legality rule arriving by edit is a business decision, and
+it should fail the build until it has a decision number.
