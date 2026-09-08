@@ -108,6 +108,29 @@ function evidenceForAngle(angleId: string, angles: AngleSet, inputs: PromptInput
     lines.push(`- eye_test ${verdict.id} verdict=${verdict.verdict}${saw}`);
   }
 
+  /*
+    An angle that declares no evidence is cross-cutting, not empty.
+
+    Angle 7 has no rules of its own by design — it sets everything the other six found against the
+    site's own research-only statements. The previous rendering gave it the same
+    "(nothing observed)" line an angle with a genuinely blank run would get, which is false about
+    this angle and points the model straight at `nothingObserved: true`. Those are two different
+    facts and they must not share a sentence.
+
+    Which rules carry the research-only statements is named in the angle's own `notes`, in the data.
+    Spelling the ids out here would be rule knowledge in the prompt builder — hard constraint 1 —
+    and would go stale the first time the disclosure rules moved.
+  */
+  if (angle.ruleIds.length === 0 && angle.eyeTestItemIds.length === 0) {
+    return (
+      'This angle declares no evidence of its own, and that is not the same as nothing having been ' +
+      'observed. Draw on the angles above: take the items you cited there and set them against the ' +
+      "site's own research-only statements, named in this angle's Notes. Cite from both sides of " +
+      'each contradiction — the item that contradicts and the statement it contradicts. Set ' +
+      '`nothingObserved` here only if the angles above produced nothing to set against anything.'
+    );
+  }
+
   return lines.length === 0 ? '- (nothing observed feeds this angle on this run)' : lines.join('\n');
 }
 

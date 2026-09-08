@@ -383,3 +383,45 @@ describe('parseDraft', () => {
     expect(parseDraft(payload)).toBeNull();
   });
 });
+
+describe('the cross-cutting angle is not an empty one', () => {
+  const prompt = promptFor(angles, ruleset, INPUTS);
+  const block = prompt.slice(prompt.indexOf('`consistency`'), prompt.indexOf('## Routing conditions'));
+
+  /*
+    Angle 7 declares no rules by design — it sets what the other six found against the site's own
+    research-only statements. It used to render the same "(nothing observed)" line an angle with a
+    genuinely blank run would get, which is false about this angle and points the model straight at
+    `nothingObserved: true`. Two different facts; they must not share a sentence.
+  */
+  it('does not tell the model nothing was observed', () => {
+    expect(block).not.toContain('nothing observed feeds this angle');
+  });
+
+  it('tells the model to draw on the other angles', () => {
+    expect(block).toContain('Draw on the angles above');
+    expect(block).toContain('declares no evidence of its own');
+    expect(block).toContain('not the same as nothing having been observed');
+  });
+
+  it('points at the research-only statements through the angle notes, not a hardcoded list', () => {
+    // The rule ids live in the data. The prompt builder names none of them.
+    const notes = angles.angles.find((a) => a.id === 'consistency')?.notes ?? '';
+    expect(notes).toContain('DISC-001');
+    expect(notes).toContain('DISC-002');
+    expect(notes).toContain('DISC-003');
+    expect(block).toContain(notes);
+    expect(block).toContain("named in this angle's Notes");
+  });
+
+  it('still allows nothingObserved, but only for the right reason', () => {
+    expect(block).toContain('only if the angles above produced nothing');
+  });
+
+  it('leaves an ordinary angle rendering its evidence list', () => {
+    const other = prompt.slice(prompt.indexOf('`products_for`'), prompt.indexOf('### Angle 3'));
+    expect(other).toContain('- finding ');
+    expect(other).not.toContain('Draw on the angles above');
+  });
+});
+

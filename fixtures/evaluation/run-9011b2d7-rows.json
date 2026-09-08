@@ -1,0 +1,434 @@
+{
+  "note": "Real rows from run 9011b2d7 (www.comopeptides.com, 2026-09-03), exported unedited. Committed so the surface-locator test derives its actual value from production shapes rather than from a map the test built to suit the code.",
+  "runId": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d",
+  "findings": [
+    {
+      "ruleId": "COMM-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "DISC-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-002",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-007",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/726d49cc522980344989da509dffbea5c2d8a2c9bce6df23bcb37ea6788374ad.png"
+    },
+    {
+      "ruleId": "GATE-006",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "GATE-001",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "DISC-001",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "DISC-002",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "FULF-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "DISC-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-006",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-007",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-008",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-011",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-013",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-001",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-002",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-009",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-010",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "FULF-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-012",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "PROD-014",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "NAME-002",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "NAME-001",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344"
+    },
+    {
+      "ruleId": "NAME-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "CATG-008",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "CATG-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "CATG-006",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "CATG-001",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "CATG-002",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "CATG-003",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "CATG-004",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "OFFS-002",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "OFFS-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "CATG-007",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "COA-002",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COA-003",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COA-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COA-001",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COA-004",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COA-006",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "FULF-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "FULF-001",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "FULF-002",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "OFFS-005",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "OFFS-003",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "OFFS-001",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "OFFS-007",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "OFFS-006",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "ruleId": "PAY-003",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "ruleId": "PAY-001",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COMM-001",
+      "evidenceKey": null
+    },
+    {
+      "ruleId": "COMM-002",
+      "evidenceKey": null
+    }
+  ],
+  "evidence": [
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/02e77d36c0be425e9c5bffad1cf33fc13fa552e2b3212afeebea832658669a1c",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/product-sitemap.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344",
+      "kind": "robots",
+      "url": "https://www.comopeptides.com/robots.txt"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/sitemap_index.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/f54351ddcf5a4117d0a082ab66fd19bc9371ba448d3a69017fdeac4a18c3a9f2",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/page-sitemap.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/02ee3365ecae60f52ad4281b8ad7ad00f1863b1d7655814c3381031f4332eae8.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/09814e5695b828267b9201bb86bc2184f368cab79a7b800c4d274ac975cd3c38.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/tz/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0d4dd6b9ac90e8b0c8331b927ceb233c6218586fe921d501f6e5ddd6986c8812.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/klow/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0e3c1ba592ded32aef134e0a65173377ca151f44801faea2eef2037048d291eb.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0ed5b8217e684b5908c90b0a11f1d8d393228743c3daf718a800bcef49801e2e.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-no-dac/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/1b05d8b150f1c89c5fdb95bd04dcdae2a112f21c300ffdc1ebcdcd39236db0a4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/290a1a79a492fe00663768a61a718ecb95ede0f26f55cc5925e8e1b39c17102a.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/melanotan-ii-mt2/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/358007bb060c3b05d1387bf8b692363e2038acbb072d6e4ba54cc410d7edbbd4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/rt/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3a269356e6f3ffdb428d49e66c90bcfc7e0675c60c47203a7abe955b8370e3a6.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/klow/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3b7bab10dca88ec24d45896c075e0156c96d5376c9b63ccf237d1ae0a59f320b.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/semax/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/401cd5d39738be50d27cc6f9ed970a4fff90580fee6ac74d205f9cf72b235fe1.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/ghk-cu-copper/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/591f87695a84226ca6f1b7d2ae1449183ab4f99754692e1a7bc5d4eaba8ffa7a.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/melanotan-i-mt1/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/630bb4c44484921fabb08f4d7a1f72a37bda739f3b8731d56e54522832985cd3.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/melanotan-i-mt1/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/680f1bf3a628e419528bac391b7fc1e6c617c7df36280a29ea82cb33cbc487bc.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/726d49cc522980344989da509dffbea5c2d8a2c9bce6df23bcb37ea6788374ad.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/termsandconditions/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/729db51b9d9b3afc034769faa327e285b4149b99dd5cb3dfcfa0f90dc8691988.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/termsandconditions/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/72c4ad475de5b4a396795cc1b6aa730e9672cf9f9913fe60e7aa83408cecc9c4.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/rt/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/74ecaba6f873d374c2c5469e8e02c8d52f0433eab8c52aee793cbc7bac6afb3b.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/melanotan-ii-mt2/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/803ed3eb85c692dc2270f9bcfa669548e65e17bbd9bbcc84b3535c68a4cbf444.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/my-account/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/918685b80981f1719adb6bdcab61d912d25cf2ac0294000f6a1f639520aa98c7.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cagrilintide/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/96547879d4a2675413bed0e9bca5b02aa424bb363b03b082c47576082df6ac9b.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/a33970f260b97677a75cdccd9698562f46d88f07b6bb5916be1b0eaa29f80113.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/b990eb89a515e4432963aac104d9b4baa2bd3a8059d6d2a6d5633e7e42d270f4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/account/register"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c1e632568efd5d6f3323617a3ae34f0b96c95d816ae828e7922fe0c194289814.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/semax/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c2de1cad76dcbaa282b2bb109bb779c5114c28d010a7680cf81ea2d56274db81.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-no-dac/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ce9fe05f534e6ab7a807b0441e81ea3a625d2e76b509a10b61f0f4f7fff7f47e.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/bpc-tb-ghk-cu/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/cf35364b9b9e9ecf589efca43587dcb01a4386f79346fd0ecc85a3581a86dad9.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/tz/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e091c52ab279dcc7c6b12b13d72667e3aba163f44aa8ea1decc2e275f758d025.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cagrilintide/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e4537aeed0431603e2f1b45281f564a36a886990a51f2418a4b15ec4cf3818c4.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/ghk-cu-copper/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ec57b40eedce64b0bdb71e65873caef47b9012f1fcc2d7e4351af7405924234a.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ee598d5404e4dd7d6e7398ba9f1f83763555cfa4a7cc376fb99fd3ff4e9ce565.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/my-account/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/eee2030b113830d23c2311fcbe727f8420facdde997f066a68c520604f98c454.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/bpc-tb-ghk-cu/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/f9b1894c19e3b742746f1d9615ddf919e7aa567716625f9f4a5968ef26817021.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin/"
+    }
+  ]
+}

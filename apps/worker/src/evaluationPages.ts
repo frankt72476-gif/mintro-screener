@@ -182,17 +182,47 @@ export interface FindingRow {
 }
 
 /**
- * The surface each evidence key was read as, from the rules that cited it.
+ * One URL, in the form two references to the same page both reduce to.
  *
- * A key cited by several rules takes the most specific surface available: `all_sampled` and
- * `footer` describe *where on a page* a check looked rather than *which page it is*, so they never
- * name a page. A key cited only by those stays unlabelled and is ordered by suspicion like any
- * other product page.
+ * Lowercase scheme and host, no query, no fragment, exactly one trailing slash. Returns null on
+ * anything that is not a URL.
+ *
+ * **The path's case is kept.** Hosts are case-insensitive and paths are not: a server may serve
+ * `/Terms` and `/terms` as two documents, and folding them would merge two pages into one on the
+ * strength of an assumption about somebody else's server.
+ */
+export function normalizeUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const path = `${parsed.pathname.replace(/\/+$/, '')}/`;
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${path}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The surface each page was read as, keyed by normalized URL.
+ *
+ * **The join is through the URL, and it has to be.** A finding cites the evidence key of whatever
+ * the check captured — a sitemap under `layer0/`, a screenshot under `layer1/….png`. The page text
+ * comes from the DOM artifact, `layer1/….html`. Those key spaces never intersect, so a locator
+ * keyed on the evidence key silently matched nothing: on run 9011b2d7, 17 findings carried an
+ * evidence key, 18 DOM artifacts existed, and the overlap was zero. The terms page came through
+ * the prompt labelled `other`.
+ *
+ * What both rows *do* share is the URL of the page they were taken from. So the finding names a
+ * surface, its evidence row names a URL, and the DOM row for that same URL is the page — joined on
+ * the one field that means the same thing in both.
+ *
+ * A key cited by several rules takes the first page surface offered. `all_sampled` and `footer`
+ * describe *where on a page* a check looked rather than *which page it is*, so they never name one.
  */
 const NON_PAGE_SURFACES = new Set(['all_sampled', 'footer', 'footer_and_public_pages']);
 
-export function surfacesByEvidenceKey(
+export function surfacesByUrl(
   findings: readonly FindingRow[],
+  evidence: readonly EvidenceRow[],
   ruleset: Ruleset,
 ): ReadonlyMap<string, string> {
   const surfaceOfRule = new Map<string, string>();
@@ -201,14 +231,22 @@ export function surfacesByEvidenceKey(
     if (surface !== undefined && !NON_PAGE_SURFACES.has(surface)) surfaceOfRule.set(rule.id, surface);
   }
 
-  const byKey = new Map<string, string>();
+  const urlOfKey = new Map(evidence.map((row) => [row.key, row.url]));
+
+  const byUrl = new Map<string, string>();
   for (const finding of findings) {
     if (finding.evidenceKey === null || finding.evidenceKey === '') continue;
     const surface = surfaceOfRule.get(finding.ruleId);
-    if (surface === undefined || byKey.has(finding.evidenceKey)) continue;
-    byKey.set(finding.evidenceKey, surface);
+    if (surface === undefined) continue;
+
+    const url = urlOfKey.get(finding.evidenceKey);
+    if (url === undefined) continue;
+    const normalized = normalizeUrl(url);
+    if (normalized === null || byUrl.has(normalized)) continue;
+
+    byUrl.set(normalized, surface);
   }
-  return byKey;
+  return byUrl;
 }
 
 /**
@@ -226,7 +264,11 @@ export function orderPages(
   surfaceOf: ReadonlyMap<string, string>,
 ): readonly { readonly surface: string; readonly sourceUrl: string; readonly domKey: string }[] {
   const manifest = report.eyeTestCaptures ?? [];
-  const manifestSurfaceByUrl = new Map(manifest.map((entry) => [entry.sourceUrl, entry.surface]));
+  const manifestSurfaceByUrl = new Map(
+    manifest
+      .map((entry) => [normalizeUrl(entry.sourceUrl), entry.surface] as const)
+      .filter((pair): pair is readonly [string, string] => pair[0] !== null),
+  );
 
   /*
     Three sources, in precedence order, and the order is the ruling.
@@ -236,15 +278,18 @@ export function orderPages(
     structure already named keeps that name, and the deduplication is a consequence of the ordering
     rather than a separate pass.
   */
-  const candidates = domRows.map((row) => ({
-    surface:
-      manifestSurfaceByUrl.get(row.url) ??
-      surfaceOf.get(row.key) ??
-      surfaceFromSlug(row.url) ??
-      'other',
-    sourceUrl: row.url,
-    domKey: row.key,
-  }));
+  const candidates = domRows.map((row) => {
+    const normalized = normalizeUrl(row.url);
+    return {
+      surface:
+        (normalized === null ? undefined : manifestSurfaceByUrl.get(normalized)) ??
+        (normalized === null ? undefined : surfaceOf.get(normalized)) ??
+        surfaceFromSlug(row.url) ??
+        'other',
+      sourceUrl: row.url,
+      domKey: row.key,
+    };
+  });
 
   const rank = (surface: string): number => {
     const index = (ALWAYS_INCLUDED_SURFACES as readonly string[]).indexOf(surface);
@@ -279,10 +324,39 @@ export async function readPages(
     (report.eyeTestCaptures ?? []).map((entry) => [entry.sourceUrl, entry.text]),
   );
 
-  const kept = ordered.slice(0, MAX_PAGES);
-  const dropped = ordered.length - kept.length;
+  /*
+    Deduplication, by normalized URL, keeping the fuller capture.
+
+    A run can hold two DOM artifacts for one page — different bytes, so different sha256, so two
+    rows. Run 9011b2d7 had two for the homepage, and both reached the prompt: three kilobytes of
+    the same page twice, inviting the model to weigh one storefront's front page as two
+    observations.
+
+    The larger text wins, on the reasoning that the shorter capture is the one that caught the page
+    mid-render. It is a heuristic and it is recorded as one: the dropped artifact's sha goes into
+    `truncations`, so a reader can fetch the capture that was not read rather than discovering later
+    that a choice was made silently.
+
+    The cap counts *distinct* pages. A duplicate never costs a slot — the bug being fixed here would
+    otherwise be able to push a real page off the end.
+  */
   const pages: EvaluationPage[] = [];
   const truncations: string[] = [];
+  const indexByUrl = new Map<string, number>();
+  const shaOf = (key: string): string => key.split('/').pop()?.replace(/\.html$/, '') ?? key;
+
+  let dropped = 0;
+  const kept: { readonly surface: string; readonly sourceUrl: string; readonly domKey: string }[] = [];
+  for (const entry of ordered) {
+    const normalized = normalizeUrl(entry.sourceUrl) ?? entry.sourceUrl;
+    if (!indexByUrl.has(normalized) && indexByUrl.size >= MAX_PAGES) {
+      dropped += 1;
+      continue;
+    }
+    kept.push(entry);
+    if (!indexByUrl.has(normalized)) indexByUrl.set(normalized, -1);
+  }
+  indexByUrl.clear();
 
   for (const entry of kept) {
     let text = '';
@@ -323,7 +397,7 @@ export async function readPages(
       );
     }
 
-    pages.push({
+    const candidate: EvaluationPage = {
       surface: entry.surface,
       sourceUrl: entry.sourceUrl,
       domKey: entry.domKey,
@@ -332,7 +406,26 @@ export async function readPages(
       truncated,
       originalLength,
       ...(problem === undefined ? {} : { problem }),
-    });
+    };
+
+    const normalized = normalizeUrl(entry.sourceUrl) ?? entry.sourceUrl;
+    const seen = indexByUrl.get(normalized);
+    if (seen === undefined) {
+      indexByUrl.set(normalized, pages.length);
+      pages.push(candidate);
+      continue;
+    }
+
+    // Two captures of one page. Keep the fuller one and say which was set aside.
+    const held = pages[seen]!;
+    const winner = candidate.originalLength > held.originalLength ? candidate : held;
+    const loser = winner === candidate ? held : candidate;
+    pages[seen] = winner;
+    truncations.push(
+      `${entry.surface} ${normalized}: two captures were stored; read the longer ` +
+        `(${winner.originalLength} characters, ${shaOf(winner.domKey)}) and set aside ` +
+        `${shaOf(loser.domKey)} (${loser.originalLength} characters)`,
+    );
   }
 
   if (dropped > 0) {

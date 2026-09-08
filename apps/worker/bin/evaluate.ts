@@ -23,7 +23,7 @@ import {
   createLoader,
   orderPages,
   readPages,
-  surfacesByEvidenceKey,
+  surfacesByUrl,
   type EvidenceRow,
 } from '../src/evaluationPages.js';
 import { estimateTokens } from '../src/evaluationPrompt.js';
@@ -135,7 +135,7 @@ async function main(argv: readonly string[]): Promise<number> {
   try {
     const loader = await createLoader(supabase, browser, ruleSelectors(ruleset));
     try {
-      const ordered = orderPages(report, domRows, surfacesByEvidenceKey(findings, ruleset));
+      const ordered = orderPages(report, domRows, surfacesByUrl(findings, evidence, ruleset));
       const selection = await readPages(report, ordered, loader);
       inputs = {
         report,

@@ -25,12 +25,18 @@ import {
   PAGE_TEXT_LIMIT,
   orderPages,
   readPages,
+  normalizeUrl,
   surfaceFromSlug,
-  surfacesByEvidenceKey,
+  surfacesByUrl,
   type EvidenceRow,
+  type FindingRow,
 } from '../src/evaluationPages.js';
+import { readFileSync } from 'node:fs';
 
 const ruleset = loadRulesetFile('rules/ruleset.json');
+
+/** Surfaces that say where on a page a check looked, not which page it is. */
+const NON_PAGE = new Set(['all_sampled', 'footer', 'footer_and_public_pages']);
 
 const report = (captures: { surface: string; sourceUrl: string; text: string }[]): ScreeningReport =>
   ({
@@ -54,41 +60,123 @@ function fakeLoader(html: Record<string, string | null>) {
   };
 }
 
-describe('surfaces are read off the rules, not off the URL', () => {
-  it('labels a page by the surface of the rule whose finding cites it', () => {
-    // GATE-007 is `surface: terms`; FULF-001 is `surface: shipping_policy`. The URLs are chosen to
-    // say nothing a matcher could use.
-    const byKey = surfacesByEvidenceKey(
-      [
-        { ruleId: 'GATE-007', evidenceKey: 'run-1/layer1/aaa.html' },
-        { ruleId: 'FULF-001', evidenceKey: 'run-1/layer1/bbb.html' },
-      ],
-      ruleset,
-    );
-    expect(byKey.get('run-1/layer1/aaa.html')).toBe('terms');
-    expect(byKey.get('run-1/layer1/bbb.html')).toBe('shipping_policy');
+/**
+ * Real rows from run 9011b2d7 (www.comopeptides.com), committed unedited.
+ *
+ * The point of the fixture is where the *actual* value comes from. The previous version of this
+ * test handed `surfacesByEvidenceKey` a map it had built itself, so expected and actual came from
+ * the same place and the join could not fail — and it did fail, completely, against production:
+ * findings cite `layer0/` and `.png` keys, DOM artifacts are `.html`, and the two never met.
+ *
+ * These rows are the shapes the database actually holds. The expected surface comes from the rule
+ * set's own `params.surface`, which the fixture knows nothing about.
+ */
+const ROWS = JSON.parse(
+  readFileSync('fixtures/evaluation/run-9011b2d7-rows.json', 'utf8'),
+) as { findings: FindingRow[]; evidence: EvidenceRow[] };
+
+describe('the surface locator, against real rows', () => {
+  const byUrl = surfacesByUrl(ROWS.findings, ROWS.evidence, ruleset);
+
+  /*
+    The defect this replaced the hand-built map for. A locator joining on the evidence key matched
+    nothing at all on this run; one joining on the URL finds the pages.
+  */
+  it('finds pages, where the key-based join found none', () => {
+    const domKeys = new Set(ROWS.evidence.filter((r) => r.kind === 'dom').map((r) => r.key));
+    const cited = ROWS.findings.map((f) => f.evidenceKey).filter((k): k is string => k !== null);
+
+    expect(cited.length).toBeGreaterThan(0);
+    // The old join, restated: not one cited key is a DOM artifact.
+    expect(cited.filter((k) => domKeys.has(k))).toEqual([]);
+    // The new one resolves pages regardless.
+    expect(byUrl.size).toBeGreaterThan(0);
   });
 
   /*
-    `all_sampled` and `footer` say *where on a page* a check looked, not *which page it is*. A key
-    labelled from one of them would name every sampled product "all_sampled" and lose the ordering
-    the run already established.
+    The page the dry run got wrong. `/termsandconditions/` is one token, so the slug locator misses
+    it and it came through the prompt labelled `other`. GATE-007 read it and declares
+    `surface: terms`, so the URL join is what recovers it.
+
+    The expected value is read out of the rule set; the actual comes from the fixture's rows.
+    Neither knows about the other.
   */
-  it('does not take a page label from a surface that is not a page', () => {
-    const byKey = surfacesByEvidenceKey(
-      [
-        { ruleId: 'PROD-008', evidenceKey: 'run-1/layer1/ccc.html' },
-        { ruleId: 'DISC-001', evidenceKey: 'run-1/layer1/ddd.html' },
-      ],
-      ruleset,
+  it('labels the terms page from the rule that read it', () => {
+    const expected = (ruleset.rules.find((r) => r.id === 'GATE-007')?.params as { surface?: string })
+      .surface;
+    const url = normalizeUrl('https://www.comopeptides.com/termsandconditions/')!;
+
+    expect(expected).toBe('terms');
+    expect(byUrl.get(url)).toBe(expected);
+    // And the slug locator genuinely cannot do it, which is why the join has to.
+    expect(surfaceFromSlug('https://www.comopeptides.com/termsandconditions/')).toBeNull();
+  });
+
+  it('labels the homepage from the rules that read it', () => {
+    const expected = (ruleset.rules.find((r) => r.id === 'GATE-001')?.params as { surface?: string })
+      .surface;
+    expect(byUrl.get(normalizeUrl('https://www.comopeptides.com/')!)).toBe(expected);
+  });
+
+  /*
+    A rule with no evidence key cannot be joined, and that is the honest outcome rather than a
+    guess. GATE-004 and GATE-005 read the sign-up page on this run and recorded no key, so the
+    locator says nothing about it — the crawl manifest labels that page instead.
+  */
+  it('says nothing about a page whose rules recorded no evidence key', () => {
+    const withKeys = new Set(
+      ROWS.findings.filter((f) => f.evidenceKey !== null).map((f) => f.ruleId),
     );
-    expect(byKey.has('run-1/layer1/ccc.html')).toBe(false);
-    expect(byKey.has('run-1/layer1/ddd.html')).toBe(false);
+    expect(withKeys.has('GATE-005')).toBe(false);
+    expect(byUrl.get(normalizeUrl('https://www.comopeptides.com/my-account/')!)).toBeUndefined();
+  });
+
+  it('normalizes both sides of the join', () => {
+    // Host case folded, query dropped, trailing slash supplied — the same page either way.
+    expect(byUrl.get(normalizeUrl('https://WWW.CoMoPeptides.com/termsandconditions?x=1')!)).toBe(
+      'terms',
+    );
+  });
+
+  it('takes no page label from a surface that is not a page', () => {
+    // PROD-008 is `all_sampled` and DISC-001 is `footer`: both say where on a page, not which page.
+    for (const id of ['PROD-008', 'DISC-001']) {
+      const rule = ruleset.rules.find((r) => r.id === id);
+      expect(NON_PAGE.has((rule?.params as { surface?: string }).surface ?? '')).toBe(true);
+    }
+    // Every value the locator produced is a page surface, never one of those.
+    for (const surface of byUrl.values()) expect(NON_PAGE.has(surface)).toBe(false);
   });
 
   it('ignores a finding with no evidence key', () => {
-    const byKey = surfacesByEvidenceKey([{ ruleId: 'GATE-007', evidenceKey: null }], ruleset);
-    expect(byKey.size).toBe(0);
+    expect(surfacesByUrl([{ ruleId: 'GATE-007', evidenceKey: null }], ROWS.evidence, ruleset).size).toBe(0);
+  });
+
+  it('ignores a finding whose evidence key is not in the evidence rows', () => {
+    const orphan = [{ ruleId: 'GATE-007', evidenceKey: 'run-9/layer0/nope' }];
+    expect(surfacesByUrl(orphan, ROWS.evidence, ruleset).size).toBe(0);
+  });
+});
+
+describe('normalizeUrl', () => {
+  it('lowercases scheme and host, drops query and fragment, keeps one trailing slash', () => {
+    expect(normalizeUrl('HTTPS://WWW.Example.COM/Shop?a=1#frag')).toBe('https://www.example.com/Shop/');
+    expect(normalizeUrl('https://www.example.com/shop')).toBe('https://www.example.com/shop/');
+    expect(normalizeUrl('https://www.example.com/shop//')).toBe('https://www.example.com/shop/');
+    expect(normalizeUrl('https://www.example.com')).toBe('https://www.example.com/');
+  });
+
+  /*
+    Path case is kept. Hosts are case-insensitive and paths are not — a server may serve `/Terms`
+    and `/terms` as two documents, and folding them would merge two pages on an assumption about
+    somebody else's server.
+  */
+  it('does not fold path case', () => {
+    expect(normalizeUrl('https://x.example/Terms')).not.toBe(normalizeUrl('https://x.example/terms'));
+  });
+
+  it('returns null on something that is not a URL', () => {
+    expect(normalizeUrl('not a url')).toBeNull();
   });
 });
 
@@ -110,7 +198,7 @@ describe('ordering', () => {
         dom('k-home', 'https://shop.example/'),
         dom('k-join', 'https://shop.example/join'),
       ],
-      new Map([['k-terms', 'terms']]),
+      new Map([[normalizeUrl('https://shop.example/x')!, 'terms']]),
     );
 
     expect(ordered.map((p) => p.surface)).toEqual([
@@ -202,7 +290,7 @@ describe('the slug locator, the second source', () => {
     const ordered = orderPages(
       report([]),
       [dom('k-x', 'https://shop.example/policies/terms-of-service')],
-      new Map([['k-x', 'shipping_policy']]),
+      new Map([[normalizeUrl('https://shop.example/policies/terms-of-service')!, 'shipping_policy']]),
     );
     expect(ordered.map((p) => p.surface)).toEqual(['shipping_policy']);
   });
@@ -323,3 +411,116 @@ describe('reading the text', () => {
     expect(selection.pages[0]?.problem).toContain('the page closed');
   });
 });
+
+describe('deduplication by normalized URL', () => {
+  /*
+    Run 9011b2d7 held two DOM artifacts for its homepage — different bytes, so different sha256, so
+    two rows — and both reached the prompt. Three kilobytes of one page twice, inviting the model to
+    weigh a storefront's front page as two observations.
+  */
+  it('keeps one page where two captures share a URL', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/aaa.html' },
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/bbb.html' },
+      ],
+      fakeLoader({ 'run/layer1/aaa.html': '<p>short</p>', 'run/layer1/bbb.html': `<p>${'x'.repeat(400)}</p>` }),
+    );
+
+    expect(selection.pages).toHaveLength(1);
+  });
+
+  it('keeps the fuller capture, on the reasoning that the short one caught a partial render', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/aaa.html' },
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/bbb.html' },
+      ],
+      fakeLoader({ 'run/layer1/aaa.html': '<p>short</p>', 'run/layer1/bbb.html': '<p>a much longer capture of the same page</p>' }),
+    );
+
+    expect(selection.pages[0]?.domKey).toBe('run/layer1/bbb.html');
+    expect(selection.pages[0]?.text).toContain('much longer');
+  });
+
+  it('keeps the fuller one whichever order they arrive in', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/bbb.html' },
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/aaa.html' },
+      ],
+      fakeLoader({ 'run/layer1/aaa.html': '<p>short</p>', 'run/layer1/bbb.html': '<p>a much longer capture of the same page</p>' }),
+    );
+    expect(selection.pages[0]?.domKey).toBe('run/layer1/bbb.html');
+  });
+
+  /*
+    The choice is recorded, not made silently. A reader who wants the capture that was set aside can
+    fetch it by sha rather than discovering later that a heuristic picked for them.
+  */
+  it('records the sha of the capture it set aside', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/aaa.html' },
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'run/layer1/bbb.html' },
+      ],
+      fakeLoader({ 'run/layer1/aaa.html': '<p>short</p>', 'run/layer1/bbb.html': '<p>a much longer capture</p>' }),
+    );
+
+    const line = selection.truncations.join(' | ');
+    expect(line).toContain('two captures were stored');
+    expect(line).toContain('set aside aaa');
+    expect(line).toContain('bbb');
+  });
+
+  it('treats two URLs that normalize the same as one page', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'k-1' },
+        { surface: 'other', sourceUrl: 'https://SHOP.example?utm=x', domKey: 'k-2' },
+      ],
+      fakeLoader({ 'k-1': '<p>one</p>', 'k-2': '<p>two, and longer</p>' }),
+    );
+    expect(selection.pages).toHaveLength(1);
+  });
+
+  it('leaves distinct pages alone', async () => {
+    const selection = await readPages(
+      report([]),
+      [
+        { surface: 'homepage', sourceUrl: 'https://shop.example/', domKey: 'k-1' },
+        { surface: 'product', sourceUrl: 'https://shop.example/a', domKey: 'k-2' },
+      ],
+      fakeLoader({ 'k-1': '<p>one</p>', 'k-2': '<p>two</p>' }),
+    );
+    expect(selection.pages).toHaveLength(2);
+    expect(selection.truncations).toEqual([]);
+  });
+
+  /*
+    A duplicate must never cost a cap slot — the bug being fixed could otherwise push a real page
+    off the end of the budget.
+  */
+  it('does not let a duplicate consume a slot in the page cap', async () => {
+    const entries = [
+      ...Array.from({ length: MAX_PAGES }, (_, i) => ({
+        surface: 'product',
+        sourceUrl: `https://shop.example/p${i}`,
+        domKey: `k-${i}`,
+      })),
+      { surface: 'product', sourceUrl: 'https://shop.example/p0/', domKey: 'k-dup' },
+    ];
+    const html = Object.fromEntries(entries.map((e) => [e.domKey, '<p>text</p>']));
+
+    const selection = await readPages(report([]), entries, fakeLoader(html));
+    expect(selection.pages).toHaveLength(MAX_PAGES);
+    // The duplicate was read and merged, not counted — so nothing was dropped by the cap.
+    expect(selection.truncations.join(' ')).not.toContain('beyond the');
+  });
+});
+

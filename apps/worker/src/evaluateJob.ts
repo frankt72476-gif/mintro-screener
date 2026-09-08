@@ -43,7 +43,7 @@ import {
 import {
   orderPages,
   readPages,
-  surfacesByEvidenceKey,
+  surfacesByUrl,
   type EvaluationPage,
   type EvidenceRow,
   type FindingRow,
@@ -342,4 +342,4 @@ export async function storeDraft(
   }
 }
 
-export { orderPages, readPages, surfacesByEvidenceKey };
+export { orderPages, readPages, surfacesByUrl };
