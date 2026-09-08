@@ -16705,3 +16705,149 @@ blind spot.
 stated once as `WEIGHTED_TIERS` in `vocabulary.ts` so the two invariants cannot drift into
 disagreeing about it. The ratified legality and routing **membership** is unchanged — six and seven,
 the same ids — so `ratified.ts` needs no edit; PROD-017 is evidence and joins neither closed set.
+
+---
+
+## D-260 — The angle set is data, and the draft is refused before it is stored
+**2026-09-09 · architect**
+
+Cluster 2 of the D-256 evaluation model. Three things: `rules/angles.json` as a versioned data
+file, the draft schema, and the validator that runs before anything is written.
+
+### The angle set is data, versioned independently
+
+`rules/angles.json`, version `1.0.0`, model `claude-opus-5`. It carries the seven angles, the
+five-position spectrum, the three placements, the routing conditions and the guardrails. **The
+prompt is built from this file and never hand-written in code**, for the reason `ruleset.json` and
+`eyetest.json` are data: changing what the evaluation asks must be a data change with a version
+bump, not an edit to a prompt string somebody has to diff out of a template literal (hard
+constraint 1).
+
+**Its version moves independently of the rule set's, and both store on every draft.** They answer
+different questions — a rule set version says what was checked, an angle set version says what was
+asked of the model — and one number for both would make a rubric change look like a standards
+change. The same arrangement `eyetest.json` already has, for the same reason.
+
+`model` lives in the file beside the questions, again as `eyetest.json` does. An environment
+variable that moved the model without moving the angle version would leave two drafts
+incomparable from their recorded versions alone, which is the one thing keeping the model beside
+the questions is for.
+
+### Coverage: every non-legality rule feeds at least one angle
+
+The validator refuses the pair otherwise. A rule the angle set does not name is a check that runs,
+produces a finding, and reaches no part of the reasoning — invisible work, and invisible in the
+direction that matters, because the evaluation would read as complete with a whole category of
+evidence unconsulted.
+
+**Legality rules are exempt but not excluded.** A legality item ends the evaluation on its own and
+does not need an angle to be heard. It may still appear where it is also evidence: PAY-001 is a
+legality rule and is also how a merchant takes money, so it sits in angle 3. Exempt, never
+forbidden.
+
+Applying the rule found one gap in the mapping as drafted: **CATG-007** (*Non-peptide research
+compounds in the catalogue*) is `evidence`, not legality, and was named by no angle. It belongs to
+angle 2 — it is a statement about what the catalogue contains — and is filed there.
+
+### The routing table has five conditions, not six
+
+D-256 named four and said "one further condition to be added". The architecture memo and
+`docs/report-layout-design.md` both then said six. The fifth is no-affiliate-marketing, and there
+is no sixth. Five:
+
+| id | observable | observed by |
+|---|---|---|
+| `registration_gate` | yes | GATE-002, GATE-003 |
+| `no_water_or_syringes` | yes | CATG-001, CATG-002, CATG-005 |
+| `order_minimum_150` | no | the application |
+| `monthly_volume_70k` | no | the application |
+| `no_affiliate_marketing` | yes | OFFS-001, OFFS-007 |
+
+`docs/report-layout-design.md` is corrected in the same commit: its "six-row table" becomes five.
+An unobservable condition must say where it is answered instead, so that *not observable* never
+reads as a fact about the merchant — the D-044 distinction, one document up.
+
+### The draft schema
+
+Per the architecture memo, with two enums named here because the memo left them as prose:
+
+- `routing[].status` is `met | not_met | not_observable`. The third is not a soft `not_met`. Order
+  minimum and monthly volume cannot be read off a storefront, and reporting them unmet would be a
+  statement about the merchant derived from a limit of the crawl.
+- `angles[].lean` is `research | neutral | consumer`. Deliberately not the four finding states: an
+  angle is a judgment and never a finding.
+
+**A citation declares its kind** — `finding`, `evidence`, `eye_test` or `angle` — and the validator
+checks it against that kind. It is never inferred from the shape of the value; a classifier that
+sniffed the format would be locating a citation by its compliant form (hard constraint 9) and would
+silently reclassify every id whose format changed.
+
+**`angle` is placement-only, and `placement` gains a `citations` field.** A placement is a judgment
+across the angles — the memo says so: "one paragraph placing the business on the spectrum and naming
+the two or three angles that drove it" — so its backing is the angles themselves, each already
+backed by captures. The validator requires **at least two distinct** angle citations there: a
+placement resting on one angle is that angle restated, and D-256 is explicit that placement is not a
+sum of leans. Captures may accompany them.
+
+An angle citation is refused anywhere else. An angle citing an angle is reasoning in a circle with
+nothing underneath it, and a routing row or shore-up citing one points at a judgment where a
+capture belongs.
+
+**The inference marker is `[inference: ...]`**, checked structurally. Not by looking for hedging
+words: *"appears to"* is a hedge, not a declaration, and a validator that accepted it would let an
+unbacked claim through for being tentatively worded. Inference spans are stripped before sentences
+are split, so a full stop inside a marker cannot split one marked sentence into an unmarked pair.
+
+### The validator, and what it refuses
+
+Before anything is stored: any citation that does not exist in the run; any uncited sentence with
+no inference marker; legality not clean while `recommended` is not `referred_out`; shore-ups on a
+consumer-side placement; an angle or routing condition omitted rather than reported as observing
+nothing; an unknown angle or condition id; and the price words.
+
+It returns **every** rejection rather than the first. Each retry is a paid model call, so
+fix-one-at-a-time is more expensive here than anywhere else the aggregate-error discipline already
+applies.
+
+**Rejection is an outcome, not an exception.** The job retries once with the rejection text
+appended, and a second rejection is stored as a failed draft the operator can see — the same
+discipline `eye_tests` follows, where an absence is stored as an outcome rather than as a null.
+
+### The price words, and why the list is scoped
+
+`price`, `pricing`, `cost`, `costs`, `fee`, `fees`, `basis point`, `basis points`, `bps`,
+`cheaper`, `expensive`, `rate`, `rates`, `discount`. Matched on word boundaries, so *corporate*
+is not *rate*.
+
+Refused in **`placement`, `routing` and `shoreUps`** — the sections describing what Mintro will do.
+**Permitted inside an angle paragraph**, and that exception is the ruling rather than a loophole.
+Angle 3 asks whether the commerce is built for a lab or a consumer, and that reasoning is about the
+merchant's own pricing posture: wholesale as the norm or an option, bundle discounts,
+subscriptions. A global ban would make angle 3 unwritable and push the model into vaguer words,
+which is worse than the thing the ban exists for. What D-256 forbids is the cost of Mintro's own
+solutions travelling in a site evaluation, and that can only appear in the three scoped sections.
+
+The last three words — `rate`, `rates`, `discount` — each carry an ordinary non-pricing sense
+(a chargeback rate, a discount the merchant offers its own customers), which is the second reason
+the list is scoped rather than global.
+
+### Storage
+
+`0075_evaluation_drafts.sql` and `0076_evaluations.sql`, per D-258. The draft is mutable and
+unique per run; the published evaluation is append-only under the same `reject_mutation()` trigger
+`findings` and `evidence` carry, and versions count 1..n so a re-publish never overwrites what an
+underwriter was already shown. **D-002 is preserved, not relaxed**: neither migration alters the
+trigger on `runs` or the append-only triggers on `findings` and `evidence`, and a schema test
+asserts the finished run still refuses an update with both evaluation rows present.
+
+### The inference marker, and where it is now required
+
+Only on a sentence with nothing behind it. A paragraph that cites is taken to have backed its
+sentences; one that cites nothing must be marked throughout. That rule now applies to `placement`
+exactly as it applies to an angle, because `placement` carries citations.
+
+**This resolves what was carried.** The memo's schema gave `placement` no citations, so under the
+uncited-sentence rule every sentence of it had to be bracketed — a fully marked paragraph that reads
+badly and blunts the marker, whose whole value is telling marked from unmarked. The angle citation
+is the fix: it gives the placement real backing rather than an exemption, and it is the thing the
+memo asked for in the first place. Nothing here is deferred.

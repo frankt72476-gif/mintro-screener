@@ -46,7 +46,8 @@ the reader knows it.
 
 ### 3. Routing conditions
 
-A six-row table. Condition · Status · Evidence.
+A five-row table. Condition · Status · Evidence. (Corrected from six by D-260: D-256 named four
+conditions and one to be added, and there is no sixth.)
 
 Status is one of **Met** / **Not met** / **Not observable**. Evidence is the capture or the
 reason it could not be observed. Order minimum and volume will usually be Not observable from a

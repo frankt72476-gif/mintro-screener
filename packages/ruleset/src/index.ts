@@ -49,6 +49,35 @@ export { checkInvariants, checkInvariantsOn, type IndexedRule } from './invarian
 // rule ids, and `invariants.ts` promises none of its own are.
 export { checkRatifiedTiers, ratifiedTierFor } from './ratified.js';
 
+// The angle set (D-260). Versioned independently of the rule set, checked against it.
+export {
+  ANGLE_IDS,
+  CONSUMER_SIDE,
+  PLACEMENT_IDS,
+  ROUTING_CONDITION_COUNT,
+  SPECTRUM_IDS,
+  AngleSetValidationError,
+  angleSetSchema,
+  anglesForRule,
+  checkAngleSet,
+  parseAngleSet,
+  type Angle,
+  type AngleId,
+  type AngleSet,
+  type PlacementId,
+  type RoutingCondition,
+  type SpectrumId,
+} from './angles.js';
+
+// Node only, like `corpusFile.ts`: the pure half above needs no filesystem.
+export {
+  ANGLES_PATH,
+  EYETEST_PATH,
+  eyeTestItemIds,
+  loadAngleSetFile,
+  tryLoadAngleSetFile,
+} from './anglesFile.js';
+
 /**
  * The standards corpus check (D-139). Node only — `checkAgainstCorpusFile` reads the corpus, and
  * the pure half is exported beside it so a caller holding the text does not need the filesystem.

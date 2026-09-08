@@ -415,3 +415,33 @@ export {
   type EyeTestRecord,
   type EyeTestRow,
 } from './eyeTestStore.js';
+
+/* The evaluation draft and the validator that guards it (D-260). */
+export {
+  ANGLE_CITATION_SECTION,
+  ANGLE_LEANS,
+  CITATION_KINDS,
+  INFERENCE_OPEN,
+  PLACEMENT_MIN_ANGLE_CITATIONS,
+  PRICE_SCOPED_SECTIONS,
+  PRICE_WORDS,
+  ROUTING_STATUSES,
+  hasInferenceMarker,
+  rejectionMessage,
+  sentencesOf,
+  validateDraft,
+  type AngleLean,
+  type Citation,
+  type CitationKind,
+  type DraftAngle,
+  type DraftLegality,
+  type DraftLegalityItem,
+  type DraftPlacement,
+  type DraftRejection,
+  type DraftRouting,
+  type DraftShoreUp,
+  type DraftValidation,
+  type EvaluationDraft,
+  type RoutingStatus,
+  type RunContext,
+} from './evaluation.js';

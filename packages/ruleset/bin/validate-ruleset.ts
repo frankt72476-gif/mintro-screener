@@ -11,10 +11,12 @@
 
 import { resolve } from 'node:path';
 import {
+  ANGLES_PATH,
   CORPUS_PATH,
   checkAgainstCorpusFile,
   checkRatifiedTiers,
   corpusClauseLines,
+  tryLoadAngleSetFile,
   tryLoadRulesetFile,
 } from '../src/index.js';
 import { readFileSync } from 'node:fs';
@@ -102,6 +104,27 @@ function main(argv: readonly string[]): number {
     lines = 0;
   }
   console.log(`  standards  ${programme} programme clause(s) matched against ${lines} corpus line(s)`);
+
+  /*
+    The angle set (D-260).
+
+    Validated here rather than in `parseRuleset` for the same reason the corpus and the ratified
+    tiers are: it is a second file checked against this one, not a property of a rule set. A rule
+    set is well-formed whether or not an angle set names it — but the pair this repository ships
+    has to agree, and the coverage rule is what makes the angle set answerable for the whole set.
+  */
+  const angles = tryLoadAngleSetFile(ruleset, resolve(process.cwd(), ANGLES_PATH));
+  if (!angles.ok) {
+    console.error(`\n${angles.error.message}`);
+    return 1;
+  }
+  const observable = angles.angles.routingConditions.filter((c) => c.observable).length;
+  console.log(
+    `  angles     ${angles.angles.angles.length} angles, ` +
+      `${angles.angles.routingConditions.length} routing conditions (${observable} observable) — ` +
+      `v${angles.angles.version}, model ${angles.angles.model}`,
+  );
+
   console.log('\nValid.');
   return 0;
 }

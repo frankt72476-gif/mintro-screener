@@ -1,0 +1,191 @@
+{
+  "version": "1.0.0",
+  "effective": "2026-09-09",
+  "source_document": "docs/angle-set-design.md, ratified under D-256; structure under D-260",
+  "model": "claude-opus-5",
+  "spectrum": [
+    { "id": "consumer_retail", "label": "Consumer retail" },
+    { "id": "consumer_leaning", "label": "Consumer-leaning" },
+    { "id": "mixed", "label": "Mixed" },
+    { "id": "research_leaning", "label": "Research-leaning" },
+    { "id": "research_supplier", "label": "Research supplier" }
+  ],
+  "placements": ["referred_out", "international", "domestic"],
+  "angles": [
+    {
+      "id": "who_it_talks_to",
+      "title": "Who the site is talking to",
+      "question": "is the copy and imagery addressed to a lab or to a person who will use the product?",
+      "reasoning": "a supplier writes to a buyer who already knows what the compound is. A retailer has to sell the outcome. Second-person benefit language, lifestyle imagery, \"how it works\" explainers, reviews and testimonials all exist to persuade an end user.",
+      "ruleIds": [
+        "PROD-009",
+        "PROD-011",
+        "PROD-012",
+        "PROD-013",
+        "PROD-014",
+        "PROD-016",
+        "PROD-017",
+        "OFFS-002",
+        "NAME-002",
+        "DISC-004"
+      ],
+      "eyeTestItemIds": [
+        "EYE-01",
+        "EYE-02",
+        "EYE-03",
+        "EYE-04",
+        "EYE-05",
+        "EYE-06",
+        "EYE-07",
+        "EYE-10",
+        "EYE-13",
+        "EYE-14"
+      ],
+      "notes": "The eye-test items here are every rubric question about imagery or tone: register (EYE-01, EYE-02, EYE-13), photography and design (EYE-03, EYE-04, EYE-05, EYE-06), composition (EYE-07), who the second person points at (EYE-10) and how the catalogue is labelled (EYE-14). They are observations, never findings, and are cited by item id. PROD-016 and PROD-017 are heavy; name them as such in the draft so the operator sees the pull."
+    },
+    {
+      "id": "products_for",
+      "title": "What the products are for",
+      "question": "does the catalogue look like a research inventory or a consumer lineup?",
+      "reasoning": "a research supplier stocks what assays need. A retailer stocks what people want to take: the GLP-1, cosmetic and recovery lineup, plus everything that helps them take it.",
+      "ruleIds": [
+        "NAME-001",
+        "NAME-003",
+        "PROD-005",
+        "PROD-007",
+        "PROD-010",
+        "CATG-001",
+        "CATG-002",
+        "CATG-005",
+        "CATG-006",
+        "CATG-007",
+        "CATG-008"
+      ],
+      "eyeTestItemIds": [],
+      "notes": "CATG-001, CATG-002 and CATG-005 also observe the no-water-or-syringes routing condition and are weighed here as well; a rule serving a condition is not thereby removed from the evidence. NAME-001, PROD-005, PROD-007 and CATG-008 are heavy. Catalogue breadth and what is conspicuously absent — no reagents, no controls, no reference standards — is an unbound observation and carries no rule id; state it as an observation or mark it as inference."
+    },
+    {
+      "id": "how_it_sells",
+      "title": "How it sells",
+      "question": "is the commerce built for a lab placing an order or a person buying a supply?",
+      "reasoning": "labs buy in research quantities at wholesale pricing with minimums. Consumers buy one vial, want a discount, and come back monthly. The commercial mechanics reveal the customer even when the copy does not.",
+      "ruleIds": ["PAY-001", "PAY-003"],
+      "eyeTestItemIds": ["EYE-08", "EYE-12"],
+      "notes": "This angle is mostly inference from page text. Only two rules observe it, and the substance — pricing posture and whether wholesale is the norm or an option, vial sizes, multi-pack structure, bundle discounts, coupon codes, loyalty points, subscriptions, order minimums — is read off the captured pages and carries no rule id. Say so: sentences that rest on it are marked as inference. This is the one angle where the merchant's own pricing posture is legitimately discussed, and the price-word rejection is scoped away from it for that reason. It is still never a comparison of what Mintro's solutions cost."
+    },
+    {
+      "id": "who_it_lets_buy",
+      "title": "Who it lets buy",
+      "question": "does anything on the site require the buyer to be a research entity?",
+      "reasoning": "a supplier that means \"research only\" has a mechanism for it. A retailer has a checkbox.",
+      "ruleIds": [
+        "GATE-001",
+        "GATE-002",
+        "GATE-003",
+        "GATE-004",
+        "GATE-005",
+        "GATE-006",
+        "GATE-007"
+      ],
+      "eyeTestItemIds": ["EYE-09"],
+      "notes": "GATE-002 and GATE-003 also observe the registration-gate routing condition and are weighed here as well. GATE-003 is heavy. B2B mechanics — invoicing, purchase orders, tax-exempt handling — are unbound observations. Where the age gate and the stated ages disagree, that is angle 7's subject, not this one."
+    },
+    {
+      "id": "operates_like_supplier",
+      "title": "Does it operate like a supplier",
+      "question": "is the back end that of a chemical supplier or a storefront?",
+      "reasoning": "real suppliers have lots, COAs, storage conditions, a shipping policy and a legal entity behind them. Dropshipped retail has product cards.",
+      "ruleIds": [
+        "PROD-001",
+        "PROD-002",
+        "PROD-003",
+        "PROD-004",
+        "COA-001",
+        "COA-002",
+        "COA-003",
+        "COA-004",
+        "COA-005",
+        "COA-006",
+        "FULF-001",
+        "FULF-002",
+        "FULF-003",
+        "FULF-004",
+        "FULF-005",
+        "COMM-001",
+        "COMM-002",
+        "COMM-003",
+        "DISC-001",
+        "DISC-002",
+        "DISC-003"
+      ],
+      "eyeTestItemIds": [],
+      "notes": "The angle where a merchant most often leans research on real evidence, so a strong showing here must not be read as settling the others. Several of these rules are manual and return not_evaluable — an unevaluated rule is not an absent practice, and the draft says which. Contact and entity information, and a published shipping scope such as \"ships anywhere in North America\", are unbound observations."
+    },
+    {
+      "id": "off_site",
+      "title": "What it does off-site",
+      "question": "where does the traffic come from, and what tone does the brand carry elsewhere?",
+      "reasoning": "research suppliers do not need influencers. Off-site posture is the highest-risk area in the standards for a reason.",
+      "ruleIds": [
+        "OFFS-001",
+        "OFFS-003",
+        "OFFS-004",
+        "OFFS-005",
+        "OFFS-006",
+        "OFFS-007"
+      ],
+      "eyeTestItemIds": ["EYE-11"],
+      "notes": "Crawl-limited. Declare what was not looked at; never infer from silence. The crawl reads the storefront and does not follow a social link, so an absence here is an absence of observation and must be stated as one. OFFS-001 and OFFS-007 also observe the no-affiliate-marketing routing condition and are weighed here as well. The influencer-payment attestation is the merchant's own statement, not an observation, and is cited as an attestation where one was given."
+    },
+    {
+      "id": "consistency",
+      "title": "Does the story hold together",
+      "question": "where does the stated research-only position contradict observed behavior?",
+      "reasoning": "this is the angle that stops a merchant scoring their way in. Disclaimers on every page plus a \"Weight Loss\" category is not compliance; it is a contradiction, and the contradiction is the finding.",
+      "ruleIds": [],
+      "eyeTestItemIds": [],
+      "notes": "Cross-cutting: this angle has no rules of its own. Set every consumer-lean item from angles 1 to 6 against DISC-001, DISC-002, DISC-003 and any research-only statement the site makes, and cite the items on both sides of each contradiction. Internal inconsistencies count too — two stated ages, a research-only footer over a review widget, a shipping scope the policy page does not match. A contradiction is cited from the evidence that contradicts, never asserted on its own."
+    }
+  ],
+  "routingConditions": [
+    {
+      "id": "registration_gate",
+      "label": "Customer registration gate",
+      "ruleIds": ["GATE-002", "GATE-003"],
+      "observable": true
+    },
+    {
+      "id": "no_water_or_syringes",
+      "label": "No bacteriostatic water, needles or syringes",
+      "ruleIds": ["CATG-001", "CATG-002", "CATG-005"],
+      "observable": true
+    },
+    {
+      "id": "order_minimum_150",
+      "label": "$150 minimum order",
+      "ruleIds": [],
+      "observable": false,
+      "source": "application"
+    },
+    {
+      "id": "monthly_volume_70k",
+      "label": "$70k or above in monthly processing volume",
+      "ruleIds": [],
+      "observable": false,
+      "source": "application"
+    },
+    {
+      "id": "no_affiliate_marketing",
+      "label": "No affiliate marketing",
+      "ruleIds": ["OFFS-001", "OFFS-007"],
+      "observable": true
+    }
+  ],
+  "guardrails": [
+    "Cite only captured evidence. No claim without a capture or an explicit inference label.",
+    "Declare what the crawl could not see. Angle 6 in particular.",
+    "Heavy evidence is named as such in the draft so the operator sees the pull.",
+    "No pricing, no cost comparison between solutions, anywhere.",
+    "Shore-ups are never drafted for a business placed on the consumer side. The routing conditions are still listed for it, as facts, without a path."
+  ]
+}
