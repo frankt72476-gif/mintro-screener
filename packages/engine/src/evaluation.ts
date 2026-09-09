@@ -358,7 +358,8 @@ export interface DraftRejection {
     | 'unbacked_legality_item'
     | 'legality_altered'
     | 'domestic_with_unmet_routing'
-    | 'unresolved_prose_handle';
+    | 'unresolved_prose_handle'
+    | 'not_observable_row_cites';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -653,6 +654,29 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     }
     seenConditions.add(row.conditionId);
     checkCitations(row.citations, `${at}.citations`);
+
+    /*
+      A `not_observable` row cites nothing, because there is nothing it could cite.
+
+      The status says the crawl cannot answer this condition at all — order minimum and monthly
+      volume are answered by the application, not by a storefront. A capture attached to such a row
+      is a capture of something else, offered where the reader expects the basis for the status, and
+      it reads as partial support for a row that has none. Run 9011b2d7 put an eye-test item about
+      checkout discounts against `$150 minimum order`: true of the page, silent on the condition,
+      and indistinguishable in the rendered table from evidence that bore on it.
+
+      The empty cell is the honest one. What belongs there is the reason it could not be observed,
+      and that is a property of the condition rather than of this run.
+    */
+    if (row.status === 'not_observable' && row.citations.length > 0) {
+      reject(
+        'not_observable_row_cites',
+        `${at}.citations`,
+        `'${row.conditionId}' is not observable, so it carries ${row.citations.length} citation(s) ` +
+          'that cannot bear on it. A capture here reads as support for a status that has none — ' +
+          'leave the citations empty and say what the status means in the angle that touches it.',
+      );
+    }
   });
   for (const conditionId of run.routingConditionIds) {
     if (seenConditions.has(conditionId)) continue;

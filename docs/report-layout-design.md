@@ -67,9 +67,23 @@ reason is crawl scope.
 
 ### 5. Shore-ups
 
-Present only for merchants placed Research-leaning or Research supplier. Short list, each item
-one line with the capture it refers to. Absent entirely for everyone else; the section does not
-render as "None."
+Absent only for **Consumer retail** and **Consumer-leaning** — the consumer side, and nothing
+else. **Mixed**, Research-leaning and Research supplier all get them. Short list, each item one
+line with the capture it refers to. Where the section is absent it is absent entirely; it does
+not render as "None."
+
+The first wording here said "Research-leaning or Research supplier," which put Mixed on the
+wrong side of the line. Guardrail 5 draws it at the consumer side, and the validator has always
+read it that way — `consumerSideSpectrum` is `consumer_retail` and `consumer_leaning`, and a
+test has stated since the rule was written that shore-ups are permitted at Mixed. The memo was
+the document out of step, and the first real draft found it: run 9011b2d7 placed CoMo Peptides
+at Mixed and drafted six shore-ups, every one of them addressed to a condition the merchant
+could actually close.
+
+That is the case for the line being where the guardrail puts it. A Mixed merchant is the one
+for whom shore-ups do the most work — far enough along that the path is real, not so far that
+there is nothing to say. Withholding them there would drop the list precisely where a merchant
+could act on it.
 
 ### 6. Evidence
 

@@ -1020,3 +1020,60 @@ describe('unresolved_prose_handle', () => {
   });
 });
 
+describe('not_observable_row_cites', () => {
+  /*
+    Run 9011b2d7 put an eye-test item about checkout discounts against `$150 minimum order`, whose
+    status was `not_observable`. The item is a true observation and it says nothing about an order
+    minimum — but rendered into the routing table it fills the Evidence column, and a reader has no
+    way to tell it apart from a capture that bore on the condition.
+  */
+  it('refuses a citation on a not_observable row', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        r.status === 'not_observable' ? { ...r, citations: [cite('EYE-01', 'eye_test')] } : r,
+      ),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('not_observable_row_cites');
+    expect(result.rejections.some((r) => r.message.includes('order_minimum_150'))).toBe(true);
+  });
+
+  it('accepts the empty citation list the status implies', () => {
+    expect(passing().routing.some((r) => r.status === 'not_observable')).toBe(true);
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+  });
+
+  /*
+    The rule is about the status, not about routing rows in general. A `met` or `not_met` row states
+    something the crawl saw, and the capture is exactly what makes it readable.
+  */
+  it('says nothing about a cited met or not_met row', () => {
+    for (const status of ['met', 'not_met'] as const) {
+      const draft = mutate((d) => ({
+        ...d,
+        routing: d.routing.map((r) => ({ ...r, status, citations: [cite('f-001')] })),
+      }));
+      expect(rejectionRules(draft), status).not.toContain('not_observable_row_cites');
+    }
+  });
+
+  it('names each offending row, not the first', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        r.status === 'not_observable' ? { ...r, citations: [cite('f-001')] } : r,
+      ),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    const offending = passing().routing.filter((r) => r.status === 'not_observable').length;
+    expect(offending).toBeGreaterThan(1);
+    expect(result.rejections.filter((r) => r.rule === 'not_observable_row_cites')).toHaveLength(offending);
+  });
+});
+
