@@ -271,3 +271,59 @@ describe('the fourth validator status (0077)', () => {
   });
 });
 
+describe('what a draft cost to produce (0079)', () => {
+  const insertCost = (
+    runId: string,
+    attempts: number | null,
+    inputTokens: number | null,
+    outputTokens: number | null,
+  ) =>
+    schema.query(
+      `insert into public.evaluation_drafts
+         (run_id, angles_version, ruleset_version, model, input_sha256, content, validator_status,
+          attempts, input_tokens, output_tokens)
+       values ($1, '1.0.0', '3.9.0', 'claude-opus-5', $2, '{}'::jsonb, 'ok', $3, $4, $5)`,
+      [runId, SHA, attempts, inputTokens, outputTokens],
+    );
+
+  it('records the attempts and the tokens', async () => {
+    const runId = await finishedRun();
+    await insertCost(runId, 2, 33_514, 5_162);
+
+    const rows = await schema.query<{ attempts: number; input_tokens: number; output_tokens: number }>(
+      `select attempts, input_tokens, output_tokens from public.evaluation_drafts where run_id = $1`,
+      [runId],
+    );
+    expect(rows[0]).toMatchObject({ attempts: 2, input_tokens: 33_514, output_tokens: 5_162 });
+  });
+
+  /*
+    A generation refused before any call really did make no attempt and really did spend nothing.
+    Zero attempts with null tokens is the shape of that row, and it has to be storable.
+  */
+  it('accepts zero attempts with no tokens, which is the refused-before-calling shape', async () => {
+    const runId = await finishedRun();
+    await expect(insertCost(runId, 0, null, null)).resolves.toBeDefined();
+  });
+
+  /*
+    Nullable, because zero would be a claim. A row written before 0079 was produced by a job that
+    did not record these numbers; filling it with 0 would say no attempt was made.
+  */
+  it('accepts a row that records none of it, as every row before 0079 does', async () => {
+    const runId = await finishedRun();
+    await expect(insertCost(runId, null, null, null)).resolves.toBeDefined();
+  });
+
+  it('refuses a negative count in any of the three', async () => {
+    for (const [attempts, input, output] of [
+      [-1, null, null],
+      [1, -1, null],
+      [1, 100, -1],
+    ] as [number, number | null, number | null][]) {
+      const runId = await finishedRun();
+      await expect(insertCost(runId, attempts, input, output)).rejects.toThrow();
+    }
+  });
+});
+

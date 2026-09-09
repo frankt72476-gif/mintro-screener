@@ -619,6 +619,20 @@ export async function storeDraft(
     validator_message: result.message ?? null,
     truncations: result.truncations,
     handles: result.handles ?? null,
+    /*
+      What the generation cost, recorded rather than printed (0079).
+
+      `attempts` above 1 means the validator refused an earlier answer, and that refusal is the
+      signal worth reading — every rule this generator has gained was found by looking at one. Both
+      numbers lived on stdout until now, which meant they lived until the terminal scrolled.
+
+      Null, never zero, when there is nothing to record: a vendor that reported no usage did not
+      report zero usage. `attempts` is the exception and is always a real count, 0 included — a
+      generation refused before any call really did make none.
+    */
+    attempts: result.attempts,
+    input_tokens: result.usage?.inputTokens ?? null,
+    output_tokens: result.usage?.outputTokens ?? null,
   });
 
   if (error !== null) {

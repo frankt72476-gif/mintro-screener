@@ -11,20 +11,30 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { loadRulesetFile, loadAngleSetFile, ANGLES_PATH, PLACEMENT_IDS } from '@mintro/ruleset';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  loadRulesetFile,
+  loadAngleSetFile,
+  ANGLES_PATH,
+  PLACEMENT_IDS,
+  type AngleSet,
+} from '@mintro/ruleset';
 import { PRICE_WORDS, type EvaluationDraft } from '@mintro/engine';
 import {
   MAX_ATTEMPTS,
   MIN_DISTINCT_TEXTS,
   generateDraft,
+  storeDraft,
   storefrontNotSeen,
   inputHash,
   parseDraft,
   promptFor,
   requestParts,
   runContextFor,
+  type EvaluateResult,
   type EvaluationInputs,
 } from '../src/evaluateJob.js';
+import type { WorkerSupabase } from '../src/store/supabase.js';
 import { estimateTokens } from '../src/evaluationPrompt.js';
 import { buildHandles, toHandle, toId } from '../src/evaluationHandles.js';
 import type { EvaluationPage } from '../src/evaluationPages.js';
@@ -892,6 +902,82 @@ describe('the placement vocabulary guidance', () => {
 
   it('scopes it to the placement and says the angles are unrestricted', () => {
     expect(prompt).toContain('this applies to the placement only');
+  });
+});
+
+/*
+  What `storeDraft` actually puts on the row.
+
+  The schema tier proves the columns accept these values; nothing there proves the job supplies
+  them. `attempts` and `usage` had been on `EvaluateResult` since the generator was written and were
+  dropped on the floor by this function for its whole life — a field computed, carried, printed and
+  never persisted, which is the orphan CLAUDE.md names one granularity finer than an unused import.
+  This test is the consumer.
+*/
+describe('storeDraft records what the generation cost', () => {
+  /** Captures the insert payload. The delete runs first and returns nothing worth asserting. */
+  function capturingSupabase(): { supabase: WorkerSupabase; rows: Record<string, unknown>[] } {
+    const rows: Record<string, unknown>[] = [];
+    const client = {
+      from: () => ({
+        delete: () => ({ eq: async () => ({ error: null }) }),
+        insert: async (row: Record<string, unknown>) => {
+          rows.push(row);
+          return { error: null };
+        },
+      }),
+    } as unknown as SupabaseClient;
+    return { supabase: { client, bucket: 'evidence' }, rows };
+  }
+
+  const angleSet = { version: '1.0.0' } as AngleSet;
+
+  /** `reported: false` omits `usage` entirely, which is what a generation with no call returns. */
+  const result = (over: Partial<EvaluateResult>, reported = true): EvaluateResult => ({
+    runId: '9011b2d7-c17e-4d62-96c7-01a1a2471b1d',
+    status: 'ok',
+    attempts: 2,
+    inputSha256: 'a'.repeat(64),
+    truncations: [],
+    ...(reported ? { usage: { inputTokens: 33_514, outputTokens: 5_162 } } : {}),
+    ...over,
+  });
+
+  it('writes the attempts and both token counts', async () => {
+    const { supabase, rows } = capturingSupabase();
+    await storeDraft(supabase, angleSet, '3.9.0', 'claude-opus-5', result({}));
+
+    expect(rows[0]).toMatchObject({ attempts: 2, input_tokens: 33_514, output_tokens: 5_162 });
+  });
+
+  /*
+    Null, never zero. A vendor that reported no usage did not report zero usage, and a refusal made
+    before any call spent nothing rather than spending a measurable nothing.
+  */
+  it('writes null tokens when no call was made, and keeps the real attempt count', async () => {
+    const { supabase, rows } = capturingSupabase();
+    await storeDraft(
+      supabase,
+      angleSet,
+      '3.9.0',
+      'claude-opus-5',
+      result({ status: 'run_did_not_see_storefront', attempts: 0 }, false),
+    );
+
+    expect(rows[0]).toMatchObject({ attempts: 0, input_tokens: null, output_tokens: null });
+  });
+
+  it('records the cost of a rejected draft too, which is the one worth reading', async () => {
+    const { supabase, rows } = capturingSupabase();
+    await storeDraft(
+      supabase,
+      angleSet,
+      '3.9.0',
+      'claude-opus-5',
+      result({ status: 'rejected', attempts: 2, message: 'cites a finding this run does not hold' }),
+    );
+
+    expect(rows[0]).toMatchObject({ validator_status: 'rejected', attempts: 2, output_tokens: 5_162 });
   });
 });
 

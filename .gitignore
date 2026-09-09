@@ -66,3 +66,6 @@ credential-public-key.txt
 credkey.txt
 *credential*key*.txt
 *credential*key*.pem
+
+# Scratch. Rendered drafts, one-off read-only tooling. Never committed.
+tmp/
