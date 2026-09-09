@@ -106,10 +106,22 @@ is not repaired and will not be (D-002).
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
   reached, so a run behind a login wall produces a document about a storefront nobody saw — the
   `storefrontNotSeen` guard says so rather than hiding it, which is the honest failure and not a fix.
+- **Consent-gate access: merchant-supplied bypass vs crawler attestation. Pending Frank.** Two
+  ways past a gate the crawler will not answer itself. A **merchant-supplied bypass** — a token, a
+  header, an allowlisted address the merchant issues knowing what it is for — leaves the assertion
+  with the party entitled to make it, and the report can say the catalogue was read with the
+  merchant's cooperation. **Crawler attestation** means Mintro ticks the boxes, which is Mintro
+  asserting things about itself that are not true, and every finding downstream would rest on that.
+  D-266 declines the second by default; whether the first is offered, and on what terms, is a
+  business ruling and not a build task.
 - **Re-screening CoMo behind the gate.** The next run of that merchant will report the gate and
-  read nothing behind it, which is correct and is not coverage. Whether Mintro screens a gated
-  catalogue at all, and on what basis, is a business question: it is the merchant's control and
-  answering it on a visitor's behalf is not something a screener does unasked.
+  read nothing behind it, which is correct and is not coverage. It waits on the ruling above.
+- **Static egress IP and allowlist copy. In progress.** The worker's outbound address is
+  `152.233.48.176` and is not one Fly reports under `ips list` — those are ingress. A dedicated
+  static egress makes the address something a merchant can allowlist, and the allowlist request
+  needs copy that says who is asking, from what address, and why, without asking anyone to
+  characterise their own compliance (hard constraint 7, D-067). Neither exists yet. This is the
+  answer to a bot challenge that does not touch D-017.
 - **Getting past a bot challenge.** Open, and deliberately not a build task. D-264 makes the crawl
   say what it met; it establishes nothing about `phoenixpeptide.com`, and three of the seven runs
   on file are of a site nobody has seen. The available answers — a different egress, an arrangement
