@@ -1242,27 +1242,37 @@ describe('the operator note and what it may not say', () => {
   });
 
   /*
-    Wider than the shore-up list and narrower than the placement's, and the difference is who is
-    speaking. A shore-up describes a change to the merchant's commerce and needs their vocabulary —
-    which is why `discount` survives there and here. `rate` does not: "their rate" and "our rate"
-    are one word apart, and only the second is refused by D-256, which is exactly why the note
-    cannot be trusted to the distinction.
+    The narrowest of the three lists, and the words it leaves out are the point.
+
+    `price`, `cost` and `rate` are the words an operator reaches for when writing about the
+    **merchant** — their prices, cost per unit, the chargeback rate that came up on a call. Refusing
+    those would refuse the honest note far more often than the forbidden one, which is the same
+    correction D-260 already made when the validator refused a shore-up for naming the merchant's
+    own bundle discounts: a rule working against its own purpose.
   */
-  it('refuses rate, which a shore-up may use', () => {
-    expect(rulesFor('Their rate is unusual.')).toContain('price_word');
-    expect(OPERATOR_NOTE_WORDS).toContain('rate');
-    expect(MINTRO_COST_WORDS).not.toContain('rate');
-  });
+  it.each(['price', 'pricing', 'cost', 'costs', 'rate', 'rates', 'discount'])(
+    'permits %s, which is how an operator describes the merchant',
+    (word) => {
+      expect(OPERATOR_NOTE_WORDS as readonly string[]).not.toContain(word);
+      expect(rulesFor(`Their ${word} came up on the call.`)).toEqual([]);
+    },
+  );
 
-  it('permits discount, which is the merchant describing their own commerce', () => {
-    expect(OPERATOR_NOTE_WORDS).not.toContain('discount');
-    expect(rulesFor('They run bundle discounts on the homepage.')).toEqual([]);
-  });
-
-  it('covers every word MINTRO_COST_WORDS holds, so the note is never the looser scope', () => {
-    for (const word of MINTRO_COST_WORDS) {
-      expect(OPERATOR_NOTE_WORDS, word).toContain(word);
+  it('is narrower than the list a shore-up is held to, and much narrower than the placement’s', () => {
+    expect(OPERATOR_NOTE_WORDS.length).toBeLessThan(MINTRO_COST_WORDS.length);
+    expect(OPERATOR_NOTE_WORDS.length).toBeLessThan(PRICE_WORDS.length);
+    // Every word it does hold is a solution-cost word the wider list already refused.
+    for (const word of OPERATOR_NOTE_WORDS) {
+      expect(MINTRO_COST_WORDS as readonly string[], word).toContain(word);
     }
+  });
+
+  /* What it exists for: one solution compared against another, in Mintro's voice. */
+  it('refuses a comparison between what two solutions cost', () => {
+    expect(rulesFor('Domestic would be cheaper for them than international.')).toContain(
+      'price_word',
+    );
+    expect(rulesFor('Worth 40 bps either way.')).toContain('price_word');
   });
 
   /* The section is in the scoped list, so a reader of that list can see it is covered. */

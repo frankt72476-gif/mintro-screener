@@ -387,27 +387,39 @@ export const MERCHANT_COMMERCE_WORDS = ['rate', 'rates', 'discount'] as const;
 export const PRICE_WORDS = [...MINTRO_COST_WORDS, ...MERCHANT_COMMERCE_WORDS] as const;
 
 /**
- * What an operator note may not say (D-261).
+ * What an operator note may not say (D-261): the vocabulary of **what a solution costs**.
  *
- * Mintro's costs, plus `rate` and `rates`. Wider than `MINTRO_COST_WORDS` and narrower than
- * `PRICE_WORDS`, and the difference is who is speaking.
+ * The narrowest of the three lists, and the only one written out rather than composed. What D-256
+ * keeps out of a site evaluation is a comparison between Mintro's solutions, and these are the
+ * words that can only be that: a `fee`, a spread in `basis points` or `bps`, one option being
+ * `cheaper` or more `expensive` than another. None of them describes a storefront.
  *
- * A shore-up describes a change to the **merchant's** commerce, so it needs their vocabulary — that
- * is why `rate` and `discount` are permitted there. An operator note is **Mintro's own prose in
- * Mintro's own voice**, sitting under the placement paragraph in a document that goes to an
- * underwriter. "Their rate is competitive" and "our rate is competitive" are one word apart, and
- * only the second is refused by D-256 — which is precisely why the note cannot be trusted to the
- * distinction. `discount` stays permitted: an operator noting the merchant's bundle discounts is
- * describing the storefront, and that is the correction D-260 already made once.
+ * **`price`, `cost` and `rate` are deliberately absent**, and the first draft of this list had all
+ * three. They are the words an operator reaches for when writing about the merchant — *their prices
+ * are consumer-facing*, *cost per unit is listed*, *their chargeback rate came up* — and refusing
+ * them would refuse the honest note far more often than the forbidden one. That is the same
+ * correction D-260 already made once, when the validator refused a shore-up for naming the
+ * merchant's own bundle discounts: a rule working against its own purpose.
+ *
+ * The note is Mintro's prose in a document an underwriter reads, so the list is not empty. It is as
+ * short as it can be while still catching the thing it exists for.
  */
-export const OPERATOR_NOTE_WORDS = [...MINTRO_COST_WORDS, 'rate', 'rates'] as const;
+export const OPERATOR_NOTE_WORDS = [
+  'fee',
+  'fees',
+  'basis point',
+  'basis points',
+  'bps',
+  'cheaper',
+  'expensive',
+] as const;
 
 /**
  * What each section may not say. Angle paragraphs are absent entirely (D-256).
  *
  *   `placement`, `routing` — both lists. These state where Mintro will place a merchant.
  *   `shoreUps`             — Mintro's costs only. The merchant's own commerce is the subject.
- *   `operatorNote`         — Mintro's costs and rates. Mintro's own voice, in the summary block.
+ *   `operatorNote`         — what a solution costs. Mintro's own voice, in the summary block.
  */
 export const PRICE_SCOPES = {
   placement: PRICE_WORDS,
