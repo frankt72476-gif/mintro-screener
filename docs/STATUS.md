@@ -22,6 +22,10 @@ and the received document verified against what the merchant actually did.
 
 D-256 architecture ratified; cluster 1 (rule tiering) done; cluster 2 must read PROD-013/014 against PROD-016 before any patterns land. Cluster 2 in progress: angles.json 1.0.0, generator built, no real run yet.
 
+Cluster 4 carries:
+
+- Angle citation lists show observed states only; `not_evaluable` collapsed to a count.
+
 ### Expect one thing to look wrong on any run screened before 2026-08-29
 
 The four states are rendered as **Not met · Needs a look · Met · Not observed** (D-175). The
