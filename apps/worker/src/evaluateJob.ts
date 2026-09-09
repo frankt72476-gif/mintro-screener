@@ -285,6 +285,35 @@ export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string 
   );
 }
 
+/**
+ * Everything the request carries, for a dry run that wants to price it honestly.
+ *
+ * The prompt alone under-counts: the answer schema goes in `output_config` and is billed as input
+ * like anything else. On run 9011b2d7 that is another ~4.4 kB the old estimate did not see.
+ *
+ * There is no separate system prompt — this request puts everything in one user message — and that
+ * is stated rather than left for a reader to infer from an absent line.
+ */
+export function requestParts(
+  angles: AngleSet,
+  ruleset: Ruleset,
+  inputs: EvaluationInputs,
+): { readonly prompt: string; readonly schema: string; readonly system: string } {
+  const run = runContextFor(angles, inputs);
+  const handles = buildHandles(run);
+  const schema = draftSchema(
+    handleContext(run, handles),
+    angles.spectrum.map((entry) => entry.id),
+    [...angles.placements],
+  );
+  return {
+    prompt: buildPrompt(angles, promptInputsFor(ruleset, inputs, handles)),
+    schema: JSON.stringify(schema),
+    // No system prompt is sent. Named so the dry run can say so rather than omit it silently.
+    system: '',
+  };
+}
+
 /** The prompt as it would be sent. Exposed for the dry run and for tests. */
 export function promptFor(
   angles: AngleSet,
@@ -377,6 +406,15 @@ export async function generateDraft(
 
   let retry: string | undefined;
   let lastMessage = '';
+  /*
+    The last document the model produced, kept even when it was refused.
+
+    A rejected draft used to store `content: null`, so an operator could read why it was refused
+    and not what was refused. On run 9011b2d7 that meant discarding a complete, well-formed
+    document over a single word. Keeping it lets the operator fix the word; `publishRefusal`
+    is what stops the repaired-or-not draft being sent.
+  */
+  let lastDraft: EvaluationDraft | undefined;
   /*
     The usage from the most recent answer, carried out of the loop.
 
@@ -499,6 +537,7 @@ export async function generateDraft(
       continue;
     }
     const draft = decoded.value;
+    lastDraft = draft;
 
     // On the real ids, never the handles: the validator's whole job is checking against the run.
     const validation = validateDraft(draft, run);
@@ -523,6 +562,7 @@ export async function generateDraft(
     attempts: MAX_ATTEMPTS,
     message: lastMessage,
     handles: stored,
+    ...(lastDraft === undefined ? {} : { draft: lastDraft }),
     ...(lastUsage === undefined ? {} : { usage: lastUsage }),
   };
 }

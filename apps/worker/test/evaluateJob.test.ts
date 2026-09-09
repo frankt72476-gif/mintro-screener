@@ -21,6 +21,7 @@ import {
   inputHash,
   parseDraft,
   promptFor,
+  requestParts,
   runContextFor,
   type EvaluationInputs,
 } from '../src/evaluateJob.js';
@@ -200,7 +201,13 @@ describe('the prompt', () => {
     is about the merchant's own pricing posture — so the assertion is on what this module writes,
     not on what the data says.
   */
-  it('introduces no price word of its own', () => {
+  /*
+    The one place the prompt says a price word is the sentence telling the model not to use them in
+    the placement. That sentence has to name them to forbid them, so it is excluded by locating it
+    structurally rather than by relaxing the rule — and asserted to exist, so the exclusion cannot
+    quietly become a hole.
+  */
+  it('introduces no price word of its own, outside the sentence that forbids them', () => {
     const fromData = [
       ...angles.angles.map((a) => `${a.notes} ${a.reasoning} ${a.question}`),
       ...angles.guardrails,
@@ -208,10 +215,14 @@ describe('the prompt', () => {
     ].join(' ');
 
     const written = promptFor(angles, ruleset, { ...INPUTS, pages: [], findings: [], eyeTest: [] });
+    const guidance = '**In this paragraph, do not use the words price, pricing, cost, fee, discount or rate.**';
+    expect(written, 'the guidance sentence is missing').toContain(guidance);
+
+    const rest = written.split(guidance).join(' ');
     for (const word of PRICE_WORDS) {
       const inData = new RegExp(`\\b${word}\\b`, 'i').test(fromData);
       if (inData) continue;
-      expect(new RegExp(`\\b${word}\\b`, 'i').test(written), `prompt introduces '${word}'`).toBe(false);
+      expect(new RegExp(`\\b${word}\\b`, 'i').test(rest), `prompt introduces '${word}'`).toBe(false);
     }
   });
 
@@ -331,7 +342,8 @@ describe('generateDraft', () => {
     expect(result.status).toBe('rejected');
     expect(result.attempts).toBe(MAX_ATTEMPTS);
     expect(result.message).toContain('distinct angle');
-    expect(result.draft).toBeUndefined();
+    // The refused document is kept, so an operator can repair it rather than regenerate.
+    expect(result.draft).toBeDefined();
     expect(calls).toHaveLength(2);
   });
 
@@ -779,6 +791,107 @@ describe('handles bound the citation space end to end', () => {
     for (const citation of result.draft?.placement.citations ?? []) {
       expect(toId(HANDLES, 'angle', H('angle', citation.ref))).toBe(citation.ref);
     }
+  });
+});
+
+describe('a rejected draft keeps what was written', () => {
+  /*
+    Run 9011b2d7 produced a complete, well-formed document and had it refused over a single word.
+    Storing `content: null` discarded all of it, so an operator could read why and not what.
+  */
+  it('carries the refused document back', async () => {
+    const bad = validDraft();
+    const invalid = {
+      ...bad,
+      placement: { ...bad.placement, paragraph: 'The pricing decides this.' },
+    };
+    const { impl } = fakeFetch([invalid, invalid]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('rejected');
+    expect(result.draft).toBeDefined();
+    expect(result.draft?.placement.paragraph).toBe('The pricing decides this.');
+    expect(result.message).toContain('pricing');
+  });
+
+  it('carries it decoded, so the operator edits real ids', async () => {
+    const bad = validDraft();
+    const invalid = {
+      ...bad,
+      placement: { ...bad.placement, paragraph: 'The pricing decides this.' },
+    };
+    const { impl } = fakeFetch([invalid, invalid]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.draft?.angles[0]?.citations[0]?.ref).toBe('f-001');
+  });
+
+  /*
+    An invented handle is refused before a document exists, so there is nothing to keep. The row
+    still records the attempt and the reason.
+  */
+  it('keeps nothing when the answer never decoded', async () => {
+    const bad = validDraft();
+    const invented = {
+      ...bad,
+      angles: bad.angles.map((a, i) =>
+        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'F404' }] } : a,
+      ),
+    };
+    const { impl } = fakeFetch([invented, invented]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('rejected');
+    expect(result.draft).toBeUndefined();
+    expect(result.message).toContain('F404');
+  });
+});
+
+describe('what the dry run prices', () => {
+  /*
+    The schema travels in `output_config` and is billed as input. An estimate over the prompt alone
+    is quietly low, which is the wrong direction for a number somebody uses to decide whether to
+    spend.
+  */
+  it('reports the prompt, the schema and the absent system prompt separately', () => {
+    const parts = requestParts(angles, ruleset, INPUTS);
+    expect(parts.prompt.length).toBeGreaterThan(0);
+    expect(parts.schema.length).toBeGreaterThan(0);
+    expect(parts.system).toBe('');
+  });
+
+  it('prices the schema as well as the prompt', () => {
+    const parts = requestParts(angles, ruleset, INPUTS);
+    const whole = estimateTokens(parts.system + parts.prompt + parts.schema);
+    const promptOnly = estimateTokens(parts.prompt);
+    expect(whole).toBeGreaterThan(promptOnly);
+  });
+
+  it('prices the schema the request actually sends', async () => {
+    const { impl, requests } = fakeFetch([validDraft()]);
+    await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const sent = JSON.stringify(requests[0]!['output_config'].format.schema);
+    expect(requestParts(angles, ruleset, INPUTS).schema).toBe(sent);
+  });
+});
+
+describe('the placement vocabulary guidance', () => {
+  const prompt = promptFor(angles, ruleset, INPUTS);
+
+  /*
+    Guidance, not a relaxation. The rule still refuses the words; the model is given ones that mean
+    the same thing and cannot be read as a statement about what Mintro charges.
+  */
+  it('names the words to avoid and the words to use', () => {
+    expect(prompt).toContain('do not use the words price, pricing, cost, fee, discount or rate');
+    expect(prompt).toContain('commercial posture');
+    expect(prompt).toContain('how it sells');
+    expect(prompt).toContain('order structure');
+  });
+
+  it('scopes it to the placement and says the angles are unrestricted', () => {
+    expect(prompt).toContain('this applies to the placement only');
   });
 });
 

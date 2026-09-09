@@ -539,6 +539,51 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
 }
 
 /**
+ * Whether a stored draft may be published, and why not when it may not.
+ *
+ * **Publishing re-validates. It never trusts the stored verdict.** Three things can have changed
+ * between a generation and a publish, and each of them is a way a refused document could otherwise
+ * reach an underwriter:
+ *
+ *   - the operator edited the draft, and the edit is not validated anywhere else;
+ *   - the stored `validator_status` says `rejected`, and somebody published anyway;
+ *   - the rules moved between the two moments.
+ *
+ * A rejected draft now keeps its content so an operator can repair one word rather than pay for a
+ * regeneration — which is the right trade, and it is exactly what makes this guard load-bearing.
+ * Before that change a rejected row held `content: null` and publishing it was impossible by
+ * accident. Now it is possible, so it has to be refused on purpose.
+ *
+ * Returns the refusal, or `null` when it may be published. Never throws: the caller shows the
+ * reason to an operator.
+ */
+export function publishRefusal(
+  draft: EvaluationDraft | null,
+  storedStatus: string,
+  run: RunContext,
+): string | null {
+  if (draft === null) {
+    return 'This draft has no content. Nothing was generated for this run, so there is nothing to publish.';
+  }
+
+  if (storedStatus !== 'ok') {
+    return (
+      `This draft was stored as '${storedStatus}'. Its content is kept so it can be repaired, not ` +
+      'so it can be sent — edit it until it validates, then publish.'
+    );
+  }
+
+  const validation = validateDraft(draft, run);
+  if (validation.ok) return null;
+
+  return (
+    `This draft no longer validates: ${validation.rejections.length} reason(s). ` +
+    'It passed when it was generated, so either it was edited or the run it cites has changed.\n' +
+    validation.rejections.map((r) => `- ${r.at}: ${r.message}`).join('\n')
+  );
+}
+
+/**
  * The rejections as a message to append to a retry.
  *
  * Written for the model rather than for a log: it names the rule, the place and what to do, and it

@@ -16,6 +16,7 @@ import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase
 import {
   generateDraft,
   promptFor,
+  requestParts,
   storeDraft,
   storefrontNotSeen,
   type EvaluationInputs,
@@ -167,7 +168,8 @@ async function main(argv: readonly string[]): Promise<number> {
   const notSeen = storefrontNotSeen(inputs.pageStats);
 
   if (dryRun) {
-    const prompt = promptFor(angles, ruleset, inputs);
+    const parts = requestParts(angles, ruleset, inputs);
+    const prompt = parts.prompt;
     console.log(prompt);
     console.log('\n' + '─'.repeat(96));
     console.log(`run          ${runId}  (${report.merchantDomain})`);
@@ -182,7 +184,21 @@ async function main(argv: readonly string[]): Promise<number> {
     );
     console.log(`eye test     ${eyeVerdicts.length} verdict(s)${eyeAbsence === undefined ? '' : ` — absent: ${eyeAbsence}`}`);
     console.log(`truncations  ${inputs.pageTruncations.length}`);
-    console.log(`prompt       ${prompt.length} characters, ~${estimateTokens(prompt)} input tokens (estimate)`);
+    /*
+      The whole request, not just the prompt.
+
+      The answer schema travels in `output_config` and is billed as input like anything else — on
+      this run it is another few kilobytes. An estimate that counted only the prompt would be
+      quietly low, which is the wrong direction for a number somebody uses to decide whether to
+      spend.
+    */
+    const billed = parts.system + parts.prompt + parts.schema;
+    console.log(`prompt       ${parts.prompt.length} characters`);
+    console.log(`schema       ${parts.schema.length} characters (sent in output_config)`);
+    console.log(
+      `system       ${parts.system.length === 0 ? 'none — everything is in the user message' : `${parts.system.length} characters`}`,
+    );
+    console.log(`estimate     ~${estimateTokens(billed)} input tokens for the whole request`);
     console.log('\nDry run: nothing was sent and nothing was written.');
     return 0;
   }
@@ -206,6 +222,30 @@ async function main(argv: readonly string[]): Promise<number> {
       2,
     ),
   );
+
+  /*
+    The mapping, after the document.
+
+    A draft cites `F12`, and printed on its own that is a reference nobody can follow. It is stored
+    on the row either way; this is so the thing a person is looking at right now is readable
+    without a second query.
+  */
+  if (result.handles !== undefined) {
+    console.log('\n' + '─'.repeat(96));
+    console.log('Handle mapping (stored on the draft)\n');
+    const sections: [string, Record<string, string>][] = [
+      ['angle', result.handles.angle],
+      ['finding', result.handles.finding],
+      ['evidence', result.handles.evidence],
+      ['eye_test', result.handles.eye_test],
+    ];
+    for (const [kind, mapping] of sections) {
+      const entries = Object.entries(mapping);
+      console.log(`${kind} (${entries.length})`);
+      for (const [handle, id] of entries) console.log(`  ${handle.padEnd(5)} ${id}`);
+      console.log('');
+    }
+  }
 
   return result.status === 'ok' ? 0 : 1;
 }

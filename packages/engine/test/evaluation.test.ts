@@ -18,6 +18,7 @@ import {
   rejectionMessage,
   sentencesOf,
   hasInferenceMarker,
+  publishRefusal,
   validateDraft,
   type Citation,
   type EvaluationDraft,
@@ -655,6 +656,65 @@ describe('unbacked_legality_item', () => {
 
   it('says nothing about a clean legality block with no items', () => {
     expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+  });
+});
+
+describe('publishRefusal', () => {
+  /*
+    A rejected draft keeps its content now, so an operator can repair one word instead of paying
+    for a regeneration. That is the right trade and it is what makes this guard load-bearing:
+    before it, publishing a refused draft was impossible by accident; now it has to be refused on
+    purpose.
+  */
+  it('lets a validating draft stored as ok through', () => {
+    expect(publishRefusal(passing(), 'ok', RUN)).toBeNull();
+  });
+
+  it('refuses a draft stored as rejected, however good its content looks', () => {
+    const refusal = publishRefusal(passing(), 'rejected', RUN);
+    expect(refusal).toContain("stored as 'rejected'");
+    expect(refusal).toContain('repaired, not so it can be sent');
+  });
+
+  it('refuses the other non-ok statuses too', () => {
+    for (const status of ['failed', 'run_did_not_see_storefront']) {
+      expect(publishRefusal(passing(), status, RUN), status).not.toBeNull();
+    }
+  });
+
+  it('refuses a draft with no content at all', () => {
+    expect(publishRefusal(null, 'ok', RUN)).toContain('no content');
+  });
+
+  /*
+    The case the stored verdict cannot cover: an operator edited the draft after it validated.
+    Nothing else checks an edit, so publishing has to.
+  */
+  it('re-validates rather than trusting the stored ok', () => {
+    const edited = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a, i) => (i === 0 ? { ...a, citations: [cite('f-999')] } : a)),
+    }));
+    const refusal = publishRefusal(edited, 'ok', RUN);
+    expect(refusal).toContain('no longer validates');
+    expect(refusal).toContain('f-999');
+    expect(refusal).toContain('either it was edited or the run it cites has changed');
+  });
+
+  it('names every reason, so one fix at a time is not the only route', () => {
+    const edited = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, spectrum: 'consumer_retail' as const, citations: [] },
+    }));
+    const result = validateDraft(edited, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    const refusal = publishRefusal(edited, 'ok', RUN)!;
+    // However many the validator found, the refusal names that many and lists each.
+    expect(refusal).toContain(`${result.rejections.length} reason(s)`);
+    expect(result.rejections.length).toBeGreaterThan(1);
+    for (const rejection of result.rejections) expect(refusal).toContain(rejection.at);
   });
 });
 
