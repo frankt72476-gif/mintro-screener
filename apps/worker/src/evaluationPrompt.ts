@@ -248,7 +248,9 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
     section(
       'Routing conditions',
       'State every one, including the ones that cannot be observed from a crawl. ' +
-        '`not_observable` is not a soft `not_met` — it means the storefront cannot show it.\n\n' +
+        '`not_observable` is not a soft `not_met` — it means the storefront cannot show it, so ' +
+        'leave its citations empty. There is nothing that could bear on it, and a capture there ' +
+        'reads as support for a status that has none.\n\n' +
         angles.routingConditions
           .map((condition) => {
             const observed =
