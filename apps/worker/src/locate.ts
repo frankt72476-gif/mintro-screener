@@ -190,6 +190,30 @@ export function establishDocument(
     exist and we were turned away. One predicate, the one D-184 put in one place, rather than a
     second reading of the status range here.
   */
+  /*
+    The merchant's consent gate is not the policy document it stands in front of (D-266).
+
+    Before the status test, like the challenge above and for the same reason: a gate answers 200.
+    A policy URL that returns the gate would otherwise clear the redirect rule and the path rule,
+    and — a gate carrying a 2,000-character acknowledgement runs close to it — possibly the
+    character floor as well.
+
+    `obstructed` is **false**, deliberately, and it is the one place in this family where that is
+    right: nothing was retrieved, but the shortfall is not ours in the sense that flag means and it
+    is certainly not the merchant failing to publish. The kind comes from `page.gated` downstream,
+    which is a third answer neither boolean can give.
+  */
+  if (page.gated !== undefined) {
+    return unreachable(
+      `${spec.label}: ${requestedUrl} was answered by the site's own consent gate, so the ` +
+        'document behind it was not read',
+      attempts,
+      false,
+      undefined,
+      page.gated,
+    );
+  }
+
   if (page.httpStatus < 200 || page.httpStatus >= 400) {
     return unreachable(
       `${spec.label}: ${requestedUrl} returned HTTP ${page.httpStatus}`,

@@ -302,6 +302,20 @@ export async function screenStorefront(
     pass · 61 not evaluable" and finished `complete`, and there was nothing on any surface an
     operator sees to say that no page of the site had been served to anybody.
   */
+  if (wall.consentGated > 0) {
+    /*
+      Said out loud, and said as the credit it is (D-266).
+
+      Run 97bf366a served the gate at sixteen of sixteen product URLs and the log said nothing.
+      The line names the merchant's control and names our own choice not to answer it, because the
+      reader's question on seeing thin coverage is *whose doing is this*.
+    */
+    say(
+      `  ${wall.consentGated} of ${wall.attempted} sampled page(s) were the merchant's own consent ` +
+        'gate; Mintro does not attest through it, so the pages behind it were not read',
+    );
+  }
+
   if (wall.challenged > 0) {
     say(
       `  ${wall.challenged} of ${wall.attempted} sampled page(s) were answered by the site's bot ` +
@@ -494,6 +508,7 @@ export async function screenStorefront(
   );
 
   const challengedPages = renderedPages.filter((page) => page.challenged !== undefined).length;
+  const gatedPages = renderedPages.filter((page) => page.gated !== undefined).length;
 
   progress.enter('assembly', 'assembling the report');
   const report = assembleReport(
@@ -551,6 +566,17 @@ export async function screenStorefront(
       ...(challengedPages === 0
         ? {}
         : { challenge: { challenged: challengedPages, pages: renderedPages.length } }),
+
+      /*
+        How many pages the merchant's own gate stood in front of (D-266).
+
+        Its own field rather than a share of `challenge`, because the two say opposite things about
+        the merchant and a masthead that merged them would report a compliance control as an
+        obstruction.
+      */
+      ...(gatedPages === 0
+        ? {}
+        : { consentGate: { challenged: gatedPages, pages: renderedPages.length } }),
 
       /*
         What the eye test should read — not what it found (D-198).

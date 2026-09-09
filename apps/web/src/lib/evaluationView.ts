@@ -122,6 +122,14 @@ export interface EvaluationRunContext {
    * `challengeLine` returns null for an absent value rather than rendering a zero.
    */
   readonly challenge?: { readonly challenged: number; readonly pages: number };
+  /**
+   * How many pages the merchant's own consent gate stood in front of (D-266).
+   *
+   * Separate from `challenge` because the two say opposite things about the merchant, and a
+   * single line covering both would file a compliance control as an obstruction. Absent means
+   * the run predates the record, not that nothing was gated.
+   */
+  readonly consentGate?: { readonly challenged: number; readonly pages: number };
 }
 
 /**
@@ -162,6 +170,20 @@ export function challengeLine(run: EvaluationRunContext): string | null {
   const challenge = run.challenge;
   if (challenge === undefined || challenge.challenged <= 0) return null;
   return `Bot challenge on ${challenge.challenged} of ${challenge.pages} pages`;
+}
+
+/**
+ * The masthead's consent-gate line, or null where there is nothing to say (D-266).
+ *
+ * A second line rather than a branch of the first. They are different facts about different
+ * parties and a run can carry both: a challenge is a third party blocking a robot, and a consent
+ * gate is the merchant's own control that Mintro chose not to answer. Merging them into one
+ * "coverage was limited" sentence is exactly the conflation D-044 exists to end.
+ */
+export function consentGateLine(run: EvaluationRunContext): string | null {
+  const gate = run.consentGate;
+  if (gate === undefined || gate.challenged <= 0) return null;
+  return `Consent gate on ${gate.challenged} of ${gate.pages} pages`;
 }
 
 // ── vocabulary ─────────────────────────────────────────────────────────────────────────────────

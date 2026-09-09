@@ -55,6 +55,16 @@ export type ArtifactKind =
   | 'dom'
   | 'coa'
   /**
+   * A merchant's own consent gate, served where a page was asked for (D-266).
+   *
+   * Kept apart from `challenge` as well as from `dom`, because it is a different fact about
+   * a different party: a challenge is a vendor refusing to show us the site, and a consent
+   * gate is the merchant asking a question we declined to answer. The first says nothing
+   * about the merchant; the second is a control in the merchant's favour, and GATE-001 cites
+   * this artifact as the evidence a gate was observed.
+   */
+  | 'gate'
+  /**
    * A bot-protection interstitial served where a page was asked for (D-264).
    *
    * Stored, because the run has to record what happened, and kept **apart from `dom`** because
@@ -231,6 +241,10 @@ export function unsettled(
  *   - `challenged` — **the site's bot protection answered instead of the site.** The request
  *     completed and a document came back; the document was an interstitial, and the page behind
  *     it was never served (D-264).
+ *   - `gated` — **the merchant's own consent gate stands in front of it**, and the crawler did
+ *     not attest through it (D-266). Nothing was established about the page, and the reason is
+ *     the only one of the seven that is a credit to the merchant rather than a shortfall of
+ *     anyone's: it is the control GATE-001 exists to look for.
  *
  * The fifth arrived with the certificate fetch and is not a refinement of the other four. A COA
  * link returning 404 is a fact about the merchant; a COA link that times out is a fact about this
@@ -245,6 +259,11 @@ export function unsettled(
  * two must not read as one, because the operator's next move differs: one is re-scanned, the
  * other cannot be (D-264).
  *
+ * The seventh is `gated`, and it is not a refinement of `challenged` either. A challenge is a
+ * third party blocking a robot and says nothing about the merchant. A consent gate is the
+ * merchant's own control, and its presence is a finding **in their favour** — reporting it as
+ * bot protection would take a compliance measure and file it as an obstruction (D-266).
+ *
  * **Declared where the finding is made, never derived from the reason text.** A classifier that
  * pattern-matched the wording would be locating the subject by its compliant form — hard
  * constraint 9 — and would silently reclassify every finding whose phrasing was reworded.
@@ -255,7 +274,8 @@ export type NotEvaluableKind =
   | 'not_exposed'
   | 'not_applicable'
   | 'not_retrieved'
-  | 'challenged';
+  | 'challenged'
+  | 'gated';
 
 /**
  * A rule that could not be observed.

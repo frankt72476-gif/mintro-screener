@@ -175,6 +175,11 @@ const NOT_EVALUABLE_ORDER: readonly { bucket: Bucket; heading: string; lede: str
     lede: "The site's bot protection answered these requests instead of the site, so the pages behind it were never seen. Nothing was established either way, and in particular nothing about the merchant. A re-run from the same place will meet the same challenge.",
   },
   {
+    bucket: 'gated',
+    heading: 'Behind the site\u2019s own consent gate',
+    lede: "The merchant serves a consent gate in place of these pages, and Mintro does not attest through it on a visitor's behalf. The gate itself was observed and is reported under the gate rules; what is behind it was not read. Nothing in this section is a shortfall of the merchant's.",
+  },
+  {
     bucket: 'unrecorded',
     heading: 'Reason not recorded',
     lede: 'This run was screened before Mintro separated these reasons, so which one applies was never written down. A completed run is never edited, so it stays as recorded.',
@@ -801,6 +806,7 @@ const EMPTY_BUCKETS: Record<Bucket, number> = {
   not_applicable: 0,
   not_retrieved: 0,
   challenged: 0,
+  gated: 0,
   unrecorded: 0,
 };
 

@@ -50,6 +50,63 @@ export interface RawExtraction {
 }
 
 /**
+ * A consent gate served **in place of** a page, rather than laid over one (D-266).
+ *
+ * ## Not the same thing as `RawGateContext`
+ *
+ * That one is an interstitial *over* content: a modal, a dialog, a fixed overlay, located by
+ * covering the viewport. It is what D-016 built and it is what GATE-001 has always read.
+ *
+ * This is the other shape, and the crawler had no name for it. CoMo Peptides deployed it between
+ * 2026-09-03 and 2026-09-08: the origin answers a product URL with `200` and a seven-kilobyte
+ * document that **is** the consent form. Nothing overlays anything, because there is nothing
+ * underneath. `RawGateContext` finds nothing, and every rule pointed at the product page evaluates
+ * the consent form as though it were the catalogue.
+ *
+ * ## Located structurally (hard constraint 9)
+ *
+ * By the **shape of the form**, never by the wording of the acknowledgements:
+ *
+ *   - a `POST` form whose only user-editable controls are **required checkboxes**. No text, email,
+ *     password, select or textarea. A form that collects nothing but assent.
+ *   - a hidden input whose value is a **same-origin path**, which is how a gate sends you back to
+ *     what you asked for. Present here as `_como_seg_return=/shop/bpc-157-tb500-blend/`.
+ *
+ * The acknowledgement labels are **reported, never matched against**. A gate wording its checkboxes
+ * differently is the population this exists to catch, and locating it by CoMo's phrasing would be
+ * D-014 exactly. What the labels are for is the evidence GATE-001 cites.
+ */
+export interface RawConsentGate {
+  found: boolean;
+  /** How it was identified, for the report. */
+  locatedBy: string;
+  /** Each required checkbox and the text sitting beside it, verbatim. Reported, never matched. */
+  acknowledgements: { label: string; name: string }[];
+  /** The same-origin path the gate would return to. Empty when no hidden input carried one. */
+  returnPath: string;
+  /** Visible text of the form's container, for the finding that cites it. */
+  text: string;
+  /** Where the form would submit. Recorded so it is visible that nothing submitted to it. */
+  action: string;
+}
+
+/**
+ * Whether the document carries the structure of a real storefront page (D-266).
+ *
+ * The third leg of the gate test, and the one that keeps it from firing on a real page that
+ * happens to carry a consent form. A product page has product structure; a gate has none of it.
+ * Read structurally — schema markup, a price element, an add-to-cart control — never from copy.
+ */
+export interface RawSurfaceSignals {
+  /** `schema.org/Product` in microdata or JSON-LD. */
+  productSchema: boolean;
+  /** A price element, by the platform-neutral class and microdata conventions. */
+  price: boolean;
+  /** A control that adds to a cart. */
+  addToCart: boolean;
+}
+
+/**
  * Evidence that an age gate exists as an *interstitial*, not merely that a string appears.
  *
  * D-016: a `pass` on GATE-001 must mean "an age gate exists", not "the characters 21+ occur
@@ -65,6 +122,112 @@ export interface RawGateContext {
   text: string;
   /** True when the container covers most of the viewport or blocks scrolling. */
   blocksEntry: boolean;
+}
+
+/**
+ * Reads the consent gate and the page structure it would have replaced (D-266).
+ *
+ * **Its own function, evaluated on its own**, for two reasons and the first is not a preference.
+ *
+ * **Playwright serialises the function it is handed and nothing else.** A call from inside
+ * `extractPage` to a module-scope helper is `undefined` in the page, the evaluate throws, and the
+ * render comes back carrying `renderError` — so every page of every run turns into a failed render
+ * and, downstream, a login wall that never existed. That is what the first draft of this did, and
+ * `noWallEscalation.test.ts` caught it by driving a real browser against the testbed: two unit
+ * tests would not have. `extractSignupForm` is separate for the same reason and it is the
+ * precedent that should have been followed first.
+ *
+ * The second reason is cost. `extractPage` walks four thousand text nodes and resolves computed
+ * styles; the gate probes want one question answered about three URLs, and paying the full
+ * extraction for that would multiply the cost of the cheapest thing the crawl does.
+ *
+ * **Nothing here submits anything.** It reads the form. Ticking four boxes that say *I am 21, I am
+ * a laboratory, I am acting institutionally* would be Mintro asserting things about itself that
+ * are not true in order to reach a catalogue the merchant put a control in front of, and every
+ * page the crawl then described would rest on that assertion (D-266).
+ */
+export function extractConsentGate(): {
+  gate: RawConsentGate;
+  surface: RawSurfaceSignals;
+} {
+  const editable = 'input:not([type=hidden]), select, textarea';
+  let gate: RawConsentGate = {
+    found: false,
+    locatedBy: '',
+    acknowledgements: [],
+    returnPath: '',
+    text: '',
+    action: '',
+  };
+
+  for (const form of Array.from(document.querySelectorAll('form'))) {
+    if ((form.getAttribute('method') ?? '').toLowerCase() !== 'post') continue;
+
+    const controls = Array.from(form.querySelectorAll(editable));
+    const boxes = controls.filter(
+      (element) =>
+        (element as HTMLInputElement).type === 'checkbox' && (element as HTMLInputElement).required,
+    );
+    // Every editable control is a required checkbox, and there is at least one. A form that also
+    // takes an email address is a sign-up form, which is a different thing with its own rules.
+    if (boxes.length === 0 || boxes.length !== controls.length) continue;
+
+    // A hidden field carrying a path on this site. It is what makes this a gate standing in front
+    // of something, rather than a standalone form that happens to collect assent.
+    let returnPath = '';
+    for (const hidden of Array.from(form.querySelectorAll('input[type=hidden]'))) {
+      const value = (hidden as HTMLInputElement).value;
+      if (value.startsWith('/') && !value.startsWith('//')) {
+        returnPath = value;
+        break;
+      }
+    }
+    if (returnPath === '') continue;
+
+    gate = {
+      found: true,
+      locatedBy:
+        `a POST form whose ${boxes.length} editable control(s) are all required checkboxes, ` +
+        'carrying a return path',
+      acknowledgements: boxes.map((box) => ({
+        label: ((box.closest('label') ?? box.parentElement)?.textContent ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 300),
+        name: (box as HTMLInputElement).name,
+      })),
+      returnPath,
+      text: (form.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 2000),
+      action: form.getAttribute('action') ?? '',
+    };
+    break;
+  }
+
+  /*
+    Does this document carry the structure of a storefront page?
+
+    Structural, and deliberately generous: any one of the three is enough to say *this is a page*.
+    Finding no structure on a real product page would put a gate finding on a page that is not one,
+    so the test leans toward finding structure.
+  */
+  const surface: RawSurfaceSignals = {
+    productSchema:
+      document.querySelector('[itemtype*="schema.org/Product" i]') !== null ||
+      Array.from(document.querySelectorAll('script[type="application/ld+json"]')).some((node) =>
+        /"@type"\s*:\s*"(Product|Offer|AggregateOffer)"/i.test(node.textContent ?? ''),
+      ),
+    price:
+      document.querySelector(
+        '.price, .woocommerce-Price-amount, [itemprop=price], [class*="product-price" i], [data-price]',
+      ) !== null,
+    addToCart:
+      document.querySelector(
+        '[name=add-to-cart], .add_to_cart_button, .single_add_to_cart_button, form.cart, ' +
+          'button[name=add], [data-add-to-cart]',
+      ) !== null,
+  };
+
+  return { gate, surface };
 }
 
 /**
@@ -389,6 +552,18 @@ export function extractPage(args: ExtractArgs): RawExtraction {
     gateCandidates.push({ element: el, how: 'modal or overlay container' });
   }
 
+  /*
+    The consent gate, and whether this document is a page at all (D-266).
+
+    Computed here rather than inferred later because only a real DOM can answer it: *are this
+    form's only editable controls required checkboxes* is a question about elements, and a regex
+    over markup would be guessing at it.
+
+    **Nothing is submitted.** This reads the form and does not touch it. The gate's own submit
+    button ships `disabled`, and attesting on a merchant's behalf is not a thing a screener does
+    (D-017's principle, one surface further out): the report would then describe a catalogue that
+    was opened by us asserting things about ourselves that are not true.
+  */
   const viewportArea = Math.max(window.innerWidth * window.innerHeight, 1);
   let gate: RawGateContext = { found: false, locatedBy: '', text: '', blocksEntry: false };
 

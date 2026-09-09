@@ -428,6 +428,8 @@ async function findDocument(
   let obstructed = false;
   /** The marker from the first candidate bot protection answered, if any (D-265). */
   let challenged: string | undefined;
+  /** The first candidate the merchant's own consent gate stood in front of, if any (D-266). */
+  let gated: string | undefined;
   /*
     Every guard now lives in `establishDocument` (D-054).
 
@@ -533,7 +535,8 @@ async function findDocument(
         still leave both alone: those are the origin answering, and the answer is about the
         merchant.
       */
-      if (outcome.challenged !== undefined) challenged ??= outcome.challenged;
+      if (outcome.gated !== undefined) gated ??= outcome.gated;
+      else if (outcome.challenged !== undefined) challenged ??= outcome.challenged;
       else if (outcome.obstructed === true) obstructed = true;
 
       record({
@@ -556,6 +559,7 @@ async function findDocument(
     mine,
     obstructed,
     challenged,
+    gated,
   );
 }
 

@@ -74,6 +74,7 @@ import {
   angleCitations,
   challengeLine,
   chipAffordance,
+  consentGateLine,
   citesHeavy,
   evaluationSectionAnchor,
   legalitySummary,
@@ -321,6 +322,26 @@ function SummaryBlock({
             <strong>{challengeLine(run)}</strong> The site&rsquo;s bot protection answered those
             requests, so the pages behind it were not seen. Nothing was established about them
             either way.
+          </p>
+        )}
+        {/*
+          The merchant's own gate, said as the credit it is (D-266).
+
+          Its own line and its own colour, because it is not the challenge line's twin. That one
+          reports an obstruction by a third party; this one reports a control the merchant put in
+          place, which is what the gate rules exist to look for. What the two share is the
+          consequence, and the sentence states it: the pages behind it were not read.
+
+          Descriptive, and it names Mintro's own choice rather than describing the merchant as
+          blocking us (hard constraint 7). The merchant is not blocking anyone. We declined to
+          answer a question they are entitled to ask.
+        */}
+        {consentGateLine(run) !== null && (
+          <p className="eval-consent-gate" role="status">
+            <strong>{consentGateLine(run)}</strong> The site asks a visitor to affirm who they are
+            before showing those pages. Mintro does not answer that on a visitor&rsquo;s behalf, so
+            what sits behind the gate was not read. The gate itself is reported under the gate
+            rules.
           </p>
         )}
         <dl className="eval-meta">

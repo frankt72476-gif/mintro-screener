@@ -196,6 +196,12 @@ export interface EvaluationInputs {
      * distinction was never made rather than that nothing was challenged.
      */
     readonly challenged?: number;
+    /**
+     * Pages the merchant's own consent gate stood in front of (D-266).
+     *
+     * Read from `report.consentGate`, never recounted. Optional and permanent, like `challenged`.
+     */
+    readonly gated?: number;
   };
 }
 
@@ -355,6 +361,9 @@ export const MIN_DISTINCT_TEXTS = 3;
  *     alone would have let it through — and a model handed that would have written a confident
  *     reading of a gate, in a document whose page list looks like broad coverage.
  *
+ *   - **The run was gated** (D-266). The merchant's own consent gate stood in front of the pages,
+ *     and the crawler did not attest through it. Distinguished from a challenge because it is a
+ *     credit to the merchant rather than an obstruction, and the message says so.
  *   - **The run was challenged** (D-264). Taken first and independently of the two above, because
  *     it is a record rather than an inference, and because the repair it names is different: a
  *     text collapse is re-scanned and a challenge cannot be.
@@ -380,6 +389,29 @@ export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string 
     each other and returned byte-identical counts. Telling an operator to do the thing that cannot
     work is worse than telling them nothing.
   */
+  /*
+    A gated run has not seen the storefront either (D-266).
+
+    Taken before the challenge test only because it is the more specific fact; either refuses. What
+    differs is the sentence, and the sentence is the artifact. A challenge is nobody's credit and
+    cannot be re-scanned past. A consent gate is the merchant's own control working as intended,
+    and the operator's move is neither a re-scan nor a repair — it is to ask the merchant, or to
+    read the gate itself, which the run's GATE-001 finding already reports.
+
+    Saying *"the site did not see the storefront"* without naming which of the two would send an
+    operator looking for a fault in a run where the merchant did something right.
+  */
+  const gated = stats.gated ?? 0;
+  if (gated > 0) {
+    return (
+      `This run did not see the storefront: the merchant's own consent gate stands in front of ` +
+      `${gated} of the pages it rendered, and Mintro does not attest through it on a visitor's ` +
+      'behalf. No prompt was sent. The gate itself was observed and is reported under the gate ' +
+      'rules; what is behind it was not read. Nothing here is a shortfall of the merchant\u2019s, ' +
+      'and re-scanning will meet the same gate.'
+    );
+  }
+
   const challenged = stats.challenged ?? 0;
   if (challenged > 0) {
     return (

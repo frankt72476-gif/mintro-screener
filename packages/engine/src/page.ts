@@ -276,6 +276,24 @@ export interface PageContext {
    */
   readonly challenged?: string;
   /**
+   * Set when the merchant's own consent gate was served in place of this page (D-266).
+   *
+   * Carries the gate's description, for the reader. **`isRendered` stays true**, and that is
+   * the difference from `challenged`: the document is real, it is the merchant's, and GATE-001
+   * reads it as the observed gate. What it is not is the surface that was asked for, so every
+   * rule pointed at that surface is blinded by it.
+   */
+  readonly gated?: string;
+  /**
+   * Evidence key for the stored consent gate, set only alongside `gated` (D-266).
+   *
+   * Its own key rather than `domKey`, for the reason `challengeKey` has one: every satisfied
+   * and violating finding builds evidence from `screenshotKey ?? domKey`, so a gate filed
+   * under `domKey` would be citable as the capture behind a verdict about a product page.
+   * GATE-001 cites this one deliberately, because for that rule the gate *is* the subject.
+   */
+  readonly gateKey?: string;
+  /**
    * Evidence key for the stored interstitial, set only alongside `challenged` (D-264).
    *
    * Deliberately **not** `domKey`. Every satisfied and violating finding builds its evidence

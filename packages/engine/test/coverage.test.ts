@@ -164,6 +164,7 @@ describe('the kind is what the finding declared', () => {
     ['not_applicable'],
     ['not_retrieved'],
     ['challenged'],
+    ['gated'],
   ])('counts a %s finding under that kind and no other', (kind) => {
     const finding = notEvaluable(ruleFor('PROD-002'), 'a reason', 'rendered_page', kind);
     const enriched: ReportFinding[] = [
@@ -187,6 +188,7 @@ describe('the kind is what the finding declared', () => {
       not_applicable: coverage.notApplicable,
       not_retrieved: coverage.notRetrieved,
       challenged: coverage.challenged,
+      gated: coverage.gated,
     };
 
     expect(counts[kind]).toBe(1);

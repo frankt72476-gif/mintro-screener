@@ -46,6 +46,14 @@ export interface WallAssessment {
    * only what is printed. Absent from a run recorded before this existed.
    */
   readonly challenged: number;
+  /**
+   * How many of the attempted pages were the merchant's own consent gate (D-266).
+   *
+   * Named apart from `challenged` because it means the opposite thing about the merchant, and
+   * apart from `walled` because no credential opens it either — the gate asks a question rather
+   * than checking an identity, and Mintro does not answer it.
+   */
+  readonly consentGated: number;
   /** Why, in words, for the report and the run log. */
   readonly reason: string;
   /** The URLs that were not served, and what happened instead. */
@@ -58,6 +66,9 @@ export function wasServed(page: PageContext): boolean {
   // What came back was the interstitial, not the page (D-264). The status it carried is not the
   // question — the same mitigation is served at 200, which the test below would have passed.
   if (page.challenged !== undefined) return false;
+  // What came back was the merchant's consent gate, not the page (D-266). The status is 200 and
+  // the URL is right, so nothing else here would have caught it.
+  if (page.gated !== undefined) return false;
   if (page.httpStatus < 200 || page.httpStatus >= 300) return false;
 
   // Compared on origin and path. A query string or fragment added by the site is not a redirect
@@ -82,6 +93,7 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
   const attempted = pages.length;
   const servedPages = pages.filter(wasServed);
   const challenged = pages.filter((page) => page.challenged !== undefined).length;
+  const consentGated = pages.filter((page) => page.gated !== undefined).length;
   const refusals = pages
     .filter((page) => !wasServed(page))
     .map((page) => describeRefusal(page));
@@ -92,6 +104,7 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
       attempted: 0,
       served: 0,
       challenged: 0,
+      consentGated: 0,
       // No product pages is a catalogue we never found, which is a different problem with a
       // different answer. Calling it a wall would send us looking for a credential to fix it.
       reason: 'no product pages were attempted, so nothing can be said about a login wall',
@@ -105,11 +118,13 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
       attempted,
       served: servedPages.length,
       challenged,
+      consentGated,
       reason:
         (servedPages.length === attempted
           ? 'every sampled product page was served to an anonymous request'
           : `${servedPages.length} of ${attempted} sampled product pages were served anonymously`) +
-        describeChallenged(challenged, attempted),
+        describeChallenged(challenged, attempted) +
+        describeGated(consentGated, attempted),
       refusals,
     };
   }
@@ -122,12 +137,36 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
     challenged and some refused still is: the refused ones may open with an account, and the run is
     entitled to try.
   */
+  /*
+    Every page behind the merchant's consent gate (D-266).
+
+    Not a wall, and the distinction is not pedantry: `walled` sends the run to look for a stored
+    credential and tells the reader coverage was limited by a login. A consent gate is neither. It
+    asks the visitor to affirm things about themselves, an account does not answer it, and the
+    honest sentence says the crawler declined rather than that it was shut out.
+  */
+  if (consentGated === attempted) {
+    return {
+      walled: false,
+      attempted,
+      served: 0,
+      challenged,
+      consentGated,
+      reason:
+        `none of the ${attempted} sampled product page(s) were read: the merchant's own consent ` +
+        'gate stands in front of every one of them, and Mintro does not attest through it. This ' +
+        'is not a login wall and no account opens it',
+      refusals,
+    };
+  }
+
   if (challenged === attempted) {
     return {
       walled: false,
       attempted,
       served: 0,
       challenged,
+      consentGated,
       reason:
         `none of the ${attempted} sampled product page(s) were seen: the site's bot protection ` +
         'answered every request. This is not a login wall and no account can open it',
@@ -140,11 +179,20 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
     attempted,
     served: 0,
     challenged,
+    consentGated,
     reason:
       `none of the ${attempted} sampled product page(s) were served to an anonymous request` +
-      describeChallenged(challenged, attempted),
+      describeChallenged(challenged, attempted) +
+      describeGated(consentGated, attempted),
     refusals,
   };
+}
+
+/** Named wherever any page was gated, so the sentence is not read as a wall or a challenge. */
+function describeGated(gated: number, attempted: number): string {
+  return gated === 0
+    ? ''
+    : `; ${gated} of ${attempted} were the merchant's own consent gate`;
 }
 
 /** Named in the reason wherever any page was challenged, so the sentence is not read as a wall. */
@@ -158,6 +206,9 @@ function describeRefusal(page: PageContext): string {
   if (page.renderError !== undefined) return `${page.requestedUrl} — ${page.renderError}`;
   if (page.challenged !== undefined) {
     return `${page.requestedUrl} — bot protection answered (${page.challenged})`;
+  }
+  if (page.gated !== undefined) {
+    return `${page.requestedUrl} — the merchant's consent gate was served in its place`;
   }
   if (page.httpStatus < 200 || page.httpStatus >= 300) {
     return `${page.requestedUrl} — HTTP ${page.httpStatus}`;

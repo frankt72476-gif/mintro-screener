@@ -13,6 +13,7 @@ import { isRendered } from '../page.js';
 import { notEvaluable, type Evidence, type EvidenceKind, type Finding } from '../findings.js';
 import { establishesAbsence } from '../fetcher.js';
 import { CHALLENGE_REASON } from '../challenge.js';
+import { CONSENT_GATE_REASON } from '../consentGate.js';
 
 /** Layer 1 and above observe a rendered page. Stated, never inferred. */
 export const RENDERED: EvidenceKind = 'rendered_page';
@@ -70,6 +71,48 @@ export function renderFailureEvidence(page: PageContext): Evidence[] {
   ];
 }
 
+/**
+ * Whether this rule's subject **is** the entry gate (D-266).
+ *
+ * Read entirely from rule data, so the engine holds no list of gate rule ids and adding one is a
+ * data change (hard constraint 1). The predicate is not invented here either: it is the same
+ * condition `assertFinding` already uses to route a rule to `gateFinding`, exported so the two
+ * cannot drift — a rule that reached the gate handler while this said otherwise would be blinded
+ * by the very thing it exists to find.
+ *
+ * Everything else pointed at a gated document is blinded, whatever its surface. A `product` rule
+ * did not get a product page. A `footer` rule did not get the footer. Both are true of the
+ * seven-kilobyte consent form CoMo served in place of sixteen product pages.
+ */
+export function readsTheEntryGate(rule: Rule): boolean {
+  if (rule.type !== 'dom_assert') return false;
+  const params = rule.params as {
+    readonly expect?: string;
+    readonly signals?: readonly string[];
+    readonly surface?: string;
+  };
+  return params.expect === 'present' && params.signals !== undefined && params.surface === 'homepage';
+}
+
+/**
+ * The finding for a rule whose surface was replaced by the merchant's consent gate (D-266).
+ *
+ * Cites the stored gate, because hard constraint 3 requires a `not_evaluable` to evidence why and
+ * the gate is the why: a reader opens it and sees what stood where the page should have been.
+ */
+export function gatedFinding(rule: Rule, page: PageContext): Finding {
+  return notEvaluable(rule, CONSENT_GATE_REASON, RENDERED, 'gated', [
+    {
+      kind: RENDERED,
+      sourceUrl: page.finalUrl,
+      sourceSha256: page.htmlSha256,
+      evidenceKey: page.gateKey ?? '',
+      capturedAt: page.capturedAt,
+      attempts: [{ url: page.requestedUrl, status: page.httpStatus }],
+    },
+  ]);
+}
+
 /** True when the page carries the captures a `rendered_page` finding requires. */
 export function hasRenderedCaptures(page: PageContext): boolean {
   return page.screenshotKey !== undefined && page.domKey !== undefined;
@@ -83,6 +126,9 @@ export function hasRenderedCaptures(page: PageContext): boolean {
  * that filed every render failure as `not_exposed` — *the merchant did not present this* — with
  * `page.renderError` on the line above, printed as the reason and ignored for the kind. Fixing the
  * first and leaving three is how this became four in the first place.
+ *
+ * **A gated page is handled first and separately**, because `isRendered` is *true* for it: the
+ * merchant served a real document, it just was not the surface asked for (D-266).
  *
  * `isRendered` is false for four different things, and they are not one fact:
  *
@@ -108,6 +154,19 @@ export function hasRenderedCaptures(page: PageContext): boolean {
  * Returns `null` when the page did render, so a caller reads as a guard clause.
  */
 export function renderFailure(rule: Rule, page: PageContext): Finding | null {
+  /*
+    The consent gate, **before** `isRendered` (D-266).
+
+    Before, and not inside the not-rendered branch, because a gated document *did* render. It is a
+    real page served by the merchant with a real status; it is simply not the page that was asked
+    for. Putting this after the `isRendered` guard would return `null` and hand every rule a
+    consent form to evaluate as a product page, which is what run 97bf366a did fifteen times.
+
+    `readsTheEntryGate` is the one exception, and it is the whole point: that rule's subject is the
+    gate, so for it this document is the observation rather than the obstruction.
+  */
+  if (page.gated !== undefined && !readsTheEntryGate(rule)) return gatedFinding(rule, page);
+
   if (isRendered(page)) return null;
 
   /*

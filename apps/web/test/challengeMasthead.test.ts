@@ -23,6 +23,7 @@ import eyeTestJson from '../../../rules/eyetest.json';
 import { EvaluationReport } from '../src/components/EvaluationReport.js';
 import {
   challengeLine,
+  consentGateLine,
   type EvaluationLabels,
   type EvaluationRunContext,
   type FindingState,
@@ -83,6 +84,19 @@ const render = (run: EvaluationRunContext): string =>
     }),
   );
 
+/**
+ * The text of one paragraph, by class.
+ *
+ * The wording assertions below are about **that line**, and running them over the whole document
+ * asks a different question: the draft fixture's own prose contains the word "blocked", so a
+ * document-wide check either fails for the wrong reason or, phrased as a regex, quietly passes.
+ * Both happened here on the way to this.
+ */
+const lineOf = (markup: string, className: string): string => {
+  const match = new RegExp(`<p class="${className}"[^>]*>([\\s\\S]*?)</p>`).exec(markup);
+  return text(match?.[1] ?? '');
+};
+
 const text = (markup: string): string =>
   markup
     .replace(/<[^>]+>/g, ' ')
@@ -136,5 +150,65 @@ describe('the bot-challenge line', () => {
   it('prints nothing on a run recorded before the field existed', () => {
     expect(render(BASE)).not.toContain('eval-challenge');
     expect(challengeLine(BASE)).toBeNull();
+  });
+});
+
+describe('the consent-gate line', () => {
+  it('reaches the rendered document, with both numbers', () => {
+    const markup = render({ ...BASE, consentGate: { challenged: 16, pages: 30 } });
+
+    expect(text(markup)).toContain('Consent gate on 16 of 30 pages');
+    expect(markup).toContain('eval-consent-gate');
+  });
+
+  /*
+    Descriptive, and about Mintro's own choice (hard constraint 7). The merchant is not blocking
+    anyone; they are asking a question we decline to answer on a visitor's behalf. A line that said
+    the merchant blocked the crawler would take a compliance control and report it as obstruction.
+  */
+  it('names Mintro’s choice, never the merchant blocking us', () => {
+    const rendered = lineOf(
+      render({ ...BASE, consentGate: { challenged: 16, pages: 30 } }),
+      'eval-consent-gate',
+    );
+
+    expect(rendered).toContain('does not answer that on a visitor');
+    expect(rendered).toContain('was not read');
+    /*
+      Plain substrings rather than a word-boundary regex.
+
+      The regex form of this assertion arrived through a shell heredoc and its four `\\b`
+      escapes reached the file as literal backspace bytes, so it matched nothing and asserted
+      nothing while reading correctly on screen. CLAUDE.md records that failure; this is it
+      happening again. A list of forbidden phrases needs no escapes and cannot break silently.
+    */
+    for (const forbidden of ['blocked', 'should', 'recommend', 'bot protection']) {
+      expect(rendered.toLowerCase(), forbidden).not.toContain(forbidden);
+    }
+  });
+
+  /*
+    Two lines, not one. A run can meet both, and they are facts about different parties: merging
+    them into a single "coverage was limited" sentence is the conflation D-044 exists to end.
+  */
+  it('is a separate line from the challenge line, and both can appear', () => {
+    const markup = render({
+      ...BASE,
+      challenge: { challenged: 3, pages: 30 },
+      consentGate: { challenged: 16, pages: 30 },
+    });
+
+    expect(markup).toContain('eval-challenge');
+    expect(markup).toContain('eval-consent-gate');
+    expect(text(markup)).toContain('Bot challenge on 3 of 30 pages');
+    expect(text(markup)).toContain('Consent gate on 16 of 30 pages');
+  });
+
+  it('prints nothing on a run that met no gate, or one recorded before the field', () => {
+    expect(render({ ...BASE, consentGate: { challenged: 0, pages: 30 } })).not.toContain(
+      'eval-consent-gate',
+    );
+    expect(render(BASE)).not.toContain('eval-consent-gate');
+    expect(consentGateLine(BASE)).toBeNull();
   });
 });

@@ -84,6 +84,26 @@ describe('a challenged run has not seen the storefront', () => {
   it('passes a healthy run with no challenge record at all', () => {
     expect(storefrontNotSeen(HEALTHY)).toBeNull();
   });
+
+  /*
+    A gated run has not seen the storefront either, and the message must not read like a fault
+    (D-266). Run 97bf366a served the gate at sixteen of sixteen product URLs, on a merchant who had
+    just deployed close to the control the programme asks for.
+  */
+  it('refuses a gated run, and does not describe it as a shortfall', () => {
+    const message = storefrontNotSeen({ ...HEALTHY, gated: 16 }) ?? '';
+
+    expect(message).toContain('consent gate');
+    expect(message).toContain('does not attest through it');
+    expect(message).toContain('shortfall of the merchant');
+    // Not bot protection. The two say opposite things about the merchant.
+    expect(message).not.toContain('bot protection');
+  });
+
+  it('tells a gated run apart from a challenged one', () => {
+    expect(storefrontNotSeen({ ...HEALTHY, challenged: 9 })).toContain('bot protection');
+    expect(storefrontNotSeen({ ...HEALTHY, gated: 9 })).not.toContain('bot protection');
+  });
 });
 
 describe('a challenge is not a published document', () => {

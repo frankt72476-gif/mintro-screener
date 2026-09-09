@@ -79,11 +79,37 @@ are immutable (D-002), so those reports keep saying three merchants publish no F
 the next run. **No finding anywhere in the corpus rests on a thrown render** — that branch was
 latent, and the live defect was the status test beside it.
 
+### The CoMo gate regression is diagnosed and closed (D-266)
+
+It was carried as open with no cause. The cause is that **CoMo deployed a site-entry consent gate**
+between 2026-09-03 19:52 and 2026-09-08 20:16 UTC, and the crawler could not tell a consent form
+from a product page. Twenty consecutive runs rendered product pages at ~42 kB; the twenty-first
+rendered them at 2.7 kB. Nothing on our side changed in that window.
+
+Run `97bf366a` then published GATE-001 as a review item saying no interstitial was observed,
+GATE-002 as an auto-fail saying three of three paths served content directly, and fifteen
+`not_exposed` findings about product pages nobody read. The merchant deployed close to the control
+the programme asks for and the report got worse in every direction.
+
+A consent gate is now classified like a challenge and reported as the opposite of one: its own
+`ArtifactKind` and `NotEvaluableKind`, GATE-001 reading it as an observed gate and passing on it,
+GATE-002 reading a gated `200` as not public, and a masthead line in the pass colour. **The crawler
+does not attest through it**, and that is a rule about conduct rather than a limitation: ticking
+four boxes that say *I am 21, I am a laboratory* would be Mintro asserting things about itself that
+are not true to reach a catalogue the merchant put a control in front of.
+
+**Migration `0085` needs production apply before the next scan**, alongside `0084`. Run `97bf366a`
+is not repaired and will not be (D-002).
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
   reached, so a run behind a login wall produces a document about a storefront nobody saw — the
   `storefrontNotSeen` guard says so rather than hiding it, which is the honest failure and not a fix.
+- **Re-screening CoMo behind the gate.** The next run of that merchant will report the gate and
+  read nothing behind it, which is correct and is not coverage. Whether Mintro screens a gated
+  catalogue at all, and on what basis, is a business question: it is the merchant's control and
+  answering it on a visitor's behalf is not something a screener does unasked.
 - **Getting past a bot challenge.** Open, and deliberately not a build task. D-264 makes the crawl
   say what it met; it establishes nothing about `phoenixpeptide.com`, and three of the seven runs
   on file are of a site nobody has seen. The available answers — a different egress, an arrangement

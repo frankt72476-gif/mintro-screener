@@ -35,6 +35,15 @@ export interface ProbeResult {
    * than re-deriving it from a status, which no status can carry.
    */
   readonly challenged?: string;
+  /**
+   * Set when the merchant's own consent gate answered this path (D-266).
+   *
+   * A gated `200` is the **compliant** answer to what GATE-002 asks, and the rule was reading it
+   * as the opposite. On run 97bf366a all three probed paths returned the gate, and the finding
+   * read *"3 of 3 path(s) served content directly with a status this rule treats as a violation"* —
+   * an auto-fail on a stopping condition, on the run where the merchant put the gate in.
+   */
+  readonly gated?: string;
   readonly sha256?: string;
   readonly fetchedAt: string;
 }
@@ -119,7 +128,21 @@ export function checkHttpProbe(
   // loaded without an account" auto-fails the compliant behaviour the rule exists to reward —
   // observed on the testbed, which gates correctly and was failed for it.
   const redirected = completed.filter(isRedirected);
-  const answered = completed.filter((result) => !isRedirected(result));
+  /*
+    A path answered by the merchant's consent gate did not serve content (D-266).
+
+    Set aside before anything else is asked of the answered set, and grouped with the redirects
+    rather than with the served pages, because it is the same observation: **the request did not
+    get the catalogue**. A redirect to a login form and a consent gate served in place of the
+    listing are two ways of doing the thing this rule exists to reward, and the status they
+    happen to carry is not what tells them apart.
+  */
+  const gatedPaths = completed.filter(
+    (result) => !isRedirected(result) && result.gated !== undefined,
+  );
+  const answered = completed.filter(
+    (result) => !isRedirected(result) && result.gated === undefined,
+  );
 
   /*
     ## `served` used to mean "answered with any status at all", and that was the false pass (D-264)
@@ -186,9 +209,20 @@ export function checkHttpProbe(
       what `results[0]` kept naming. Served first, then a path that redirected away, since a
       redirect is itself the observation that a gate is working.
     */
-    return satisfied(rule, describeClean(served, absent, redirected, session), DOCUMENT, [
-      sessionEvidence(session, results, served[0] ?? absent[0] ?? redirected[0] ?? completed[0]),
-    ]);
+    return satisfied(
+      rule,
+      describeClean(served, absent, redirected, gatedPaths, session),
+      DOCUMENT,
+      [
+        sessionEvidence(
+          session,
+          results,
+          // Cited to a path that carries the observation (D-215). A gate is the strongest thing a
+          // clean result here can rest on, so it is named first.
+          gatedPaths[0] ?? served[0] ?? absent[0] ?? redirected[0] ?? completed[0],
+        ),
+      ],
+    );
   }
 
   return violation(rule, describeViolation(offending, served, redirected, session), DOCUMENT, [
@@ -253,6 +287,8 @@ function describeClean(
   served: readonly ProbeResult[],
   absent: readonly ProbeResult[],
   redirected: readonly ProbeResult[],
+  /** Paths answered by the merchant's own consent gate (D-266). */
+  gatedPaths: readonly ProbeResult[],
   session: SessionDescriptor,
 ): string {
   const statuses = [...new Set(served.map((result) => result.status))].sort().join(', ');
@@ -271,7 +307,15 @@ function describeClean(
           .join('; ')}.`
       : '';
 
-  return `${servedClause}${absentClause}${describeRedirects(redirected)} Each was ${describeSession(session)}.`;
+  const gatedClause =
+    gatedPaths.length > 0
+      ? ` ${gatedPaths.length} path(s) were answered by the site's own consent gate rather than by ` +
+        `the listing: ${gatedPaths
+          .map((result) => safePath(result.url) ?? result.url)
+          .join('; ')}.`
+      : '';
+
+  return `${servedClause}${absentClause}${gatedClause}${describeRedirects(redirected)} Each was ${describeSession(session)}.`;
 }
 
 /** Redirects are the observation that a gate is working, so they are stated, not dropped. */

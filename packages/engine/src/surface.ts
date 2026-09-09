@@ -68,6 +68,19 @@ export type Located<T> =
        */
       readonly challenged?: string;
       /**
+       * Set when the merchant's own consent gate stands in front of it (D-266).
+       *
+       * A fourth answer, and it is the only one that is not a shortfall: the document may well be
+       * published and well written, and the crawler declined to attest through the gate to read
+       * it. Filing that as `not_exposed` would take a compliance control and report it as the
+       * merchant publishing nothing.
+       *
+       * **Does not imply `obstructed`**, unlike `challenged`. Nothing was retrieved, but the
+       * shortfall is neither the merchant's nor a failure of this run, and the boolean has no
+       * value that means "we chose not to".
+       */
+      readonly gated?: string;
+      /**
        * True when **our request failed** rather than the surface being absent (D-181).
        *
        * Same meaning as `FlowObservation.obstructed`, and it exists here for the same reason: a
@@ -103,6 +116,8 @@ export const unreachable = <T>(
   obstructed = false,
   /** The marker, where bot protection answered. Implies `obstructed` (D-265). */
   challenged?: string,
+  /** The gate, where the merchant's own consent gate answered. Implies nothing (D-266). */
+  gated?: string,
 ): Located<T> => ({
   located: false,
   reason,
@@ -112,6 +127,7 @@ export const unreachable = <T>(
   // challenge as the merchant publishing nothing.
   ...(obstructed || challenged !== undefined ? { obstructed: true as const } : {}),
   ...(challenged === undefined ? {} : { challenged }),
+  ...(gated === undefined ? {} : { gated }),
 });
 
 /**

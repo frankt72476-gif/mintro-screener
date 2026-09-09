@@ -220,6 +220,7 @@ export function EvaluationEditor({
           ...(report === null ? {} : { anchoredRuleIds: anchoredRuleIds(report) }),
           // The same run fact the published render carries, from the same place (D-264).
           ...(report?.challenge === undefined ? {} : { challenge: report.challenge }),
+          ...(report?.consentGate === undefined ? {} : { consentGate: report.consentGate }),
           findings: (findingsRead.data ?? []).map((finding) => ({
             id: finding['id'] as string,
             ruleId: finding['rule_id'] as string,

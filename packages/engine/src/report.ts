@@ -124,6 +124,15 @@ export interface ReportCoverage {
    */
   readonly challenged: number;
   /**
+   * The merchant's own consent gate stands in front of it (D-266).
+   *
+   * Its own bucket rather than a share of `challenged`, because the two say opposite things about
+   * the merchant. A challenge is a third party blocking a robot. A consent gate is the merchant's
+   * control, and the run's own GATE-001 finding credits them for it — so a coverage line that
+   * filed it as bot protection would take a compliance measure and print it as an obstruction.
+   */
+  readonly gated: number;
+  /**
    * `not_evaluable` findings from runs recorded before D-044, which carry no kind.
    *
    * Counted separately and never folded into another bucket. Those runs are immutable (D-002),
@@ -323,6 +332,16 @@ export interface ScreeningReport {
    * that no page of the site had been seen.
    */
   readonly challenge?: ChallengeSummary;
+  /**
+   * How many pages the merchant's own consent gate stood in front of (D-266).
+   *
+   * Counted and reported apart from `challenge`, and on the masthead for the same reason: it
+   * qualifies every finding under it. Run `97bf366a` served the gate at sixteen of sixteen product
+   * URLs and its report gave a reader no way to know.
+   *
+   * **Optional, permanently**, like every field before it. Absent renders nothing.
+   */
+  readonly consentGate?: ChallengeSummary;
 }
 
 /**
@@ -439,6 +458,8 @@ export interface AssembleInput {
   readonly sample?: SampleBasis;
   /** How many rendered pages were answered by bot protection. Omitted where none was (D-264). */
   readonly challenge?: ChallengeSummary;
+  /** How many rendered pages were the merchant's consent gate. Omitted where none was (D-266). */
+  readonly consentGate?: ChallengeSummary;
   /** Which captures the eye test should read. Omitted where the crawl took none (D-198). */
   readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
 }
@@ -529,6 +550,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     blocking: summariseBlocking(enriched, ruleset),
     ...(input.sample === undefined ? {} : { sample: input.sample }),
     ...(input.challenge === undefined ? {} : { challenge: input.challenge }),
+    ...(input.consentGate === undefined ? {} : { consentGate: input.consentGate }),
     ...(input.eyeTestCaptures === undefined ? {} : { eyeTestCaptures: input.eyeTestCaptures }),
     verdict: describeVerdict(enriched, counts),
     categories,
@@ -833,6 +855,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
   const notExposed = of('not_exposed');
   const notRetrieved = of('not_retrieved');
   const challenged = of('challenged');
+  const gated = of('gated');
   const kindNotRecorded = unevaluated.filter((finding) => finding.notEvaluableKind === undefined).length;
 
   return {
@@ -844,6 +867,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     notApplicable,
     notRetrieved,
     challenged,
+    gated,
     kindNotRecorded,
     // Resolved and outstanding are derived here rather than in the renderer, for the same reason
     // coverage itself is: a renderer that computed them could get the split wrong quietly, and
@@ -854,8 +878,17 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     //
     // `challenged` is outstanding too, and for a harder reason: nothing was established and a
     // re-run will not establish it either (D-264).
+    //
+    // `gated` is outstanding as well. The gate is a credit to the merchant and the page behind it
+    // is still unread, so nothing about *that page* was resolved either way (D-266).
     outstanding:
-      noCheckBuilt + notReachable + notExposed + notRetrieved + challenged + kindNotRecorded,
+      noCheckBuilt +
+      notReachable +
+      notExposed +
+      notRetrieved +
+      challenged +
+      gated +
+      kindNotRecorded,
   };
 }
 

@@ -14,7 +14,7 @@ import { checkDomAssert } from './checks/domAssert.js';
 import { targetPhrases } from './layer1.js';
 import { checkTextMatch } from './checks/textMatch.js';
 import { checkTextCooccurrence } from './checks/textCooccurrence.js';
-import { RENDERED } from './checks/pageEvidence.js';
+import { RENDERED, renderFailure } from './checks/pageEvidence.js';
 import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
 import {
   checkCoaDate,
@@ -24,7 +24,6 @@ import {
   type CertificateOutcome,
 } from './checks/docParse.js';
 import { isRendered, type PageContext } from './page.js';
-import { CHALLENGE_REASON } from './challenge.js';
 import type { ScoredUrl } from './suspicion.js';
 
 /** Check types this layer has handlers for. `doc_parse` joined at stage 4 (D-057). */
@@ -95,8 +94,18 @@ export function runLayer2(
         A challenge reproduces on a re-scan — phoenixpeptide returned byte-identical counts three
         times — so the finding has to say which of the two it was.
       */
-      if (!noneToSample && sampled.every((entry) => entry.page.challenged !== undefined)) {
-        findings.push(notEvaluable(rule, CHALLENGE_REASON, RENDERED, 'challenged'));
+      /*
+        A sample that was entirely gated or entirely challenged, deferred to the one place that
+        decides which of the six kinds a page-level shortfall is (D-264, D-266).
+
+        This used to build the finding here, with the reason and the kind spelled out and **no
+        evidence at all** — which hard constraint 3 forbids of a `not_evaluable`, and which is a
+        gap the D-264 commit introduced. `renderFailure` answers the same question and attaches the
+        stored interstitial or gate, so there is one decision and the finding carries its why.
+      */
+      const shortfall = noneToSample ? null : renderFailure(rule, sampled[0]!.page);
+      if (shortfall !== null) {
+        findings.push(shortfall);
         continue;
       }
       findings.push(
@@ -157,6 +166,25 @@ export function runLayer2(
       observations.
     */
     if (rule.type === 'doc_parse') {
+      /*
+        A certificate nobody could look for is not a certificate the merchant does not publish
+        (D-266).
+
+        `certificateFinding` reports an absent certificate as `not_exposed` — *no sampled product
+        page linked to a certificate of analysis* — and on a gated run that is an assertion about
+        pages nobody read. These four rules never touch a `PageContext`, so the chokepoint in
+        `renderFailure` is not on their path and the shortfall has to be caught here.
+
+        Only where **every** sampled page was gated. A run that read some pages and was gated on
+        others did look for a certificate, and its answer stands.
+      */
+      const allGated =
+        sampled.length > 0 && sampled.every((entry) => entry.page.gated !== undefined);
+      const gatedFinding = allGated ? renderFailure(rule, sampled[0]!.page) : null;
+      if (gatedFinding !== null) {
+        findings.push(gatedFinding);
+        continue;
+      }
       findings.push(certificateFinding(rule as RuleOfType<'doc_parse'>, certificate));
       continue;
     }

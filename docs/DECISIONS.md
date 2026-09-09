@@ -17503,3 +17503,126 @@ poorer for losing it. So is a `200` that redirected away or fell under the chara
 page was read, and it did not carry what identifies the surface. Both are asserted, because a
 change that made everything `not_retrieved` would satisfy every assertion about the eighteen and
 quietly delete the finding the layer exists to make.
+
+## D-266 — A merchant's consent gate is not the page behind it
+**2026-09-09 · architect**
+
+The third member of the family D-264 opened, and the only one where the document standing in the
+way is a credit to the merchant.
+
+CoMo Peptides deployed a site-entry gate between 2026-09-03 19:52 and 2026-09-08 20:16 UTC. Twenty
+consecutive runs before it rendered product pages at about 42 kB. The twenty-first rendered them at
+2.7 kB. Every product URL answers `200` with a seven-kilobyte document that **is** a consent form:
+four required checkboxes affirming age, research use, institutional purpose and terms, a nonce, and
+a hidden field naming the path you asked for. The homepage is exempt; the gate covers the shop
+paths. Nothing on our side changed in that window — `render.ts` was untouched from 2026-08-28.
+
+### What run 97bf366a published
+
+| | |
+|---|---|
+| GATE-001 | pass → **review**, *"no entry interstitial was observed"* |
+| GATE-002 | **fail**, *"3 of 3 path(s) served content directly"* |
+| GATE-003 / 004 / 005 | **not_exposed**: no add-to-cart control, no account-creation form |
+| PROD-003 | **not_exposed × 15**, one per gated URL |
+| PROD-001, COA-001 | **review × 15 each** |
+
+The merchant deployed close to the control the programme asks for, and the report got worse in
+every direction at once. GATE-001 is the sharpest: the age-gate locator hunts for an overlay
+covering the viewport, which presumes content underneath to cover. This gate *is* the document, so
+there was nothing to overlay and the rule reported the gate's absence on the run it arrived.
+
+### Located structurally, and not by what the checkboxes say
+
+Three conditions, all required:
+
+1. **A `200`.** A gate is the origin answering successfully with something else. A `403` is already
+   `establishesAbsence`; an interstitial is already `classifyChallenge`.
+2. **The form's shape.** A `POST` form whose only editable controls are **required checkboxes**,
+   carrying a hidden same-origin return path. No text, email, password, select or textarea — a form
+   that collects nothing but assent, standing in front of something.
+3. **None of the surface's own structure.** No product schema, no price, no add-to-cart.
+
+The acknowledgement wording is **reported and never matched**. A gate wording its boxes differently
+is the population this exists to catch, and locating it by CoMo's phrasing would be D-014 exactly.
+The third condition is what keeps a real page carrying a consent checkbox from being called a gate,
+and it is asserted against the same merchant's real product page from five days earlier.
+
+### The crawler does not attest through it
+
+Stated as a rule about conduct. Ticking four boxes that say *I am 21, I am a laboratory, I am acting
+institutionally* would be Mintro asserting things about itself that are not true, in order to reach
+a catalogue the merchant chose to put a control in front of — and every page the crawl then
+described would rest on that assertion. The gate is read and reported. It is not answered.
+
+That is D-017's principle one surface out. A challenge is a vendor blocking a robot; a consent gate
+is the merchant asking a question, and the honest answer to a question you are not entitled to
+answer is silence.
+
+### Its own kind, not a flavour of `challenged`
+
+`NotEvaluableKind` gains `gated`, `ArtifactKind` gains `gate`, and both are deliberate:
+
+- A challenge says **nothing about the merchant**. A consent gate is the merchant's own control,
+  and GATE-001 now cites the stored gate as the evidence that a gate was observed. Filing the two
+  under one kind would put the capture behind a compliance credit and the capture behind an
+  obstruction in the same bucket.
+- `evaluationRun` selects the documents a draft reasons over with `kind = 'dom'`. Run 97bf366a
+  stored sixteen consent gates as `dom`.
+
+`isRendered` stays **true** for a gated page, which is the difference from a challenge: the merchant
+served a real document with a real status. It simply is not the surface that was asked for. So the
+blinding happens before the `isRendered` guard rather than inside it.
+
+### One rule reads it; everything else is blinded
+
+`readsTheEntryGate` is the predicate `assertFinding` already used to route a rule to `gateFinding` —
+`expect: present`, `signals` declared, `surface: homepage` — exported so `renderFailure` asks the
+same question. Read entirely from rule data, so the engine holds no gate rule id (hard constraint 1)
+and the two cannot drift. It resolves to GATE-001 alone, and a test asserts that.
+
+Every other rule pointed at a gated document returns `not_evaluable`, kind `gated`, reason *"the
+page sits behind the merchant's own consent gate; the crawler did not attest through it"*, citing
+the stored gate. The four COA `doc_parse` rules needed catching separately: they never touch a
+`PageContext`, so the chokepoint is not on their path, and an absent certificate was being reported
+as *"no sampled product page linked to a certificate of analysis"* about pages nobody read.
+
+GATE-002 treats a gated path as **not public** — grouped with the redirects, because a redirect to a
+login form and a gate served in place of the listing are two ways of doing the thing the rule exists
+to reward, and the status they happen to carry is not what tells them apart.
+
+### The reach of it
+
+`wasServed` is false. `assessWall` gains `consentGated` and refuses to call an all-gated sample
+walled: `walled` is what sends the run looking for a stored credential, and no account answers a
+question about who you are. A mixed sample is still walled — the other pages may open, and the run
+is entitled to try. `establishDocument` refuses a gated policy page, and `Located` gains `gated`
+beside `challenged` so it does not land on `not_exposed`. `storefrontNotSeen` refuses a gated run
+with a message that names the merchant's control rather than a fault. The masthead carries
+**"Consent gate on N of M pages"** as its own line in the pass colour, beside rather than merged
+with the challenge line: a run can meet both, and they are facts about different parties.
+
+### Two things the work found
+
+**A function serialised into a browser cannot call one that was not.** The first draft had
+`extractPage` call the new gate reader by name. Playwright serialises only the function it is
+handed, so the call was `undefined` in the page, the evaluate threw, and every render in the suite
+came back carrying `renderError` — which downstream is a login wall that does not exist.
+`noWallEscalation.test.ts` caught it by driving a real browser against the testbed. No unit test
+would have. `extractSignupForm` is a separate evaluate for exactly this reason and is the precedent
+that should have been followed first.
+
+**A `not_evaluable` with no evidence, introduced by D-264.** The Layer 2 aggregate branches built
+their challenge finding inline with the kind spelled out and nothing attached, which hard constraint
+3 forbids. Both branches now defer to `renderFailure`, which decides the kind and attaches the
+stored artifact.
+
+### Migration
+
+`0085` widens `evidence.kind` to admit `gate`. It must be applied before the next scan of a gated
+merchant, or the evidence insert fails and the run is left open.
+
+### The four affected runs are not repaired
+
+Run `97bf366a` keeps its fifteen `not_exposed` findings and its GATE-002 auto-fail. Runs are
+immutable (D-002). What changes is the next run of that merchant.

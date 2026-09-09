@@ -3554,6 +3554,12 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   background:color-mix(in srgb, var(--alert) 7%, transparent);color:var(--ink-mid);
   font-size:13px;line-height:1.6}
 .eval-challenge strong{display:block;color:var(--ink);font-size:13px}
+/* D-266: the merchant's own control, so the jade the pass state uses rather than the alert
+   colour. Same shape as the challenge note; the colour is the whole of the difference. */
+.eval-consent-gate{max-width:64ch;margin:0 0 16px;padding:10px 12px;border-left:3px solid var(--jade);
+  background:color-mix(in srgb, var(--jade) 7%, transparent);color:var(--ink-mid);
+  font-size:13px;line-height:1.6}
+.eval-consent-gate strong{display:block;color:var(--ink);font-size:13px}
 .eval-meta{display:flex;flex-wrap:wrap;gap:0 28px;margin:0 0 24px;padding:0}
 .eval-meta-pair{display:flex;gap:6px;font-size:12px}
 .eval-meta dt{color:var(--ink-mid)}

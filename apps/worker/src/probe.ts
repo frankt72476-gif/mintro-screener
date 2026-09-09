@@ -12,7 +12,14 @@
 
 import { createHash } from 'node:crypto';
 import type { Browser, BrowserContext } from 'playwright';
-import { classifyChallenge, headerLookup, type ProbeResult } from '@mintro/engine';
+import {
+  classifyChallenge,
+  classifyConsentGate,
+  describeConsentGate,
+  headerLookup,
+  type ProbeResult,
+} from '@mintro/engine';
+import { extractConsentGate } from './extract.js';
 import { withDeadline } from './deadline.js';
 
 export interface ProbeOptions {
@@ -77,12 +84,34 @@ export async function probePaths(
           body: bodyText,
         });
 
+        /*
+          And whether the merchant's own gate answered instead of the listing (D-266).
+
+          One extra `page.evaluate` on three paths per run, and it is the difference between
+          GATE-002 auto-failing a merchant for their gate and crediting them for it. Asked only
+          when there was no challenge: an interstitial from the edge never reached the merchant.
+
+          Nothing submits the form. This reads it.
+        */
+        const gate =
+          challenge === null
+            ? classifyConsentGate({
+                status: response?.status() ?? 0,
+                ...((await withDeadline(
+                  page.evaluate(extractConsentGate),
+                  timeout,
+                  `page.evaluate() reading the consent gate at ${url}`,
+                )) as Awaited<ReturnType<typeof extractConsentGate>>),
+              })
+            : null;
+
         results.push({
           url,
           status: response?.status() ?? 0,
           finalUrl: page.url(),
           sha256: createHash('sha256').update(bodyText, 'utf8').digest('hex'),
           ...(challenge === null ? {} : { challenged: challenge.marker }),
+          ...(gate === null ? {} : { gated: describeConsentGate(gate) }),
           fetchedAt,
         });
       } catch (error) {

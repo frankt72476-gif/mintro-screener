@@ -37,6 +37,15 @@ export {
   type ChallengeVerdict,
 } from './challenge.js';
 
+export {
+  classifyConsentGate,
+  describeConsentGate,
+  CONSENT_GATE_REASON,
+  type ConsentGateSubject,
+  type ConsentGateVerdict,
+  type SurfaceSignals,
+} from './consentGate.js';
+
 export { parseRobotsTxt, EMPTY_ROBOTS, type RobotsTxt } from './robots.js';
 
 export {
@@ -343,7 +352,7 @@ export {
 } from './suspicion.js';
 export { checkTextMatch, isCasNumber, passesValidator } from './checks/textMatch.js';
 export { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
-export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, RENDERED } from './checks/pageEvidence.js';
+export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, readsTheEntryGate, gatedFinding, RENDERED } from './checks/pageEvidence.js';
 
 export {
   notEvaluable,

@@ -9,7 +9,7 @@
 import type { RuleOfType } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import { notEvaluable, satisfied, unsettled, violation, type Evidence, type Finding } from '../findings.js';
-import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
+import { pageEvidence, readsTheEntryGate, renderFailure, RENDERED } from './pageEvidence.js';
 import {
   bestResemblance,
   describeResemblance,
@@ -74,7 +74,9 @@ function assertFinding(
     return declaredSubjectFinding(rule, page, expect, targetPhrases);
   }
 
-  if (expect === 'present' && rule.params.signals !== undefined && rule.params.surface === 'homepage') {
+  // One predicate, exported, because `renderFailure` has to ask the same question to know which
+  // rule may read a gated document — and a second copy here would be free to disagree (D-266).
+  if (readsTheEntryGate(rule)) {
     return gateFinding(rule, page);
   }
 
@@ -416,6 +418,35 @@ function selectorFinding(
  */
 function gateFinding(rule: RuleOfType<'dom_assert'>, page: PageContext): Finding {
   const signals = rule.params.signals ?? [];
+
+  /*
+    A gate served **in place of** the page is an observed gate (D-266).
+
+    Taken first, because the overlay test below cannot see it. `page.gate` is located by covering
+    the viewport, which presumes something underneath to cover; a gate that replaced the document
+    has nothing underneath and so was found by nothing. On run 97bf366a that produced *"no entry
+    interstitial was observed"* on the very run where the interstitial became mandatory, and turned
+    a merchant's new control into a review item against them.
+
+    The evidence is the stored gate itself and the words it asks the visitor to affirm — the same
+    standard the overlay branch meets, and hard constraint 3's requirement that a `pass` carry what
+    a violation would.
+  */
+  if (page.gated !== undefined) {
+    return satisfied(rule, `${page.gated} The page it stands in front of was not read.`, RENDERED, [
+      {
+        kind: RENDERED,
+        sourceUrl: page.finalUrl,
+        sourceSha256: page.htmlSha256,
+        evidenceKey: page.gateKey ?? '',
+        capturedAt: page.capturedAt,
+        matchedValue: signals.filter((signal) =>
+          page.gated?.toLowerCase().includes(signal.toLowerCase()),
+        ).join(', '),
+      },
+    ]);
+  }
+
   const inGate = page.gate.found
     ? signals.filter((signal) => page.gate.text.toLowerCase().includes(signal.toLowerCase()))
     : [];

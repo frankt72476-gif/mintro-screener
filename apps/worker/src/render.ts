@@ -13,6 +13,8 @@ import { gzipSync } from 'node:zlib';
 import type { Browser, BrowserContext } from 'playwright';
 import {
   classifyChallenge,
+  classifyConsentGate,
+  describeConsentGate,
   headerLookup,
   MISSING_REGION,
   NO_GATE,
@@ -28,6 +30,7 @@ import {
   USER_AGENT,
 } from '@mintro/engine';
 import {
+  extractConsentGate,
   extractPage,
   extractSignupForm,
   type RawExtraction,
@@ -266,9 +269,31 @@ export async function renderPage(
       body: html,
     });
 
+    /*
+      Was this the page, or the merchant's gate standing in front of it (D-266)?
+
+      Asked only where there was no challenge, because the two cannot both be true and a challenge
+      is the more basic fact: an interstitial from the edge never reached the merchant's own gate.
+
+      The structural observation comes from the DOM pass, which is the only thing that can answer
+      *are this form's only editable controls required checkboxes*. Nothing here submits it.
+    */
+    const gate =
+      challenge === null
+        ? classifyConsentGate({
+            status,
+            ...((await withDeadline(
+              page.evaluate(extractConsentGate),
+              timeout,
+              `page.evaluate() reading the consent gate at ${url}`,
+            )) as Awaited<ReturnType<typeof extractConsentGate>>),
+          })
+        : null;
+
     const provisional: PageContext = {
       ...toPageContext(url, finalUrl, status, extraction, html, htmlSha256, capturedAt),
       ...(challenge === null ? {} : { challenged: challenge.marker }),
+      ...(gate === null ? {} : { gated: describeConsentGate(gate) }),
     };
     /*
       A challenged response is never worth a screenshot, whatever the caller thinks (D-264).
@@ -277,6 +302,14 @@ export async function renderPage(
       DOM is retained because it is the record of what was served; a full-page PNG of it is 44 kB
       of a spinner, and — worse — it is the sort of artifact that ends up beside a finding as
       though it showed the merchant's site. Run 0003c814 stored exactly one.
+    */
+    /*
+      A gated document **is** screenshotted, and a challenged one is not (D-264, D-266).
+
+      The difference is what the picture shows. An interstitial from the edge shows a spinner and
+      evidences nothing anyone needs to look at. A consent gate is the merchant's own control, and
+      GATE-001 now returns `pass` on it — so a reader auditing that finding is entitled to see the
+      gate as it was served, which is the same standard the overlay branch has always met.
     */
     const keep =
       challenge === null && (options.keepCapture === undefined || options.keepCapture(provisional));
@@ -291,6 +324,7 @@ export async function renderPage(
     let screenshotKey: string | undefined;
     let domKey: string | undefined;
     let challengeKey: string | undefined;
+    let gateKey: string | undefined;
 
     if (screenshot !== undefined) {
       const digest = sha256Buffer(screenshot);
@@ -320,11 +354,12 @@ export async function renderPage(
         those are the whole point: `evaluationRun` selects the pages a draft reasons over with
         `kind === 'dom'`, and the nine interstitials of run 0003c814 were `dom`.
       */
-      if (challenge === null) domKey = key;
-      else challengeKey = key;
+      if (challenge !== null) challengeKey = key;
+      else if (gate !== null) gateKey = key;
+      else domKey = key;
       artifacts.push({
         key,
-        kind: challenge === null ? 'dom' : 'challenge',
+        kind: challenge !== null ? 'challenge' : gate !== null ? 'gate' : 'dom',
         url: finalUrl,
         sha256: htmlSha256,
         byteLength: Buffer.byteLength(html, 'utf8'),
@@ -345,6 +380,7 @@ export async function renderPage(
         ...(screenshotKey === undefined ? {} : { screenshotKey }),
         ...(domKey === undefined ? {} : { domKey }),
         ...(challengeKey === undefined ? {} : { challengeKey }),
+        ...(gateKey === undefined ? {} : { gateKey }),
       },
       artifacts,
       ...(signupForm === undefined ? {} : { signupForm }),

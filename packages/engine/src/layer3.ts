@@ -267,6 +267,10 @@ function documentFinding(
  * acquisition failing on a page the merchant demonstrably served (D-156). A report that says the
  * merchant did not carry a page, while holding a 200 for it, is contradicting its own evidence.
  *
+ * **Four answers, not two (D-265, D-266).** The fourth is the merchant's own consent gate, which
+ * is not a shortfall of anyone's: the document may be published and well written, and the crawler
+ * declined to attest through the gate to read it.
+ *
  * **Three answers, not two (D-265).** `obstructed` is a boolean and the question has three
  * answers: the merchant does not publish this, this run could not fetch it, and bot protection
  * answered instead of the site. The third arrived with D-264 and was still landing on the second
@@ -283,11 +287,13 @@ function unreachedSurface(rule: Rule, surface: Located<PageContext> & { located:
     rule,
     surface.reason,
     RENDERED,
-    surface.challenged !== undefined
-      ? 'challenged'
-      : surface.obstructed === true
-        ? 'not_retrieved'
-        : 'not_exposed',
+    surface.gated !== undefined
+      ? 'gated'
+      : surface.challenged !== undefined
+        ? 'challenged'
+        : surface.obstructed === true
+          ? 'not_retrieved'
+          : 'not_exposed',
     [
       {
         kind: RENDERED,
