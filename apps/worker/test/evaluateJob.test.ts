@@ -25,6 +25,7 @@ import {
   type EvaluationInputs,
 } from '../src/evaluateJob.js';
 import { estimateTokens } from '../src/evaluationPrompt.js';
+import { buildHandles, toHandle, toId } from '../src/evaluationHandles.js';
 import type { EvaluationPage } from '../src/evaluationPages.js';
 
 const ruleset = loadRulesetFile('rules/ruleset.json');
@@ -77,7 +78,16 @@ const INPUTS: EvaluationInputs = {
   pageStats: { selectedCount: 6, distinctTexts: 6, dominantTextCount: 1, dominantTextSample: '' },
 };
 
-/** A draft that passes the validator against `INPUTS`. */
+/**
+ * The handles this run issues, derived the same way the job derives them.
+ *
+ * The model answers in handle space and the job decodes before validating, so a fixture written
+ * in real ids would be testing a path that no longer exists.
+ */
+const HANDLES = buildHandles(runContextFor(angles, INPUTS));
+const H = (kind: string, id: string): string => toHandle(HANDLES, kind, id);
+
+/** A draft that passes the validator against `INPUTS`, in handle space. */
 function validDraft(): EvaluationDraft {
   return {
     placement: {
@@ -85,8 +95,8 @@ function validDraft(): EvaluationDraft {
       recommended: 'referred_out',
       paragraph: 'The catalogue is organised by outcome and there is no gate.',
       citations: [
-        { kind: 'angle', ref: 'products_for' },
-        { kind: 'angle', ref: 'who_it_lets_buy' },
+        { kind: 'angle', ref: H('angle', 'products_for') },
+        { kind: 'angle', ref: H('angle', 'who_it_lets_buy') },
       ],
     },
     legality: { clean: true, items: [] },
@@ -96,10 +106,10 @@ function validDraft(): EvaluationDraft {
       citations: [],
     })),
     angles: angles.angles.map((a) => ({
-      angleId: a.id,
+      angleId: H('angle', a.id),
       lean: 'consumer' as const,
       paragraph: 'The catalogue is organised by outcome.',
-      citations: [{ kind: 'finding' as const, ref: 'f-001' }],
+      citations: [{ kind: 'finding' as const, ref: H('finding', 'f-001') }],
     })),
     shoreUps: [],
   };
@@ -144,7 +154,9 @@ describe('the prompt', () => {
 
   it('carries every angle, with its question and reasoning verbatim', () => {
     for (const angle of angles.angles) {
-      expect(prompt, `missing ${angle.id}`).toContain(angle.id);
+      // Headed by handle, not by id: handles are sorted, so `A1` is not "Angle 1", and printing
+      // both would put a mismatch in front of the model at every citation site.
+      expect(prompt, `missing the handle for ${angle.id}`).toContain(`### ${H('angle', angle.id)} —`);
       expect(prompt, `missing the title for ${angle.id}`).toContain(angle.title);
       expect(prompt, `missing the question for ${angle.id}`).toContain(angle.question);
       expect(prompt, `missing the reasoning for ${angle.id}`).toContain(angle.reasoning);
@@ -166,8 +178,8 @@ describe('the prompt', () => {
 
   it('files each finding under the angle that reads it, with its id and heavy marker', () => {
     // NAME-001 feeds products_for and is heavy; the model needs both facts to weigh it.
-    const productsFor = prompt.slice(prompt.indexOf('`products_for`'));
-    expect(productsFor).toContain('f-001');
+    const productsFor = prompt.slice(prompt.indexOf(`### ${H('angle', 'products_for')} —`));
+    expect(productsFor).toContain(H('finding', 'f-001'));
     expect(productsFor).toContain('[HEAVY]');
   });
 
@@ -270,6 +282,10 @@ describe('generateDraft', () => {
     expect(result.status).toBe('ok');
     expect(result.attempts).toBe(1);
     expect(result.draft?.angles).toHaveLength(7);
+    // Decoded: the stored draft carries real ids, whatever the model wrote.
+    expect(result.draft?.angles[0]?.citations[0]?.ref).toBe('f-001');
+    expect(angles.angles.map((a) => a.id)).toContain(result.draft?.angles[0]?.angleId);
+    expect(result.handles?.finding[H('finding', 'f-001')]).toBe('f-001');
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('Your previous answer was refused');
   });
@@ -284,7 +300,7 @@ describe('generateDraft', () => {
     const invalid = {
       ...bad,
       angles: bad.angles.map((a, i) =>
-        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'f-999' }] } : a,
+        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'F999' }] } : a,
       ),
     };
     const { impl, calls } = fakeFetch([invalid, validDraft()]);
@@ -294,14 +310,20 @@ describe('generateDraft', () => {
     expect(result.attempts).toBe(2);
     expect(calls).toHaveLength(2);
     expect(calls[1]).toContain('Your previous answer was refused');
-    expect(calls[1]).toContain('f-999');
+    // The handle it invented, in the words it used — not a real id it never wrote.
+    expect(calls[1]).toContain('F999');
   });
 
   it('stores a rejected draft after two refusals, with the reason', async () => {
     const bad = validDraft();
     const invalid = {
       ...bad,
-      placement: { ...bad.placement, citations: [{ kind: 'angle' as const, ref: 'products_for' }] },
+      // One valid handle, so it decodes cleanly and fails on the two-distinct-angles rule rather
+      // than on the handle check — this test is about the validator, not the decode.
+      placement: {
+        ...bad.placement,
+        citations: [{ kind: 'angle' as const, ref: H('angle', 'products_for') }],
+      },
     };
     const { impl, calls } = fakeFetch([invalid, invalid]);
     const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
@@ -397,7 +419,10 @@ describe('parseDraft', () => {
 
 describe('the cross-cutting angle is not an empty one', () => {
   const prompt = promptFor(angles, ruleset, INPUTS);
-  const block = prompt.slice(prompt.indexOf('`consistency`'), prompt.indexOf('## Routing conditions'));
+  const block = prompt.slice(
+    prompt.indexOf(`### ${H('angle', 'consistency')} —`),
+    prompt.indexOf('## Routing conditions'),
+  );
 
   /*
     Angle 7 declares no rules by design — it sets what the other six found against the site's own
@@ -430,7 +455,10 @@ describe('the cross-cutting angle is not an empty one', () => {
   });
 
   it('leaves an ordinary angle rendering its evidence list', () => {
-    const other = prompt.slice(prompt.indexOf('`products_for`'), prompt.indexOf('### Angle 3'));
+    const other = prompt.slice(
+      prompt.indexOf(`### ${H('angle', 'products_for')} —`),
+      prompt.indexOf(`### ${H('angle', 'how_it_sells')} —`),
+    );
     expect(other).toContain('- finding ');
     expect(other).not.toContain('Draw on the angles above');
   });
@@ -630,7 +658,9 @@ describe('the request carries the run-scoped schema', () => {
     await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     const schema = requests[0]!['output_config'].format.schema;
-    expect(schema.$defs.findingId.enum).toEqual(['f-001', 'f-002']);
+    // Handles, not uuids: the real ids never reach the model or the schema.
+    expect(schema.$defs.findingId.enum).toEqual(['F1', 'F2']);
+    expect(JSON.stringify(schema)).not.toContain('f-001');
     expect(JSON.stringify(schema)).not.toContain('fdd0000-0000');
   });
 
@@ -678,13 +708,77 @@ describe('the request carries the run-scoped schema', () => {
     const consumerSide = {
       ...bad,
       placement: { ...bad.placement, spectrum: 'consumer_retail' },
-      shoreUps: [{ text: 'Add a gate.', citation: { kind: 'finding', ref: 'f-001' } }],
+      shoreUps: [{ text: 'Add a gate.', citation: { kind: 'finding', ref: H('finding', 'f-001') } }],
     };
     const { impl } = fakeFetch([consumerSide, consumerSide]);
     const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     expect(result.status).toBe('rejected');
     expect(result.message).toContain('consumer side');
+  });
+});
+
+describe('handles bound the citation space end to end', () => {
+  it('sends handles in the prompt and never a real id', () => {
+    const prompt = promptFor(angles, ruleset, INPUTS);
+    expect(prompt).toContain(H('finding', 'f-001'));
+    expect(prompt).not.toContain('f-001');
+    expect(prompt).not.toContain('run-1/layer0/aaa');
+  });
+
+  /*
+    An invented handle is refused before the validator sees it, and reported in the words the model
+    used. Handing the validator a string the model never wrote would produce a complaint nobody
+    could act on.
+  */
+  it('refuses an invented handle without reaching validateDraft', async () => {
+    const bad = validDraft();
+    const invented = {
+      ...bad,
+      angles: bad.angles.map((a, i) =>
+        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'F404' }] } : a,
+      ),
+    };
+    const { impl, calls } = fakeFetch([invented, invented]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('rejected');
+    expect(result.message).toContain('F404');
+    expect(result.message).toContain('did not issue');
+    expect(calls[1]).toContain('F404');
+  });
+
+  it('stores the mapping alongside the draft', async () => {
+    const { impl } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.handles).toBeDefined();
+    expect(Object.keys(result.handles!.finding)).toEqual(['F1', 'F2']);
+    expect(result.handles!.finding['F1']).toBe('f-001');
+    expect(result.handles!.angle[H('angle', 'consistency')]).toBe('consistency');
+  });
+
+  it('stores it on a rejected draft too, so the citations stay readable', async () => {
+    const bad = validDraft();
+    const invalid = { ...bad, placement: { ...bad.placement, citations: [] } };
+    const { impl } = fakeFetch([invalid, invalid]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('rejected');
+    expect(result.handles).toBeDefined();
+  });
+
+  it('round-trips: what the run holds is what the decoded draft cites', async () => {
+    const { impl } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    const cited = (result.draft?.angles ?? []).flatMap((a) => a.citations.map((c) => c.ref));
+    for (const ref of cited) {
+      expect(INPUTS.findings.map((f) => f.id)).toContain(ref);
+    }
+    for (const citation of result.draft?.placement.citations ?? []) {
+      expect(toId(HANDLES, 'angle', H('angle', citation.ref))).toBe(citation.ref);
+    }
   });
 });
 

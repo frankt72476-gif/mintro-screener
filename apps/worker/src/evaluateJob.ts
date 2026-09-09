@@ -42,6 +42,15 @@ import {
 } from './evaluationPrompt.js';
 import { draftSchema } from './evaluationSchema.js';
 import {
+  buildHandles,
+  decodeDraft,
+  handleContext,
+  storeHandles,
+  unknownHandleMessage,
+  type HandleMap,
+  type StoredHandles,
+} from './evaluationHandles.js';
+import {
   orderPages,
   readPages,
   surfacesByUrl,
@@ -116,6 +125,14 @@ export interface EvaluateResult {
   readonly truncations: readonly string[];
   /** What the vendor reported for the accepted answer. Absent when no call was made. */
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
+  /**
+   * The handle mapping this generation used.
+   *
+   * Stored with the draft rather than recomputed: a draft citing `F12` is unreadable without
+   * it, and recomputing it from a run that has since been re-scanned would silently re-point
+   * every citation.
+   */
+  readonly handles?: StoredHandles;
 }
 
 export interface EvaluateOptions {
@@ -197,6 +214,7 @@ export function runContextFor(
 function promptInputsFor(
   ruleset: Ruleset,
   inputs: EvaluationInputs,
+  handles: HandleMap,
   retryMessage?: string,
 ): PromptInputs {
   const byId = new Map(ruleset.rules.map((rule) => [rule.id, rule]));
@@ -222,6 +240,7 @@ function promptInputsFor(
     ...(inputs.eyeTestAbsence === undefined ? {} : { eyeTestAbsence: inputs.eyeTestAbsence }),
     pages: inputs.pages,
     truncations: inputs.pageTruncations,
+    handles,
     ...(retryMessage === undefined ? {} : { retryMessage }),
   };
 }
@@ -273,7 +292,8 @@ export function promptFor(
   inputs: EvaluationInputs,
   retryMessage?: string,
 ): string {
-  return buildPrompt(angles, promptInputsFor(ruleset, inputs, retryMessage));
+  const handles = buildHandles(runContextFor(angles, inputs));
+  return buildPrompt(angles, promptInputsFor(ruleset, inputs, handles, retryMessage));
 }
 
 function firstLine(text: string): string {
@@ -343,6 +363,15 @@ export async function generateDraft(
   const run = runContextFor(angles, inputs);
   const spectrum = angles.spectrum.map((entry) => entry.id);
   const placements = [...angles.placements];
+
+  /*
+    Handles, built once and used for three things that must agree: the prompt the model reads,
+    the enums it is constrained to, and the decode back to real ids. Building them twice would
+    be two assignments that happen to match.
+  */
+  const handles = buildHandles(run);
+  const handleRun = handleContext(run, handles);
+  const stored = storeHandles(handles);
   const doFetch = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
 
@@ -358,7 +387,7 @@ export async function generateDraft(
   let lastUsage: EvaluateResult['usage'];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = promptFor(angles, ruleset, inputs, retry);
+    const prompt = buildPrompt(angles, promptInputsFor(ruleset, inputs, handles, retry));
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -388,7 +417,7 @@ export async function generateDraft(
               constrains shape, that enforces meaning, and only the second can say a shore-up does
               not belong on a consumer-side placement.
             */
-            format: { type: 'json_schema', schema: draftSchema(run, spectrum, placements) },
+            format: { type: 'json_schema', schema: draftSchema(handleRun, spectrum, placements) },
           },
           messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         }),
@@ -449,16 +478,39 @@ export async function generateDraft(
       };
     }
 
-    const draft = parseDraft(payload);
-    if (draft === null) {
+    const raw = parseDraft(payload);
+    if (raw === null) {
       lastMessage = 'the answer was not the document: no parseable JSON of the required shape';
       retry = lastMessage;
       continue;
     }
 
+    /*
+      Handles back to real ids before anything is judged.
+
+      An unresolvable handle is the fabrication the enums exist to prevent, and it is reported in
+      the same shape a bad citation already produces — so a retry is told what it invented rather
+      than being handed a validator complaint about a string it never wrote.
+    */
+    const decoded = decodeDraft(raw, handles);
+    if (!decoded.ok) {
+      lastMessage = unknownHandleMessage(decoded.unknown);
+      retry = lastMessage;
+      continue;
+    }
+    const draft = decoded.value;
+
+    // On the real ids, never the handles: the validator's whole job is checking against the run.
     const validation = validateDraft(draft, run);
     if (validation.ok) {
-      return { ...base, status: 'ok', attempts: attempt, draft, ...(usage === undefined ? {} : { usage }) };
+      return {
+        ...base,
+        status: 'ok',
+        attempts: attempt,
+        draft,
+        handles: stored,
+        ...(usage === undefined ? {} : { usage }),
+      };
     }
 
     lastMessage = rejectionMessage(validation.rejections);
@@ -470,6 +522,7 @@ export async function generateDraft(
     status: 'rejected',
     attempts: MAX_ATTEMPTS,
     message: lastMessage,
+    handles: stored,
     ...(lastUsage === undefined ? {} : { usage: lastUsage }),
   };
 }
@@ -500,6 +553,7 @@ export async function storeDraft(
     validator_status: result.status,
     validator_message: result.message ?? null,
     truncations: result.truncations,
+    handles: result.handles ?? null,
   });
 
   if (error !== null) {

@@ -19,6 +19,7 @@
 
 import type { AngleSet } from '@mintro/ruleset';
 import type { EvaluationPage } from './evaluationPages.js';
+import { toHandle, type HandleMap } from './evaluationHandles.js';
 
 /** One finding, as the model sees it. Ids are what a citation points at. */
 export interface PromptFinding {
@@ -51,6 +52,13 @@ export interface PromptInputs {
   readonly truncations: readonly string[];
   /** Appended on a retry. The validator's own words, unedited. */
   readonly retryMessage?: string;
+  /**
+   * Short ids the model reads and writes in place of uuids and storage keys.
+   *
+   * Every id rendered below goes through this, so the prompt and the answer schema cannot
+   * disagree about what the model is allowed to cite.
+   */
+  readonly handles: HandleMap;
 }
 
 /**
@@ -66,18 +74,18 @@ export const ANSWER_SCHEMA = `{
     "spectrum": "one of the spectrum ids",
     "recommended": "referred_out | international | domestic",
     "paragraph": "one paragraph placing the business and naming the angles that drove it",
-    "citations": [{"kind": "angle", "ref": "<angle id>"}]
+    "citations": [{"kind": "angle", "ref": "A3"}]
   },
-  "legality": { "clean": true, "items": [{"ruleId": "...", "evidenceKey": "..."}] },
+  "legality": { "clean": true, "items": [{"ruleId": "CATG-003", "evidenceKey": "E7"}] },
   "routing": [{"conditionId": "...", "status": "met | not_met | not_observable", "citations": []}],
   "angles": [{
-    "angleId": "...",
+    "angleId": "A3",
     "lean": "research | neutral | consumer",
     "paragraph": "...",
-    "citations": [{"kind": "finding | evidence | eye_test", "ref": "..."}],
+    "citations": [{"kind": "finding | evidence | eye_test", "ref": "F12"}],
     "nothingObserved": false
   }],
-  "shoreUps": [{"text": "...", "citation": {"kind": "finding | evidence | eye_test", "ref": "..."}}]
+  "shoreUps": [{"text": "...", "citation": {"kind": "finding | evidence | eye_test", "ref": "F12"}}]
 }`;
 
 function section(title: string, body: string): string {
@@ -97,15 +105,20 @@ function evidenceForAngle(angleId: string, angles: AngleSet, inputs: PromptInput
   const lines: string[] = [];
   for (const finding of rows) {
     const heavy = finding.weight === 'heavy' ? ' [HEAVY]' : '';
-    const key = finding.evidenceKey === null ? '' : ` evidence=${finding.evidenceKey}`;
+    const handle = toHandle(inputs.handles, 'finding', finding.id);
+    const key =
+      finding.evidenceKey === null
+        ? ''
+        : ` evidence=${toHandle(inputs.handles, 'evidence', finding.evidenceKey)}`;
     lines.push(
-      `- finding ${finding.id} ${finding.ruleId}${heavy} state=${finding.state}${key}\n` +
+      `- finding ${handle} ${finding.ruleId}${heavy} state=${finding.state}${key}\n` +
         `    ${finding.title}: ${finding.note}`,
     );
   }
   for (const verdict of eye) {
     const saw = verdict.saw === undefined ? '' : ` — ${verdict.saw}`;
-    lines.push(`- eye_test ${verdict.id} verdict=${verdict.verdict}${saw}`);
+    const handle = toHandle(inputs.handles, 'eye_test', verdict.id);
+    lines.push(`- eye_test ${handle} verdict=${verdict.verdict}${saw}`);
   }
 
   /*
@@ -163,13 +176,15 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
   parts.push(
     section(
       'Citing',
-      'Every claim rests on something. A citation is one of:\n' +
-        '- `{"kind":"finding","ref":"<finding id>"}` — a finding from this run, listed below.\n' +
-        '- `{"kind":"evidence","ref":"<evidence key>"}` — a stored capture, for an observation ' +
-        'bound to no rule.\n' +
-        '- `{"kind":"eye_test","ref":"EYE-nn"}` — an eye-test verdict, listed below.\n' +
-        '- `{"kind":"angle","ref":"<angle id>"}` — **placement only**. The placement names at ' +
+      'Every claim rests on something. Cite by the short handle printed beside each item below — ' +
+        'never by any other name for it.\n\n' +
+        '- `{"kind":"finding","ref":"F12"}` — a finding from this run.\n' +
+        '- `{"kind":"evidence","ref":"E7"}` — a stored capture, for an observation bound to ' +
+        'no rule.\n' +
+        '- `{"kind":"eye_test","ref":"Y3"}` — an eye-test verdict.\n' +
+        '- `{"kind":"angle","ref":"A5"}` — **placement only**. The placement names at ' +
         'least two distinct angles that drove it.\n\n' +
+        'Use only handles that appear in this document. There are no others.\n\n' +
         'A sentence that rests on reasoning rather than on a capture is wrapped ' +
         '`[inference: ...]`. A paragraph that cites nothing must be marked throughout. Do not hedge ' +
         'instead of marking — "appears to" is not a declaration.',
@@ -186,9 +201,17 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
     ),
   );
 
-  const angleBlocks = angles.angles.map((angle, index) => {
+  const angleBlocks = angles.angles.map((angle) => {
+    /*
+      The handle leads, and there is no ordinal.
+
+      Handles are assigned from sorted ids, so `A1` is not "Angle 1". Printing both would put a
+      mismatch in front of the model at every citation site — the sort of thing that produces a
+      confident wrong reference. One name, used everywhere.
+    */
+    const handle = toHandle(inputs.handles, 'angle', angle.id);
     return (
-      `### Angle ${index + 1}: ${angle.title} (\`${angle.id}\`)\n\n` +
+      `### ${handle} — ${angle.title}\n\n` +
       `**Question:** ${angle.question}\n\n` +
       `**Reasoning:** ${angle.reasoning}\n\n` +
       `**Notes:** ${angle.notes}\n\n` +
@@ -221,7 +244,11 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
       : inputs.eyeTest.length === 0
         ? 'No eye-test verdicts are recorded for this run.'
         : inputs.eyeTest
-            .map((v) => `- ${v.id} ${v.verdict}${v.saw === undefined ? '' : ` — ${v.saw}`}\n    ${v.question}`)
+            .map(
+              (v) =>
+                `- ${toHandle(inputs.handles, 'eye_test', v.id)} ${v.verdict}` +
+                `${v.saw === undefined ? '' : ` — ${v.saw}`}\n    ${v.question}`,
+            )
             .join('\n');
   parts.push(section('Eye-test verdicts', eyeBlock));
 
@@ -258,7 +285,8 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
       'Answer',
       `Reply with JSON only, in exactly this shape:\n\n${ANSWER_SCHEMA}\n\n` +
         'Every angle appears, in the order above, even one that observed nothing — set ' +
-        '`nothingObserved` and say so in the paragraph. Every routing condition appears.',
+        '`nothingObserved` and say so in the paragraph. Every routing condition appears. ' +
+        'Refer to angles by their handle (`A1`, `A2`, …), exactly as headed above.',
     ),
   );
 
