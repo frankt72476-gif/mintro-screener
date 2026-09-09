@@ -57,25 +57,29 @@
   --sec-questions: var(--violet-lift);
 
   /*
-    The spectrum's two ends (D-256).
+    The scale: research green, neutral yellow, consumer red.
 
-    **A new pair, not an alias.** Every other accent in this file resolves to a token above, and the
-    D-201 note explains why: colour had one job — state — and section identity was given to it
-    without adding a sixth hue. The spectrum cannot follow that rule, because the three tokens that
-    already read as warm and cool are `--rose` (fail), `--amber` (review) and `--jade` (pass). Using
-    them here would put a merchant's *position on a scale* in the exact colours that mean *this rule
-    failed*, and a Consumer-retail label drawn in the fail red would read as a verdict. Mintro does
-    not make compliance determinations, and the palette should not imply one.
+    One ramp, used by the angle lean dots and by the spectrum strip. They are the same judgment at
+    two grains — where one angle came out, and where the business sits across all seven — so a
+    reader who has learned one has learned the other.
 
-    So: clay and harbour. Warm and cool at roughly equal weight, both distinct in hue from rose,
-    amber and jade, and neither carrying a state's meaning anywhere else in the document. The
-    consumer end is warm because that is the retail end; the research end is cool. Mixed takes
-    neither and is drawn in ink, which is the honest reading of the middle.
+    Green and yellow are the palette's own `--jade` and `--amber`, aliased rather than added: there
+    is one green and one amber in this file, so a lean dot and a passing rule share a colour but
+    have nothing to be confused *with*.
 
-    Measured L*: clay 52, harbour 46 — close enough that neither end looks like the good one.
+    **Red is a new value, and it has to be.** `--rose` is the failure state and appears in the same
+    view as a lean dot — the routing cells, the legality items and the `state-fail` chips all use it
+    in the summary block, beside the angle chips. Measured, `--rose` is L* 50.5 at hue 351 and this
+    red is L* 31.0 at hue 356: the same hue family, nineteen points of lightness apart, which is
+    what makes an 8px dot tell itself from a failure marker. Reusing `--rose` would have put two
+    meanings in one swatch at one size in one glance.
+
+    Nineteen is above the fifteen the D-201 note uses as this palette's bar for two colours a reader
+    has to tell apart.
   */
-  --clay:#B4592E;
-  --harbour:#2C6E8F;
+  --scale-consumer:#8E1B23;
+  --scale-neutral:var(--amber);
+  --scale-research:var(--jade);
 
   --r:10px;
   --shadow:0 1px 2px rgba(42,15,99,.06), 0 8px 24px -12px rgba(42,15,99,.18);
@@ -3573,9 +3577,12 @@ a.eval-rowlabel:hover{color:var(--violet);text-decoration:underline}
 a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
 
 /*
-  The strip. Five segments, warm at the consumer end and cool at the research end, and the marker
-  is the only saturated element in the row — the addendum's wording, and the reason the unmarked
-  segments carry a tint rather than a fill.
+  The strip. Five segments running red at the consumer end through yellow at Mixed to green at the
+  research end, and the marker is the only saturated element in the row — the addendum's wording,
+  and the reason the unmarked segments carry a tint rather than a fill.
+
+  The two intermediate stops are mixed from their neighbours rather than typed, so the ramp is
+  derived from the three scale tokens and moving one moves the ramp.
 */
 .eval-spectrum{display:flex;list-style:none;margin:6px 0 0;padding:0;border-radius:6px;overflow:hidden}
 .eval-position{
@@ -3584,17 +3591,37 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
   color:var(--ink-mid);border-right:1px solid var(--card);
 }
 .eval-position:last-child{border-right:0}
-.eval-position[data-position="consumer_retail"]{background:color-mix(in srgb, var(--clay) 14%, var(--paper))}
-.eval-position[data-position="consumer_leaning"]{background:color-mix(in srgb, var(--clay) 8%, var(--paper))}
-.eval-position[data-position="mixed"]{background:var(--paper)}
-.eval-position[data-position="research_leaning"]{background:color-mix(in srgb, var(--harbour) 8%, var(--paper))}
-.eval-position[data-position="research_supplier"]{background:color-mix(in srgb, var(--harbour) 14%, var(--paper))}
-.eval-position.is-here{color:#fff;font-weight:600}
-.eval-position.is-here[data-position="consumer_retail"],
-.eval-position.is-here[data-position="consumer_leaning"]{background:var(--clay)}
-.eval-position.is-here[data-position="research_leaning"],
-.eval-position.is-here[data-position="research_supplier"]{background:var(--harbour)}
-.eval-position.is-here[data-position="mixed"]{background:var(--ink-mid)}
+.eval-position[data-position="consumer_retail"]{background:color-mix(in srgb, var(--scale-consumer) 14%, var(--paper))}
+.eval-position[data-position="consumer_leaning"]{
+  background:color-mix(in srgb, color-mix(in srgb, var(--scale-consumer) 60%, var(--scale-neutral)) 14%, var(--paper));
+}
+.eval-position[data-position="mixed"]{background:color-mix(in srgb, var(--scale-neutral) 14%, var(--paper))}
+.eval-position[data-position="research_leaning"]{
+  background:color-mix(in srgb, color-mix(in srgb, var(--scale-neutral) 50%, var(--scale-research)) 14%, var(--paper));
+}
+.eval-position[data-position="research_supplier"]{background:color-mix(in srgb, var(--scale-research) 14%, var(--paper))}
+
+/*
+  The marked position, filled.
+
+  Text colour is per stop rather than white throughout, because the ramp is a hue ramp and its
+  lightness is not monotonic: white on `--amber` measures 2.13:1 and on `--jade` 3.39:1, both under
+  the 4.5:1 a 10.5px label needs. Ink clears on the three yellow-to-green stops and white clears on
+  the two red ones, so each says which it uses rather than one rule guessing for all five.
+
+  `consumer_leaning` sits at 60% red for the same reason: an even blend of red and yellow measures
+  4.31:1 against white and 4.12:1 against ink, clearing neither.
+*/
+.eval-position.is-here{font-weight:600}
+.eval-position.is-here[data-position="consumer_retail"]{background:var(--scale-consumer);color:#fff}
+.eval-position.is-here[data-position="consumer_leaning"]{
+  background:color-mix(in srgb, var(--scale-consumer) 60%, var(--scale-neutral));color:#fff;
+}
+.eval-position.is-here[data-position="mixed"]{background:var(--scale-neutral);color:var(--ink)}
+.eval-position.is-here[data-position="research_leaning"]{
+  background:color-mix(in srgb, var(--scale-neutral) 50%, var(--scale-research));color:var(--ink);
+}
+.eval-position.is-here[data-position="research_supplier"]{background:var(--scale-research);color:var(--ink)}
 
 /* Grid children default to min-width:auto, which lets a long condition label widen the column
    past its track and push the row sideways. */
@@ -3643,9 +3670,14 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
 .eval-angle-chip a:hover{border-color:var(--violet)}
 .eval-angle-chip-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
 .eval-angle-chip-title{font-size:12.5px;font-weight:600;line-height:1.25}
+/*
+  The lean dot, on the same scale as the strip. The word travels beside it either way — a dot is
+  never the only thing saying which way an angle came out.
+*/
 .eval-lean-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--slate)}
-.eval-lean-dot.is-consumer{background:var(--clay)}
-.eval-lean-dot.is-research{background:var(--harbour)}
+.eval-lean-dot.is-consumer{background:var(--scale-consumer)}
+.eval-lean-dot.is-neutral{background:var(--scale-neutral)}
+.eval-lean-dot.is-research{background:var(--scale-research)}
 .eval-weight{font-size:12px;color:var(--ink-mid);margin-left:auto}
 .eval-angle-chip-line{display:block;font-size:11.5px;line-height:1.45;color:var(--ink-mid)}
 
@@ -3704,8 +3736,18 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
   font-size:11px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
   padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-mid);
 }
-.eval-lean.is-consumer{color:var(--clay);border-color:color-mix(in srgb, var(--clay) 40%, var(--line))}
-.eval-lean.is-research{color:var(--harbour);border-color:color-mix(in srgb, var(--harbour) 40%, var(--line))}
+.eval-lean.is-consumer{
+  color:var(--scale-consumer);border-color:color-mix(in srgb, var(--scale-consumer) 40%, var(--line));
+}
+.eval-lean.is-research{
+  color:var(--scale-research);border-color:color-mix(in srgb, var(--scale-research) 40%, var(--line));
+}
+/*
+  Neutral takes the border and not the text. `--amber` on the card measures 2.13:1, well under what
+  an 11px label needs, so the word stays in ink-mid and the scale shows in the outline — the dot
+  beside it is where the colour does its work.
+*/
+.eval-lean.is-neutral{border-color:color-mix(in srgb, var(--scale-neutral) 55%, var(--line))}
 
 /* ---------- shore-ups ---------- */
 .eval-shoreup-list{list-style:none;margin:0;padding:0;display:grid;gap:14px}

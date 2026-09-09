@@ -188,6 +188,235 @@ describe('the recommended placement is what the first screen is about', () => {
   });
 });
 
+/* ── the lean and spectrum scale ──────────────────────────────────────────────────────────────── */
+
+/*
+  Green, yellow, red — one ramp for the lean dots and the spectrum strip.
+
+  Read out of the stylesheet and measured, because a colour is a value and no rendered assertion can
+  see one. The two things worth asserting are that the three are distinguishable from each other,
+  and that the consumer red is distinguishable from `--rose`: the failure state appears in the same
+  view as a lean dot, so an 8px dot in the fail red would be two meanings in one swatch.
+
+  L* rather than hue. Hue tells red from green and says nothing about two reds, which is the pair
+  that actually had to be told apart — and lightness is the channel that survives an 8px circle.
+*/
+describe('the lean and spectrum scale', () => {
+  const CSS = readFileSync('apps/web/src/styles.css', 'utf8');
+
+  /** The five positions, consumer end first — the order the strip is drawn in. */
+  const SPECTRUM = [
+    'consumer_retail',
+    'consumer_leaning',
+    'mixed',
+    'research_leaning',
+    'research_supplier',
+  ] as const;
+
+  /**
+   * A custom property's value, following `var()` aliases to the hex they end at.
+   *
+   * Following them matters: `--scale-neutral` *is* `var(--amber)`, and a lookup that only matched a
+   * literal hex would return nothing for two of the three stops. It would also miss the failure this
+   * whole scale exists to avoid — pointing `--scale-consumer` at `--rose` is a one-line change that
+   * a hex-only matcher reads as "no token" and crashes on, rather than as "these are the same red".
+   */
+  const token = (name: string, seen = new Set<string>()): string | null => {
+    if (seen.has(name)) return null;
+    seen.add(name);
+    const found = CSS.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`));
+    if (found === null) return null;
+    const value = found[1]!.trim();
+    if (/^#[0-9A-Fa-f]{6}$/.test(value)) return value.toUpperCase();
+    const alias = value.match(/^var\(--([\w-]+)\)$/);
+    return alias === null ? null : token(alias[1]!, seen);
+  };
+
+  const rgb = (hex: string): [number, number, number] => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+
+  const luminance = (hex: string): number => {
+    const channel = (c: number): number => {
+      const v = c / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const [r, g, b] = rgb(hex);
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  };
+
+  const lstar = (hex: string): number => {
+    const y = luminance(hex);
+    const f = y > 0.008856 ? y ** (1 / 3) : 7.787 * y + 16 / 116;
+    return 116 * f - 16;
+  };
+
+  const contrast = (a: string, b: string): number => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi! + 0.05) / (lo! + 0.05);
+  };
+
+  /** `color-mix(in srgb, A p%, B)` as the browser computes it. */
+  const blend = (a: string, b: string, share: number): string => {
+    const [ra, ga, ba] = rgb(a);
+    const [rb, gb, bb] = rgb(b);
+    const at = (x: number, y: number): string =>
+      Math.round(x * share + y * (1 - share))
+        .toString(16)
+        .padStart(2, '0');
+    return `#${at(ra, rb)}${at(ga, gb)}${at(ba, bb)}`.toUpperCase();
+  };
+
+  /** The colour a `background` declaration computes to: one token, or a mix of two. */
+  const fillOf = (body: string): string | null => {
+    const mixed = body.match(
+      /color-mix\(in srgb,\s*var\(--([\w-]+)\)\s*([\d.]+)%,\s*var\(--([\w-]+)\)\s*\)/,
+    );
+    if (mixed !== null) {
+      const a = token(mixed[1]!);
+      const b = token(mixed[3]!);
+      return a === null || b === null ? null : blend(a, b, Number(mixed[2]) / 100);
+    }
+    const plain = body.match(/background:\s*var\(--([\w-]+)\)/);
+    return plain === null ? null : token(plain[1]!);
+  };
+
+  // Green and yellow are aliases, so they resolve through to the palette's own values.
+  const RED = token('scale-consumer');
+  const YELLOW = token('amber');
+  const GREEN = token('jade');
+  const ROSE = token('rose');
+
+  it('resolves every colour it is about, so nothing below passes over a missing token', () => {
+    for (const [name, value] of [
+      ['scale-consumer', RED],
+      ['amber', YELLOW],
+      ['jade', GREEN],
+      ['rose', ROSE],
+    ] as const) {
+      expect(value, `--${name} did not resolve to a hex`).toMatch(/^#[0-9A-F]{6}$/);
+    }
+  });
+
+  it('defines the scale, and the ends it replaced are gone', () => {
+    expect(CSS).toContain('--scale-consumer:');
+    expect(CSS).toContain('--scale-neutral:var(--amber)');
+    expect(CSS).toContain('--scale-research:var(--jade)');
+    // clay and harbour went with the recolour — a token nothing reads is a colour nobody chose.
+    expect(CSS).not.toMatch(/--clay\s*:/);
+    expect(CSS).not.toMatch(/--harbour\s*:/);
+    expect(CSS).not.toContain('var(--clay)');
+    expect(CSS).not.toContain('var(--harbour)');
+  });
+
+  it('draws its green, yellow and red far enough apart to tell at dot size', () => {
+    const pairs: [string, string, string][] = [
+      ['red/yellow', RED!, YELLOW!],
+      ['yellow/green', YELLOW!, GREEN!],
+      ['red/green', RED!, GREEN!],
+    ];
+    for (const [label, a, b] of pairs) {
+      expect(Math.abs(lstar(a) - lstar(b)), `${label} ${a} vs ${b}`).toBeGreaterThan(10);
+    }
+  });
+
+  /*
+    The reason the red is a new value rather than `--rose`.
+
+    Fifteen is the bar the D-201 note sets for two of this palette's colours a reader has to tell
+    apart, and these two sit side by side: a routing cell in the failure rose, an angle chip's dot
+    in the consumer red, both in the summary block.
+  */
+  it('keeps the consumer red clear of the failure rose', () => {
+    expect(RED).not.toBe(ROSE);
+    expect(
+      Math.abs(lstar(RED!) - lstar(ROSE!)),
+      `scale-consumer ${RED} against rose ${ROSE}`,
+    ).toBeGreaterThan(15);
+  });
+
+  it('gives every lean its own colour from the scale', () => {
+    expect(CSS).toContain('.eval-lean-dot.is-consumer{background:var(--scale-consumer)}');
+    expect(CSS).toContain('.eval-lean-dot.is-neutral{background:var(--scale-neutral)}');
+    expect(CSS).toContain('.eval-lean-dot.is-research{background:var(--scale-research)}');
+  });
+
+  /*
+    The strip runs the same scale, in order.
+
+    Asserted as *which stops each position draws from* rather than as five hex values: the two
+    intermediates are mixed from their neighbours, so the ordering is the thing to hold and the
+    values follow from the tokens.
+  */
+  it('runs red at the consumer end through yellow at Mixed to green at the research end', () => {
+    expect(SPECTRUM).toHaveLength(5);
+    const ruleFor = (position: string): string => {
+      const found = CSS.match(
+        new RegExp(`\\.eval-position\\[data-position="${position}"\\]\\{([^}]*)\\}`),
+      );
+      expect(found, position).not.toBeNull();
+      return found![1]!;
+    };
+
+    expect(ruleFor('consumer_retail')).toContain('--scale-consumer');
+    expect(ruleFor('consumer_retail')).not.toContain('--scale-research');
+
+    expect(ruleFor('consumer_leaning')).toContain('--scale-consumer');
+    expect(ruleFor('consumer_leaning')).toContain('--scale-neutral');
+
+    expect(ruleFor('mixed')).toContain('--scale-neutral');
+    expect(ruleFor('mixed')).not.toContain('--scale-consumer');
+    expect(ruleFor('mixed')).not.toContain('--scale-research');
+
+    expect(ruleFor('research_leaning')).toContain('--scale-neutral');
+    expect(ruleFor('research_leaning')).toContain('--scale-research');
+
+    expect(ruleFor('research_supplier')).toContain('--scale-research');
+    expect(ruleFor('research_supplier')).not.toContain('--scale-consumer');
+  });
+
+  /*
+    The marked position's label is readable on every one of the five fills.
+
+    This is the assertion the ramp was built around. An even blend of red and yellow measures
+    4.31:1 against white and 4.12:1 against ink — clearing neither — so `consumer_leaning` carries
+    60% red, and the yellow-to-green stops take ink where white would fail at 2.13:1 and 3.39:1.
+    Computing the blends here rather than trusting them is the whole point: the values that failed
+    were the mixed ones.
+  */
+  it('clears 4.5:1 on every filled segment', () => {
+    const WHITE = '#FFFFFF';
+    const INK = token('ink');
+
+    for (const position of SPECTRUM) {
+      const rule = CSS.match(
+        new RegExp(`\\.eval-position\\.is-here\\[data-position="${position}"\\]\\{([^}]*)\\}`),
+      );
+      expect(rule, `${position} has no filled rule`).not.toBeNull();
+
+      const body = rule![1]!;
+      /*
+        The fill is resolved out of this rule, blend percentage and all.
+
+        The first version computed the blends here from the weights I had chosen, so it measured the
+        ramp I meant rather than the one declared — changing 60% to 50% in the stylesheet left it
+        green on a stop that clears neither text colour. The expected value has to come from where
+        the actual value comes from (D-026).
+      */
+      const fill = fillOf(body);
+      expect(fill, `${position} declares no resolvable fill`).toMatch(/^#[0-9A-F]{6}$/);
+
+      // Explicit on every stop: one rule guessing for all five is what produced the failures above.
+      expect(body, position).toMatch(/color:\s*(#fff|var\(--ink\))/);
+
+      const text = body.includes('#fff') ? WHITE : INK!;
+      expect(contrast(text, fill!), `${position}: ${text} on ${fill}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
 /* ── 2. section labels ────────────────────────────────────────────────────────────────────────── */
 
 describe('a summary row and its section carry the same label', () => {
