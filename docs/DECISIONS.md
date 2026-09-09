@@ -17145,3 +17145,114 @@ is written. The published version is unaffected and stays readable without a cap
 true statement about where this system is. Cluster 4 replaces that function with a render against
 the evaluation route; nothing else changes.
 
+## D-262 — The evaluation is the report on the analyst surface
+**2026-09-09 · architect**
+
+Cluster 4, first commit. On the run review screen `EvaluationEditor` is the only report rendered;
+`ReportView` is unmounted there. D-256 decided this and the layout memo describes it — rendering
+both left one screen saying the same thing twice in two vocabularies, with the checklist's masthead
+arguing with the evaluation's.
+
+**Unmounting one component stopped five.** `AttestationSection`, `EyeTestPanel`, `MerchantResponse`
+and `Participation` reach an analyst only through `ReportView`. `CommentPane` is the exception and
+was never on that screen: it is the merchant's own page, reached with a link token, and
+`MerchantRoute` stays routable so a link already sent still opens. **Nothing is deleted** — removal
+is cluster 5's decision.
+
+`RunActions` is `ReportView`'s action bar lifted out unchanged. Send, Mark ready and Re-screen had
+no other home once the checklist went, and a reader needs to know which run they are acting on.
+
+**The invite action is removed**; `InviteModal` and its queue stay. The layout memo takes the
+invitation flow off this document, and a dialog with no control to open it is dead weight
+pretending to be a feature.
+
+**A run with no draft says so and offers Generate.** The editor returned `null` while `ReportView`
+filled the screen behind it; nothing fills it now, so an unevaluated run would have rendered an
+empty page with no way to tell it from a broken one.
+
+`/evaluation-preview` is gone — route, component and matcher. It existed so the rendering could be
+looked at while the operator surface was built; the operator surface is the review screen now.
+
+### The test ruling, and what it turned out to be
+
+The architecture memo listed `counting`, `numbering`, `sections`, `solicitation` and `respondZone`
+as locking the old layout, to be retired here. **None was retirable at this commit.** Every one
+renders `ReportView` directly rather than the review screen, so all of them kept passing over a
+component the screen no longer draws — and all of them still meant something, because the capture
+still rendered it.
+
+Which exposed the real gap: **unmounting `ReportView` broke nothing.** The whole suite passed. That
+is D-246's orphan pointing the other way — not a flag nothing renders, but a removal nothing
+asserts — and `reviewScreen.test.ts` is what holds it now.
+
+`RunActions` joins the internal-identity audit (D-233). It imports `ReportActions` as a type and the
+scan reads that as rendering `ReportView`; the scan is imprecise, and the answer is to audit the
+file rather than teach the scan about type imports. Narrowing a guard to quiet it is how a guard
+stops guarding, and this component holds Send.
+
+## D-263 — Capture and send re-pointed to the published evaluation
+**2026-09-09 · architect**
+
+Cluster 4, second and third commits. The capture route renders the newest published evaluation
+read-only, and the send links it.
+
+### The capture moves from assembly to publish
+
+It used to happen when the run closed, and that was right while the artifact was the checklist: the
+document did not differ by delivery path. The artifact is the evaluation now, and at assembly there
+is no evaluation — no draft, let alone a published version. A capture taken there would be a capture
+of a page saying so.
+
+So it is queued when the evaluation is published (0082), `captureRunReport` refuses a run without
+one before the browser starts, and `assertCapturable` requires the version line in the delivered
+bytes and refuses a file stamped Draft. **That is what makes "a draft cannot be sent" structural**:
+`send.ts` refuses to compose without a capture, and a capture cannot exist without a published
+version.
+
+A finished run therefore has no capture until somebody publishes. That is a true statement about the
+document: there is nothing to send yet.
+
+### What verifying against the real artifact found
+
+The commit was verified by capturing the first published evaluation rather than a fixture, and it
+found two things a fixture would not have.
+
+**The first capture was refused for carrying no statement of what it is.** The posture sentence
+lived in `ReportView`'s masthead and the guard was still looking for the checklist's. The evaluation
+has its own — the layout memo's ratified replacement — written out in the component where nothing
+could assert it reached the file. It is `EVALUATION_POSTURE` in the engine now, rendered from there
+and required in the bytes, which is what D-246 says about a sentence that lives in a component.
+
+**The evidence disclosure was a React button over a hidden div.** `assertCapturable` refuses a
+`<script>`, so in the delivered file that is a toggle that cannot open, sealing 59 rule anchors the
+reader can never reach. It is a native `<details>`/`<summary>` now: collapsed by default, present in
+the DOM, openable with nothing running, and the same behaviour on both surfaces.
+
+### The posture paragraph, merged and shared
+
+The email carried *"Findings state what was observed. They are not compliance determinations."* and
+the document carried nothing of the kind — so the claim hard constraint 7 turns on travelled with
+the message and not with the artifact, and the artifact is the forwardable thing. The clause is
+inside the posture paragraph now, and `evaluationPosture(subject)` renders it for both the masthead
+and the email so the two cannot drift.
+
+**The counts leave the email.** They were the checklist's summary, and the evaluation does not count
+rules at all. A tally in the covering mail would frame the reader in the vocabulary the document
+deliberately avoids. The subject convention is unchanged.
+
+### A send links the current document or does not happen
+
+`latestCapture` read the newest row in `report_captures`. Two situations now make the newest file
+and the current document different things: a checklist capture from before the evaluation existed,
+and a re-published run. Neither fails — both send a well-formed message pointing at the wrong
+document, which is the shape this project keeps rediscovering.
+
+The gate requires a completed capture request for the newest published version, and reports three
+outcomes separately because the sender's next move differs: nothing published, capture not yet run,
+capture failed.
+
+### The old captures
+
+Reachable through *Open report*, labelled as the checklist they are. They are what was sent, and a
+run's history is not rewritten because the document changed (D-002).
+

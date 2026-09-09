@@ -597,6 +597,8 @@ function Screener({
    */
   const [depositedAt, setDepositedAt] = useState<Readonly<Record<string, string>>>({});
   const [capture, setCapture] = useState<CapturedReport | null>(null);
+  /** True while the only stored capture predates the evaluation (D-263). */
+  const [captureIsChecklist, setCaptureIsChecklist] = useState(false);
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
   const review = useMemo(() => createReviewPath(client), [client]);
   /*
@@ -831,6 +833,7 @@ function Screener({
     setAttestations(undefined);
     setEyeTest(null);
     setCapture(null);
+    setCaptureIsChecklist(false);
     try {
       const loaded = await runs.load(runId);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
@@ -886,6 +889,20 @@ function Screener({
         offered and dead.
       */
       setCapture(await readReportCapture(client, runId, window.location.origin));
+      /*
+        Whether the stored capture is of the evaluation or of the checklist that preceded it (D-263).
+
+        A run with no published evaluation cannot have an evaluation capture — the capture is queued
+        at publish and refused without one — so the absence of a published row is exactly the
+        question. Old captures stay reachable and say what they are; they are what was sent, and a
+        run's history is not rewritten because the document changed (D-002).
+      */
+      const published = await client
+        .from('evaluations')
+        .select('id')
+        .eq('run_id', runId)
+        .limit(1);
+      setCaptureIsChecklist((published.data ?? []).length === 0);
 
       const stored = await readRunAttestations(client, runId);
       // A rule set that failed to parse renders no report at all a few lines down, so there is
@@ -1288,6 +1305,7 @@ function Screener({
                       }
                     : {}),
                   reportUrl: capture?.url ?? null,
+                  supersededCapture: captureIsChecklist,
                   /*
                     No `onInvite`. The invitation flow leaves the analyst surface with the checklist
                     (layout memo, "What leaves the report"); `MerchantRoute` stays routable, so a

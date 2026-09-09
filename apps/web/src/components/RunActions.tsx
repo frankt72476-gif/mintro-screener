@@ -73,14 +73,30 @@ export function RunActions({
             today's bundle.
           */}
           {typeof actions.reportUrl === 'string' && (
+            <>
             <a
               className="btn btn-ghost"
               href={actions.reportUrl}
               target="_blank"
               rel="noopener noreferrer"
+              {...(actions.supersededCapture === true
+                ? { title: 'Checklist report, superseded by evaluation' }
+                : {})}
             >
-              Open report
+              {/*
+                Says what it opens (D-263).
+
+                A run captured before the evaluation existed has a checklist file, and it stays
+                reachable: it is what was sent, and a run's history is not rewritten because the
+                document changed (D-002). What would be wrong is a control labelled *Open report*
+                over a document that is no longer the report.
+              */}
+              {actions.supersededCapture === true ? 'Open checklist report' : 'Open report'}
             </a>
+            {actions.supersededCapture === true && (
+              <span className="capture-superseded">Superseded by the evaluation</span>
+            )}
+            </>
           )}
           {actions.onSend !== undefined && (
             <button className="btn btn-primary" onClick={actions.onSend}>

@@ -111,6 +111,14 @@ export interface ReportActions {
    * own findings and its own comment round (D-002).
    */
   readonly onRescan?: () => void;
+  /**
+   * The stored capture is of the checklist, not the evaluation (D-263).
+   *
+   * True for every run captured before the evaluation existed. The link stays — it is what was
+   * sent — and says what it opens, because a control labelled *Open report* over a document that is
+   * no longer the report is the quiet kind of wrong.
+   */
+  readonly supersededCapture?: boolean;
 }
 
 interface Props {

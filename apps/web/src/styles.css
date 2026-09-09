@@ -3975,3 +3975,6 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 }
 .eval-empty-head{margin:0 0 6px;font-size:16px;font-weight:600;color:var(--ink)}
 .eval-empty-sub{margin:0 0 14px;font-size:13px;line-height:1.6;color:var(--ink-mid);max-width:64ch}
+
+/* A capture that predates the evaluation, still reachable and saying so (D-263). */
+.capture-superseded{font-size:11px;color:var(--ink-mid);align-self:center}

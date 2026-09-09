@@ -22,11 +22,29 @@ and the received document verified against what the merchant actually did.
 
 D-256 architecture ratified; cluster 1 (rule tiering) done; cluster 2 must read PROD-013/014 against PROD-016 before any patterns land. Cluster 2 in progress: angles.json 1.0.0, generator validated on a real run (9011b2d7, 2026-09-09); awaiting Frank's read of the draft.
 
-Cluster 3 in progress: rendering component behind /evaluation-preview.
+**Cluster 4 complete; first send under D-256 pending.**
 
-Cluster 4 carries:
+The evaluation is the report. On the run review screen it is the only document rendered — the
+checklist is unmounted there, and `AttestationSection`, `EyeTestPanel`, `MerchantResponse` and
+`Participation` go dormant with it (D-262). The capture renders the newest published evaluation and
+the send links it, refusing any run without a completed capture of its current version (D-263).
 
-- Angle citation lists show observed states only; `not_evaluable` collapsed to a count.
+One evaluation has been published and captured: run `9011b2d7` (CoMo Peptides), version 1, a 5.46 MB
+file carrying the summary block, sections 2 to 7, 59 rule anchors behind a native disclosure and
+eight inlined captures. **Nothing has been sent under the new document yet.** The other six runs
+hold checklist captures, labelled as superseded and still reachable; they are not sendable, because
+they have no published evaluation.
+
+### Open, and not addressed by cluster 4
+
+- **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
+  reached, so a run behind a login wall produces a document about a storefront nobody saw — the
+  `storefrontNotSeen` guard says so rather than hiding it, which is the honest failure and not a fix.
+- **The CoMo gate regression.** Still open. Carried into the evaluation unchanged: what the run
+  observed is what the angles reason over.
+- Angle citation lists show observed states only; `not_evaluable` collapsed to a count. Done.
+- Removing the dormant attestation and invitation code is its own decision (architecture memo,
+  cluster 5). It is unmounted, not deleted.
 
 ### Expect one thing to look wrong on any run screened before 2026-08-29
 
