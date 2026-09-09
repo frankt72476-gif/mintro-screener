@@ -34,18 +34,31 @@
  * count: legality rules **not** observed, and citations an angle collapsed.
  */
 
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type JSX,
+  type RefObject,
+} from 'react';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { formatStamp } from '../lib/format.js';
+import { useEvidenceDisclosure } from './EvidenceDisclosure.js';
 import {
+  INERT_REASON,
   LEAN_LABEL,
   PLACEMENT_LABEL,
   ROUTING_STATUS_LABEL,
+  SECTION_LABEL,
   SPECTRUM_LABEL,
   SPECTRUM_ORDER,
+  TOP_ANCHOR,
   angleAnchor,
   angleCitations,
+  chipAffordance,
   citesHeavy,
+  evaluationSectionAnchor,
   legalitySummary,
   proseSpans,
   resolveCitation,
@@ -55,6 +68,7 @@ import {
   type DraftCitation,
   type EvaluationLabels,
   type EvaluationRunContext,
+  type EvaluationSectionId,
   type IconName,
   type ProseSpan,
   type Resolved,
@@ -87,15 +101,80 @@ interface Props {
 
 export function EvaluationReport({ draft, run, access, labels, appendix }: Props): JSX.Element {
   const shared = { draft, run, access, labels };
+  const summary = useRef<HTMLElement>(null);
   return (
-    <article className="evaluation">
-      <SummaryBlock {...shared} />
+    <article className="evaluation" id={TOP_ANCHOR}>
+      <SummaryBlock {...shared} anchor={summary} />
       <Legality {...shared} />
       <RoutingTable {...shared} />
       <Angles {...shared} />
       {showsShoreUps(draft.placement.spectrum) && <ShoreUps {...shared} />}
       {appendix}
+      <BackToTop watching={summary} />
     </article>
+  );
+}
+
+/**
+ * The heading a section and its summary row share.
+ *
+ * One string from `SECTION_LABEL` in both places. Written twice they drift, and a reader who clicks
+ * *Routing* and lands on *Routing conditions* is left checking whether they arrived.
+ */
+function SectionHeading({ id }: { readonly id: EvaluationSectionId }): JSX.Element {
+  return <h2 className="eval-heading">{SECTION_LABEL[id]}</h2>;
+}
+
+/**
+ * A summary row's label, which is also the way down to the section it summarises.
+ *
+ * The rows and the sections were two readings of the same four things with nothing joining them, so
+ * a reader who wanted the detail behind a row scrolled looking for it. The label is the link.
+ */
+function RowLabel({ id }: { readonly id: EvaluationSectionId }): JSX.Element {
+  return (
+    <a className="eyebrow eval-rowlabel" href={`#${evaluationSectionAnchor(id)}`}>
+      {SECTION_LABEL[id]}
+    </a>
+  );
+}
+
+/**
+ * Back to the top, once the summary block has gone.
+ *
+ * Watched with an observer rather than a scroll handler: the question is whether the block is on
+ * screen, which is what an `IntersectionObserver` answers directly and what a scroll offset only
+ * approximates.
+ *
+ * An `<a href>` and not a button, so it is a real destination — it works before the observer has
+ * fired, in a print, and with scripting off. Hidden until it is wanted, because a control that
+ * floats over the first screen is covering the thing it would take you back to.
+ */
+function BackToTop({
+  watching,
+}: {
+  readonly watching: RefObject<HTMLElement>;
+}): JSX.Element {
+  const [past, setPast] = useState(false);
+
+  useEffect(() => {
+    const summary = watching.current;
+    // Absent in the print renderer and in any environment without a layout. Nothing to observe is
+    // not an error; the control simply stays hidden, which is its resting state anyway.
+    if (summary === null || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => setPast(entries[0]?.isIntersecting === false),
+      { threshold: 0 },
+    );
+    observer.observe(summary);
+    return () => observer.disconnect();
+  }, [watching]);
+
+  return (
+    <a className="eval-totop" href={`#${TOP_ANCHOR}`} hidden={!past}>
+      <span aria-hidden="true">↑</span> Top
+    </a>
   );
 }
 
@@ -108,14 +187,16 @@ function SummaryBlock({
   run,
   access,
   labels,
+  anchor,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
+  readonly anchor: RefObject<HTMLElement>;
 }): JSX.Element {
   return (
-    <section className="panel eval-summary">
+    <section className="panel eval-summary" ref={anchor}>
       <header className="eval-masthead">
         <div className="eval-masthead-top">
           <h1 className="eval-domain">{run.merchantDomain ?? 'unknown domain'}</h1>
@@ -144,12 +225,26 @@ function SummaryBlock({
         </dl>
       </header>
 
-      <PlacementRow draft={draft} access={access} labels={labels} />
+      <FocalPlacement draft={draft} access={access} labels={labels} />
+      <PlacementRow draft={draft} />
       <LegalityAndRoutingRow draft={draft} access={access} labels={labels} />
       <AngleChipsRow draft={draft} run={run} labels={labels} />
 
-      {/* Row 4. The only prose in the block. */}
-      <Paragraph run={run} labels={labels} text={draft.placement.paragraph} className="eval-lede" />
+      {/*
+        Row 4. The only prose in the block, and the section the Placement label points at.
+
+        Section 1 of the layout memo is a line and a paragraph, both of them here, so there is no
+        placement block further down for the row label to reach. This paragraph is the reasoning
+        behind the badge above, which is what a reader clicking *Placement* is after.
+      */}
+      <div className="eval-row eval-row-lede" id={evaluationSectionAnchor('placement')}>
+        <Paragraph
+          run={run}
+          labels={labels}
+          text={draft.placement.paragraph}
+          className="eval-lede"
+        />
+      </div>
     </section>
   );
 }
@@ -218,18 +313,21 @@ function Icon({ name }: { readonly name: IconName }): JSX.Element {
 }
 
 /**
- * Row 1 — the spectrum strip and the placement badge.
+ * The recommended placement, as the thing the first screen is about.
  *
- * The strip runs warm at the consumer end to cool at the research end, and the marker is the only
- * saturated element in the row. Five positions are all drawn because a position means something
- * only against the scale it sits on; a lone label would leave the reader guessing which end is
- * which.
+ * It was a badge in the right-hand column of row 1, the same visual weight as the spectrum strip
+ * beside it, and a reader opening the document met two things of equal size and had to work out
+ * which one was the answer. Referred out / International / Domestic **is** the answer; the spectrum
+ * is where the business sits, which is why the answer came out that way.
  *
- * Referred out puts the legality item that fixed it directly beneath the badge — that placement is
- * not a judgment about the business, it is the consequence of one observation, and the observation
+ * So it leads, at a size nothing else in the document reaches, under a label that says what it is.
+ * Everything else in the summary block explains it.
+ *
+ * Referred out keeps the legality item that fixed it directly beneath: that placement is not a
+ * judgment about the business, it is the consequence of one observation, and the observation
  * belongs where the consequence is stated.
  */
-function PlacementRow({
+function FocalPlacement({
   draft,
   access,
   labels,
@@ -238,13 +336,49 @@ function PlacementRow({
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
 }): JSX.Element {
-  const { spectrum, recommended } = draft.placement;
+  const { recommended } = draft.placement;
   const { observed } = legalitySummary(draft.legality);
+
+  return (
+    <div className="eval-row eval-row-focal">
+      <span className="eyebrow">Recommended placement</span>
+      <p className={`eval-focal-badge is-${recommended}`}>
+        {PLACEMENT_LABEL[recommended] ?? recommended}
+      </p>
+      {recommended === 'referred_out' && observed.length > 0 && (
+        <ul className="eval-fixed-by">
+          {observed.map((item) => (
+            <li key={item.ruleId}>
+              <span className="eval-alert">{labels.ruleTitle[item.ruleId] ?? item.ruleId}</span>
+              {item.evidenceKey !== '' && (
+                <EvidenceChip evidenceKey={item.evidenceKey} label="Capture" access={access} />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Row 1 — the spectrum strip, beneath the badge it explains.
+ *
+ * The strip runs warm at the consumer end to cool at the research end, and the marker is the only
+ * saturated element in the row. Five positions are all drawn because a position means something
+ * only against the scale it sits on; a lone label would leave the reader guessing which end is
+ * which.
+ */
+function PlacementRow({ draft }: { readonly draft: StoredDraft }): JSX.Element {
+  const { spectrum } = draft.placement;
 
   return (
     <div className="eval-row eval-row-placement">
       <div className="eval-spectrum-cell">
-        <span className="eyebrow">Where this business sits</span>
+        <RowLabel id="placement" />
+        <p className="eval-rowsub">
+          Where this business sits: <strong>{SPECTRUM_LABEL[spectrum] ?? spectrum}</strong>
+        </p>
         <ol className="eval-spectrum" aria-label="Spectrum position">
           {SPECTRUM_ORDER.map((position) => (
             <li
@@ -257,25 +391,6 @@ function PlacementRow({
             </li>
           ))}
         </ol>
-      </div>
-
-      <div className="eval-placement-cell">
-        <span className="eyebrow">Placement today</span>
-        <p className={`eval-badge is-${recommended}`}>
-          {PLACEMENT_LABEL[recommended] ?? recommended}
-        </p>
-        {recommended === 'referred_out' && observed.length > 0 && (
-          <ul className="eval-fixed-by">
-            {observed.map((item) => (
-              <li key={item.ruleId}>
-                <span className="eval-alert">{labels.ruleTitle[item.ruleId] ?? item.ruleId}</span>
-                {item.evidenceKey !== '' && (
-                  <EvidenceChip evidenceKey={item.evidenceKey} label="Capture" access={access} />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   );
@@ -310,7 +425,7 @@ function LegalityAndRoutingRow({
   return (
     <div className="eval-row eval-row-status">
       <div className="eval-legality-cell">
-        <span className="eyebrow">Legality</span>
+        <RowLabel id="legality" />
         {summary.clean ? (
           <>
             <p className="eval-badge-line is-clean">
@@ -337,7 +452,7 @@ function LegalityAndRoutingRow({
       </div>
 
       <div className="eval-routing-cell">
-        <span className="eyebrow">Routing conditions</span>
+        <RowLabel id="routing" />
         <ul className="eval-condition-cells">
           {rows.map((row) => (
             <li key={row.conditionId} className={`eval-condition is-${row.status}`}>
@@ -383,6 +498,7 @@ function AngleChipsRow({
 
   return (
     <div className="eval-row eval-row-angles">
+      <RowLabel id="angles" />
       <ul className="eval-angle-chips">
         {angles.map((angle) => (
           <li key={angle.angleId} className={`eval-angle-chip lean-${angle.lean}`}>
@@ -435,8 +551,12 @@ function Legality({
   const summary = legalitySummary(draft.legality);
 
   return (
-    <section className="panel eval-legality" data-clean={String(summary.clean)}>
-      <h2 className="eval-heading">Legality</h2>
+    <section
+      className="panel eval-legality"
+      id={evaluationSectionAnchor('legality')}
+      data-clean={String(summary.clean)}
+    >
+      <SectionHeading id="legality" />
 
       {items.length === 0 ? (
         <p className="eval-line">No legality item was observed.</p>
@@ -507,8 +627,8 @@ function RoutingTable({
   const unmet = rows.filter((row) => row.status === 'not_met');
 
   return (
-    <section className="panel eval-routing">
-      <h2 className="eval-heading">Routing conditions</h2>
+    <section className="panel eval-routing" id={evaluationSectionAnchor('routing')}>
+      <SectionHeading id="routing" />
       <table className="eval-table">
         <thead>
           <tr>
@@ -570,9 +690,9 @@ function Angles({
   );
 
   return (
-    <section className="panel eval-angles" id="evaluation-angles">
-      <h2 className="eval-heading">Angles</h2>
-      {angles.map((angle) => (
+    <section className="panel eval-angles" id={evaluationSectionAnchor('angles')}>
+      <SectionHeading id="angles" />
+      {angles.map((angle, index) => (
         <article
           key={angle.angleId}
           id={angleAnchor(angle.angleId)}
@@ -597,9 +717,46 @@ function Angles({
             access={access}
             heading="Cited"
           />
+          {/*
+            Once, under the first angle.
+
+            The chips are the document's one piece of machinery a reader has to learn, and they
+            learn it where they first meet a list of them. Repeating it under all seven would be the
+            document telling them the same thing seven times.
+          */}
+          {index === 0 && <ChipLegend />}
         </article>
       ))}
     </section>
+  );
+}
+
+/**
+ * What the two kinds of chip mean.
+ *
+ * Written from the reader's side — what happens when you click — rather than from the data's. A
+ * legend explaining `not_evaluable` would be a second vocabulary to hold; the muted chip says its
+ * own reason on hover, and this only says that it will.
+ */
+function ChipLegend(): JSX.Element {
+  return (
+    <p className="eval-legend">
+      <span className="eval-chip is-finding is-linked">
+        A chip like this<ChipArrow />
+      </span>{' '}
+      opens the capture behind it or jumps to the rule below.{' '}
+      <span className="eval-chip is-inert">A chip like this</span> has nowhere to go, and says why
+      when you rest on it.
+    </p>
+  );
+}
+
+/** The mark that says a chip goes somewhere. Decorative: the underline and colour say it too. */
+function ChipArrow(): JSX.Element {
+  return (
+    <span className="eval-chip-arrow" aria-hidden="true">
+      ↗
+    </span>
   );
 }
 
@@ -626,8 +783,9 @@ function ShoreUps({
   if (draft.shoreUps.length === 0) return null;
 
   return (
-    <section className="panel eval-shoreups">
-      <h2 className="eval-heading">What would close the open conditions</h2>
+    <section className="panel eval-shoreups" id={evaluationSectionAnchor('shoreups')}>
+      <SectionHeading id="shoreups" />
+      <p className="eval-line">What would close the open conditions.</p>
       <ul className="eval-shoreup-list">
         {draft.shoreUps.map((shoreUp) => {
           const resolved = resolveCitation(run, labels, shoreUp.citation);
@@ -639,7 +797,7 @@ function ShoreUps({
                 text={shoreUp.text}
                 className="eval-shoreup-text"
               />
-              {resolved !== null && <Chip resolved={resolved} access={access} />}
+              {resolved !== null && <Chip resolved={resolved} run={run} access={access} />}
             </li>
           );
         })}
@@ -665,7 +823,7 @@ function Paragraph({
   return (
     <p className={className}>
       {proseSpans(run, labels, text).map((span, index) => (
-        <ProseChunk key={index} span={span} />
+        <ProseChunk key={index} span={span} run={run} />
       ))}
     </p>
   );
@@ -679,7 +837,13 @@ function Paragraph({
  * whose mapping did not store, would otherwise print a bare `F99` indistinguishable from a working
  * reference. Marked and visible beats silently plausible.
  */
-function ProseChunk({ span }: { readonly span: ProseSpan }): JSX.Element {
+function ProseChunk({
+  span,
+  run,
+}: {
+  readonly span: ProseSpan;
+  readonly run: EvaluationRunContext;
+}): JSX.Element {
   if ('text' in span) return <>{span.text}</>;
   if (span.resolved === null) {
     return (
@@ -698,16 +862,25 @@ function ProseChunk({ span }: { readonly span: ProseSpan }): JSX.Element {
 
     A link and not a button: a capture opens through `EvidenceAccess`, and a button inside a
     paragraph would break the line it sits in. Opening captures stays the citation lists' job, where
-    a chip is a block of its own.
+    a chip is a block of its own — which is also why `hasAccess` is false here.
   */
   if (span.resolved.anchor !== undefined) {
     return (
-      <a className={className} href={`#${span.resolved.anchor}`}>
+      <AnchorChip
+        className={`${className} is-linked`}
+        anchor={span.resolved.anchor}
+        {...(span.resolved.ruleId === undefined ? {} : { ruleId: span.resolved.ruleId })}
+      >
         {span.resolved.label}
-      </a>
+      </AnchorChip>
     );
   }
-  return <span className={className}>{span.resolved.label}</span>;
+  const affordance = chipAffordance(span.resolved, run, false);
+  return (
+    <span className={`${className} is-inert`} title={affordance.reason}>
+      {span.resolved.label}
+    </span>
+  );
 }
 
 /**
@@ -738,7 +911,7 @@ function CitationList({
       <ul className="eval-chip-list">
         {observed.map((resolved) => (
           <li key={`${resolved.kind}:${resolved.id}`}>
-            <Chip resolved={resolved} {...(access === undefined ? {} : { access })} />
+            <Chip resolved={resolved} run={run} {...(access === undefined ? {} : { access })} />
           </li>
         ))}
         {unevaluated > 0 && (
@@ -779,7 +952,7 @@ function Chips({
             {resolved === null ? (
               <span className="eval-chip is-unresolved">{citation.ref} — does not resolve</span>
             ) : (
-              <Chip resolved={resolved} access={access} />
+              <Chip resolved={resolved} run={run} access={access} />
             )}
           </li>
         );
@@ -789,23 +962,31 @@ function Chips({
 }
 
 /**
- * One citation.
+ * One citation, and one of three things.
  *
- * A citation with a capture behind it opens that capture; an angle scrolls to its own detail; the
- * rest are labels. All three are the same shape deliberately — what a reader can open is a property
- * of the run, not something the document should make look like a different kind of claim.
+ * It opens a capture, it jumps to a row, or it does neither and says why. The first two look like
+ * links — underlined, in the link colour, with an arrow — and the third is muted with its reason on
+ * hover.
+ *
+ * They used to be indistinguishable, on the reasoning that what a reader can open is a property of
+ * the run and not something the document should dress differently. That was wrong in practice: a
+ * reader met a row of identical chips, clicked one that did nothing, and had no way to tell it from
+ * the six beside it that worked. Telling them which is which is not a claim about the merchant.
  */
 function Chip({
   resolved,
+  run,
   access,
 }: {
   readonly resolved: Resolved;
+  readonly run: EvaluationRunContext;
   readonly access?: EvidenceAccess;
 }): JSX.Element {
   const state = resolved.state === undefined ? '' : ` state-${resolved.state}`;
   const heavy = resolved.heavy === true ? ' is-heavy' : '';
+  const affordance = chipAffordance(resolved, run, access !== undefined);
 
-  if (resolved.evidenceKey !== undefined && access !== undefined) {
+  if (affordance.kind === 'capture' && resolved.evidenceKey !== undefined && access !== undefined) {
     return (
       <EvidenceChip
         evidenceKey={resolved.evidenceKey}
@@ -817,15 +998,63 @@ function Chip({
     );
   }
 
-  if (resolved.anchor !== undefined) {
+  if (affordance.kind === 'link' && resolved.anchor !== undefined) {
     return (
-      <a className={`eval-chip is-${resolved.kind}${state}${heavy}`} href={`#${resolved.anchor}`}>
+      <AnchorChip
+        className={`eval-chip is-${resolved.kind}${state}${heavy} is-linked`}
+        anchor={resolved.anchor}
+        {...(resolved.ruleId === undefined ? {} : { ruleId: resolved.ruleId })}
+      >
         {resolved.label}
-      </a>
+      </AnchorChip>
     );
   }
 
-  return <span className={`eval-chip is-${resolved.kind}${state}${heavy}`}>{resolved.label}</span>;
+  return (
+    <span className={`eval-chip is-${resolved.kind}${state}${heavy} is-inert`} title={affordance.reason}>
+      {resolved.label}
+    </span>
+  );
+}
+
+/**
+ * A chip that goes somewhere in this document.
+ *
+ * An `<a href>` first, so it is a real destination: it works with scripting off, it shows the
+ * reader where it goes, and it survives a print. The click handler is an improvement on top —
+ * where the evidence section is collapsed, a bare fragment link would point at a row that has not
+ * rendered and the page would sit still, so the handler opens the section and asks it to scroll.
+ *
+ * Only a finding does that. An angle chip points at a block that is always open, so it is left to
+ * the browser.
+ */
+function AnchorChip({
+  className,
+  anchor,
+  ruleId,
+  children,
+}: {
+  readonly className: string;
+  readonly anchor: string;
+  readonly ruleId?: string;
+  readonly children: string;
+}): JSX.Element {
+  const disclosure = useEvidenceDisclosure();
+  const reveal = useCallback(
+    (event: { preventDefault: () => void }) => {
+      if (disclosure === null || ruleId === undefined) return;
+      event.preventDefault();
+      disclosure.reveal(ruleId);
+    },
+    [disclosure, ruleId],
+  );
+
+  return (
+    <a className={className} href={`#${anchor}`} onClick={reveal}>
+      {children}
+      <ChipArrow />
+    </a>
+  );
 }
 
 /**

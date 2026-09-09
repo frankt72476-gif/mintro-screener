@@ -35,16 +35,19 @@
  * reference the reader cannot follow.
  */
 
-import { useMemo, type JSX } from 'react';
+import { useEffect, useMemo, type JSX } from 'react';
 import type { ReportFinding, ScreeningReport } from '@mintro/engine';
 import {
   PART_ONE,
+  findingAnchor,
   ordinalsFor,
   referencesFor,
   reportParts,
   type FindingGroup,
   type ReportPart,
 } from '../lib/grouping.js';
+import { SECTION_LABEL, evaluationSectionAnchor } from '../lib/evaluationView.js';
+import { useEvidenceDisclosure } from './EvidenceDisclosure.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { NumberingContext, createNumbering } from '../lib/numbering.js';
 import { ReportSectionView } from './Sections.js';
@@ -138,15 +141,62 @@ export function EvaluationEvidence({
     (part) => part.passes !== undefined && part.passes.groups.length > 0,
   )?.passes;
 
+  /*
+    Collapsed by default, and open when nothing can open it.
+
+    Section 6 is a hundred rules of appendix under a document whose point is the four sections above
+    it. A reader who wants it asks for it, and a finding chip asks on their behalf.
+
+    `useEvidenceDisclosure` is null wherever nothing is controlling the section — the print path, a
+    test rendering it alone — and that reads as open. A collapsed section with no control able to
+    open it is a section nobody can reach, and it would take every anchor in the document with it.
+  */
+  const disclosure = useEvidenceDisclosure();
+  const open = disclosure === null ? true : disclosure.open;
+  const pending = disclosure?.pending ?? null;
+
+  /*
+    The scroll the chip asked for, performed once the row exists.
+
+    A `scrollIntoView` at click time would run while the section was still collapsed, against an
+    element that had not rendered. This runs after the render that created it.
+  */
+  useEffect(() => {
+    if (!open || pending === null || disclosure === null) return;
+    document.getElementById(findingAnchor(pending))?.scrollIntoView({ block: 'start' });
+    disclosure.settle();
+  }, [open, pending, disclosure]);
+
   return (
     <NumberingContext.Provider value={numbering}>
-      <section className="panel eval-evidence" id="evaluation-evidence">
-        <h2 className="eval-heading">Evidence</h2>
+      <section
+        className="panel eval-evidence"
+        id={evaluationSectionAnchor('evidence')}
+        data-open={String(open)}
+      >
+        {disclosure === null ? (
+          <SectionHeading />
+        ) : (
+          <button
+            type="button"
+            className="eval-disclose"
+            onClick={disclosure.toggle}
+            aria-expanded={open}
+            aria-controls={EVIDENCE_BODY_ID}
+          >
+            <SectionHeading />
+            <span className="eval-disclose-count">{ruleCount(report)}</span>
+            <span className="eval-disclose-caret" aria-hidden="true">
+              {open ? '▾' : '▸'}
+            </span>
+          </button>
+        )}
         <p className="eval-line">
           Every rule this run checked, with the capture behind it. The angles above cite into this
           section.
         </p>
 
+        <div id={EVIDENCE_BODY_ID} hidden={!open}>
         <StoppingPanel
           report={report}
           parts={parts}
@@ -189,9 +239,33 @@ export function EvaluationEvidence({
             print
           />
         )}
+        </div>
       </section>
     </NumberingContext.Provider>
   );
+}
+
+/** The section's own heading, the same label its summary row carries. */
+function SectionHeading(): JSX.Element {
+  return <h2 className="eval-heading">{SECTION_LABEL.evidence}</h2>;
+}
+
+/** Where the rows live, named so the toggle can say what it controls. */
+const EVIDENCE_BODY_ID = 'evaluation-evidence-body';
+
+/**
+ * How many rules the section holds, for the collapsed line.
+ *
+ * Counted from the findings rather than from the rule set, so it says what is *in this document*
+ * and not how large the rule set is. It is not a score and cannot be read as one: there is no
+ * denominator and no split by state — the summary block's ban on counts is about a number a reader
+ * could mistake for a verdict, and "59 rules" under a closed drawer is a size.
+ */
+function ruleCount(report: ScreeningReport): string {
+  const rules = new Set(
+    report.categories.flatMap((category) => category.findings.map((finding) => finding.ruleId)),
+  ).size;
+  return `${rules} rule${rules === 1 ? '' : 's'}`;
 }
 
 /**
@@ -253,7 +327,12 @@ export function EvaluationNotChecked({
 }): JSX.Element | null {
   if (report.notChecked === undefined) return null;
   return (
-    <section className="panel eval-notchecked">
+    <section className="panel eval-notchecked" id={evaluationSectionAnchor('not-checked')}>
+      {/*
+        `NotCheckedSection` brings its own heading, and it already reads *What was not checked* —
+        the same string `SECTION_LABEL` carries. Nothing is added here: two headings over one list
+        is worse than one whose styling has to be matched in CSS, which is where it is matched.
+      */}
       <NotCheckedSection items={report.notChecked} />
     </section>
   );

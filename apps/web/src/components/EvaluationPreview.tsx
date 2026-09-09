@@ -17,6 +17,7 @@ import rulesetJson from '../../../../rules/ruleset.json';
 import eyeTestJson from '../../../../rules/eyetest.json';
 import { EvaluationReport } from './EvaluationReport.js';
 import { EvaluationEvidence, EvaluationNotChecked, anchoredRuleIds } from './EvaluationEvidence.js';
+import { EvidenceDisclosureProvider } from './EvidenceDisclosure.js';
 import type { ScreeningReport } from '@mintro/engine';
 import type { EvaluationLabels } from '../lib/evaluationView.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
@@ -186,14 +187,20 @@ export function EvaluationPreview({
           <EvaluationNotChecked report={report} />
         </>
       );
+    /*
+      The provider wraps the whole document, because the two ends of the disclosure are far apart:
+      a finding chip in the summary block asks, and section 6 answers.
+    */
     return (
-      <EvaluationReport
-        draft={load.draft}
-        run={load.run}
-        access={access}
-        labels={LABELS}
-        appendix={appendix}
-      />
+      <EvidenceDisclosureProvider>
+        <EvaluationReport
+          draft={load.draft}
+          run={load.run}
+          access={access}
+          labels={LABELS}
+          appendix={appendix}
+        />
+      </EvidenceDisclosureProvider>
     );
   }, [load, access]);
 

@@ -196,6 +196,110 @@ export function routingIcon(status: string): IconName {
   return ROUTING_STATUS_ICON[status] ?? 'dash';
 }
 
+// ── the document's sections ────────────────────────────────────────────────────────────────────
+
+/**
+ * Every section of the evaluation, named once.
+ *
+ * A summary-block row and the section it summarises carry the **same string from here**. Written in
+ * two places they drift, and a reader clicking *Routing* to land on a heading reading *Routing
+ * conditions* is left checking whether they are the same thing.
+ *
+ * `placement` is the one with no separate block below it: the layout memo puts section 1 entirely
+ * in the summary block, so its label links down to the placement paragraph — row 4, the reasoning
+ * behind the badge — rather than to a section further on.
+ */
+export const EVALUATION_SECTIONS = [
+  { id: 'placement', label: 'Placement' },
+  { id: 'legality', label: 'Legality' },
+  { id: 'routing', label: 'Routing' },
+  { id: 'angles', label: 'Angles' },
+  { id: 'shoreups', label: 'Shore-ups' },
+  { id: 'evidence', label: 'Evidence' },
+  { id: 'not-checked', label: 'What was not checked' },
+] as const;
+
+export type EvaluationSectionId = (typeof EVALUATION_SECTIONS)[number]['id'];
+
+export const SECTION_LABEL: Readonly<Record<EvaluationSectionId, string>> = Object.fromEntries(
+  EVALUATION_SECTIONS.map((section) => [section.id, section.label]),
+) as Readonly<Record<EvaluationSectionId, string>>;
+
+/**
+ * Where a section sits. Distinct from `sectionAnchor` in `grouping.ts`, which names the checklist
+ * report's own sections — two documents, two id spaces, and one prefix each so they cannot collide.
+ */
+export function evaluationSectionAnchor(id: EvaluationSectionId): string {
+  return `evaluation-${id}`;
+}
+
+/** The top of the document, for the back-to-top control. */
+export const TOP_ANCHOR = 'evaluation-top';
+
+// ── what a chip can do ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Why a chip goes nowhere.
+ *
+ * Stated, never implied. A chip that reads like every other one and does nothing when clicked
+ * teaches a reader that the chips are unreliable, and they then stop trying the ones that work.
+ */
+export const INERT_REASON = {
+  noCapture: 'no capture recorded for this rule',
+  notEvaluable: 'not evaluable on this run',
+  countedNotNamed: 'counted, not named, in the stopping conditions',
+  /*
+    The eye test is not a rule and has no capture to record — it is Mintro's read, and D-196 says it
+    must never become a finding. "No capture recorded for this rule" would call it one.
+  */
+  eyeTest: 'the eye test records a read, not a capture',
+} as const;
+
+export type ChipKind = 'capture' | 'link' | 'inert';
+
+export interface ChipAffordance {
+  readonly kind: ChipKind;
+  /** Present only on `inert`. */
+  readonly reason?: string;
+}
+
+/**
+ * What a chip does, decided from the citation rather than from the markup.
+ *
+ * Three outcomes and no fourth: it opens a capture, it jumps to a row, or it does nothing and says
+ * why. The first two are visibly links; the third is muted, so a reader can tell before clicking
+ * which is which.
+ *
+ * `hasAccess` is passed rather than read because minting a signed URL is the component's business
+ * — but whether one *can* be minted decides what the chip is, and that is a decision.
+ */
+export function chipAffordance(
+  resolved: Resolved,
+  run: EvaluationRunContext,
+  hasAccess: boolean,
+): ChipAffordance {
+  if (resolved.evidenceKey !== undefined && hasAccess) return { kind: 'capture' };
+  if (resolved.anchor !== undefined) return { kind: 'link' };
+
+  if (resolved.kind === 'eye_test') return { kind: 'inert', reason: INERT_REASON.eyeTest };
+  /*
+    A rule the evidence section counts rather than names — a stopping condition met on a run where
+    another failed. It is the only reason a finding has no anchor while other findings have one, so
+    it is checked before the general answers.
+  */
+  if (
+    resolved.ruleId !== undefined &&
+    run.anchoredRuleIds !== undefined &&
+    !run.anchoredRuleIds.has(resolved.ruleId)
+  ) {
+    return { kind: 'inert', reason: INERT_REASON.countedNotNamed };
+  }
+  if (resolved.state === 'not_evaluable') {
+    return { kind: 'inert', reason: INERT_REASON.notEvaluable };
+  }
+  return { kind: 'inert', reason: INERT_REASON.noCapture };
+}
+
 /**
  * The consumer half of the spectrum. Shore-ups do not render for these.
  *
@@ -221,6 +325,13 @@ export interface Resolved {
   readonly kind: ResolvedKind;
   /** The real id — a finding uuid, an evidence key, an eye-test item id, an angle id. */
   readonly id: string;
+  /**
+   * The rule, for a finding. Absent for every other kind.
+   *
+   * Carried alongside the title because the two answer different questions: the title is what the
+   * chip says, and the rule id is where it points and what decides whether it can point anywhere.
+   */
+  readonly ruleId?: string;
   /** What the chip says: a rule title, a host and path, a rubric question, an angle title. */
   readonly label: string;
   /** The capture to open, where one exists. */
@@ -290,6 +401,7 @@ export function resolveId(
     return {
       kind,
       id,
+      ruleId: finding.ruleId,
       // The title, not the rule id. `CATG-005` names a rule to somebody who has the rule set open;
       // "Reconstitution solution labelling" names it to the reader (addendum).
       label: labels.ruleTitle[finding.ruleId] ?? finding.ruleId,

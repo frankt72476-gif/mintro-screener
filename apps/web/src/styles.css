@@ -3539,11 +3539,38 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 
 /* ---------- summary block: the four rows (addendum) ---------- */
 .eval-row{border-top:1px solid var(--line-soft);padding:20px 0}
-.eval-row-placement,.eval-row-status{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:start}
-.eval-row-status{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+.eval-row-status{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:32px;align-items:start}
 @media (max-width:720px){
-  .eval-row-placement,.eval-row-status{grid-template-columns:1fr;gap:20px}
+  .eval-row-status{grid-template-columns:1fr;gap:20px}
 }
+
+/*
+  The recommended placement, as the thing the first screen is about.
+
+  It shared row 1 with the spectrum strip at the same visual weight, so a reader met two elements of
+  equal size and had to work out which one was the answer. This is the answer; everything else in
+  the block explains it. 40px is the largest type in the document by a wide margin, and
+  `evaluationLayout.test.ts` holds it there.
+*/
+.eval-row-focal{border-top:0;padding-top:8px}
+.eval-focal-badge{
+  display:inline-block;margin:8px 0 0;padding:14px 28px;border-radius:10px;
+  font-size:40px;line-height:1.1;font-weight:700;letter-spacing:-.02em;
+  color:#fff;background:var(--violet);
+}
+.eval-focal-badge.is-referred_out{background:var(--rose)}
+.eval-focal-badge.is-domestic{background:var(--jade)}
+.eval-row-focal .eval-fixed-by{justify-items:start}
+.eval-rowsub{margin:6px 0 0;font-size:12.5px;color:var(--ink-mid)}
+.eval-rowsub strong{color:var(--ink);font-weight:600}
+
+/*
+  A row label is the way down to the section it summarises. Underlined on hover only: four
+  underlined labels down the first screen would compete with the badge above them.
+*/
+a.eval-rowlabel{display:inline-block;color:var(--ink-mid);text-decoration:none}
+a.eval-rowlabel:hover{color:var(--violet);text-decoration:underline}
+a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
 
 /*
   The strip. Five segments, warm at the consumer end and cool at the research end, and the marker
@@ -3572,14 +3599,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 /* Grid children default to min-width:auto, which lets a long condition label widen the column
    past its track and push the row sideways. */
 .eval-spectrum-cell,.eval-legality-cell,.eval-routing-cell{min-width:0}
-.eval-placement-cell{text-align:right}
-.eval-badge{
-  display:inline-block;margin:6px 0 0;padding:8px 16px;border-radius:6px;
-  font-size:16px;font-weight:600;letter-spacing:-.005em;color:#fff;background:var(--violet);
-}
-.eval-badge.is-referred_out{background:var(--rose)}
-.eval-badge.is-domestic{background:var(--jade)}
-.eval-fixed-by{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;justify-items:end}
+.eval-fixed-by{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;justify-items:start}
 .eval-alert{color:var(--rose);font-size:12.5px;font-weight:500}
 
 /* Row 2. */
@@ -3704,10 +3724,34 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 }
 a.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 .eval-chip.is-heavy{font-weight:600}
+
+/*
+  Linked and inert, told apart before the click.
+
+  Every chip looked the same, so a reader met a row of them, clicked one that did nothing, and had
+  no way to tell it from the six beside it that worked. Three signals on the ones that go somewhere
+  — link colour, an underline, and a small arrow — because colour alone is not a signal to everyone.
+  The inert ones are muted and carry their reason in a `title`.
+*/
+.eval-chip.is-linked{color:var(--violet);text-decoration:underline;text-underline-offset:2px}
+.eval-chip.is-linked:hover{border-color:var(--violet);background:color-mix(in srgb, var(--violet) 6%, var(--paper))}
+.eval-chip-arrow{margin-left:3px;font-size:9px;vertical-align:1px}
+.eval-chip.is-inert{color:var(--slate);opacity:.72;cursor:help;border-style:dotted}
+button.eval-chip.is-capture{color:var(--violet);text-decoration:underline;text-underline-offset:2px}
+
+/* The legend, once, under the first angle. */
+.eval-legend{
+  margin:14px 0 0;padding:10px 12px;border-radius:6px;background:var(--paper);
+  font-size:11.5px;line-height:1.7;color:var(--ink-mid);
+}
 /* Inside a paragraph the chip sits in running text, so it loses the box and keeps the tint. */
 .eval-para .eval-chip,.eval-lede .eval-chip,.eval-note .eval-chip,.eval-shoreup-text .eval-chip{
   border:0;background:color-mix(in srgb, var(--violet) 7%, transparent);
   color:var(--violet);padding:1px 5px;
+}
+.eval-para .eval-chip.is-inert,.eval-lede .eval-chip.is-inert,
+.eval-note .eval-chip.is-inert,.eval-shoreup-text .eval-chip.is-inert{
+  background:transparent;color:var(--slate);border-bottom:1px dotted var(--slate);
 }
 button.eval-chip{cursor:pointer;text-align:left}
 button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
@@ -3720,3 +3764,37 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 .eval-chip.is-unreachable{border-color:var(--rose);color:var(--rose)}
 .eval-chip-note{font-style:italic}
 
+/* ---------- section 6, collapsed until it is wanted ---------- */
+.eval-disclose{
+  display:flex;align-items:baseline;gap:10px;width:100%;
+  background:none;border:0;padding:0;margin:0 0 16px;cursor:pointer;text-align:left;font:inherit;
+}
+.eval-disclose .eval-heading{margin:0}
+.eval-disclose-count{
+  font-size:11px;letter-spacing:.04em;color:var(--ink-mid);font-variant-numeric:tabular-nums;
+}
+.eval-disclose-caret{margin-left:auto;font-size:11px;color:var(--slate)}
+.eval-disclose:hover .eval-heading,.eval-disclose:hover .eval-disclose-caret{color:var(--violet)}
+.eval-evidence[data-open="false"] .eval-line{margin-bottom:0}
+
+/*
+  Section 7 brings its own heading from `Attestations.tsx`. Matched here rather than replaced, so
+  the list has one heading and this document has one heading style.
+*/
+.eval-notchecked .att-nc h2{
+  font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mid);
+  margin:0 0 16px;font-weight:600;
+}
+
+/* ---------- back to top ---------- */
+.eval-totop{
+  position:fixed;right:24px;bottom:24px;z-index:20;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);box-shadow:var(--shadow);
+  font-size:11.5px;letter-spacing:.04em;color:var(--ink-mid);text-decoration:none;
+}
+.eval-totop:hover{border-color:var(--violet);color:var(--violet)}
+/* The floating position would otherwise beat the attribute's own display:none. */
+.eval-totop[hidden]{display:none}
+@media print{.eval-totop{display:none}}

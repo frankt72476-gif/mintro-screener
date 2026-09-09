@@ -163,7 +163,7 @@ describe('the whole document renders', () => {
 
   it('leads with the placement and the spectrum, in words', () => {
     const body = text(HTML);
-    expect(body).toContain('Placement today');
+    expect(body).toContain('Recommended placement');
     expect(body).toContain('International');
     // All five positions, so the one it sits at means something against a scale.
     for (const label of ['Consumer retail', 'Consumer-leaning', 'Mixed', 'Research-leaning', 'Research supplier']) {
@@ -249,8 +249,9 @@ describe('prose handles become chips', () => {
   });
 
   it('puts the thing the handle points at in its place', () => {
-    // Every angle paragraph resolves to at least one rule id the reader can see.
-    const chips = [...HTML.matchAll(/class="eval-chip is-(finding|evidence|eye_test|angle)"/g)];
+    // Every angle paragraph resolves to at least one rule id the reader can see. A chip carries its
+    // kind and then its affordance, so the class list continues past the kind.
+    const chips = [...HTML.matchAll(/class="eval-chip is-(?:finding|evidence|eye_test|angle)\b/g)];
     expect(chips.length).toBeGreaterThan(50);
     expect(HTML).not.toContain('is-unresolved');
   });
@@ -491,8 +492,8 @@ describe('the summary block, row by row (addendum)', () => {
   });
 
   it('states the placement as a single badge', () => {
-    expect(SUMMARY).toContain(`eval-badge is-${FIXTURE.draft.placement.recommended}`);
-    expect([...SUMMARY.matchAll(/class="eval-badge /g)]).toHaveLength(1);
+    expect(SUMMARY).toContain(`eval-focal-badge is-${FIXTURE.draft.placement.recommended}`);
+    expect([...SUMMARY.matchAll(/class="eval-focal-badge /g)]).toHaveLength(1);
   });
 
   /*
