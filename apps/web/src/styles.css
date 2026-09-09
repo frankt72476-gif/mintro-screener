@@ -3885,3 +3885,22 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
   font-family:'JetBrains Mono', monospace;font-size:11px;line-height:1.6;
   white-space:pre-wrap;overflow-x:auto;color:var(--ink-mid);
 }
+
+/* ---------- publish (D-261) ---------- */
+.eval-editor-publish{
+  font:inherit;font-size:12px;font-weight:600;letter-spacing:.02em;
+  border-radius:6px;padding:7px 16px;cursor:pointer;
+  background:var(--jade);border:1px solid var(--jade);color:#fff;
+}
+.eval-editor-publish:disabled{opacity:.6;cursor:default}
+.eval-publish-state{
+  max-width:840px;margin:0 auto 12px;font-size:12px;color:var(--ink-mid);
+}
+.eval-publish-state.is-done{color:var(--jade);font-weight:600}
+
+/* A published version says so where a draft says Draft. */
+.eval-stamp.is-published{
+  color:var(--jade);background:color-mix(in srgb, var(--jade) 10%, var(--card));
+  border-color:color-mix(in srgb, var(--jade) 40%, var(--line));
+  letter-spacing:.04em;text-transform:none;
+}

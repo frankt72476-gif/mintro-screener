@@ -315,6 +315,98 @@ describe('the operator note is its own section under the placement paragraph', (
   });
 });
 
+/* ── the published masthead ───────────────────────────────────────────────────────────────────── */
+
+/*
+  A published version says so where a draft says Draft.
+
+  The masthead's one variable, and the two cannot both be true. A document with no stamp at all is
+  the one a reader mistakes for sent, so there is always exactly one.
+*/
+describe('a published version replaces the Draft stamp', () => {
+  const published = renderToStaticMarkup(
+    createElement(EvaluationReport, {
+      draft: DRAFT,
+      run: RUN,
+      access: ACCESS,
+      labels: LABELS,
+      published: { at: '2026-09-09T14:30:00Z', operator: 'Frank Thomas', version: 2 },
+    }),
+  );
+
+  it('says Draft while there is no published version', () => {
+    expect(text(READ_ONLY)).toContain('Draft');
+    expect(READ_ONLY).toContain('class="eval-stamp"');
+  });
+
+  it('names the version, the date and the operator instead', () => {
+    const body = text(published);
+    expect(body).toContain('Version 2');
+    expect(body).toContain('Frank Thomas');
+    expect(body).toMatch(/published \d/);
+  });
+
+  it('drops the word Draft entirely, so the two cannot be read together', () => {
+    const masthead = published.slice(0, published.indexOf('eval-standing'));
+    expect(text(masthead)).not.toContain('Draft');
+    expect(published).toContain('eval-stamp is-published');
+  });
+
+  it('renders one stamp either way, never none and never two', () => {
+    expect([...READ_ONLY.matchAll(/class="eval-stamp/g)]).toHaveLength(1);
+    expect([...published.matchAll(/class="eval-stamp/g)]).toHaveLength(1);
+  });
+});
+
+/* ── publish ──────────────────────────────────────────────────────────────────────────────────── */
+
+/*
+  Publish is a queue row, and the worker answers it.
+
+  The browser could run `publishRefusal` and then call the function — the first cut did — and that
+  put the only real guard on the far side of the thing being gated. Asserted against the source for
+  the same reason regenerate is: there is no DOM here and no database, and what would go wrong is
+  the editor reaching past the queue.
+*/
+describe('publish asks rather than writes', () => {
+  const EDITOR = readFileSync('apps/web/src/components/EvaluationEditor.tsx', 'utf8');
+
+  it('inserts a queued publish request', () => {
+    expect(EDITOR).toContain("from('evaluation_publish_requests')");
+    expect(EDITOR).toMatch(/evaluation_publish_requests'\)\s*\.insert\(\{[^}]*status: 'queued'/s);
+  });
+
+  it('never calls publish_evaluation, and never writes the published row itself', () => {
+    expect(EDITOR).not.toContain("rpc('publish_evaluation'");
+    expect(EDITOR).not.toMatch(/from\('evaluations'\)[\s\S]{0,120}\.insert\(/);
+    expect(EDITOR).not.toMatch(/from\('evaluation_drafts'\)[\s\S]{0,120}\.delete\(/);
+  });
+
+  it('is answered by the worker, which validates before it writes', () => {
+    const job = readFileSync('apps/worker/src/evaluationPublishJob.ts', 'utf8');
+    expect(job).toContain('publishRefusal');
+    expect(job).toContain('runContextFor');
+    /*
+      The refusal returns before the RPC, so no write happens on a refused publish.
+
+      Both halves asserted. The first version compared indexes alone, and deleting the branch made
+      `indexOf` return -1 — which is less than any index, so the test went green on the mutation it
+      existed to catch. A position is only meaningful once the thing is known to be there.
+    */
+    const guard = job.indexOf('if (refusal !== null) return');
+    const write = job.indexOf("rpc('publish_evaluation'");
+    expect(guard).toBeGreaterThan(-1);
+    expect(write).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(write);
+  });
+
+  it('is drained by the worker loop', () => {
+    const loop = readFileSync('apps/worker/bin/worker.ts', 'utf8');
+    expect(loop).toContain('claimNextPublish');
+    expect(loop).toContain('finishPublish');
+  });
+});
+
 /* ── regenerate ───────────────────────────────────────────────────────────────────────────────── */
 
 /*

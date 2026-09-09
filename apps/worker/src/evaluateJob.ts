@@ -216,14 +216,21 @@ export function inputHash(
  * What a draft is checked against: the ids it may cite, the legality block it must echo, and the
  * conditions that gate `domestic`.
  *
+ * Typed on the three fields it reads rather than on the whole of `EvaluationInputs`. The publish
+ * job has findings, evidence and eye-test verdicts and no pages at all, and it must build the
+ * context **through this function** — a second builder would be the derivation drift D-216 names,
+ * in the one place where the two copies decide whether a document may be sent.
+ *
  * `knownHandles` is filled in by the caller that has the mapping — `runContextFor` cannot build it
  * without assigning handles, and assigning them twice would be two assignments that happen to
  * match. It is empty here and populated in `generateDraft`.
  */
+export type RunContextInputs = Pick<EvaluationInputs, 'findings' | 'evidence' | 'eyeTest'>;
+
 export function runContextFor(
   angles: AngleSet,
   ruleset: Ruleset,
-  inputs: EvaluationInputs,
+  inputs: RunContextInputs,
   knownHandles: ReadonlySet<string> = new Set(),
 ): RunContext {
   /** Findings on a set of rules. The scope maps are all this, over different rule lists. */

@@ -33,7 +33,11 @@
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ScreeningReport } from '@mintro/engine';
-import { EvaluationReport, type EvaluationEdit } from './EvaluationReport.js';
+import {
+  EvaluationReport,
+  type EvaluationEdit,
+  type PublishedBy,
+} from './EvaluationReport.js';
 import { EvaluationEvidence, EvaluationNotChecked, anchoredRuleIds } from './EvaluationEvidence.js';
 import { EvidenceDisclosureProvider } from './EvidenceDisclosure.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
@@ -65,10 +69,37 @@ type Load =
       readonly row: DraftRow;
       readonly run: EvaluationRunContext;
       readonly report: ScreeningReport | null;
+      /** The newest published version, or `null` while the run is still a draft. */
+      readonly published: PublishedRow | null;
     };
 
 /** What Save is doing, so the button says it rather than appearing inert. */
 type Saving = 'idle' | 'saving' | 'saved' | { readonly failed: string };
+
+/**
+ * The publish request, as the editor watches it.
+ *
+ * Publishing is a queue row and the worker answers it, so the button cannot report the outcome —
+ * it can only say that the question was asked. This is what the answer looks like when it lands.
+ */
+interface PublishRow {
+  readonly id: string;
+  readonly status: string;
+  readonly refusal: string | null;
+  readonly error: string | null;
+  readonly evaluation_id: string | null;
+}
+
+/** A published version, as the masthead needs it. */
+interface PublishedRow {
+  readonly version: number;
+  readonly content: StoredDraft;
+  readonly published_at: string;
+  readonly analysts: { readonly full_name: string | null; readonly email: string } | null;
+}
+
+/** How long between polls of the publish request. The job is seconds, not minutes. */
+const POLL_MS = 2_000;
 
 export function EvaluationEditor({
   client,
@@ -97,17 +128,44 @@ export function EvaluationEditor({
   const [draft, setDraft] = useState<StoredDraft | null>(null);
   const [saving, setSaving] = useState<Saving>('idle');
   const [regenerating, setRegenerating] = useState(false);
+  const [publishing, setPublishing] = useState<PublishRow | null>(null);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     let live = true;
     void (async () => {
-      const [draftRead, runRead, findingsRead, evidenceRead] = await Promise.all([
+      const [draftRead, publishedRead, runRead, findingsRead, evidenceRead] = await Promise.all([
         client
           .from('evaluation_drafts')
           .select(
             'content, handles, validator_status, validator_message, ruleset_version, angles_version, model, edited_at',
           )
           .eq('run_id', runId)
+          .maybeSingle(),
+        /*
+          The newest published version.
+
+          Read alongside the draft rather than instead of it: publishing deletes the draft, so a run
+          that has been published has one of these and no draft, and a run mid-edit has the reverse.
+          Reading both in one round trip means the screen never shows "no evaluation" for a document
+          that exists.
+        */
+        client
+          .from('evaluations')
+          /*
+            The relationship is named, not inferred.
+
+            PostgREST resolves an unnamed embed by looking for exactly one foreign key between the
+            two tables, and answers PGRST201 — failing the whole query — the day a second one
+            arrives. D-213 is that bug, and `embeds.test.ts` reads this line out of the source and
+            asks the database about it.
+          */
+          .select(
+            'version, content, published_at, analysts!evaluations_published_by_fkey (full_name, email)',
+          )
+          .eq('run_id', runId)
+          .order('version', { ascending: false })
+          .limit(1)
           .maybeSingle(),
         client.from('runs').select('report').eq('id', runId).maybeSingle(),
         client.from('findings').select('id, rule_id, state, evidence_key').eq('run_id', runId),
@@ -120,14 +178,29 @@ export function EvaluationEditor({
         setLoad({ status: 'error', message: draftRead.error.message });
         return;
       }
-      // No draft is not an error. Most runs have never been evaluated, and this screen sits above
-      // a report that stands on its own.
-      if (draftRead.data === null) {
+      const publishedRow = (publishedRead.data as unknown as PublishedRow | null) ?? null;
+
+      // No draft and no published version is not an error. Most runs have never been evaluated, and
+      // this screen sits above a report that stands on its own.
+      if (draftRead.data === null && publishedRow === null) {
         setLoad({ status: 'absent' });
         return;
       }
 
-      const row = draftRead.data as unknown as DraftRow;
+      /*
+        A published run has no draft. The row below is the draft's metadata, and a published version
+        carries its own — so the versions and the model come off whichever exists.
+      */
+      const row = (draftRead.data as unknown as DraftRow | null) ?? {
+        content: publishedRow!.content,
+        handles: null,
+        validator_status: 'ok',
+        validator_message: null,
+        ruleset_version: '',
+        angles_version: '',
+        model: '',
+        edited_at: null,
+      };
       const report = (runRead.data as { report?: ScreeningReport } | null)?.report ?? null;
 
       setDraft(row.content);
@@ -135,6 +208,7 @@ export function EvaluationEditor({
         status: 'ready',
         row,
         report,
+        published: publishedRow,
         run: {
           runId,
           merchantDomain: report?.merchantDomain ?? null,
@@ -162,7 +236,7 @@ export function EvaluationEditor({
     return () => {
       live = false;
     };
-  }, [client, runId]);
+  }, [client, runId, reloads]);
 
   const save = useCallback(async () => {
     if (draft === null) return;
@@ -173,6 +247,59 @@ export function EvaluationEditor({
     });
     setSaving(error === null ? 'saved' : { failed: error.message });
   }, [client, draft, runId]);
+
+  /*
+    Publish asks; the worker answers.
+
+    The row is the whole of what this does. `publishRefusal` runs in the worker against the run —
+    there is no path to `publish_evaluation` that has not been through it — so the button cannot
+    know the outcome and does not pretend to. It inserts, then watches.
+  */
+  const publish = useCallback(async () => {
+    const { data, error } = await client
+      .from('evaluation_publish_requests')
+      .insert({ run_id: runId, requested_by: analystId, status: 'queued' })
+      .select('id, status, refusal, error, evaluation_id')
+      .single();
+
+    if (error !== null) {
+      setSaving({ failed: error.message });
+      return;
+    }
+    setPublishing(data as unknown as PublishRow);
+  }, [analystId, client, runId]);
+
+  /*
+    Watching the request.
+
+    Polled rather than subscribed, for the reason the scan already is: a realtime channel is more
+    machinery for the same half-minute, and this one is seconds. It stops the moment the row settles.
+  */
+  useEffect(() => {
+    if (publishing === null) return;
+    if (publishing.status !== 'queued' && publishing.status !== 'running') return;
+
+    let live = true;
+    const timer = setInterval(() => {
+      void (async () => {
+        const { data } = await client
+          .from('evaluation_publish_requests')
+          .select('id, status, refusal, error, evaluation_id')
+          .eq('id', publishing.id)
+          .maybeSingle();
+        if (!live || data === null) return;
+        const row = data as unknown as PublishRow;
+        setPublishing(row);
+        // Published: the draft is gone and a version exists. Re-read rather than guess.
+        if (row.status === 'done') setReloads((n) => n + 1);
+      })();
+    }, POLL_MS);
+
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [client, publishing]);
 
   const regenerate = useCallback(async () => {
     setRegenerating(true);
@@ -219,6 +346,15 @@ export function EvaluationEditor({
     );
   }
 
+  /*
+    A published run has no draft, so nothing is editable and nothing is published again from here.
+
+    The controls are absent rather than disabled: there is no draft to save, and a re-publish is a
+    new draft rather than a second press of this button (0076 — a re-review produces its own
+    version).
+  */
+  const draftIsLive = load.published === null || load.row.edited_at !== null;
+
   const report = load.report;
   const appendix =
     report === null ? null : (
@@ -239,7 +375,15 @@ export function EvaluationEditor({
         />
       )}
 
-      {canEdit && (
+      {/*
+        The publish request's answer, in place.
+
+        A refusal is the validator's own words and the draft is untouched — the operator repairs the
+        document here and asks again, which is why a refused draft keeps its content at all.
+      */}
+      {publishing !== null && <PublishState row={publishing} />}
+
+      {canEdit && draftIsLive && (
         <div className="eval-editor-bar">
           <button type="button" className="eval-editor-save" onClick={() => void save()} disabled={saving === 'saving'}>
             {saving === 'saving' ? 'Saving…' : 'Save'}
@@ -252,6 +396,21 @@ export function EvaluationEditor({
           >
             {regenerating ? 'Queued…' : 'Regenerate'}
           </button>
+          {/*
+            Publish is offered on an accepted draft only. A rejected one is repaired first, and a
+            button that queued a request the worker would refuse would be a round trip to learn what
+            the screen already says.
+          */}
+          {load.row.validator_status === 'ok' && (
+            <button
+              type="button"
+              className="eval-editor-publish"
+              onClick={() => void publish()}
+              disabled={publishing !== null && publishing.status !== 'refused' && publishing.status !== 'failed'}
+            >
+              Publish
+            </button>
+          )}
           <span className="eval-editor-state">
             {saving === 'saved' && 'Saved.'}
             {typeof saving === 'object' && `Not saved: ${saving.failed}`}
@@ -267,9 +426,57 @@ export function EvaluationEditor({
           access={access}
           labels={labels}
           appendix={appendix}
-          {...(edit === undefined ? {} : { edit })}
+          {...(edit === undefined || !draftIsLive ? {} : { edit })}
+          {...(load.published === null || draftIsLive
+            ? {}
+            : { published: publishedBy(load.published) })}
         />
       </EvidenceDisclosureProvider>
+    </div>
+  );
+}
+
+/** The masthead's published line, from the row. */
+function publishedBy(row: PublishedRow): PublishedBy {
+  return {
+    at: row.published_at,
+    // The name where there is one, and the address where there is not. Never a uuid: that looks
+    // like information and is not (`internalIdentity.ts`).
+    operator: row.analysts?.full_name ?? row.analysts?.email ?? 'a Mintro operator',
+    version: row.version,
+  };
+}
+
+/**
+ * What the worker said about a publish request.
+ *
+ * Three outcomes and three sentences. `refused` is the validator's own words and the draft is
+ * untouched; `failed` is the job not running and says nothing about the document — the D-044
+ * distinction the queue's own columns already make.
+ */
+function PublishState({ row }: { readonly row: PublishRow }): JSX.Element | null {
+  if (row.status === 'queued' || row.status === 'running') {
+    return <p className="eval-publish-state">Publishing… the worker is re-validating the document.</p>;
+  }
+  if (row.status === 'done') {
+    return <p className="eval-publish-state is-done">Published.</p>;
+  }
+  if (row.status === 'refused') {
+    return (
+      <div className="eval-refused">
+        <p className="eval-refused-head">
+          <strong>Not published.</strong> The draft is unchanged — repair it here and publish again.
+        </p>
+        <pre className="eval-refused-why">{row.refusal}</pre>
+      </div>
+    );
+  }
+  return (
+    <div className="eval-refused">
+      <p className="eval-refused-head">
+        <strong>The publish job did not run.</strong> Nothing was decided about the document.
+      </p>
+      {row.error !== null && <pre className="eval-refused-why">{row.error}</pre>}
     </div>
   );
 }

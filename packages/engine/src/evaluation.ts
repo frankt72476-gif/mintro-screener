@@ -1033,13 +1033,44 @@ export function publishRefusal(
   }
 
   const validation = validateDraft(draft, run);
-  if (validation.ok) return null;
+  if (!validation.ok) {
+    return (
+      `This draft no longer validates: ${validation.rejections.length} reason(s). ` +
+      'It passed when it was generated, so either it was edited or the run it cites has changed.\n' +
+      validation.rejections.map((r) => `- ${r.at}: ${r.message}`).join('\n')
+    );
+  }
 
-  return (
-    `This draft no longer validates: ${validation.rejections.length} reason(s). ` +
-    'It passed when it was generated, so either it was edited or the run it cites has changed.\n' +
-    validation.rejections.map((r) => `- ${r.at}: ${r.message}`).join('\n')
-  );
+  /*
+    `domestic` is stricter at publish than in a draft, and deliberately.
+
+    A draft may **propose** domestic over the two conditions the application answers — order minimum
+    and monthly processing volume — by saying they must hold. That is a conditional recommendation,
+    and the report states the condition rather than the conclusion (D-260).
+
+    A published evaluation is not a proposal. It is the document that goes to an underwriter under
+    Mintro's name, and it is immutable once written: nobody comes back to add "…provided the two
+    application answers hold". By the time an operator publishes they have the application in front
+    of them and the editor lets them record both, so the answer exists — this refuses publishing
+    without it rather than publishing a conditional as a statement.
+
+    Every row, not only the observable ones. That is the difference from
+    `domestic_with_unmet_routing`, which is the draft-time rule and exempts the two by design.
+  */
+  if (draft.placement.recommended === 'domestic') {
+    const open = draft.routing.filter((row) => row.status !== 'met');
+    if (open.length > 0) {
+      return (
+        `This recommends 'domestic' with ${open.length} routing condition(s) not met: ` +
+        `${open.map((row) => `${row.conditionId} (${row.status})`).join(', ')}.\n` +
+        'A draft may propose domestic over the conditions the application answers, saying they must ' +
+        'hold. A published evaluation states it, and cannot be amended afterwards — record the ' +
+        'answers you have, or publish the placement that is available today.'
+      );
+    }
+  }
+
+  return null;
 }
 
 /**

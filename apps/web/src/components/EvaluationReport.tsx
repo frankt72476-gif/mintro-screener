@@ -124,6 +124,21 @@ interface Props {
    * a document with no controls in it at all — not disabled controls, absent ones.
    */
   readonly edit?: EvaluationEdit;
+  /**
+   * Set on a published version, absent on a draft (D-261).
+   *
+   * The masthead's one variable. A draft is stamped **Draft**; a published version says when it was
+   * published and by whom, which is what the layout memo asks a masthead to carry and what a draft
+   * has no answer for. Both cannot be true, and the type says so: this is present or the stamp is.
+   */
+  readonly published?: PublishedBy;
+}
+
+/** Who published a version, and when. */
+export interface PublishedBy {
+  readonly at: string;
+  readonly operator: string;
+  readonly version: number;
 }
 
 /**
@@ -144,8 +159,16 @@ export function EvaluationReport({
   labels,
   appendix,
   edit,
+  published,
 }: Props): JSX.Element {
-  const shared = { draft, run, access, labels, ...(edit === undefined ? {} : { edit }) };
+  const shared = {
+    draft,
+    run,
+    access,
+    labels,
+    ...(edit === undefined ? {} : { edit }),
+    ...(published === undefined ? {} : { published }),
+  };
   const summary = useRef<HTMLElement>(null);
   return (
     <article className="evaluation" id={TOP_ANCHOR}>
@@ -234,6 +257,7 @@ function SummaryBlock({
   labels,
   anchor,
   edit,
+  published,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
@@ -241,6 +265,7 @@ function SummaryBlock({
   readonly labels: EvaluationLabels;
   readonly anchor: RefObject<HTMLElement>;
   readonly edit?: EvaluationEdit;
+  readonly published?: PublishedBy;
 }): JSX.Element {
   return (
     <section className="panel eval-summary" ref={anchor}>
@@ -248,13 +273,24 @@ function SummaryBlock({
         <div className="eval-masthead-top">
           <h1 className="eval-domain">{run.merchantDomain ?? 'unknown domain'}</h1>
           {/*
-            Unconditional, because this component is typed on `StoredDraft` and every caller it has
-            renders a draft. When publishing lands (D-258) this becomes the draft/published
-            distinction and the masthead gains the published date and operator name the layout memo
-            asks for; until then a label that could say "Draft" or nothing would have no second
-            state to be, and a document with no stamp at all is the one a reader mistakes for sent.
+            The stamp, or what replaced it.
+
+            This said "Draft" unconditionally and carried a note that publishing would make it a
+            distinction. It has. A draft says Draft; a published version says its version, when it
+            was published and who published it — the three things the layout memo's masthead asks
+            for and a draft has no answer to.
+
+            One or the other, never both and never neither: a document with no stamp at all is the
+            one a reader mistakes for sent.
           */}
-          <span className="eval-stamp">Draft</span>
+          {published === undefined ? (
+            <span className="eval-stamp">Draft</span>
+          ) : (
+            <span className="eval-stamp is-published">
+              Version {published.version} · published {formatStamp(published.at)} by{' '}
+              {published.operator}
+            </span>
+          )}
         </div>
         <p className="eval-standing">
           Mintro reviewed the public pages of this site and formed a view of what the business is

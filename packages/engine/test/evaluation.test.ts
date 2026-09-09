@@ -751,6 +751,87 @@ describe('publishRefusal', () => {
   });
 
   /*
+    `domestic` is stricter at publish than in a draft, and that is the whole difference between a
+    proposal and a statement.
+
+    A draft may propose domestic over the two conditions the application answers, saying they must
+    hold. A published evaluation is immutable — nobody comes back to add "provided the application
+    answers hold" — so the answers exist before it is written, or it is not written.
+  */
+  describe('domestic needs every condition met, not only the observable ones', () => {
+    const clean = { ...RUN, legality: { clean: true, items: [] } };
+
+    const domestic = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>) =>
+      mutate((d) => ({
+        ...d,
+        legality: { clean: true, items: [] },
+        placement: {
+          ...d.placement,
+          spectrum: 'research_supplier' as const,
+          recommended: 'domestic' as const,
+        },
+        routing: d.routing.map((r) => ({
+          ...r,
+          status: statuses[r.conditionId] ?? ('met' as const),
+          citations: [],
+        })),
+      }));
+
+    it('publishes when all five are met', () => {
+      expect(publishRefusal(domestic({}), 'ok', clean)).toBeNull();
+    });
+
+    /*
+      The case the draft rule lets through and this one does not. `validateDraft` accepts it — that
+      is asserted here so the two rules are visibly different rather than accidentally the same.
+    */
+    it('refuses over an unobserved application condition the draft rule permits', () => {
+      const draft = domestic({ order_minimum_150: 'not_observable' });
+      expect(validateDraft(draft, clean)).toEqual({ ok: true });
+
+      const refusal = publishRefusal(draft, 'ok', clean);
+      expect(refusal).toContain('order_minimum_150');
+      expect(refusal).toContain('not_observable');
+      expect(refusal).toContain('cannot be amended afterwards');
+    });
+
+    it.each(CONDITION_IDS)('refuses over %s left unobserved', (conditionId) => {
+      expect(publishRefusal(domestic({ [conditionId]: 'not_observable' }), 'ok', clean)).not.toBeNull();
+    });
+
+    it('says nothing about international or referred out', () => {
+      for (const recommended of ['international'] as const) {
+        const draft = mutate((d) => ({
+          ...d,
+          legality: { clean: true, items: [] },
+          placement: { ...d.placement, recommended },
+        }));
+        expect(publishRefusal(draft, 'ok', clean), recommended).toBeNull();
+      }
+    });
+  });
+
+  /*
+    A refusal is a value, not a write.
+
+    `publishRefusal` is pure and takes the draft by reference; the worker writes only when it
+    returns null. This is the half of "a refused publish leaves the draft untouched" that lives
+    here — the other half is the worker never reaching `publish_evaluation`, which is a branch in
+    `runPublish`.
+  */
+  it('leaves the draft exactly as it was when it refuses', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, recommended: 'domestic' as const },
+    }));
+    const before = JSON.stringify(draft);
+
+    expect(publishRefusal(draft, 'ok', { ...RUN, legality: { clean: true, items: [] } })).not.toBeNull();
+    expect(JSON.stringify(draft)).toBe(before);
+  });
+
+  /*
     The case the stored verdict cannot cover: an operator edited the draft after it validated.
     Nothing else checks an edit, so publishing has to.
   */

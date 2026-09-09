@@ -17053,3 +17053,95 @@ the prompt only implies costs a retry to teach, and a prompt that restated the r
 would be the ratified rule and the sent rule agreeing by coincidence — the defect this repository
 has hit in four separate places.
 
+## D-261 — Operator notes, the publish gate, and publishing behind the worker
+**2026-09-09 · architect**
+
+Cluster 3 of the D-256 evaluation model: the operator editor and the publish path. Three rulings.
+
+### Operator notes are a separate field, in a separate voice
+
+`operatorNote` is an optional string on the draft, rendered as its own labelled section under the
+placement paragraph. It is **absent from the answer schema and from the prompt**, so a generation
+cannot produce one and a regeneration cannot overwrite one — the model's work is replaced and the
+operator's is left beside it.
+
+Folding it into the placement paragraph was the alternative and it is worse in both directions: a
+reader could not tell the model's sentences from a person's, and Regenerate would silently take the
+operator's words with it.
+
+**The word list is the narrowest of the three.** `OPERATOR_NOTE_WORDS` is `fee`, `fees`,
+`basis point`, `basis points`, `bps`, `cheaper`, `expensive` — the vocabulary of what a *solution*
+costs, and nothing else. The first version added `rate` and every word `MINTRO_COST_WORDS` holds,
+and that was the D-260 correction made twice: `price`, `cost` and `rate` are what an operator
+reaches for when writing about the merchant — *their prices are consumer-facing*, *cost per unit is
+listed*, *the chargeback rate came up on the call* — so refusing them refuses the honest note far
+more often than the forbidden one. `discount` is permitted for the same reason it is permitted in a
+shore-up.
+
+The note is Mintro's prose on the first screen of a document an underwriter reads, so the list is
+not empty. It is as short as it can be while still catching a comparison between two solutions.
+
+### Editing and publishing are the host organisation's
+
+Not a capability flag. `can_submit_to_iqwallet` gates sending and `showsMarkReadyAction` is its
+complement, so "the permission that gates marking ready and sending" is two permissions rather than
+one. The question here is different: the evaluation states **Mintro's** view under Mintro's name
+(D-256), so a partner analyst reads it and cannot change it. `current_admin_can_edit_evaluation()`
+is `current_admin_is_host()`, named once because three call sites ask it.
+
+Three layers, and only one is a gate. The React client hides the controls (`showsEvaluationEditing`);
+`edit_evaluation_draft` refuses a non-host caller; `evaluation_publish_requests_insert` refuses one
+too. The first is cosmetic and the other two resolve the capability from `auth.uid()`, never from a
+value the client passed — 0075 said the edit would arrive as a function for exactly this reason.
+
+### Publishing runs in the worker, because the validator lives in TypeScript
+
+`publishRefusal` re-validates the edited content against the run it cites: which findings exist,
+which angle may cite what, whether every handle in a paragraph resolves in the stored mapping. Those
+are relations between two documents and the one implementation of them is `validateDraft`.
+
+**The first cut had the browser run it and then call `publish_evaluation`.** That put the only real
+guard on the far side of the thing being gated — a caller with a REST client and a token skips the
+client and calls the function, which is the reasoning 0069 opens with and the reason there is no
+HTTP API in front of this database.
+
+**Restating the rules in PL/pgSQL was the other way out, and it is worse.** It would be a second
+implementation of the one thing in this system that must have exactly one, and the two would drift
+on the first rule change. That is the derivation drift D-216 names, sitting on the decision of
+whether a document may be sent — the highest-stakes place in the system for two answers to one
+question. The publish job builds its run context **through `runContextFor`**, the same function the
+generator uses, whose parameter was narrowed to the three fields it reads so that reuse needs no
+second builder.
+
+So publish is a queue row (0083). The operator asks; the worker validates and writes;
+`publish_evaluation` is granted to nobody, so there is no path to it that has not been through the
+validator.
+
+**Refused is not failed.** A refusal is the validator saying no: the draft is untouched, the reasons
+are on the request row, the operator repairs the document and asks again. A failure is the job not
+running, and says nothing about the document. Folding them together would tell an operator to retry
+a job that worked, or hide a job that never ran behind a document that was merely refused — the
+D-044 distinction, made again because the alternative is a lie about whose fault something is.
+
+#### `domestic` is stricter at publish than in a draft
+
+A draft may **propose** domestic over the two conditions the application answers, by saying they
+must hold; the report states the condition rather than the conclusion (D-260). A published
+evaluation is immutable and **states** rather than proposes — nobody comes back to add "provided the
+application answers hold". By the time an operator publishes they have the application in front of
+them and the editor records both answers, so `publishRefusal` requires all five conditions `met`,
+and `publish_evaluation` requires it again over the stored jsonb.
+
+#### The capture of a published evaluation is refused on purpose
+
+`captureRunReport` renders the built app's print route, and that route renders `ReportView` — the
+checklist. It knows nothing about the evaluation layout. Running it against a published evaluation
+would produce a valid capture of the **wrong document** and file it as the evaluation's artifact,
+which is what a send links to. The failure would not be a missing file; it would be an underwriter
+opening "the evaluation" and reading a rule checklist, on a job that reported success.
+
+So `evaluationCaptureRefusal()` returns a reason, the request goes to `failed` with it, and nothing
+is written. The published version is unaffected and stays readable without a capture, which is a
+true statement about where this system is. Cluster 4 replaces that function with a render against
+the evaluation route; nothing else changes.
+

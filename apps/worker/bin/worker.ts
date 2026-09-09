@@ -62,6 +62,12 @@ import { claimNextUpload, runUpload } from '../src/uploadJob.js';
 import { refuseIfRevoked } from '../src/capabilityGate.js';
 import { claimNextEyeTest, runEyeTestJob } from '../src/eyeTestJob.js';
 import { claimNextEvaluation, finishEvaluation } from '../src/evaluationRequestJob.js';
+import {
+  claimNextEvaluationCapture,
+  evaluationCaptureRefusal,
+  finishEvaluationCapture,
+} from '../src/evaluationCaptureJob.js';
+import { claimNextPublish, finishPublish, runPublish } from '../src/evaluationPublishJob.js';
 import { runEvaluationRequest } from '../src/evaluationRun.js';
 import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
 import {
@@ -510,6 +516,43 @@ async function main(argv: readonly string[]): Promise<number> {
       if (evaluation !== null) {
         const failure = await runEvaluationRequest(supabase, evaluation.run_id);
         await finishEvaluation(supabase, evaluation.id, failure);
+        continue;
+      }
+
+      /*
+        An operator asked to publish (D-261).
+
+        The validation is here rather than in the browser, so there is no path to
+        `publish_evaluation` that has not been through `publishRefusal`. Ahead of the capture below
+        because it is what produces one.
+      */
+      const publishRequest = await claimNextPublish(supabase, STALE_CLAIM_MS);
+      if (publishRequest !== null) {
+        const outcome = await runPublish(supabase, publishRequest);
+        console.log(
+          outcome.kind === 'published'
+            ? `  published run ${publishRequest.run_id} as version ${outcome.version}`
+            : `  publish ${publishRequest.id} ${outcome.kind}`,
+        );
+        await finishPublish(supabase, publishRequest.id, outcome);
+        continue;
+      }
+
+      /*
+        A published evaluation's capture — refused, on purpose, until cluster 4 (D-261).
+
+        The capture route renders the checklist report. Running it here would file a document with
+        no summary block and no angles as the evaluation itself, and the send path links to that
+        file. So the row fails with the reason, nothing is written, and the published version stays
+        readable without one.
+      */
+      const evaluationCapture = await claimNextEvaluationCapture(supabase, STALE_CLAIM_MS);
+      if (evaluationCapture !== null) {
+        const refusal = evaluationCaptureRefusal();
+        if (refusal !== null) {
+          console.error(`  evaluation capture ${evaluationCapture.id} refused: ${refusal}`);
+          await finishEvaluationCapture(supabase, evaluationCapture.id, { failure: refusal });
+        }
         continue;
       }
 
