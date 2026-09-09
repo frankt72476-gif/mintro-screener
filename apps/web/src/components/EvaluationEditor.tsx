@@ -331,7 +331,35 @@ export function EvaluationEditor({
   );
 
   if (load.status === 'loading') return null;
-  if (load.status === 'absent') return null;
+  /*
+    No draft, and this is the whole report now (D-262).
+
+    It used to return null and let `ReportView` fill the screen. `ReportView` is not mounted here
+    any more, so returning null would leave a finished run showing nothing at all — a reader with no
+    way to tell an unevaluated run from a broken screen. It says which, and offers the one thing
+    that changes it.
+  */
+  if (load.status === 'absent') {
+    return (
+      <div className="eval-empty">
+        <p className="eval-empty-head">No evaluation drafted yet.</p>
+        <p className="eval-empty-sub">
+          The run is finished and its findings are stored. Generating reads them, with the pages the
+          crawl captured, and drafts the evaluation for review.
+        </p>
+        {canEdit && (
+          <button
+            type="button"
+            className="eval-editor-regen"
+            onClick={() => void regenerate()}
+            disabled={regenerating}
+          >
+            {regenerating ? 'Queued…' : 'Generate'}
+          </button>
+        )}
+      </div>
+    );
+  }
   if (load.status === 'error') {
     return <div className="empty">The evaluation draft could not be read: {load.message}</div>;
   }

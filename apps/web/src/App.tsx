@@ -14,10 +14,9 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
-import { matchesEvaluationPreview } from './lib/evaluationRoute.js';
 import { EvaluationEditor } from './components/EvaluationEditor.js';
+import { RunActions } from './components/RunActions.js';
 import { EVALUATION_LABELS } from './lib/evaluationLabels.js';
-import { EvaluationPreview } from './components/EvaluationPreview.js';
 import { AccessLogPane, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
@@ -75,7 +74,6 @@ import { MARK_READY_NOTE, homeShape, reviewStateLabel } from './lib/homeShape.js
 import { createReviewPath, type ReviewState } from './lib/reviewPath.js';
 import { Disclosure, PartnerEmptyState } from './components/PartnerNotes.js';
 import { NotAvailable } from './components/NotAvailable.js';
-import { AttestationForm } from './components/Attestations.js';
 import { recordAnswer, recordComment } from './lib/operatorAnswers.js';
 import type { InFlightRun } from './lib/domainGroups.js';
 import type { RunList } from './lib/runs.js';
@@ -350,28 +348,6 @@ function AnalystWorkspace(): JSX.Element {
     );
   }
 
-  /*
-    The evaluation preview — temporary, unlinked, analyst-only.
-
-    Here rather than in `Screener` because it is a whole screen rather than a pane, which is the
-    same reason the two above are here. No `ownsTheAccount` guard: these are drafts of screening
-    work and every analyst does that work, where administration is the owner's alone. The row is
-    gated by RLS on `is_analyst()` regardless of what this branch decides.
-
-    It exists so the rendering can be looked at against real drafts while the operator surface is
-    built, and it goes when that lands.
-  */
-  const evaluationRun = matchesEvaluationPreview(path);
-  if (evaluationRun !== null) {
-    return (
-      <EvaluationPreview
-        client={state.client}
-        runId={evaluationRun}
-        access={createEvidenceAccess(state.client)}
-      />
-    );
-  }
-
   return <Screener client={state.client} analyst={state.analyst} />;
 }
 
@@ -586,7 +562,6 @@ function Screener({
   const [reviewState, setReviewState] = useState<ReviewState>('unknown');
   const [marking, setMarking] = useState(false);
   const invites = useMemo(() => createInviteQueue(client, analyst.id), [client, analyst.id]);
-  const [inviting, setInviting] = useState(false);
 
   /*
     What the merchant said about the open run (D-063).
@@ -1227,16 +1202,61 @@ function Screener({
             <>
               {quarantine !== null && <QuarantineNotice reason={quarantine} />}
               {/*
-                The evaluation, above the checklist it cites into (D-261).
+                The run, its controls, and the evaluation (D-262).
 
-                Both render, and that is deliberate for now: the evaluation is the document the
-                layout memo makes the report, and the checklist is the one every existing test,
-                send path and PDF is written against. Replacing one with the other is its own
-                commit, and doing it here would be doing it silently.
+                `ReportView` is not mounted here. The evaluation is the report — that is what D-256
+                decided and what the layout memo describes — and rendering both left one screen
+                saying the same thing twice in two vocabularies, with the checklist's masthead
+                arguing with the evaluation's.
 
+                It is not deleted. The capture route still renders it, and `AttestationSection`,
+                `CommentPane`, `EyeTestPanel`, `MerchantResponse` and `Participation` reach an
+                analyst only through it — so unmounting it here is what stops all five, in one move
+                rather than five.
+
+                `RunActions` carries what the checklist header held that the evaluation does not:
+                the domain, the date and the controls. Send, Mark ready and Re-screen had no other
+                home.
+              */}
+              <RunActions
+                report={report}
+                actions={{
+                  /*
+                    Send, or hand it to Mintro — never both, and never neither (D-230, 0070).
+
+                    Decided here from `homeShape` rather than inside the component, because it is
+                    the same decision the rail makes about the Documents Check tab. Absent, not
+                    disabled: a partner without the capability never sees Send.
+                  */
+                  ...(shape.showsSubmitAction ? { onSend: () => setSending(true) } : {}),
+                  ...(shape.showsMarkReadyAction && reviewState === 'complete'
+                    ? { onMarkReadyForReview: () => void markReady(report.runId), marking }
+                    : {}),
+                  ...(reviewState === 'ready_for_review'
+                    ? {
+                        reviewLine: shape.seesEveryOrg
+                          ? reviewStateLabel(shape)
+                          : `${reviewStateLabel(shape)}. ${MARK_READY_NOTE}`,
+                      }
+                    : {}),
+                  reportUrl: capture?.url ?? null,
+                  /*
+                    No `onInvite`. The invitation flow leaves the analyst surface with the checklist
+                    (layout memo, "What leaves the report"); `MerchantRoute` stays routable, so a
+                    link already sent still opens. Absent rather than disabled, as everything here
+                    is — there is nothing to pass, so there is nothing to get wrong.
+                  */
+                  onRescan: () => {
+                    setPane('reports');
+                    rescan(report.merchantDomain);
+                  },
+                }}
+              />
+              {/*
                 `showsEvaluationEditing` decides whether the controls are drawn, never whether the
-                writes are permitted — that is 0081, resolved from auth.uid(). It renders nothing on
-                a run with no draft.
+                writes are permitted — that is 0081, resolved from `auth.uid()`. With no draft it
+                says so and offers Generate; with a refused one it shows the refusal above the
+                document it refused.
               */}
               <EvaluationEditor
                 client={client}
@@ -1245,175 +1265,6 @@ function Screener({
                 labels={EVALUATION_LABELS}
                 analystId={analyst.id}
                 canEdit={shape.showsEvaluationEditing}
-              />
-              <ReportView
-              report={report}
-              access={access}
-                actions={{
-                  /*
-                    Send, or hand it to Mintro — never both, and never neither (D-230, 0070).
-
-                    Decided here from `homeShape` rather than inside `ReportView`, because it is the
-                    same decision the rail makes about the Documents Check tab and it belongs beside
-                    it. `showsMarkReadyAction` is written as the complement of `showsSubmitAction`,
-                    so the two cannot both be true; the state check is what stops the mark being
-                    offered on a run that has already been marked or sent.
-
-                    Absent, not disabled. A partner without the capability never sees Send.
-                  */
-                  ...(shape.showsSubmitAction ? { onSend: () => setSending(true) } : {}),
-                  ...(shape.showsMarkReadyAction && reviewState === 'complete'
-                    ? { onMarkReadyForReview: () => void markReady(report.runId), marking }
-                    : {}),
-                  ...(reviewState === 'ready_for_review'
-                    ? {
-                        /*
-                          What the state is called depends on who is reading (`reviewStateLabel`).
-                          The partner is told what happens next as well; a host member is not,
-                          because for them the next thing is their own work.
-                        */
-                        reviewLine: shape.seesEveryOrg
-                          ? reviewStateLabel(shape)
-                          : `${reviewStateLabel(shape)}. ${MARK_READY_NOTE}`,
-                      }
-                    : {}),
-                  reportUrl: capture?.url ?? null,
-                  onInvite: () => setInviting(true),
-                  /*
-                    Re-screen, where the decision is made (D-211).
-
-                    An agent decides to run it again while reading the report that made her decide.
-                    Sending her to another pane to find the button is asking her to hold the reason
-                    in her head on the way.
-                  */
-                  onRescan: () => {
-                    setPane('reports');
-                    rescan(report.merchantDomain);
-                  },
-                }}
-                {...commentaryProps(commentary, report)}
-                {...(attestations === undefined ? {} : { attestations })}
-                eyeTest={eyeTest}
-                {...({
-                      /*
-                        The same boxes the comment page offers, on the report (D-212).
-
-                        `ReportView` already accepted these; nothing rendered them for an analyst.
-                        What they write is attributed to them and never to the merchant.
-                      */
-                      commentBox: (finding: ReportFinding, ordinal?: number, reference?: string) => (
-                        <RecordBox
-                          key={`rec-${finding.ruleId}-${ordinal ?? 'x'}`}
-                          label="Record the merchant’s answer"
-                          {...(reference === undefined ? {} : { reference })}
-                          value={recordedDrafts.get(`${finding.ruleId}::${ordinal ?? 'x'}`) ?? ''}
-                          savedAt={recordedSaved.get(`${finding.ruleId}::${ordinal ?? 'x'}`)}
-                          onChange={(next: string) =>
-                            setRecordedDrafts((existing) =>
-                              new Map(existing).set(`${finding.ruleId}::${ordinal ?? 'x'}`, next),
-                            )
-                          }
-                          onSave={async () => {
-                            const key = `${finding.ruleId}::${ordinal ?? 'x'}`;
-                            const result = await recordComment(client, recorder, {
-                              runId: report.runId,
-                              ruleId: finding.ruleId,
-                              ordinal,
-                              subject: null,
-                              body: recordedDrafts.get(key) ?? '',
-                            });
-                            if (result.ok) {
-                              setRecordedSaved((e) => new Map(e).set(key, new Date().toISOString()));
-                            }
-                            return result.ok ? null : (result.error ?? 'That could not be saved.');
-                          }}
-                        />
-                      ),
-                      /*
-                        A plan per impression, recorded on the merchant's behalf (D-249).
-
-                        Same key as the merchant's own box — `(subject='eye-test', ordinal=<rubric
-                        number>)` — so an answer an analyst takes down a phone call and one the
-                        merchant types land in the same place and read back to the same line.
-                      */
-                      eyeLineCommentBox: (line: {
-                        readonly rubricId: string;
-                        readonly ordinal: number;
-                      }) => (
-                        <RecordBox
-                          key={`rec-eye-${line.rubricId}`}
-                          label="Record the merchant’s plan for this"
-                          reference={`${line.rubricId} · Mintro’s read`}
-                          value={recordedDrafts.get(`subject:eye-test:${line.ordinal}`) ?? ''}
-                          savedAt={recordedSaved.get(`subject:eye-test:${line.ordinal}`)}
-                          onChange={(next: string) =>
-                            setRecordedDrafts((existing) =>
-                              new Map(existing).set(`subject:eye-test:${line.ordinal}`, next),
-                            )
-                          }
-                          onSave={async () => {
-                            const result = await recordComment(client, recorder, {
-                              runId: report.runId,
-                              ruleId: null,
-                              ordinal: line.ordinal,
-                              subject: 'eye-test',
-                              body: recordedDrafts.get(`subject:eye-test:${line.ordinal}`) ?? '',
-                            });
-                            if (result.ok) {
-                              setRecordedSaved((e) =>
-                                new Map(e).set(`subject:eye-test:${line.ordinal}`, new Date().toISOString()),
-                              );
-                              return null;
-                            }
-                            return result.error ?? 'The plan could not be recorded.';
-                          }}
-                        />
-                      ),
-                      eyeCommentBox: () => (
-                        <RecordBox
-                          label="Record the merchant’s response to this read"
-                          value={recordedDrafts.get('subject:eye-test') ?? ''}
-                          savedAt={recordedSaved.get('subject:eye-test')}
-                          onChange={(next: string) =>
-                            setRecordedDrafts((existing) =>
-                              new Map(existing).set('subject:eye-test', next),
-                            )
-                          }
-                          onSave={async () => {
-                            const result = await recordComment(client, recorder, {
-                              runId: report.runId,
-                              ruleId: null,
-                              ordinal: undefined,
-                              subject: 'eye-test',
-                              body: recordedDrafts.get('subject:eye-test') ?? '',
-                            });
-                            if (result.ok) {
-                              setRecordedSaved((e) =>
-                                new Map(e).set('subject:eye-test', new Date().toISOString()),
-                              );
-                            }
-                            return result.ok ? null : (result.error ?? 'That could not be saved.');
-                          }}
-                        />
-                      ),
-                      questionsForm: (
-                        <AttestationForm
-                          questions={report.attestationQuestions ?? []}
-                          answers={new Map()}
-                          identified
-                          recordingFor="the merchant"
-                          onAnswer={async (questionId, _outcome, body) => {
-                            // Answers only (D-253); the box cannot produce anything else.
-                            const result = await recordAnswer(client, recorder, {
-                              runId: report.runId,
-                              questionId,
-                              body: body ?? '',
-                            });
-                            return result.ok ? null : (result.error ?? 'That could not be saved.');
-                          }}
-                        />
-                      ),
-                    })}
               />
 
               {/*
@@ -1479,22 +1330,14 @@ function Screener({
         />
       )}
 
-      {inviting && report !== null && (
-        <InviteModal
-          report={report}
-          runId={report.runId}
-          queue={invites}
-          onCancel={() => setInviting(false)}
-          onIssued={(invite) => {
-            setInviting(false);
-            void readRunCommentary(client, invite.runId).then(setCommentary);
-            // The toast repeats what actually happened, dry run included. An analyst who reads
-            // "Invitation sent" over a composed-but-untransmitted mail has been told something
-            // false about their own action (D-063).
-            setToast(describeInvite(invite));
-          }}
-        />
-      )}
+      {/*
+        The invitation dialog is gone with the action that opened it (D-262).
+
+        `InviteModal` and the queue behind it stay in the tree — a link already sent still opens
+        `MerchantRoute`, and removing the code is its own decision (architecture memo, cluster 5).
+        What is removed is the way in: the layout memo takes the invitation flow off this document,
+        and a dialog with no control to open it would be dead weight pretending to be a feature.
+      */}
 
       {credentialFor !== null && (
         <CredentialModal

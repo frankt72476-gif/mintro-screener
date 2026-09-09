@@ -42,11 +42,19 @@ const PRINT_PATH = [
     to IQwallet, and D-233's ruling is about what may reach an outbound assembly rather than about
     which file renders it.
 
-    `EvaluationPreview.tsx` is deliberately not here. It is the authenticated shell that mounts
-    these two and reads the run, the same standing `App.tsx` has — nothing outbound renders it.
+    `EvaluationEditor.tsx` is deliberately not here. It is the authenticated shell that mounts these
+    two and reads the run, the same standing `App.tsx` has — nothing outbound renders it.
   */
   'components/EvaluationReport.tsx',
   'components/EvaluationEvidence.tsx',
+  /*
+    `RunActions.tsx` is here because it imports `ReportActions` from `ReportView`, and the scan
+    below reads that as rendering it. The import is type-only and renders nothing, so the scan is
+    imprecise — but the answer is to audit the file rather than to teach the scan about type
+    imports. Narrowing a guard to quiet it is how a guard stops guarding, and this component holds
+    Send: an internal name reaching it would be one keystroke from an outbound payload.
+  */
+  'components/RunActions.tsx',
 ];
 
 const read = (relative: string): string => readFileSync(join(SRC, relative), 'utf8');

@@ -3963,3 +3963,10 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
   border-color:color-mix(in srgb, var(--jade) 40%, var(--line));
   letter-spacing:.04em;text-transform:none;
 }
+
+/* ---------- a run with no evaluation yet (D-262) ---------- */
+.eval-empty{
+  max-width:840px;margin:0 auto;padding:28px 0;
+}
+.eval-empty-head{margin:0 0 6px;font-size:16px;font-weight:600;color:var(--ink)}
+.eval-empty-sub{margin:0 0 14px;font-size:13px;line-height:1.6;color:var(--ink-mid);max-width:64ch}
