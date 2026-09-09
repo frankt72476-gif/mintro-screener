@@ -37,6 +37,16 @@ const PRINT_PATH = [
   'components/DeclineNotice.tsx',
   'components/CommentPane.tsx',
   'components/DocumentsReportView.tsx',
+  /*
+    The evaluation (D-256). Audited for the same reason `ReportView` is: it is a document that goes
+    to IQwallet, and D-233's ruling is about what may reach an outbound assembly rather than about
+    which file renders it.
+
+    `EvaluationPreview.tsx` is deliberately not here. It is the authenticated shell that mounts
+    these two and reads the run, the same standing `App.tsx` has — nothing outbound renders it.
+  */
+  'components/EvaluationReport.tsx',
+  'components/EvaluationEvidence.tsx',
 ];
 
 const read = (relative: string): string => readFileSync(join(SRC, relative), 'utf8');

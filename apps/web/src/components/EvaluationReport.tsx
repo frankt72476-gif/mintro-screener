@@ -69,9 +69,23 @@ interface Props {
   readonly access: EvidenceAccess;
   /** Titles and labels from `rules/`. Passed in, never spelled out here (hard constraint 1). */
   readonly labels: EvaluationLabels;
+  /**
+   * Sections 6 and 7 — the evidence the angles cite into, and what was not checked.
+   *
+   * A slot rather than a `ScreeningReport` prop, and the reason is the note on `FindingRow` above:
+   * this component's whole surface is the draft and the handful of run facts a citation resolves
+   * through. Typed on the full report it would compile against the clause, the severity, the tier
+   * and the merchant's comments, and the constraint that it renders none of them would rest on
+   * nobody having reached for them.
+   *
+   * The caller composes it, because the caller is where the run is already loaded. Optional because
+   * the summary and the angles are a complete document on their own — a draft over a run whose
+   * report could not be read still renders, and says what it can.
+   */
+  readonly appendix?: JSX.Element | null;
 }
 
-export function EvaluationReport({ draft, run, access, labels }: Props): JSX.Element {
+export function EvaluationReport({ draft, run, access, labels, appendix }: Props): JSX.Element {
   const shared = { draft, run, access, labels };
   return (
     <article className="evaluation">
@@ -80,6 +94,7 @@ export function EvaluationReport({ draft, run, access, labels }: Props): JSX.Ele
       <RoutingTable {...shared} />
       <Angles {...shared} />
       {showsShoreUps(draft.placement.spectrum) && <ShoreUps {...shared} />}
+      {appendix}
     </article>
   );
 }
@@ -673,7 +688,26 @@ function ProseChunk({ span }: { readonly span: ProseSpan }): JSX.Element {
       </span>
     );
   }
-  return <span className={`eval-chip is-${span.resolved.kind}`}>{span.resolved.label}</span>;
+  const className = `eval-chip is-${span.resolved.kind}`;
+  /*
+    A handle with somewhere to go is a link, in prose as much as in a citation list.
+
+    A sentence reading *"…outcome-branded blends (F16)"* names a finding, and the reader following
+    it should land on that finding's row rather than be told its title and left to search. The
+    anchor is what makes that possible and `resolveId` sets it only where the target exists.
+
+    A link and not a button: a capture opens through `EvidenceAccess`, and a button inside a
+    paragraph would break the line it sits in. Opening captures stays the citation lists' job, where
+    a chip is a block of its own.
+  */
+  if (span.resolved.anchor !== undefined) {
+    return (
+      <a className={className} href={`#${span.resolved.anchor}`}>
+        {span.resolved.label}
+      </a>
+    );
+  }
+  return <span className={className}>{span.resolved.label}</span>;
 }
 
 /**

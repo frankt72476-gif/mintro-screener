@@ -882,12 +882,12 @@ const boxProp = (box: JSX.Element | null | undefined): { commentBox?: JSX.Elemen
  * Said once, above them. **Not dropped:** hard constraint 3 is about a finding evidencing why, and
  * the block's own sentence is where that lives when the reason is the block's rather than the row's.
  */
-function blockHasNoEvidence(block: SectionBlock): boolean {
+export function blockHasNoEvidence(block: SectionBlock): boolean {
   const findings = block.groups.flatMap((group) => group.findings);
   return findings.length > 1 && findings.every((finding) => finding.evidence.length === 0);
 }
 
-function StoppingPanel({
+export function StoppingPanel({
   report,
   parts,
   print,
@@ -1082,8 +1082,22 @@ function StoppingPanel({
               <p className="stop-grouphead">
                 Checked and clear <span className="stop-groupn">{met.length}</span>
               </p>
+              {/*
+                One line of names, and each name carries its rule's anchor.
+
+                The line is unchanged — same titles, same separator, D-195's "reassurance rather
+                than something to read". What is new is that each is addressable, because things
+                outside this panel link to `findingAnchor(ruleId)`: section 1's checklist already
+                does, and the evaluation's finding chips do. A rule rendered somewhere with no id is
+                a link that resolves nowhere, and a link that goes nowhere is worse than plain text.
+              */}
               <p className="stop-clear">
-                {met.map((row) => row.title).join(' · ')}
+                {met.map((row, i) => (
+                  <Fragment key={row.ruleId}>
+                    {i > 0 && ' · '}
+                    <span id={findingAnchor(row.ruleId)}>{row.title}</span>
+                  </Fragment>
+                ))}
               </p>
             </div>
           )}
@@ -1881,7 +1895,7 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
  * substitute for them, and print opens the disclosure so the export holds exactly what the screen
  * holds (D-042 as revised by D-166).
  */
-function PassDisclosure({
+export function PassDisclosure({
   groups,
   tally,
   access,
@@ -1936,7 +1950,7 @@ function PassDisclosure({
  * A critical failure on one product page and the same failure on all five are different facts
  * about a merchant, and the collapsed row would present them identically.
  */
-function GroupCard({
+export function GroupCard({
   hideEmptyEvidence = false,
   group,
   access,
@@ -2117,8 +2131,15 @@ function Consequences({
         {group.consequences.length === 1 ? 'further rule' : 'further rules'} could not be evaluated:{' '}
         {group.consequences.map((c) => `${c.ruleId} (${c.title})`).join(', ')}.
       </p>
+      {/*
+        The child carries its own anchor.
+
+        A nested rule is still a rule somebody links to — the evaluation's finding chips resolve by
+        rule id and do not know, or need to know, that this one rendered inside its parent's card.
+        Additive: an id on a div that already existed.
+      */}
       {group.consequences.map((child) => (
-        <div key={child.ruleId} className="conseq-item">
+        <div key={child.ruleId} id={findingAnchor(child.ruleId)} className="conseq-item">
           {child.findings.map((finding, i) => (
             <FindingRow
               key={`${child.ruleId}-${i}`}

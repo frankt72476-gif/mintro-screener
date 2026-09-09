@@ -24,6 +24,7 @@ import anglesJson from '../../../rules/angles.json';
 import rulesetJson from '../../../rules/ruleset.json';
 import eyeTestJson from '../../../rules/eyetest.json';
 import { EvaluationReport } from '../src/components/EvaluationReport.js';
+import { findingAnchor } from '../src/lib/grouping.js';
 import {
   PROSE_HANDLE,
   angleAnchor,
@@ -777,6 +778,122 @@ describe('a chip says what it points at, not its identifier', () => {
     for (const angle of FIXTURE.draft.angles) {
       expect(HTML, angle.angleId).toContain(`id="${angleAnchor(angle.angleId)}"`);
     }
+  });
+});
+
+/*
+  A finding chip scrolls to its rule's row in section 6.
+
+  Before this the chip was an inert span wherever the finding carried no capture — a reference the
+  reader could read and not follow, which is the shape `unresolved_prose_handle` refuses at
+  generation time and the rendering half of the same guarantee.
+
+  A link **only where the anchor exists**. `anchoredRuleIds` says which rules section 6 renders a
+  row for, and a met stopping condition on a run where another failed is not one of them: the panel
+  counts those rather than naming them (D-195). A link to an id nothing carries does nothing at all
+  when clicked, which is worse than plain text because it looks followable.
+*/
+describe('a finding chip scrolls to its row in the evidence section', () => {
+  const uncaptured = FIXTURE.findings.filter((f) => f.evidenceKey === null);
+
+  it('the fixture has findings with no capture, so this is not asserted over an empty set', () => {
+    expect(uncaptured.length).toBeGreaterThan(0);
+  });
+
+  it('links to the rule’s anchor when the section renders a row for it', () => {
+    const finding = uncaptured[0]!;
+    const anchored = { ...RUN, anchoredRuleIds: new Set([finding.ruleId]) };
+    const resolved = resolveId(anchored, LABELS, 'finding', finding.id)!;
+    expect(resolved.anchor).toBe(findingAnchor(finding.ruleId));
+    expect(resolved.evidenceKey).toBeUndefined();
+  });
+
+  it('offers no link where the section renders no row', () => {
+    const finding = uncaptured[0]!;
+    const resolved = resolveId(
+      { ...RUN, anchoredRuleIds: new Set<string>() },
+      LABELS,
+      'finding',
+      finding.id,
+    )!;
+    expect(resolved.anchor).toBeUndefined();
+  });
+
+  /*
+    And the chip is drawn as a link rather than described as one.
+
+    Asserted against the markup: `Resolved.anchor` being set says nothing about what `Chip` does
+    with it, and the whole point is the thing the reader can click.
+  */
+  it('draws it as an anchor in the document', () => {
+    const anchored = { ...RUN, anchoredRuleIds: new Set(RUN.findings.map((f) => f.ruleId)) };
+    const markup = renderToStaticMarkup(
+      createElement(EvaluationReport, {
+        draft: FIXTURE.draft,
+        run: anchored,
+        access: ACCESS,
+        labels: LABELS,
+      }),
+    );
+    /*
+      Cited, uncaptured, and not collapsed.
+
+      A `not_evaluable` citation does not render as a chip at all — the list folds those into a
+      count — so it has no link to assert and asserting one would fail for the wrong reason.
+    */
+    const cited = FIXTURE.draft.angles
+      .flatMap((angle) => angle.citations)
+      .filter((citation) => citation.kind === 'finding')
+      .map((citation) => RUN.findings.find((f) => f.id === citation.ref))
+      .filter(
+        (f): f is (typeof RUN.findings)[number] =>
+          f !== undefined && f.evidenceKey === null && f.state !== 'not_evaluable',
+      );
+
+    expect(cited.length).toBeGreaterThan(0);
+    for (const finding of cited) {
+      expect(markup, finding.ruleId).toContain(`href="#${findingAnchor(finding.ruleId)}"`);
+    }
+  });
+
+  /*
+    And a handle inside a sentence, which is the other place a finding is named.
+
+    A paragraph reads *"…outcome-branded blends (F16)"*. The chip that replaces the handle was an
+    inert span, so a reader following the sentence was given the rule's title and left to find the
+    row themselves.
+  */
+  it('links a finding handle inside a paragraph', () => {
+    const anchored = { ...RUN, anchoredRuleIds: new Set(RUN.findings.map((f) => f.ruleId)) };
+    const markup = renderToStaticMarkup(
+      createElement(EvaluationReport, {
+        draft: FIXTURE.draft,
+        run: anchored,
+        access: ACCESS,
+        labels: LABELS,
+      }),
+    );
+
+    const inProse = FIXTURE.draft.angles
+      .flatMap((angle) => angle.paragraph.match(PROSE_HANDLE) ?? [])
+      .filter((handle) => handle.startsWith('F'))
+      .map((handle) => FIXTURE.handles.finding[handle])
+      .map((id) => RUN.findings.find((f) => f.id === id))
+      .filter((f): f is (typeof RUN.findings)[number] => f !== undefined);
+
+    expect(inProse.length).toBeGreaterThan(0);
+    for (const finding of inProse) {
+      expect(markup, finding.ruleId).toContain(`href="#${findingAnchor(finding.ruleId)}"`);
+    }
+  });
+
+  /* A capture is the better destination, and the chip still prefers it. */
+  it('still opens the capture where the finding has one', () => {
+    const withCapture = FIXTURE.findings.find((f) => f.evidenceKey !== null)!;
+    const anchored = { ...RUN, anchoredRuleIds: new Set([withCapture.ruleId]) };
+    const resolved = resolveId(anchored, LABELS, 'finding', withCapture.id)!;
+    expect(resolved.evidenceKey).toBe(withCapture.evidenceKey);
+    expect(resolved.anchor).toBe(findingAnchor(withCapture.ruleId));
   });
 });
 

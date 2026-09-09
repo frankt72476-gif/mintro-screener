@@ -16,6 +16,8 @@ import anglesJson from '../../../../rules/angles.json';
 import rulesetJson from '../../../../rules/ruleset.json';
 import eyeTestJson from '../../../../rules/eyetest.json';
 import { EvaluationReport } from './EvaluationReport.js';
+import { EvaluationEvidence, EvaluationNotChecked, anchoredRuleIds } from './EvaluationEvidence.js';
+import type { ScreeningReport } from '@mintro/engine';
 import type { EvaluationLabels } from '../lib/evaluationView.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import type {
@@ -48,7 +50,20 @@ const LABELS: EvaluationLabels = {
 type Load =
   | { readonly status: 'loading' }
   | { readonly status: 'error'; readonly message: string }
-  | { readonly status: 'ready'; readonly draft: StoredDraft; readonly run: EvaluationRunContext };
+  | {
+      readonly status: 'ready';
+      readonly draft: StoredDraft;
+      readonly run: EvaluationRunContext;
+      /**
+       * The screening report, for sections 6 and 7.
+       *
+       * Null when the run carries none. Null rather than absent because the two say different
+       * things: a run with no stored report has no evidence section to render, and rendering the
+       * document without one is correct — rendering it while implying the evidence was checked and
+       * empty would not be.
+       */
+      readonly report: ScreeningReport | null;
+    };
 
 interface DraftRow {
   readonly content: StoredDraft | null;
@@ -112,12 +127,13 @@ export function EvaluationPreview({
         runRead.error?.message ?? findingsRead.error?.message ?? evidenceRead.error?.message;
       if (problem !== undefined) return fail(`the run could not be read: ${problem}`);
 
-      const report = (runRead.data as { report?: { merchantDomain?: string } } | null)?.report;
+      const report = (runRead.data as { report?: ScreeningReport } | null)?.report ?? null;
 
       if (!live) return;
       setLoad({
         status: 'ready',
         draft: row.content,
+        report,
         run: {
           runId,
           merchantDomain: report?.merchantDomain ?? null,
@@ -126,6 +142,13 @@ export function EvaluationPreview({
           anglesVersion: row.angles_version,
           model: row.model,
           handles: row.handles,
+          /*
+            What section 6 will anchor, decided from the same report it renders.
+
+            Absent when the run carries no report: with no evidence section there is nothing for a
+            chip to scroll to, and a link would point into a document that is not there.
+          */
+          ...(report === null ? {} : { anchoredRuleIds: anchoredRuleIds(report) }),
           findings: (findingsRead.data ?? []).map((finding) => ({
             id: finding['id'] as string,
             ruleId: finding['rule_id'] as string,
@@ -149,8 +172,28 @@ export function EvaluationPreview({
   const body = useMemo(() => {
     if (load.status === 'loading') return <div className="empty">Loading the evaluation…</div>;
     if (load.status === 'error') return <div className="empty">{load.message}</div>;
+    /*
+      Sections 6 and 7, composed here rather than inside `EvaluationReport`.
+
+      This is where the run is already loaded, and it keeps the rendering component typed on the
+      draft alone — see the note on its `appendix` prop.
+    */
+    const report = load.report;
+    const appendix =
+      report === null ? null : (
+        <>
+          <EvaluationEvidence report={report} access={access} />
+          <EvaluationNotChecked report={report} />
+        </>
+      );
     return (
-      <EvaluationReport draft={load.draft} run={load.run} access={access} labels={LABELS} />
+      <EvaluationReport
+        draft={load.draft}
+        run={load.run}
+        access={access}
+        labels={LABELS}
+        appendix={appendix}
+      />
     );
   }, [load, access]);
 

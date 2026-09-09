@@ -8,6 +8,8 @@
  * to* are questions about data, and they are answered here where a test can ask them directly.
  */
 
+import { findingAnchor } from './grouping.js';
+
 /** The four states an engine finding can carry. Repeated rather than imported: see `FindingRow`. */
 export type FindingState = 'fail' | 'review' | 'pass' | 'not_evaluable';
 
@@ -92,6 +94,18 @@ export interface EvaluationRunContext {
   readonly findings: readonly FindingRow[];
   readonly evidence: readonly EvidenceRow[];
   readonly handles: StoredHandles;
+  /**
+   * The rules section 6 renders an anchor for, from `anchoredRuleIds`.
+   *
+   * A finding chip scrolls to `findingAnchor(ruleId)`, and this is what says the target exists. A
+   * fragment link to an id nothing carries does nothing when clicked — the page sits still, and the
+   * reader is left holding a reference that looks followable and is not.
+   *
+   * **Absent means no finding scrolls**, which is right for the two cases that produce it: a draft
+   * rendered without its evidence section, and a run whose report could not be read. Chips fall
+   * back to plain labels, which is what they were before section 6 existed.
+   */
+  readonly anchoredRuleIds?: ReadonlySet<string>;
 }
 
 /**
@@ -281,6 +295,24 @@ export function resolveId(
       label: labels.ruleTitle[finding.ruleId] ?? finding.ruleId,
       state: finding.state,
       heavy: labels.heavyRuleIds.has(finding.ruleId),
+      /*
+        Where the chip goes when there is no capture to open (addendum: *opens the capture or
+        scrolls to the finding*).
+
+        `findingAnchor` and not a second anchor scheme: it is the id section 6 marks each rule with,
+        and the report has used it since M3. Two spellings of one anchor is a link that works on the
+        day it is written and stops when either side is renamed.
+
+        **Only where section 6 actually anchors the rule.** See `anchoredRuleIds` — a met stopping
+        condition on a run where another failed is a count in the panel rather than a named row, so
+        it has no id, and a chip linking to one would sit there doing nothing when clicked.
+
+        Set whether or not a capture exists. A capture is the better destination and `Chip` prefers
+        it, but a finding with one is still a row in section 6.
+      */
+      ...(run.anchoredRuleIds?.has(finding.ruleId) === true
+        ? { anchor: findingAnchor(finding.ruleId) }
+        : {}),
       ...(finding.evidenceKey === null ? {} : { evidenceKey: finding.evidenceKey }),
     };
   }
