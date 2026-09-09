@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   loadRulesetFile,
@@ -1238,6 +1239,103 @@ describe('the prompt states the citation scope and the lean anchor', () => {
     expect(prompt).toContain('cannot lean research');
     expect(prompt).toContain('[HEAVY]');
     expect(prompt).toContain('does not bind the lean');
+  });
+});
+
+/*
+  What a legality item with no capture carries.
+
+  `evidenceKey` is required on every item, and the row for an unobserved rule prints as "(no
+  capture recorded)" — which named the gap and left the model to guess what to echo in the field.
+  The empty string was the answer, written down in a comment in `evaluationSchema.ts` and nowhere
+  the model could read it. A guess there becomes an invented handle, `decodeDraft` refuses it, and
+  a whole retry goes on a convention nobody stated.
+*/
+describe('the prompt states the empty-key convention for an unobserved legality rule', () => {
+  /*
+    A legality rule the crawl could not reach, added here rather than to `INPUTS`.
+
+    The block is computed from the findings, so this row is what produces the "(no capture
+    recorded)" line — and adding it to the shared fixture would change the legality block under
+    every other test in this file.
+  */
+  const GAP_RULE = 'PROD-006';
+  const withGap = promptFor(angles, ruleset, {
+    ...INPUTS,
+    findings: [
+      ...INPUTS.findings,
+      {
+        id: 'f-900',
+        ruleId: GAP_RULE,
+        title: 'A legality rule the crawl could not reach',
+        state: 'not_evaluable',
+        note: 'The page that would carry it timed out.',
+        evidenceKey: null,
+      },
+    ],
+  });
+
+  it('has a legality rule with no capture, so this is not asserted over an empty block', () => {
+    expect(LEGALITY_RULE_IDS).toContain(GAP_RULE);
+    expect(withGap).toContain(GAP_RULE);
+  });
+
+  it('shows the row as having no capture, which is the case the convention covers', () => {
+    expect(withGap).toContain('(no capture recorded)');
+  });
+
+  it('says the field carries the empty string, not a handle and not an omission', () => {
+    expect(withGap).toContain('"evidenceKey": ""');
+    expect(withGap).toContain('the empty string');
+    expect(withGap).toContain('never observed');
+  });
+
+  /*
+    And in the answer shape as well as the prose. The shape is what a model copies, and a convention
+    stated only in a paragraph above it is one the copying does not carry down.
+  */
+  it('shows the same convention in the shape the model copies', () => {
+    expect(withGap).toContain('"state": "not_evaluable", "evidenceKey": ""');
+  });
+});
+
+/*
+  Every field the generator produces reaches the person running it.
+
+  ## The defect this exists for
+
+  `retryMessage` was designed, typed, documented, stored in its own migration and asserted by three
+  tests — and `bin/evaluate.ts` printed every other field of the result and not that one. So the one
+  record of the validator doing its job was written to a column nobody was reading yet and shown to
+  nobody at all, on a run that looked completely successful.
+
+  That is D-246's shape one layer along: not a flag no component renders, but a result field no
+  caller prints. Neither typechecking nor a unit test on `generateDraft` can see it, because the
+  field exists and is correct — what is missing is a consumer.
+
+  ## Why the interface is read from source
+
+  So the list cannot fall out of step by being written twice. A field added to `EvaluateResult`
+  fails here until the CLI says something about it, which is the property that was violated, rather
+  than "the fields somebody remembered when writing this test".
+*/
+describe('the CLI surfaces every field of the result', () => {
+  const JOB = readFileSync('apps/worker/src/evaluateJob.ts', 'utf8');
+  const CLI = readFileSync('apps/worker/bin/evaluate.ts', 'utf8');
+
+  const body = JOB.slice(
+    JOB.indexOf('export interface EvaluateResult {'),
+    JOB.indexOf('export interface EvaluateOptions {'),
+  );
+  const FIELDS = [...body.matchAll(/^\s*readonly (\w+)\??:/gm)].map((match) => match[1]!);
+
+  it('found the interface, so this is not passing over an empty list', () => {
+    expect(FIELDS).toContain('retryMessage');
+    expect(FIELDS.length).toBeGreaterThan(8);
+  });
+
+  it.each(FIELDS)('says something about %s', (field) => {
+    expect(CLI).toContain(`result.${field}`);
   });
 });
 

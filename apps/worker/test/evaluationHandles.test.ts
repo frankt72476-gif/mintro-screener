@@ -240,6 +240,30 @@ describe('decoding a draft', () => {
     expect(message).toContain('F901');
     expect(message).toContain('return the whole document again');
   });
+
+  /*
+    The kind goes at the end of the sentence, so no article has to agree with it.
+
+    The wording was `is not a ${kind} handle in this run`, and two of the four kinds begin with a
+    vowel: *"'E999' is not a evidence handle"*. This is the message a model is asked to read
+    carefully before trying again, and the retry costs a whole call.
+  */
+  it('names the kind without an article that has to agree with it', () => {
+    const draft = handleDraft();
+    draft['legality'].items[0].evidenceKey = 'E999';
+    draft['angles'][0].citations[0] = { kind: 'eye_test', ref: 'Y99' };
+
+    const result = decodeDraft(draft, map);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    const message = unknownHandleMessage(result.unknown);
+    // The two kinds that begin with a vowel, which are the two the old wording got wrong.
+    expect(message).toContain('evidence');
+    expect(message).toContain('eye_test');
+    expect(message).not.toMatch(/\ba [aeiou]/);
+    expect(message).toContain("is not a handle this run issued for evidence");
+  });
 });
 
 describe('the handle-space run context, for the schema', () => {

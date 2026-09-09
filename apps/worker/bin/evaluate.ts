@@ -216,12 +216,27 @@ async function main(argv: readonly string[]): Promise<number> {
         truncations: result.truncations,
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.message === undefined ? {} : { message: result.message }),
+        ...(result.retryMessage === undefined ? {} : { retryMessage: result.retryMessage }),
         ...(result.draft === undefined ? {} : { draft: result.draft }),
       },
       null,
       2,
     ),
   );
+
+  /*
+    Why the previous attempt was refused, on a run that then succeeded.
+
+    Printed as prose and not only inside the JSON above, where a multi-line refusal is one line of
+    backslash-n and nobody reads it. `attempts: 2` says a refusal happened; this is the part worth
+    reading, and on a successful generation it is the only record of the validator doing its job
+    (0080). It sits under the document because it is about the answer that was thrown away.
+  */
+  if (result.retryMessage !== undefined) {
+    console.log('\n' + '─'.repeat(96));
+    console.log(`A previous attempt was refused (${result.attempts} attempts in all)\n`);
+    console.log(result.retryMessage);
+  }
 
   /*
     The mapping, after the document.

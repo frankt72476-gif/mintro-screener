@@ -292,9 +292,21 @@ export function decodeDraft<T>(draft: T, map: HandleMap): DecodeResult<T> {
   return unknown.length > 0 ? { ok: false, unknown } : { ok: true, value: decoded as T };
 }
 
-/** The unresolved handles, as a message a retry can act on. */
+/**
+ * The unresolved handles, as a message a retry can act on.
+ *
+ * The kind moves to the end of the sentence. It read `is not a ${kind} handle in this run`, which
+ * for the two kinds that begin with a vowel produced *"is not a evidence handle"* and *"is not a
+ * eye_test handle"* — an article the interpolation cannot get right, in the one message whose whole
+ * job is to be read carefully by a model being asked to try again.
+ *
+ * The wording now matches `unresolved_prose_handle` in the engine, which has always said *is not a
+ * handle this run issued*. Two refusals for the same mistake said it two ways.
+ */
 export function unknownHandleMessage(unknown: readonly UnknownHandle[]): string {
-  const lines = unknown.map((u) => `- ${u.at}: '${u.handle}' is not a ${u.kind} handle in this run`);
+  const lines = unknown.map(
+    (u) => `- ${u.at}: '${u.handle}' is not a handle this run issued for ${u.kind}`,
+  );
   return (
     `The previous draft used ${unknown.length} handle(s) this run did not issue. ` +
     'Cite only the handles listed against each angle, and return the whole document again:\n' +

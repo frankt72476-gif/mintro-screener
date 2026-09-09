@@ -84,7 +84,10 @@ export const ANSWER_SCHEMA = `{
     "paragraph": "one paragraph placing the business and naming the angles that drove it",
     "citations": [{"kind": "angle", "ref": "A3"}]
   },
-  "legality": { "clean": true, "items": [{"ruleId": "CATG-003", "state": "fail", "evidenceKey": "E7", "note": "one sentence"}] },
+  "legality": { "clean": true, "items": [
+    {"ruleId": "CATG-003", "state": "fail", "evidenceKey": "E7", "note": "one sentence"},
+    {"ruleId": "CATG-004", "state": "not_evaluable", "evidenceKey": "", "note": "one sentence"}
+  ] },
   "routing": [{"conditionId": "...", "status": "met | not_met | not_observable", "citations": []}],
   "angles": [{
     "angleId": "A3",
@@ -376,6 +379,17 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
         'Return this block exactly as given. You may add a `note` of one sentence to any item, ' +
         'saying what it means for this merchant. You may not add an item, remove one, change a ' +
         "state, or change `clean`.\n\n" +
+        /*
+          The convention, stated.
+
+          `evidenceKey` is required on every item and the row for an unobserved rule prints as
+          "(no capture recorded)", which left the model to guess what to echo there. The empty
+          string was the answer and nothing said so — so a guess became an invented handle, the
+          decode refused it, and a whole retry went on a rule nobody had written down.
+        */
+        'An item shown as *(no capture recorded)* carries `"evidenceKey": ""` — the empty string. ' +
+        'Not a handle, and not the field left out: the rule was never observed, so there is no ' +
+        'capture to name. A handle invented there is refused and the draft comes back to you.\n\n' +
         '`not_evaluable` is not a pass and not a violation: the rule could not be observed at all. ' +
         'Say so where it bears on an angle rather than treating it as either.',
     ),
