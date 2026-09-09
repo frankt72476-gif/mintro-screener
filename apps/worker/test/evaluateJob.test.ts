@@ -36,6 +36,7 @@ import {
 } from '../src/evaluateJob.js';
 import type { WorkerSupabase } from '../src/store/supabase.js';
 import { estimateTokens } from '../src/evaluationPrompt.js';
+import { sectionWords } from '../src/evaluationSchema.js';
 import { buildHandles, toHandle, toId } from '../src/evaluationHandles.js';
 import type { EvaluationPage } from '../src/evaluationPages.js';
 
@@ -978,6 +979,81 @@ describe('storeDraft records what the generation cost', () => {
     );
 
     expect(rows[0]).toMatchObject({ validator_status: 'rejected', attempts: 2, output_tokens: 5_162 });
+  });
+});
+
+/*
+  Concision, in the prompt (angle set 1.1.0).
+
+  The tests that matter here are the verbatim ones. Every number and every rule below is asserted
+  against `rules/angles.json` rather than against a figure written in this file — the same standard
+  the guardrail tests already hold, because a prompt test that declares its own expected wording
+  proves the test agrees with itself.
+*/
+describe('the length guidance reaches the model from the file', () => {
+  const prompt = promptFor(angles, ruleset, INPUTS);
+
+  it('renders every limit the file declares, with its number', () => {
+    expect(angles.limits).toHaveLength(4);
+    for (const limit of angles.limits) {
+      expect(prompt, `${limit.section} count`).toContain(`at most ${limit.maxWords} words`);
+    }
+  });
+
+  /*
+    The rule travels verbatim beside the number. A count alone bounds the length and permits the
+    failure it was drawn against: seven 80-word angles that each open by re-summarising the business
+    are shorter than seven 150-word ones and just as repetitive.
+  */
+  it('carries each rule verbatim, not paraphrased', () => {
+    for (const limit of angles.limits) {
+      expect(prompt, `${limit.section} rule`).toContain(limit.rule);
+    }
+  });
+
+  it('names the section each limit applies to', () => {
+    expect(prompt).toContain('The placement paragraph');
+    expect(prompt).toContain('Each angle paragraph');
+    expect(prompt).toContain('Each shore-up');
+    expect(prompt).toContain('Each legality note');
+  });
+
+  it('says the limits are ceilings rather than targets', () => {
+    expect(prompt).toContain('These are limits, not targets');
+  });
+
+  /*
+    The placement gets more room than an angle, and that asymmetry is the whole change. One number
+    for both is what produced a draft whose seven observations were each as long as its conclusion.
+  */
+  it('gives the placement a longer limit than an angle', () => {
+    const words = sectionWords(angles.limits);
+    expect(words.placement).toBeGreaterThan(words.angle);
+    expect(words.angle).toBeGreaterThan(words.shoreUp);
+    expect(words.shoreUp).toBeGreaterThan(words.legalityNote);
+  });
+
+  it('carries the two concision guardrails verbatim, like every other guardrail', () => {
+    for (const guardrail of angles.guardrails) expect(prompt).toContain(guardrail);
+    expect(angles.guardrails.join(' ')).toContain('Say each thing once');
+  });
+
+  /*
+    No number in the prompt that the file does not know about. The old `Around 120 words` lived in
+    the schema builder and would have kept shipping beside the new guidance, telling the model two
+    lengths for one field.
+  */
+  it('states no length the angle set has not ratified', () => {
+    const declared = new Set(angles.limits.map((l) => String(l.maxWords)));
+    const stated = [...prompt.matchAll(/at most (\d+) words/g)].map((m) => m[1]!);
+    expect(stated.length).toBeGreaterThan(0);
+    expect(stated.filter((n) => !declared.has(n))).toEqual([]);
+    expect(prompt).not.toContain('Around 120 words');
+  });
+
+  it('puts the limits after the guardrails they serve and before the angles', () => {
+    expect(prompt.indexOf('## Rules you must follow')).toBeLessThan(prompt.indexOf('## Length'));
+    expect(prompt.indexOf('## Length')).toBeLessThan(prompt.indexOf('## The seven angles'));
   });
 });
 

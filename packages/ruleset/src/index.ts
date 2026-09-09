@@ -53,6 +53,7 @@ export { checkRatifiedTiers, ratifiedTierFor } from './ratified.js';
 export {
   ANGLE_IDS,
   CONSUMER_SIDE,
+  LIMITED_SECTIONS,
   PLACEMENT_IDS,
   ROUTING_CONDITION_COUNT,
   SPECTRUM_IDS,
@@ -64,6 +65,7 @@ export {
   type Angle,
   type AngleId,
   type AngleSet,
+  type LimitedSection,
   type PlacementId,
   type RoutingCondition,
   type SpectrumId,

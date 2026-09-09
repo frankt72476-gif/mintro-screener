@@ -52,9 +52,7 @@
  */
 
 import type { RunContext } from '@mintro/engine';
-
-/** Roughly how long a paragraph should be. Guidance in the schema, never a hard limit. */
-export const PARAGRAPH_WORDS = 120;
+import type { AngleSet, LimitedSection } from '@mintro/ruleset';
 
 /** The most shore-ups a draft may carry. */
 export const MAX_SHORE_UPS = 6;
@@ -63,10 +61,27 @@ interface JsonSchema {
   readonly [key: string]: unknown;
 }
 
-const paragraph = (subject: string): JsonSchema => ({
+/**
+ * How long each written section may run, by section id.
+ *
+ * Passed in from `rules/angles.json` rather than declared here (angle set 1.1.0). The schema
+ * description is what the model is reading while it fills the field, and the prompt's Length section
+ * is what it read a page earlier; two numbers for one field would be a contradiction it has to
+ * resolve on its own. There is one number, in the ratified file.
+ *
+ * This replaced a `PARAGRAPH_WORDS = 120` that applied one length to both the placement and the
+ * angles — which is what produced a draft whose seven angles were each as long as its conclusion.
+ */
+export type SectionWords = Readonly<Record<LimitedSection, number>>;
+
+export function sectionWords(limits: AngleSet['limits']): SectionWords {
+  return Object.fromEntries(limits.map((limit) => [limit.section, limit.maxWords])) as SectionWords;
+}
+
+const paragraph = (subject: string, maxWords: number): JsonSchema => ({
   type: 'string',
   description:
-    `${subject} Around ${PARAGRAPH_WORDS} words — a reader should be able to take it in at once. ` +
+    `${subject} At most ${maxWords} words — a limit, not a target. ` +
     'A sentence resting on reasoning rather than a capture is wrapped [inference: ...].',
 });
 
@@ -141,6 +156,7 @@ export function draftSchema(
   run: RunContext,
   spectrum: readonly string[],
   placements: readonly string[],
+  words: SectionWords,
 ): JsonSchema {
   const { defs, branches } = definitions(run);
   const cite = citationRef(branches, false);
@@ -159,7 +175,7 @@ export function draftSchema(
         properties: {
           spectrum: { enum: [...spectrum] },
           recommended: { enum: [...placements] },
-          paragraph: paragraph('Where this business sits and what put it there.'),
+          paragraph: paragraph('Where this business sits and what put it there.', words.placement),
           /*
             `minItems: 1` is the most the subset allows; "at least two, and distinct" is the
             description's job and `validateDraft`'s. The distinctness half was never expressible
@@ -205,7 +221,10 @@ export function draftSchema(
                     : { enum: run.legality.items.map((item) => item.ruleId) },
                 state: { enum: ['fail', 'not_evaluable'] },
                 evidenceKey: { type: 'string' },
-                note: { type: 'string', description: 'One sentence. The only part you may write.' },
+                note: {
+                  type: 'string',
+                  description: `One clause, at most ${words.legalityNote} words. The only part you may write.`,
+                },
               },
             },
             description:
@@ -238,7 +257,7 @@ export function draftSchema(
           properties: {
             angleId: { enum: [...run.angleIds] },
             lean: { enum: ['research', 'neutral', 'consumer'] },
-            paragraph: paragraph('What this angle found.'),
+            paragraph: paragraph('What this angle found, and nothing another section already says.', words.angle),
             citations: { type: 'array', items: cite },
             nothingObserved: { type: 'boolean' },
           },
@@ -253,7 +272,10 @@ export function draftSchema(
           additionalProperties: false,
           required: ['text', 'citation'],
           properties: {
-            text: { type: 'string' },
+            text: {
+              type: 'string',
+              description: `One sentence, at most ${words.shoreUp} words. Never restate an angle paragraph.`,
+            },
             citation: cite,
           },
         },

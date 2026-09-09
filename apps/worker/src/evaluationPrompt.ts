@@ -17,7 +17,7 @@
  * this repository has now hit in four different places.
  */
 
-import type { AngleSet } from '@mintro/ruleset';
+import type { AngleSet, LimitedSection } from '@mintro/ruleset';
 import type { EvaluationPage } from './evaluationPages.js';
 import { toHandle, type HandleMap } from './evaluationHandles.js';
 import type { DraftLegality } from '@mintro/engine';
@@ -100,6 +100,21 @@ function section(title: string, body: string): string {
   return `## ${title}\n\n${body}`;
 }
 
+/**
+ * What each limited section is called in the prompt.
+ *
+ * Presentation, so it lives in code — the file names sections by the id the schema uses, and a
+ * reader of `angles.json` should not have to pick a heading for a document they never see. The ids
+ * themselves come from `LIMITED_SECTIONS`, so a section added to the vocabulary and forgotten here
+ * fails to compile rather than rendering `undefined` into a prompt.
+ */
+const LIMIT_LABELS: Record<LimitedSection, string> = {
+  placement: 'The placement paragraph',
+  angle: 'Each angle paragraph',
+  shoreUp: 'Each shore-up',
+  legalityNote: 'Each legality note',
+};
+
 /** Findings grouped under the angle that reads them, so the model sees what feeds what. */
 function evidenceForAngle(angleId: string, angles: AngleSet, inputs: PromptInputs): string {
   const angle = angles.angles.find((a) => a.id === angleId);
@@ -180,6 +195,28 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
   );
 
   parts.push(section('Rules you must follow', angles.guardrails.map((g) => `- ${g}`).join('\n')));
+
+  /*
+    Length, from the file (angle set 1.1.0).
+
+    Both halves come from `limits` — the count and the rule beside it. Writing either here would put
+    a number in the prompt that the ratified file does not know about, which is the paraphrased-
+    guardrail defect in a different shape: the sent length and the ratified length would be two
+    things that happen to agree.
+
+    The rule matters as much as the count. The first real draft ran to roughly 1,100 words with each
+    angle opening by re-summarising the business, and seven 80-word angles that do the same thing are
+    shorter and just as repetitive.
+  */
+  parts.push(
+    section(
+      'Length',
+      'These are limits, not targets. A section with little to say is short.\n\n' +
+        angles.limits
+          .map((limit) => `- **${LIMIT_LABELS[limit.section]}** — at most ${limit.maxWords} words. ${limit.rule}`)
+          .join('\n'),
+    ),
+  );
 
   parts.push(
     section(

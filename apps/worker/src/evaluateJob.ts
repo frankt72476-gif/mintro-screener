@@ -41,7 +41,7 @@ import {
   type PromptFinding,
   type PromptInputs,
 } from './evaluationPrompt.js';
-import { draftSchema } from './evaluationSchema.js';
+import { draftSchema, sectionWords } from './evaluationSchema.js';
 import {
   buildHandles,
   decodeDraft,
@@ -318,6 +318,7 @@ export function requestParts(
     handleContext(run, handles),
     angles.spectrum.map((entry) => entry.id),
     [...angles.placements],
+    sectionWords(angles.limits),
   );
   return {
     prompt: buildPrompt(angles, promptInputsFor(ruleset, inputs, handles)),
@@ -405,6 +406,7 @@ export async function generateDraft(
   const run = runContextFor(angles, inputs);
   const spectrum = angles.spectrum.map((entry) => entry.id);
   const placements = [...angles.placements];
+  const words = sectionWords(angles.limits);
 
   /*
     Handles, built once and used for three things that must agree: the prompt the model reads,
@@ -480,7 +482,7 @@ export async function generateDraft(
               constrains shape, that enforces meaning, and only the second can say a shore-up does
               not belong on a consumer-side placement.
             */
-            format: { type: 'json_schema', schema: draftSchema(handleRun, spectrum, placements) },
+            format: { type: 'json_schema', schema: draftSchema(handleRun, spectrum, placements, words) },
           },
           messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         }),

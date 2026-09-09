@@ -12,7 +12,8 @@
 
 import { describe, expect, it } from 'vitest';
 import type { RunContext } from '@mintro/engine';
-import { MAX_SHORE_UPS, PARAGRAPH_WORDS, draftSchema } from '../src/evaluationSchema.js';
+import { MAX_SHORE_UPS, draftSchema, sectionWords } from '../src/evaluationSchema.js';
+import { ANGLES_PATH, loadAngleSetFile, loadRulesetFile } from '@mintro/ruleset';
 
 const RUN: RunContext = {
   findingIds: new Set(['f-001', 'f-002']),
@@ -29,7 +30,15 @@ const RUN: RunContext = {
 const SPECTRUM = ['consumer_retail', 'mixed', 'research_supplier'];
 const PLACEMENTS = ['referred_out', 'international', 'domestic'];
 
-const schema = draftSchema(RUN, SPECTRUM, PLACEMENTS) as Record<string, any>;
+/*
+  The lengths come from `rules/angles.json`, not from numbers written here.
+
+  A test that declared its own would pass while the shipped schema carried something else — the
+  drift this arrangement exists to close, reproduced inside its own test.
+*/
+const WORDS = sectionWords(loadAngleSetFile(loadRulesetFile('rules/ruleset.json'), ANGLES_PATH).limits);
+
+const schema = draftSchema(RUN, SPECTRUM, PLACEMENTS, WORDS) as Record<string, any>;
 const props = schema['properties'] as Record<string, any>;
 const defs = schema['$defs'] as Record<string, any>;
 
@@ -95,6 +104,7 @@ describe('ids are enums of what the run holds', () => {
       },
       SPECTRUM,
       PLACEMENTS,
+      WORDS,
     ) as Record<string, any>;
 
     const item = withItems['properties'].legality.properties.items.items.properties;
@@ -132,7 +142,7 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
     the kinds this run can support.
   */
   it('drops the eye-test branch when the run has no verdicts', () => {
-    const blind = draftSchema({ ...RUN, eyeTestItemIds: new Set() }, SPECTRUM, PLACEMENTS) as Record<string, any>;
+    const blind = draftSchema({ ...RUN, eyeTestItemIds: new Set() }, SPECTRUM, PLACEMENTS, WORDS) as Record<string, any>;
     expect(Object.keys(blind['$defs'])).not.toContain('eyeTestRef');
     expect(Object.keys(blind['$defs'])).not.toContain('eyeTestItemId');
     const refs = blind['properties'].angles.items.properties.citations.items.anyOf.map(
@@ -142,7 +152,7 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
   });
 
   it('falls back to a plain string where an enum would be empty', () => {
-    const bare = draftSchema({ ...RUN, evidenceKeys: new Set() }, SPECTRUM, PLACEMENTS) as Record<string, any>;
+    const bare = draftSchema({ ...RUN, evidenceKeys: new Set() }, SPECTRUM, PLACEMENTS, WORDS) as Record<string, any>;
     const key = bare['properties'].legality.properties.items.items.properties.evidenceKey;
     expect(key.enum).toBeUndefined();
     expect(key.type).toBe('string');
@@ -153,6 +163,7 @@ describe('an empty list is omitted, not emitted as an empty enum', () => {
       { ...RUN, evidenceKeys: new Set(), eyeTestItemIds: new Set() },
       SPECTRUM,
       PLACEMENTS,
+      WORDS,
     );
     for (const { path, values } of enumsIn(sparse)) {
       expect(values.length, `${path} is an empty enum`).toBeGreaterThan(0);
@@ -237,10 +248,35 @@ describe('the shape rules the schema can carry', () => {
     expect(props['placement'].properties.citations.description).toContain('at least two different angles');
   });
 
-  it('states the paragraph length as guidance', () => {
-    expect(props['placement'].properties.paragraph.description).toContain(`${PARAGRAPH_WORDS} words`);
-    expect(props['angles'].items.properties.paragraph.description).toContain(`${PARAGRAPH_WORDS} words`);
-    expect(PARAGRAPH_WORDS).toBe(120);
+  /*
+    Each field states its own length, and the numbers come from the ratified file.
+
+    The single `PARAGRAPH_WORDS = 120` this replaced applied one length to the placement and to
+    every angle, so a conclusion and each of the seven observations that fed it were told to be the
+    same size. The first real draft came back exactly that shape.
+  */
+  it('states each section length from the angle set, not from a number written here', () => {
+    expect(props['placement'].properties.paragraph.description).toContain(`${WORDS.placement} words`);
+    expect(props['angles'].items.properties.paragraph.description).toContain(`${WORDS.angle} words`);
+    expect(props['shoreUps'].items.properties.text.description).toContain(`${WORDS.shoreUp} words`);
+    expect(props['legality'].properties.items.items.properties.note.description).toContain(
+      `${WORDS.legalityNote} words`,
+    );
+  });
+
+  it('gives the placement and the angles different lengths, which is the point of the change', () => {
+    expect(WORDS.placement).toBeGreaterThan(WORDS.angle);
+    expect(props['placement'].properties.paragraph.description).not.toEqual(
+      props['angles'].items.properties.paragraph.description,
+    );
+  });
+
+  /*
+    A limit, not a target. "Around 120 words" invited padding a thin angle up to length, which is
+    the same failure as running past it and reads worse — filler that cites nothing.
+  */
+  it('says the length is a ceiling', () => {
+    expect(props['placement'].properties.paragraph.description).toContain('a limit, not a target');
   });
 
   it('closes every object, so an invented field is not silently accepted', () => {

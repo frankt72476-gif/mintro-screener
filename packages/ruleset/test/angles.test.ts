@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import {
   ANGLE_IDS,
   PLACEMENT_IDS,
+  LIMITED_SECTIONS,
   ROUTING_CONDITION_COUNT,
   SPECTRUM_IDS,
   checkAngleSet,
@@ -47,7 +48,7 @@ function messages(mutated: AngleSet): string {
 
 describe('rules/angles.json', () => {
   it('loads and validates against the committed rule set', () => {
-    expect(angles.version).toBe('1.0.0');
+    expect(angles.version).toBe('1.1.0');
     expect(angles.model).toBe('claude-opus-5');
     expect(checkAngleSet(angles, ruleset, items)).toEqual([]);
   });
@@ -89,10 +90,92 @@ describe('rules/angles.json', () => {
   });
 
   it('carries the guardrails as prose the prompt builder includes verbatim', () => {
-    expect(angles.guardrails).toHaveLength(5);
+    expect(angles.guardrails).toHaveLength(7);
     expect(angles.guardrails[0]).toContain('Cite only captured evidence');
     expect(angles.guardrails.join(' ')).toContain('No pricing, no cost comparison');
     expect(angles.guardrails.join(' ')).toContain('never drafted for a business placed on the consumer side');
+    // 1.1.0. The qualitative half of concision: the numbers are in `limits`, this is the rule they serve.
+    expect(angles.guardrails.join(' ')).toContain('Say each thing once, in the section that owns it');
+    expect(angles.guardrails.join(' ')).toContain('limits, not targets');
+  });
+
+  /*
+    The limits, and the reason they are data.
+
+    A word count written into the prompt builder would be a length the ratified file does not know
+    about — the same defect as a paraphrased guardrail, in a number. These are pinned because they
+    are what the operator's review of the first draft settled, and a change to any of them is a
+    change to what the evaluation asks for.
+  */
+  it('carries a length limit for every written section', () => {
+    expect(angles.limits.map((l) => l.section)).toEqual([...LIMITED_SECTIONS]);
+    expect(Object.fromEntries(angles.limits.map((l) => [l.section, l.maxWords]))).toEqual({
+      placement: 100,
+      angle: 80,
+      shoreUp: 20,
+      legalityNote: 15,
+    });
+    for (const limit of angles.limits) expect(limit.rule.length).toBeGreaterThan(0);
+  });
+
+  /*
+    Each limit carries the rule that says what belongs in the section, not only how much.
+
+    A count alone bounds the length and permits the failure the count was drawn against: seven
+    80-word angles that each open by re-summarising the business are shorter than seven 150-word
+    ones and just as repetitive.
+  */
+  it('says what each section is for, not only how long it may run', () => {
+    const rules = Object.fromEntries(angles.limits.map((l) => [l.section, l.rule]));
+    expect(rules['placement']).toContain('only place the business is summarised');
+    expect(rules['angle']).toContain('Never restate the placement or another angle');
+    expect(rules['shoreUp']).toContain('Never restate the angle paragraph');
+    expect(rules['legalityNote']).toContain('One clause');
+  });
+
+  it('records why the version moved', () => {
+    expect(angles.changelog.some((line) => line.startsWith(`${angles.version} `))).toBe(true);
+    expect(angles.changelog.join(' ')).toContain('9011b2d7');
+  });
+});
+
+describe('the limits, as invariants', () => {
+  /*
+    A section the data forgets is worse than one with a generous limit: the prompt would bound three
+    sections and say nothing about the fourth, and silence reads as "unbounded" rather than as an
+    omission.
+  */
+  it('refuses a file that forgets a section', () => {
+    const mutated = copy();
+    mutated.limits = mutated.limits.filter((l) => l.section !== 'shoreUp');
+    expect(messages(mutated)).toContain("'shoreUp' has no length limit");
+  });
+
+  it('refuses two limits for one section, since nothing says which wins', () => {
+    const mutated = copy();
+    mutated.limits = [...mutated.limits, mutated.limits[1]!];
+    expect(messages(mutated)).toContain("'angle' has 2 length limits");
+  });
+
+  it('refuses a version with no changelog line', () => {
+    const mutated = copy();
+    mutated.version = '9.9.9';
+    expect(messages(mutated)).toContain('no line for version 9.9.9');
+  });
+
+  it('refuses a zero or negative word count at the schema, before any cross-check', () => {
+    for (const maxWords of [0, -20]) {
+      const broken = {
+        ...angles,
+        limits: angles.limits.map((l) => (l.section === 'angle' ? { ...l, maxWords } : l)),
+      };
+      expect(() => parseAngleSet(broken, ruleset, items), String(maxWords)).toThrow();
+    }
+  });
+
+  it('refuses a section name the code does not know', () => {
+    const broken = { ...angles, limits: [...angles.limits, { section: 'footer', maxWords: 10, rule: 'x' }] };
+    expect(() => parseAngleSet(broken, ruleset, items)).toThrow();
   });
 });
 

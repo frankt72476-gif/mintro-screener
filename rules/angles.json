@@ -1,7 +1,11 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "effective": "2026-09-09",
   "source_document": "docs/angle-set-design.md, ratified under D-256; structure under D-260",
+  "changelog": [
+    "1.0.0 — initial set: seven angles, five-position spectrum, three placements, five routing conditions, five guardrails (D-256, D-259, D-260).",
+    "1.1.0 — concision. Per-section word limits under `limits`, and two guardrails saying each thing is said once, in the section that owns it. The first real draft (run 9011b2d7) ran to roughly 1,100 words, with seven angles that each re-summarised the business before saying what they observed."
+  ],
   "model": "claude-opus-5",
   "spectrum": [
     { "id": "consumer_retail", "label": "Consumer retail" },
@@ -181,11 +185,19 @@
       "observable": true
     }
   ],
+  "limits": [
+    { "section": "placement", "maxWords": 100, "rule": "The only place the business is summarised. Every other section observes; this one concludes." },
+    { "section": "angle", "maxWords": 80, "rule": "Say only what this angle observed. Never restate the placement or another angle — the reader has already read them." },
+    { "section": "shoreUp", "maxWords": 20, "rule": "One sentence. Never restate the angle paragraph it came from." },
+    { "section": "legalityNote", "maxWords": 15, "rule": "One clause on what this item means for this merchant. Nothing else." }
+  ],
   "guardrails": [
     "Cite only captured evidence. No claim without a capture or an explicit inference label.",
     "Declare what the crawl could not see. Angle 6 in particular.",
     "Heavy evidence is named as such in the draft so the operator sees the pull.",
     "No pricing, no cost comparison between solutions, anywhere.",
-    "Shore-ups are never drafted for a business placed on the consumer side. The routing conditions are still listed for it, as facts, without a path."
+    "Shore-ups are never drafted for a business placed on the consumer side. The routing conditions are still listed for it, as facts, without a path.",
+    "Say each thing once, in the section that owns it. A reader who meets the same observation in the placement, an angle and a shore-up cannot tell whether it was found three times or said three times.",
+    "The word limits are limits, not targets. A section with little to say is short, and padding it to length is the same failure as running past it."
   ]
 }

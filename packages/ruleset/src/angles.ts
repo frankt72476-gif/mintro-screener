@@ -67,6 +67,16 @@ export type PlacementId = (typeof PLACEMENT_IDS)[number];
 /** The consumer half of the spectrum. Shore-ups are never drafted for these (guardrail 5). */
 export const CONSUMER_SIDE: readonly SpectrumId[] = ['consumer_retail', 'consumer_leaning'];
 
+/**
+ * The written sections a length limit applies to (angle set 1.1.0).
+ *
+ * Every one is present or the file is refused. A limit the data forgets is a section with no
+ * guidance at all — the prompt would render three limits and say nothing about the fourth, and the
+ * omission would read to the model as "this one is unbounded" rather than as a mistake.
+ */
+export const LIMITED_SECTIONS = ['placement', 'angle', 'shoreUp', 'legalityNote'] as const;
+export type LimitedSection = (typeof LIMITED_SECTIONS)[number];
+
 const idPattern = /^[a-z][a-z0-9_]*$/;
 const EYE_ITEM_PATTERN = /^EYE-\d{2}$/;
 
@@ -111,7 +121,30 @@ export const angleSetSchema = z
     placements: z.array(z.enum(PLACEMENT_IDS)),
     angles: z.array(angleSchema),
     routingConditions: z.array(routingConditionSchema),
+    /**
+     * How long each written section may run, and the rule that governs what goes in it.
+     *
+     * **The numbers live here and in no other artifact.** The prompt renders them and the answer
+     * schema's field descriptions are built from them, so a limit cannot be raised in one place and
+     * left standing in the other — the "two things that happen to agree" defect this repository has
+     * hit in four places, applied to a number rather than a sentence.
+     *
+     * `rule` is the qualitative half and travels verbatim, like a guardrail. A word count alone
+     * would say how much to write and nothing about what belongs there, which is the half that
+     * actually stops the same observation appearing in three sections.
+     */
+    limits: z.array(
+      z
+        .object({
+          section: z.enum(LIMITED_SECTIONS),
+          maxWords: z.number().int().positive(),
+          rule: z.string().min(1),
+        })
+        .strict(),
+    ),
     guardrails: z.array(z.string().min(1)).min(1),
+    /** One line per version, oldest first. What moved, and why — not a diff. */
+    changelog: z.array(z.string().min(1)).min(1),
   })
   .strict();
 
@@ -238,6 +271,43 @@ export function checkAngleSet(
       );
     }
   });
+
+  /*
+    Every limited section carries exactly one limit.
+
+    Missing and duplicated are both checked, and the second is the one worth stating: two limits for
+    `angle` would render both into the prompt, and the model would be told two different lengths for
+    one paragraph with nothing saying which wins.
+  */
+  const limited = angles.limits.map((limit) => limit.section);
+  for (const section of LIMITED_SECTIONS) {
+    const found = limited.filter((s) => s === section).length;
+    if (found === 1) continue;
+    defects.push(
+      defect(
+        'limits',
+        found === 0
+          ? `'${section}' has no length limit — the prompt would bound every other section and say nothing about this one`
+          : `'${section}' has ${found} length limits, and nothing says which the model should follow`,
+      ),
+    );
+  }
+
+  /*
+    The changelog names the current version.
+
+    A version bump whose reason is not written down is the ruling that reaches the data and not the
+    record — D-025's rule, which the rule set carries through `docs/DECISIONS.md` and this file
+    carries here, because an angle set version is what a stored draft is compared against.
+  */
+  if (!angles.changelog.some((line) => line.startsWith(`${angles.version} `))) {
+    defects.push(
+      defect(
+        'changelog',
+        `no line for version ${angles.version} — a bump with no entry leaves the reason for the change nowhere`,
+      ),
+    );
+  }
 
   // The spectrum is the closed vocabulary the draft's placement is checked against.
   const spectrum = angles.spectrum.map((entry) => entry.id);
