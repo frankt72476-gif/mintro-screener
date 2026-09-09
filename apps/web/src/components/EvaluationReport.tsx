@@ -42,6 +42,7 @@ import {
   type JSX,
   type RefObject,
 } from 'react';
+import { EVALUATION_POSTURE } from '@mintro/engine';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { formatStamp } from '../lib/format.js';
 import { useEvidenceDisclosure } from './EvidenceDisclosure.js';
@@ -292,11 +293,16 @@ function SummaryBlock({
             </span>
           )}
         </div>
-        <p className="eval-standing">
-          Mintro reviewed the public pages of this site and formed a view of what the business is
-          and where it fits. This is Mintro’s assessment. The underwriting decision belongs to the
-          team reviewing the account.
-        </p>
+        {/*
+          The sentence comes from the engine, because the capture asserts it in the delivered file.
+
+          It was written out here, and the capture of the first published evaluation was refused for
+          not carrying a posture statement — the check was still looking for the checklist's. A
+          sentence that lives in a component and does not reach the artifact is a sentence nobody
+          reads (D-246), and this document is a forwardable link: it may be opened with no covering
+          email by someone who has never heard of Mintro.
+        */}
+        <p className="eval-standing">{EVALUATION_POSTURE}</p>
         <dl className="eval-meta">
           <Meta
             label="Screened"

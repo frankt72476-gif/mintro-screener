@@ -64,8 +64,8 @@ import { claimNextEyeTest, runEyeTestJob } from '../src/eyeTestJob.js';
 import { claimNextEvaluation, finishEvaluation } from '../src/evaluationRequestJob.js';
 import {
   claimNextEvaluationCapture,
-  evaluationCaptureRefusal,
   finishEvaluationCapture,
+  runOf,
 } from '../src/evaluationCaptureJob.js';
 import { claimNextPublish, finishPublish, runPublish } from '../src/evaluationPublishJob.js';
 import { runEvaluationRequest } from '../src/evaluationRun.js';
@@ -548,10 +548,33 @@ async function main(argv: readonly string[]): Promise<number> {
       */
       const evaluationCapture = await claimNextEvaluationCapture(supabase, STALE_CLAIM_MS);
       if (evaluationCapture !== null) {
-        const refusal = evaluationCaptureRefusal();
-        if (refusal !== null) {
-          console.error(`  evaluation capture ${evaluationCapture.id} refused: ${refusal}`);
-          await finishEvaluationCapture(supabase, evaluationCapture.id, { failure: refusal });
+        const run = runOf(evaluationCapture);
+        if (run === null) {
+          const failure = 'the capture request names an evaluation that could not be read';
+          console.error(`  evaluation capture ${evaluationCapture.id} failed: ${failure}`);
+          await finishEvaluationCapture(supabase, evaluationCapture.id, { failure });
+          continue;
+        }
+
+        const browser = await chromium.launch();
+        try {
+          const captured = await captureRunReport(supabase, browser, {
+            runId: run,
+            webRoot: WEB_ROOT,
+          });
+          console.log(
+            `  captured evaluation ${(captured.bytes / 1048576).toFixed(1)} MB, ` +
+              `${captured.images} capture(s) → ${captured.storageKey}`,
+          );
+          await finishEvaluationCapture(supabase, evaluationCapture.id, {
+            storageKey: captured.storageKey,
+          });
+        } catch (error) {
+          const failure = error instanceof Error ? error.message : String(error);
+          console.error(`  evaluation capture ${evaluationCapture.id} failed: ${failure}`);
+          await finishEvaluationCapture(supabase, evaluationCapture.id, { failure });
+        } finally {
+          await browser.close();
         }
         continue;
       }
@@ -762,23 +785,18 @@ async function handle(
     }
 
     /*
-      The capture, at assembly.
+      The capture does not happen here any more (D-263).
 
-      Here rather than at send, because the artifact does not differ by path: a blocked package
-      goes to the agent with no IQwallet send and no comment link, and that path gets a link to
-      the same captured report. Delivery differs; the document does not.
+      It used to, at assembly, and the reasoning was sound while the artifact was the checklist: the
+      document did not differ by delivery path, so it was made once when the run closed. The
+      artifact is the **evaluation** now, and at assembly there is no evaluation — no draft, let
+      alone a published version. A capture taken here would be a capture of a page saying so.
 
-      After `assessRun`, so nothing is captured from a run this worker has not confirmed complete.
-      The run is already closed and immutable at this point (D-002) — the capture is a second
-      artifact derived from it, never a write back into it, and a failure here leaves a finished
-      run with no capture rather than an unfinished one.
+      So the capture is queued when the evaluation is published (0082), and `captureRunReport`
+      refuses a run without one. A finished run therefore has no capture until somebody publishes,
+      which is a true statement about the document: there is nothing to send yet.
+
     */
-    const captured = await captureRunReport(supabase, browser, { runId, webRoot: WEB_ROOT });
-    console.log(
-      `  captured ${(captured.bytes / 1048576).toFixed(1)} MB, ${captured.images} capture(s) ` +
-        `→ ${captured.storageKey}`,
-    );
-
     await settleThenFinish(progress, supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
     return { recycleBrowser: false };

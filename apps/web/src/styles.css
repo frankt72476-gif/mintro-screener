@@ -3824,16 +3824,21 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 .eval-chip-note{font-style:italic}
 
 /* ---------- section 6, collapsed until it is wanted ---------- */
-.eval-disclose{
-  display:flex;align-items:baseline;gap:10px;width:100%;
-  background:none;border:0;padding:0;margin:0 0 16px;cursor:pointer;text-align:left;font:inherit;
+.eval-disclose-head{
+  display:flex;align-items:baseline;gap:10px;
+  margin:0 0 16px;cursor:pointer;list-style:none;
 }
-.eval-disclose .eval-heading{margin:0}
+.eval-disclose-head::-webkit-details-marker{display:none}
+/* The caret is the marker, drawn so it turns with the element rather than beside it. */
+.eval-disclose-head::after{
+  content:"▸";margin-left:auto;font-size:11px;color:var(--slate);
+}
+.eval-disclose[open] > .eval-disclose-head::after{content:"▾"}
+.eval-disclose-head .eval-heading{margin:0}
 .eval-disclose-count{
   font-size:11px;letter-spacing:.04em;color:var(--ink-mid);font-variant-numeric:tabular-nums;
 }
-.eval-disclose-caret{margin-left:auto;font-size:11px;color:var(--slate)}
-.eval-disclose:hover .eval-heading,.eval-disclose:hover .eval-disclose-caret{color:var(--violet)}
+.eval-disclose-head:hover .eval-heading{color:var(--violet)}
 .eval-evidence[data-open="false"] .eval-line{margin-bottom:0}
 
 /*

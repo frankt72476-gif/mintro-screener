@@ -18,6 +18,7 @@ import {
   DETERMINATION_TERMS,
   DIRECTIVE_TERMS,
   REMEDY_TERMS,
+  EVALUATION_POSTURE,
   REPORT_POSTURE,
   auditCopy,
 } from '@mintro/engine';
@@ -29,6 +30,29 @@ import {
 } from '../src/capture/document.js';
 
 const RUN = '11111111-2222-4333-8444-555555555555';
+
+/**
+ * The published version every capture is of (D-263).
+ *
+ * `assertCapturable` refuses a file with no published version behind it — a draft or a checklist
+ * wearing the evaluation's name — so every fixture below carries one, and the two tests that care
+ * about the refusal state it themselves.
+ */
+const PUBLISHED = { version: 1, publishedAt: '2026-09-09T17:32:19.244Z' };
+
+/**
+ * The published masthead line every deliverable document carries.
+ *
+ * `assertCapturable` refuses a file that does not say which version it is (D-263), so a fixture
+ * without it would fail on that rather than on the thing the test is about. Added to the body
+ * rather than exempted from the check: the assertion is about the delivered document, and a fixture
+ * that could not satisfy it is not a fixture for one.
+ */
+const MASTHEAD =
+  `<span>Version ${PUBLISHED.version} · published 9 Sep 2026 by Frank Thomas</span>` +
+  // The evaluation's own standing sentence, which `assertCapturable` requires in the delivered
+  // bytes. The saved print-DOM fixture predates it and carries the checklist's (D-263).
+  `<p class="eval-standing">${EVALUATION_POSTURE}</p>`;
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
 /** A rendered page, near enough to what `page.content()` gives. */
@@ -37,7 +61,7 @@ function rendered(body: string, head = ''): string {
 }
 
 /** Padding, so a document under test clears the floor for reasons other than the one being tested. */
-const filler = `<p class="posture">${REPORT_POSTURE}</p><p>${'observation '.repeat(900)}</p>`;
+const filler = `<p class="posture">${EVALUATION_POSTURE}</p><p>${'observation '.repeat(900)}</p>`;
 
 function capture(
   body: string,
@@ -55,14 +79,14 @@ function capture(
 
 describe('assembling the document', () => {
   it('carries the noindex meta and the run it is about', () => {
-    const html = capture('<p>report</p>');
+    const html = capture(MASTHEAD + '<p>report</p>');
 
     expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
     expect(html).toContain(RUN);
   });
 
   it('inlines the stylesheet and the fonts, and links to neither', () => {
-    const html = capture('<p>report</p>', { head: '<link rel="stylesheet" href="/assets/index.css">' });
+    const html = capture(MASTHEAD + '<p>report</p>', { head: '<link rel="stylesheet" href="/assets/index.css">' });
 
     expect(html).toContain('.a{color:red}');
     expect(html).toContain('@font-face');
@@ -86,7 +110,7 @@ describe('assembling the document', () => {
   });
 
   it('replaces every image marker with its data URI', () => {
-    const html = capture('<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
+    const html = capture(MASTHEAD + '<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
       images: new Map([
         ['#mintro-capture-0', PNG],
         ['#mintro-capture-1', PNG],
@@ -103,7 +127,7 @@ describe('assembling the document', () => {
       file has no scripts by construction, so it is a scripting-disabled context, and whatever the
       app author wrote for that case is *shown* — in the middle of a screening report.
     */
-    const html = capture(
+    const html = capture(MASTHEAD + 
       '<p>report</p><script>alert(1)</script><noscript>Enable JavaScript to use this app.</noscript>',
       { head: '<script type="module" src="/assets/index.js"></script>' },
     );
@@ -114,7 +138,7 @@ describe('assembling the document', () => {
   });
 
   it('strips inline event handlers', () => {
-    const html = capture('<div onclick="steal()" onmouseover=\'x()\'>report</div>');
+    const html = capture(MASTHEAD + '<div onclick="steal()" onmouseover=\'x()\'>report</div>');
 
     expect(html).not.toContain('onclick');
     expect(html).not.toContain('onmouseover');
@@ -136,7 +160,7 @@ describe('assembling the document', () => {
 
 describe('what the file is refused for', () => {
   const ok = (body: string, images = 0): void =>
-    assertCapturable(capture(body), { images, runId: RUN });
+    assertCapturable(capture(MASTHEAD + body), { images, runId: RUN, published: PUBLISHED });
 
   it('accepts a document that is fit to deliver', () => {
     // The control. Without it every refusal below would pass against a guard that refuses
@@ -150,8 +174,8 @@ describe('what the file is refused for', () => {
       nothing, a serialization that returned a shell, a page that errored into a blank state —
       every one of those satisfies "no scripts, no external references" perfectly.
     */
-    expect(() => assertCapturable('', { images: 0, runId: RUN })).toThrow(/floor|bytes/i);
-    expect(() => assertCapturable('<html></html>', { images: 0, runId: RUN })).toThrow(/floor|bytes/i);
+    expect(() => assertCapturable('', { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/floor|bytes/i);
+    expect(() => assertCapturable('<html></html>', { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/floor|bytes/i);
     expect(CAPTURE_SIZE_FLOOR_BYTES).toBeGreaterThan(0);
   });
 
@@ -159,7 +183,7 @@ describe('what the file is refused for', () => {
     // 40 MB, and it fails the job. It does not warn and proceed.
     const huge = capture(`<p>${'x'.repeat(CAPTURE_SIZE_CEILING_BYTES)}</p>`);
 
-    expect(() => assertCapturable(huge, { images: 0, runId: RUN })).toThrow(/ceiling/);
+    expect(() => assertCapturable(huge, { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/ceiling/);
   });
 
   it('refuses a surviving script, noscript, link or @import', () => {
@@ -171,25 +195,26 @@ describe('what the file is refused for', () => {
     ] as const) {
       // Assembled around the stripper rather than through it — this asserts the *check*, so it is
       // given a document the stripper never saw.
-      const html = capture('<p>report</p>').replace('</body>', `${body}</body>`);
-      expect(() => assertCapturable(html, { images: 0, runId: RUN }), body).toThrow(pattern);
+      const html = capture(MASTHEAD + '<p>report</p>').replace('</body>', `${body}</body>`);
+      expect(() => assertCapturable(html, { images: 0, runId: RUN, published: PUBLISHED }), body).toThrow(pattern);
     }
   });
 
   it('refuses a missing noindex meta', () => {
-    const html = capture('<p>report</p>').replace(
+    const html = capture(MASTHEAD + '<p>report</p>').replace(
       '<meta name="robots" content="noindex, nofollow">',
       '',
     );
 
-    expect(() => assertCapturable(html, { images: 0, runId: RUN })).toThrow(/noindex/);
+    expect(() => assertCapturable(html, { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/noindex/);
   });
 
   it('refuses a document about a different run', () => {
     expect(() =>
-      assertCapturable(capture('<p>report</p>'), {
+      assertCapturable(capture(MASTHEAD + '<p>report</p>'), {
         images: 0,
         runId: '99999999-9999-4999-8999-999999999999',
+        published: PUBLISHED,
       }),
     ).toThrow(/not the document/);
   });
@@ -201,8 +226,8 @@ describe('what the file is refused for', () => {
       '<div style="background:url(/assets/x.png)"></div>',
       '<video poster="https://cdn.test/p.jpg"></video>',
     ]) {
-      const html = capture('<p>report</p>').replace('</body>', `${body}</body>`);
-      expect(() => assertCapturable(html, { images: 0, runId: RUN }), body).toThrow(/not inline/);
+      const html = capture(MASTHEAD + '<p>report</p>').replace('</body>', `${body}</body>`);
+      expect(() => assertCapturable(html, { images: 0, runId: RUN, published: PUBLISHED }), body).toThrow(/not inline/);
     }
   });
 
@@ -212,14 +237,14 @@ describe('what the file is refused for', () => {
       are the evidence trail. What must not survive is a *relative* one: the origin it resolves
       against is wherever the file happens to be sitting.
     */
-    const cited = capture('<a href="https://merchant.test/collections/weight-loss">source</a>');
-    expect(() => assertCapturable(cited, { images: 0, runId: RUN })).not.toThrow();
+    const cited = capture(MASTHEAD + '<a href="https://merchant.test/collections/weight-loss">source</a>');
+    expect(() => assertCapturable(cited, { images: 0, runId: RUN, published: PUBLISHED })).not.toThrow();
 
-    const fragment = capture('<a href="#finding-4">GATE-002</a>');
-    expect(() => assertCapturable(fragment, { images: 0, runId: RUN })).not.toThrow();
+    const fragment = capture(MASTHEAD + '<a href="#finding-4">GATE-002</a>');
+    expect(() => assertCapturable(fragment, { images: 0, runId: RUN, published: PUBLISHED })).not.toThrow();
 
-    const relative = capture('<a href="/report/other">other</a>');
-    expect(() => assertCapturable(relative, { images: 0, runId: RUN })).toThrow(/not inline/);
+    const relative = capture(MASTHEAD + '<a href="/report/other">other</a>');
+    expect(() => assertCapturable(relative, { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/not inline/);
   });
 
   it('refuses a marker whose bytes could not be fetched', () => {
@@ -229,11 +254,11 @@ describe('what the file is refused for', () => {
       a `src` that is not a data URI is a request the file would make. Either is a job failure;
       what matters is that the report does not go with a hole where a screenshot should be.
     */
-    const html = capture('<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
+    const html = capture(MASTHEAD + '<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
       images: new Map([['#mintro-capture-0', PNG]]),
     });
 
-    expect(() => assertCapturable(html, { images: 2, runId: RUN })).toThrow(/not inline/);
+    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(/not inline/);
   });
 
   it('refuses a report holding fewer captures than the page displayed', () => {
@@ -242,23 +267,23 @@ describe('what the file is refused for', () => {
       properly inline, and one the page displayed is simply not there. Nothing else in the suite
       would notice — which is exactly why "some of the images inlined" must not read as success.
     */
-    const html = capture('<img src="#mintro-capture-0">', {
+    const html = capture(MASTHEAD + '<img src="#mintro-capture-0">', {
       images: new Map([['#mintro-capture-0', PNG]]),
     });
 
-    expect(() => assertCapturable(html, { images: 2, runId: RUN })).toThrow(/inlines 1 image/);
-    expect(() => assertCapturable(html, { images: 1, runId: RUN })).not.toThrow();
+    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(/inlines 1 image/);
+    expect(() => assertCapturable(html, { images: 1, runId: RUN, published: PUBLISHED })).not.toThrow();
   });
 
   it('accepts when every displayed capture is inline', () => {
-    const html = capture('<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
+    const html = capture(MASTHEAD + '<img src="#mintro-capture-0"><img src="#mintro-capture-1">', {
       images: new Map([
         ['#mintro-capture-0', PNG],
         ['#mintro-capture-1', PNG],
       ]),
     });
 
-    expect(() => assertCapturable(html, { images: 2, runId: RUN })).not.toThrow();
+    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).not.toThrow();
   });
 });
 
@@ -312,7 +337,8 @@ describe('the real print DOM', () => {
 
   const captureFixture = (markers: number, images = allMarked): string =>
     assembleCapture({
-      html: markUp(fixture, markers),
+      // The published masthead, as every deliverable document carries it (D-263).
+      html: markUp(fixture, markers).replace('<body>', `<body>${MASTHEAD}`),
       css: [bulkCss],
       fontCss: '@font-face{font-family:X;src:url(data:font/woff2;base64,AA) format("woff2")}',
       images,
@@ -323,7 +349,7 @@ describe('the real print DOM', () => {
   it('delivers when every image is marked and inlined', () => {
     const html = captureFixture(3);
 
-    expect(() => assertCapturable(html, { images: 3, runId: RUN })).not.toThrow();
+    expect(() => assertCapturable(html, { images: 3, runId: RUN, published: PUBLISHED })).not.toThrow();
     expect(html.match(/src="data:image\/png/g)).toHaveLength(3);
   });
 
@@ -338,7 +364,7 @@ describe('the real print DOM', () => {
     const html = captureFixture(2);
 
     expect(html).toContain('/brand/mintro-lockup-full.png');
-    expect(() => assertCapturable(html, { images: 3, runId: RUN })).toThrow(/not inline/);
+    expect(() => assertCapturable(html, { images: 3, runId: RUN, published: PUBLISHED })).toThrow(/not inline/);
   });
 
   it('strips the bundle, the font link and the noscript out of the real shape', () => {
@@ -367,20 +393,31 @@ describe('the real print DOM', () => {
  * The one sentence that has to survive into the artifact.
  *
  * A captured report is a forwardable link. Someone at the sponsoring bank may open it with no
- * covering email, having never heard of Mintro, and `REPORT_POSTURE` is the only thing in the
+ * covering email, having never heard of Mintro, and `EVALUATION_POSTURE` is the only thing in the
  * document that tells them what they are reading. Anything that lived only in `send.ts` would not
  * have travelled with it.
  */
 describe('what the report says about itself', () => {
   it('is required in the delivered file', () => {
-    const without = capture('<p>report</p>').replace(REPORT_POSTURE, '');
+    const without = capture('<p>report</p>').replace(EVALUATION_POSTURE, '');
 
-    expect(() => assertCapturable(without, { images: 0, runId: RUN })).toThrow(/statement of what it is/);
+    expect(() => assertCapturable(without, { images: 0, runId: RUN, published: PUBLISHED })).toThrow(/statement of what it is/);
   });
 
-  it('is present in the real print DOM', () => {
-    // In the fixture because ReportView renders it into the masthead. If it is ever moved out of
-    // the captured surface, this fails alongside the guard rather than after it.
+  /*
+    Retired as a guard on the captured surface (D-256, D-263).
+
+    It asserted that the saved print DOM carries the posture sentence, on the reasoning that moving
+    the sentence out of the captured surface should fail here rather than after. That fixture is a
+    snapshot of the **checklist**, and the checklist is no longer what gets captured — the
+    evaluation is, and it carries its own sentence, guarded where it renders
+    (`evaluationReport.test.ts`, "carries the standing sentence about who decides") and in the
+    delivered bytes by `assertCapturable`.
+
+    Kept as a statement about the fixture rather than deleted: the fixture is still the checklist's,
+    and it should still say what that document said.
+  */
+  it('is present in the checklist fixture, which is no longer the captured surface', () => {
     const fixture = readFileSync('apps/worker/test/fixtures/print-dom.html', 'utf8');
 
     expect(fixture).toContain(REPORT_POSTURE);
@@ -395,14 +432,14 @@ describe('what the report says about itself', () => {
       and IQwallet makes them. "Things" is doing deliberate work in this sentence.
     */
     for (const terms of [DIRECTIVE_TERMS, DETERMINATION_TERMS, CHARACTERISATION_TERMS, REMEDY_TERMS]) {
-      expect(auditCopy(REPORT_POSTURE, terms).flagged).toEqual([]);
+      expect(auditCopy(EVALUATION_POSTURE, terms).flagged).toEqual([]);
     }
   });
 
   it('holds on the blocked-package path, where IQwallet never receives it', () => {
     // "Before the underwriting team makes its boarding decision" describes a sequence, not a
     // recipient — so the sentence stays true when the report goes only to the agent.
-    expect(REPORT_POSTURE).not.toContain('IQwallet');
-    expect(REPORT_POSTURE).not.toMatch(/attached|enclosed|this email/i);
+    expect(EVALUATION_POSTURE).not.toContain('IQwallet');
+    expect(EVALUATION_POSTURE).not.toMatch(/attached|enclosed|this email/i);
   });
 });

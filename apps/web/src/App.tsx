@@ -11,10 +11,23 @@ import { parseRuleset, type Ruleset } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
 import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
+import type { EvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { EvaluationEditor } from './components/EvaluationEditor.js';
+import { EvaluationReport } from './components/EvaluationReport.js';
+import {
+  EvaluationEvidence,
+  EvaluationNotChecked,
+  anchoredRuleIds,
+} from './components/EvaluationEvidence.js';
+import { EvidenceDisclosureProvider } from './components/EvidenceDisclosure.js';
+import type {
+  FindingState,
+  StoredDraft,
+  StoredHandles,
+} from './lib/evaluationView.js';
 import { RunActions } from './components/RunActions.js';
 import { EVALUATION_LABELS } from './lib/evaluationLabels.js';
 import { AccessLogPane, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
@@ -134,8 +147,43 @@ function openRequest(): string | null {
  * rather than a fetch. What `docs/ARCHITECTURE.md` rules out is a second *template*, because two
  * templates drift; one component with two data sources cannot say two different things.
  */
+/**
+ * The published evaluation, as the capture needs it (D-263).
+ *
+ * The whole document travels in the payload rather than being read from the database by the page:
+ * the capture runs against a static build with no session, and a render that queried would be a
+ * render that could come back different on a retry. The worker reads it once and injects it.
+ */
+interface InjectedEvaluation {
+  readonly content: StoredDraft;
+  readonly version: number;
+  readonly publishedAt: string;
+  readonly operator: string;
+  /** The handle mapping the draft was written against (0078), so every chip resolves. */
+  readonly handles: StoredHandles;
+  readonly findings: readonly {
+    readonly id: string;
+    readonly ruleId: string;
+    readonly state: FindingState;
+    readonly evidenceKey: string | null;
+  }[];
+  readonly evidenceRows: readonly { readonly key: string; readonly kind: string; readonly url: string }[];
+  readonly rulesetVersion: string;
+  readonly anglesVersion: string;
+  readonly model: string;
+}
+
 interface InjectedPrint {
   readonly report: ScreeningReport;
+  /**
+   * The published evaluation this capture is of (D-263).
+   *
+   * The capture renders the evaluation, not the checklist. `assertCapturable` requires a published
+   * version and `evaluationCaptureRefusal` refuses the job without one, so by the time a payload
+   * exists this is present — but it is optional in the type because the *browser* print route can
+   * be reached for a run that has none, and that route says so rather than rendering nothing.
+   */
+  readonly evaluation?: InjectedEvaluation;
   /**
    * What the merchant stated about what no crawl can see (D-134).
    *
@@ -1858,20 +1906,102 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
 
   usePrintReady(injected.report);
 
+  /*
+    The evaluation, and only the evaluation (D-263).
+
+    This is the document that reaches an underwriter. `ReportView` is not rendered here any more —
+    the checklist is the appendix now, mounted as sections 6 and 7 inside the evaluation, and
+    rendering both would put two mastheads and two verdicts in one file.
+
+    `attestations`, `commentary` and `eyeTest` still arrive in the payload and nothing reads them.
+    Left in place rather than removed: the worker still resolves them, and taking them out of the
+    payload is the same decision as taking the components out of the tree — cluster 5's, not this
+    commit's.
+  */
+  if (injected.evaluation === undefined) {
+    return (
+      <div className="shell">
+        <main className="main">
+          <div className="empty">
+            This run has no published evaluation, so there is nothing to capture.
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="shell">
       <main className="main">
         <PrintHeader report={injected.report} />
-        <ReportView
+        <PublishedEvaluation
+          injected={injected.evaluation}
           report={injected.report}
           access={access}
-          print
-          {...commentaryProps(injected.commentary, injected.report)}
-          {...(injected.attestations === undefined ? {} : { attestations: injected.attestations })}
-          eyeTest={injected.eyeTest ?? null}
         />
       </main>
     </div>
+  );
+}
+
+/**
+ * A published evaluation, rendered read-only for the capture (D-263).
+ *
+ * Three things this must be and the type is what makes them so: **no `edit` prop**, so there is no
+ * control in the file; a `published` masthead, so the document says which version it is and who
+ * published it rather than saying Draft; and the evidence section **present but collapsed**.
+ *
+ * Collapsed matters for the artifact. `EvidenceDisclosureProvider` renders the rows with `hidden`
+ * rather than omitting them, so every anchor a chip points at is in the delivered bytes — the file
+ * is one document a reader opens and expands, not one that drops half its evidence to be shorter.
+ * Without the provider the section renders open, which is the right default for a screen nothing
+ * can toggle and the wrong one for a hundred rules under a four-section conclusion.
+ */
+function PublishedEvaluation({
+  injected,
+  report,
+  access,
+}: {
+  readonly injected: InjectedEvaluation;
+  readonly report: ScreeningReport;
+  readonly access: EvidenceAccess;
+}): JSX.Element {
+  const run = useMemo(
+    () => ({
+      runId: report.runId,
+      merchantDomain: report.merchantDomain,
+      screenedAt: report.finishedAt ?? null,
+      rulesetVersion: injected.rulesetVersion,
+      anglesVersion: injected.anglesVersion,
+      model: injected.model,
+      handles: injected.handles,
+      findings: injected.findings,
+      evidence: injected.evidenceRows,
+      anchoredRuleIds: anchoredRuleIds(report),
+    }),
+    [injected, report],
+  );
+
+  return (
+    <EvidenceDisclosureProvider>
+      <EvaluationReport
+        draft={injected.content}
+        run={run}
+        access={access}
+        labels={EVALUATION_LABELS}
+        published={{
+          at: injected.publishedAt,
+          operator: injected.operator,
+          version: injected.version,
+        }}
+        appendix={
+          <>
+            <EvaluationEvidence report={report} access={access} />
+            <EvaluationNotChecked report={report} />
+          </>
+        }
+      />
+    </EvidenceDisclosureProvider>
   );
 }
 

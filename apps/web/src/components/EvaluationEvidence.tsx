@@ -174,29 +174,30 @@ export function EvaluationEvidence({
         id={evaluationSectionAnchor('evidence')}
         data-open={String(open)}
       >
-        {disclosure === null ? (
-          <SectionHeading />
-        ) : (
-          <button
-            type="button"
-            className="eval-disclose"
-            onClick={disclosure.toggle}
-            aria-expanded={open}
-            aria-controls={EVIDENCE_BODY_ID}
-          >
+        {/*
+          A native disclosure, not a button and a `hidden` div.
+
+          The captured file has no JavaScript — `assertCapturable` refuses a `<script>` outright —
+          so a React toggle in the delivered document is a control that cannot open, guarding a
+          hundred rules the reader can then never reach. The first capture of a published evaluation
+          had exactly that: 59 rule anchors present in the bytes and no way to see one.
+
+          `<details>` is the same behaviour on both surfaces and needs nothing to work. On the screen
+          the provider still drives `open`, so a finding chip can reveal a row; in the file the
+          reader clicks the summary. Collapsed by default and reachable, rather than collapsed by
+          default and sealed.
+        */}
+        <details className="eval-disclose" open={open}>
+          <summary className="eval-disclose-head" onClick={disclosure?.toggle}>
             <SectionHeading />
             <span className="eval-disclose-count">{ruleCount(report)}</span>
-            <span className="eval-disclose-caret" aria-hidden="true">
-              {open ? '▾' : '▸'}
-            </span>
-          </button>
-        )}
-        <p className="eval-line">
-          Every rule this run checked, with the capture behind it. The angles above cite into this
-          section.
-        </p>
+          </summary>
+          <p className="eval-line">
+            Every rule this run checked, with the capture behind it. The angles above cite into this
+            section.
+          </p>
 
-        <div id={EVIDENCE_BODY_ID} hidden={!open}>
+          <div id={EVIDENCE_BODY_ID}>
         <StoppingPanel
           report={report}
           parts={parts}
@@ -239,7 +240,8 @@ export function EvaluationEvidence({
             print
           />
         )}
-        </div>
+          </div>
+        </details>
       </section>
     </NumberingContext.Provider>
   );

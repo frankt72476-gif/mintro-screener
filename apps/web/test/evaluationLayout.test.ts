@@ -673,11 +673,25 @@ describe('a chip says whether it goes anywhere', () => {
 /* ── 5. the evidence section is collapsed until it is wanted ──────────────────────────────────── */
 
 describe('section 6 opens on request', () => {
+  /*
+    A native `<details>`, not a scripted toggle.
+
+    The captured file has no JavaScript — `assertCapturable` refuses a `<script>` — so a React
+    button in the delivered document is a control that cannot open, guarding a hundred rules the
+    reader can then never reach. The first capture of a published evaluation had exactly that.
+  */
   it('is collapsed under a count when something can open it', () => {
     const markup = evidence(true);
     expect(markup).toContain('data-open="false"');
-    expect(markup).toContain('aria-expanded="false"');
-    expect(markup).toMatch(/<div id="evaluation-evidence-body"[^>]*hidden/);
+    expect(markup).toContain('<details class="eval-disclose">');
+    expect(markup).toContain('<summary');
+  });
+
+  it('opens without a script, so the file can be read as delivered', () => {
+    const markup = evidence(true);
+    // No button, and nothing that needs an event handler to reveal the rows.
+    expect(markup).not.toContain('eval-disclose"><button');
+    expect(markup).not.toMatch(/<div id="evaluation-evidence-body"[^>]*hidden/);
   });
 
   it('states how many rules are inside, as a size and not a score', () => {
@@ -690,7 +704,7 @@ describe('section 6 opens on request', () => {
     */
     const markup = evidence(true);
     const toggle = text(
-      markup.slice(markup.indexOf('<button'), markup.indexOf('</button>')),
+      markup.slice(markup.indexOf('<summary'), markup.indexOf('</summary>')),
     );
     const rules = new Set(
       REPORT.categories.flatMap((category) => category.findings.map((f) => f.ruleId)),
@@ -711,8 +725,7 @@ describe('section 6 opens on request', () => {
   it('is open when no disclosure is controlling it', () => {
     const markup = evidence(false);
     expect(markup).toContain('data-open="true"');
-    expect(markup).not.toContain('eval-disclose');
-    expect(markup).not.toMatch(/<div id="evaluation-evidence-body"[^>]*hidden/);
+    expect(markup).toContain('<details class="eval-disclose" open');
   });
 
   /*
@@ -733,9 +746,14 @@ describe('section 6 opens on request', () => {
     }
   });
 
-  it('names what the toggle controls, so the control and the region are joined', () => {
+  /*
+    `<details>` joins the control to the region by containing it, which is why there is no
+    `aria-controls` any more: the summary and the rows are one element, and the browser announces
+    the state itself.
+  */
+  it('contains the region it controls', () => {
     const markup = evidence(true);
-    expect(markup).toContain('aria-controls="evaluation-evidence-body"');
     expect(markup).toContain('id="evaluation-evidence-body"');
+    expect(markup.indexOf('<summary')).toBeLessThan(markup.indexOf('id="evaluation-evidence-body"'));
   });
 });

@@ -601,6 +601,28 @@ export const EYE_TEST_TERMS: readonly string[] = [
  * screen, a signed-in audience, and a different thing to say. Two audiences, two strings. Merging
  * them would make one of them wrong somewhere, and it is not obvious which.
  */
+/**
+ * What the **evaluation** is, in the delivered bytes (D-263).
+ *
+ * `REPORT_POSTURE` is the checklist's sentence and says what that document was: a record of what
+ * was found, surfaced early. This document is a different claim — Mintro formed a view — and the
+ * layout memo writes the replacement in as many words, ratified with the rest of the masthead.
+ *
+ * It lives here for the reason `REPORT_POSTURE` does, and the reason is the check that reads it.
+ * `assertCapturable` asserts the sentence is in the file, because the evaluation is delivered as a
+ * forwardable link: someone at the sponsoring bank may open it with no covering email and no idea
+ * who Mintro is, and this is the only thing in the document that tells them. A sentence that lived
+ * in a component and did not reach the artifact would be a sentence nobody reads (D-246).
+ *
+ * The last clause is not decoration. D-256 and hard constraint 7: Mintro states a view and the
+ * decision belongs to the underwriter, and the document says so where it cannot be separated from
+ * the assessment it qualifies.
+ */
+export const EVALUATION_POSTURE =
+  'Mintro reviewed the public pages of this site and formed a view of what the business is and ' +
+  'where it fits. This is Mintro’s assessment. The underwriting decision belongs to the team ' +
+  'reviewing the account.';
+
 export const REPORT_POSTURE =
   'Mintro reviewed the public pages of this site and recorded what it found. The point is to ' +
   "surface things early, while there's time to address them, before the underwriting team makes " +

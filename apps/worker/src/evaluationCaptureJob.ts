@@ -1,38 +1,30 @@
 /**
- * The published evaluation's capture, and why this refuses to make one yet (D-261).
+ * The queue that turns a published evaluation into a delivered file (D-263).
  *
- * ## What this exists to prevent
+ * ## It used to refuse
  *
- * `captureRunReport` renders the built app's print route, and that route renders `ReportView` — the
- * **checklist** report. It knows nothing about the evaluation layout: no summary block, no angles,
- * no placement, no operator note. Cluster 4 teaches it; until then, running it against a published
- * evaluation would produce a perfectly valid capture of the wrong document and file it as the
- * published evaluation's artifact.
+ * While the capture route rendered the checklist, this job returned a refusal on every request:
+ * capturing would have filed a document with no summary block and no angles as the evaluation
+ * itself, and the send path links to that file. The failure would not have been a missing file —
+ * it would have been an underwriter opening "the evaluation" and reading a rule checklist, on a job
+ * that reported success.
  *
- * That artifact is what a send links to. So the failure mode is not a missing file — it is an
- * underwriter opening "the evaluation" and reading a rule checklist, with nothing anywhere saying
- * the two are different. Nobody would find it by looking at the queue, because the job would have
- * succeeded.
+ * The route renders the evaluation now, so the refusal is gone and the render is here. What
+ * survives of it is the shape: `captureRunReport` refuses a run with no published version, before
+ * the browser starts, and `assertCapturable` refuses a file that does not say which version it is.
+ * A draft cannot be captured and therefore cannot be sent.
  *
- * ## So it fails, loudly, and writes nothing
+ * ## One request per published version
  *
- * The request goes to `failed` with a reason an operator reads. No object is written, no
- * `storage_key` is set, and `finished_evaluation_captures_have_a_file` would refuse a `done` row
- * without one anyway — the constraint and this agree, which is the arrangement 0014 already has.
- *
- * The publish itself is unaffected: the evaluation row is written and immutable, and the capture is
- * a second artifact derived from it. A run may sit with a published evaluation and a failed capture,
- * which is a true statement about where this system is.
- *
- * **This is a placeholder with a name.** Cluster 4 replaces `evaluationCaptureRefusal` with a render
- * against the evaluation route; nothing else here changes. Written as a function rather than as a
- * `throw` in the loop so the refusal is a value a test can ask about, and so the day it stops
- * refusing is a diff on one line.
+ * Keyed on the evaluation rather than the run. A run can have several published versions, each its
+ * own immutable document, and a queue that named only the run could not say which one a file was
+ * of.
  */
 
 import type { WorkerSupabase } from './store/supabase.js';
 
-const SELECT = 'id, evaluation_id, requested_by, status, claimed_at';
+const SELECT =
+  'id, evaluation_id, requested_by, status, claimed_at, evaluations ( run_id, version )';
 
 export interface EvaluationCaptureRequest {
   readonly id: string;
@@ -40,23 +32,19 @@ export interface EvaluationCaptureRequest {
   readonly requested_by: string;
   readonly status: string;
   readonly claimed_at: string | null;
+  /**
+   * The run and version this capture is of, joined at claim time.
+   *
+   * The queue is keyed on the evaluation because each published version is its own document, and
+   * the capture needs the run to read the findings the evaluation cites into. Read here rather
+   * than in a second query so the row the worker holds is the whole request.
+   */
+  readonly evaluations: { readonly run_id: string; readonly version: number } | null;
 }
 
-/**
- * Why this capture cannot be made, or `null` when it can.
- *
- * Always a refusal today. It returns a string rather than throwing because the caller's job is to
- * write the reason onto the queue row, and a thrown error would have to be caught and stringified
- * to get there — losing the guarantee that the reason is the one written here.
- */
-export function evaluationCaptureRefusal(): string | null {
-  return (
-    'The capture route renders the checklist report, not the evaluation. Capturing this ' +
-    'published evaluation would file a document with no summary block, no angles and no ' +
-    'placement as the evaluation itself, and the send path links to that file. Refused until the ' +
-    'route renders the evaluation layout (cluster 4). The published version is unaffected and ' +
-    'stays readable; only its capture is missing.'
-  );
+/** The run this request is for, or `null` when the join found nothing. */
+export function runOf(request: EvaluationCaptureRequest): string | null {
+  return request.evaluations?.run_id ?? null;
 }
 
 export async function claimNextEvaluationCapture(

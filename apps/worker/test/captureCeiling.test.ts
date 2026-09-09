@@ -21,12 +21,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { REPORT_POSTURE } from '@mintro/engine';
+import { EVALUATION_POSTURE } from '@mintro/engine';
 import type { WorkerSupabase } from '../src/store/supabase.js';
 import { deliverCapture } from '../src/captureJob.js';
 import { CAPTURE_SIZE_CEILING_BYTES, assembleCapture } from '../src/capture/document.js';
 
 const RUN = '11111111-2222-4333-8444-555555555555';
+
+/** The published version the ceiling test's documents are of (D-263). */
+const PUBLISHED = { version: 1, publishedAt: '2026-09-09T17:32:19.244Z' };
 
 interface Attempts {
   readonly uploads: { key: string; bytes: number }[];
@@ -69,7 +72,11 @@ function recordingSupabase(): { supabase: WorkerSupabase; attempts: Attempts } {
 function documentOf(bytes: number): string {
   const shell =
     `<!DOCTYPE html><html lang="en" class="printing"><head><title>a</title></head>` +
-    `<body><p class="posture">${REPORT_POSTURE}</p>PADDING</body></html>`;
+    `<body><p class="posture">${EVALUATION_POSTURE}</p>` +
+    // The published masthead: `assertCapturable` refuses a file that does not say which version
+    // it is, and a fixture that could not satisfy that is not a deliverable document (D-263).
+    `<span>Version ${PUBLISHED.version} · published 9 Sep 2026 by Frank Thomas</span>` +
+    `PADDING</body></html>`;
 
   const assembled = assembleCapture({
     html: shell.replace('PADDING', ''),
@@ -101,6 +108,7 @@ describe('a document over the ceiling', () => {
         runId: RUN,
         html: documentOf(CAPTURE_SIZE_CEILING_BYTES + 1),
         images: 0,
+        published: PUBLISHED,
       }),
     ).rejects.toThrow(/ceiling/);
   });
@@ -118,6 +126,7 @@ describe('a document over the ceiling', () => {
         runId: RUN,
         html: documentOf(CAPTURE_SIZE_CEILING_BYTES + 1),
         images: 0,
+        published: PUBLISHED,
       }),
     ).rejects.toThrow();
 
@@ -136,6 +145,7 @@ describe('a document over the ceiling', () => {
       runId: RUN,
       html: documentOf(CAPTURE_SIZE_CEILING_BYTES - 1024),
       images: 0,
+      published: PUBLISHED,
     });
 
     expect(attempts.uploads).toHaveLength(1);

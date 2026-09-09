@@ -40,6 +40,7 @@ import { cssUrlReferences, hoistPrintRules, stripImports } from './capture/css.j
 import { fontFaceCss } from './capture/fonts.js';
 import { storeReportCapture, type StoredCapture } from './reportCaptureStore.js';
 import { signEvidenceUrl, type WorkerSupabase } from './store/supabase.js';
+import { readPublishedEvaluation } from './evaluationCapture.js';
 
 export interface CaptureJobResult extends StoredCapture {
   readonly runId: string;
@@ -60,6 +61,25 @@ export async function captureRunReport(
   input: { readonly runId: string; readonly webRoot: string },
 ): Promise<CaptureJobResult> {
   const report = await loadReport(supabase, input.runId);
+
+  /*
+    No published evaluation, no capture (D-263).
+
+    The route this renders is the evaluation now, so a run without one produces a page saying so —
+    and a file of that page would be a capture of an absence, stored under a name that says it is
+    the report. Refused here, before the browser starts, rather than caught by `assertCapturable`
+    after a render nobody needed.
+
+    This is also what makes "a draft cannot be sent" structural: `send.ts` refuses to compose
+    without a capture, and a capture cannot exist without a published version.
+  */
+  const published = await readPublishedEvaluation(supabase, input.runId);
+  if (published === null) {
+    throw new Error(
+      `run ${input.runId} has no published evaluation, so there is nothing to capture. The ` +
+        'evaluation is the report (D-256); a run is captured when its evaluation is published.',
+    );
+  }
 
   // Signed URLs for the page to render from. Not for the file — see the header.
   const evidence = await signCitedCaptures(supabase, report);
@@ -87,7 +107,26 @@ export async function captureRunReport(
         commentary,
         eyeTest,
         ...(attestations === undefined ? {} : { attestations }),
-      },
+        /*
+          The evaluation, which is what the page renders.
+
+          `commentary`, `eyeTest` and `attestations` still travel and nothing reads them. Left in
+          the payload rather than removed: taking them out is the same decision as taking the
+          components out of the tree, and that is cluster 5's.
+        */
+        evaluation: {
+          content: published.content,
+          version: published.version,
+          publishedAt: published.publishedAt,
+          operator: published.operator,
+          handles: published.handles,
+          rulesetVersion: published.rulesetVersion,
+          anglesVersion: published.anglesVersion,
+          model: published.model,
+          findings: (await readFindings(supabase, input.runId)),
+          evidenceRows: (await readEvidenceRows(supabase, input.runId)),
+        },
+      } as never,
     });
 
     /*
@@ -125,12 +164,48 @@ export async function captureRunReport(
       runId: input.runId,
       html,
       images: rendered.images.total,
+      published: { version: published.version, publishedAt: published.publishedAt },
     });
 
     return { ...stored, runId: input.runId, images: rendered.images.total };
   } finally {
     await server.close();
   }
+}
+
+/** The run's findings, as the evaluation's chips resolve through them. */
+async function readFindings(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<{ id: string; ruleId: string; state: string; evidenceKey: string | null }[]> {
+  const { data, error } = await supabase.client
+    .from('findings')
+    .select('id, rule_id, state, evidence_key')
+    .eq('run_id', runId);
+  if (error !== null) throw new Error(`could not read findings: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row['id'] as string,
+    ruleId: row['rule_id'] as string,
+    state: row['state'] as string,
+    evidenceKey: (row['evidence_key'] as string | null) ?? null,
+  }));
+}
+
+/** The stored captures, so an `E` chip can say which page it is of. */
+async function readEvidenceRows(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<{ key: string; kind: string; url: string }[]> {
+  const { data, error } = await supabase.client
+    .from('evidence')
+    .select('key, kind, url')
+    .eq('run_id', runId);
+  if (error !== null) throw new Error(`could not read evidence: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    key: row['key'] as string,
+    kind: row['kind'] as string,
+    url: row['url'] as string,
+  }));
 }
 
 /**
@@ -148,9 +223,19 @@ export async function captureRunReport(
  */
 export async function deliverCapture(
   supabase: WorkerSupabase,
-  input: { readonly runId: string; readonly html: string; readonly images: number },
+  input: {
+    readonly runId: string;
+    readonly html: string;
+    readonly images: number;
+    /** The published version this file is of, asserted in the bytes before anything is written. */
+    readonly published: { readonly version: number; readonly publishedAt: string };
+  },
 ): Promise<StoredCapture> {
-  assertCapturable(input.html, { images: input.images, runId: input.runId });
+  assertCapturable(input.html, {
+    images: input.images,
+    runId: input.runId,
+    published: input.published,
+  });
 
   return storeReportCapture(supabase, {
     runId: input.runId,
@@ -170,7 +255,7 @@ export async function deliverCapture(
  * synthesising a visual capture that did not occur, and an empty `src` in a delivered report would
  * be exactly that, a finding presenting as though it had a screenshot.
  */
-async function inlineImages(
+export async function inlineImages(
   supabase: WorkerSupabase,
   markers: ReadonlyMap<string, CaptureImageSource>,
 ): Promise<Map<string, string>> {
@@ -252,7 +337,7 @@ function contentTypeFor(key: string): string {
  * the internet: a captured report may not depend on a third party at capture time any more than at
  * reading time.
  */
-async function inlineStylesheetUrls(css: string, origin: string): Promise<string> {
+export async function inlineStylesheetUrls(css: string, origin: string): Promise<string> {
   let out = css;
 
   for (const reference of cssUrlReferences(css)) {

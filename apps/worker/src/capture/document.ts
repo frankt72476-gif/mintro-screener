@@ -22,7 +22,7 @@
  * report handed to a bank's processor. It comes out.
  */
 
-import { REPORT_POSTURE } from '@mintro/engine';
+import { EVALUATION_POSTURE } from '@mintro/engine';
 
 /** What the assembler needs. Everything is already fetched; nothing here reaches for anything. */
 export interface CaptureInput {
@@ -174,6 +174,25 @@ export interface CaptureExpectation {
   /** How many `<img>` the page reported. Every one must be inline in the delivered file. */
   readonly images: number;
   readonly runId: string;
+  /**
+   * The published evaluation this file is of (D-263).
+   *
+   * Required, because the capture is the evaluation now. A file with no published version behind it
+   * is either a draft — which may not be sent, and `send.ts` refuses to compose without a capture,
+   * so allowing one here would be the only hole in that guarantee — or a checklist render, which is
+   * the wrong document under a name that says otherwise.
+   *
+   * The version and the published date are checked *in the bytes*, not taken on the caller's word.
+   * This is the only place that sees the artifact, and a masthead that lives in a component and
+   * does not reach the file is a masthead nobody reads — the D-246 shape, which this function
+   * already applies to `REPORT_POSTURE`.
+   */
+  readonly published: { readonly version: number; readonly publishedAt: string };
+}
+
+/** The text a reader sees, for assertions about words rather than about markup. */
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ');
 }
 
 /**
@@ -239,9 +258,9 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
     opened by someone at the sponsoring bank with no covering email and no idea who Mintro is —
     and this is the only thing in the document that tells them.
   */
-  if (!html.includes(REPORT_POSTURE)) {
+  if (!html.includes(EVALUATION_POSTURE)) {
     throw new Error(
-      'the captured report does not carry the statement of what it is. It is delivered as a ' +
+      'the captured evaluation does not carry the statement of what it is. It is delivered as a ' +
         'forwardable link and may be opened with no email around it, so the sentence has to be ' +
         'in the document.',
     );
@@ -276,6 +295,28 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
     throw new Error(
       `the captured report inlines ${inlined} image(s) and the page displayed ${expected.images}. ` +
         'A report missing a capture is not a report to deliver.',
+    );
+  }
+
+  /*
+    It is the published evaluation, and it says which version.
+
+    Both halves matter and they fail differently. A file with no version line is a draft or a
+    checklist wearing the evaluation's name. A file carrying the wrong version is the right kind of
+    document from the wrong moment — worse, because it would pass every other check here and reach
+    an underwriter as current.
+  */
+  if (!html.includes(`Version ${expected.published.version}`)) {
+    throw new Error(
+      `the captured file does not say it is version ${expected.published.version}. A capture with ` +
+        'no published version behind it is a draft or a checklist, and neither may be sent.',
+    );
+  }
+
+  if (/\bDraft\b/.test(stripTags(html))) {
+    throw new Error(
+      'the captured file is stamped Draft. Only a published version has a link, and a draft that ' +
+        'reached the bucket would be one an underwriter could be sent.',
     );
   }
 }
