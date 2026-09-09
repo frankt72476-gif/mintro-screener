@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { RunContext } from '@mintro/engine';
+import { PLACEMENT_BY_SPECTRUM } from '@mintro/ruleset';
 import {
   buildHandles,
   decodeDraft,
@@ -56,6 +57,7 @@ const RUN: RunContext = {
   angleIds: ANGLE_IDS,
   routingConditionIds: ['registration_gate', 'no_water_or_syringes'],
   consumerSideSpectrum: new Set(['consumer_retail']),
+  placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: { clean: true, items: [] },
   observableConditionIds: [],
   knownHandles: new Set<string>(),

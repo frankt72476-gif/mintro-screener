@@ -10,6 +10,13 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  PLACEMENT_BY_SPECTRUM,
+  PLACEMENT_IDS,
+  SPECTRUM_IDS,
+  type PlacementId,
+  type SpectrumId,
+} from '@mintro/ruleset';
+import {
   MAX_SHORE_UPS,
   MERCHANT_COMMERCE_WORDS,
   MINTRO_COST_WORDS,
@@ -69,6 +76,7 @@ const RUN: RunContext = {
   angleIds: ANGLE_IDS,
   routingConditionIds: CONDITION_IDS,
   consumerSideSpectrum: new Set(['consumer_retail', 'consumer_leaning']),
+  placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: LEGALITY,
   observableConditionIds: OBSERVABLE,
   knownHandles: new Set(['F1', 'F2', 'E1', 'Y1', 'A1', 'A2']),
@@ -962,6 +970,15 @@ describe('domestic_with_unmet_routing', () => {
     expect(validateDraft(draft, clean)).toEqual({ ok: true });
   });
 
+  /*
+    This rule is about `domestic` and nothing else.
+
+    Asserted on the rejection codes rather than on overall validity, because a clean
+    `research_leaning` draft recommending `referred_out` is now refused — by
+    `placement_outside_spectrum`, which is a different rule with a different reason. Asserting
+    `ok: true` here would have made this test a second, quieter statement of the spectrum rule and
+    it would have had to be relaxed every time another placement check landed.
+  */
   it('says nothing about international or referred_out', () => {
     for (const recommended of ['international', 'referred_out'] as const) {
       const draft = mutate((d) => ({
@@ -970,8 +987,214 @@ describe('domestic_with_unmet_routing', () => {
         placement: { ...d.placement, recommended },
       }));
       const result = validateDraft(draft, { ...RUN, legality: { clean: true, items: [] } });
-      expect(result.ok, recommended).toBe(true);
+      const rules = result.ok ? [] : result.rejections.map((r) => r.rule);
+      expect(rules, recommended).not.toContain('domestic_with_unmet_routing');
+      expect(rules, recommended).not.toContain('domestic_with_unobserved_routing');
     }
+  });
+
+  it('leaves international valid outright on this run', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, recommended: 'international' as const },
+    }));
+    expect(validateDraft(draft, { ...RUN, legality: { clean: true, items: [] } })).toEqual({
+      ok: true,
+    });
+  });
+});
+
+/*
+  The spectrum and the placement, joined.
+
+  They were two fields with nothing between them, so **Consumer retail · Domestic** passed every
+  check in this file — a consumer storefront recommended for the placement the programme reserves
+  for research suppliers who have met every condition.
+
+  The table is `PLACEMENT_BY_SPECTRUM` in the angle set, and it is read from there rather than
+  restated here: a copy in the test would agree with a copy in the code and neither would be the
+  ratified rule.
+*/
+describe('placement_outside_spectrum', () => {
+  const clean = { ...RUN, legality: { clean: true, items: [] } };
+
+  /** A clean draft at one position recommending one placement. */
+  const at = (spectrum: SpectrumId, recommended: PlacementId): EvaluationDraft =>
+    mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, spectrum, recommended },
+      /*
+        Every observable condition met, so `domestic` is refused by this rule where it is refused
+        at all — the routing gate would otherwise fire alongside it and neither assertion could say
+        which check spoke.
+      */
+      routing: d.routing.map((r) => ({ ...r, status: 'met' as const, citations: [] })),
+      // Shore-ups are refused on the consumer side, and two of the six positions below are.
+      shoreUps: [],
+    }));
+
+  const rulesFor = (spectrum: SpectrumId, recommended: PlacementId): readonly string[] => {
+    const result = validateDraft(at(spectrum, recommended), clean);
+    return result.ok ? [] : result.rejections.map((r) => r.rule);
+  };
+
+  it('reads the ratified table, so this is not asserted over an invented one', () => {
+    expect(Object.keys(PLACEMENT_BY_SPECTRUM).sort()).toEqual([...SPECTRUM_IDS].sort());
+    expect(PLACEMENT_BY_SPECTRUM.consumer_retail).toEqual(['referred_out']);
+  });
+
+  it.each(SPECTRUM_IDS)('permits every placement the table allows at %s', (spectrum) => {
+    for (const recommended of PLACEMENT_BY_SPECTRUM[spectrum]) {
+      expect(rulesFor(spectrum, recommended), `${spectrum}/${recommended}`).not.toContain(
+        'placement_outside_spectrum',
+      );
+    }
+  });
+
+  it.each(SPECTRUM_IDS)('refuses every placement the table withholds at %s', (spectrum) => {
+    const withheld = PLACEMENT_IDS.filter((id) => !PLACEMENT_BY_SPECTRUM[spectrum].includes(id));
+    expect(withheld.length).toBeGreaterThan(0);
+    for (const recommended of withheld) {
+      expect(rulesFor(spectrum, recommended), `${spectrum}/${recommended}`).toContain(
+        'placement_outside_spectrum',
+      );
+    }
+  });
+
+  /* The three the reading turned on, named rather than left to the loops above. */
+  it('refuses a consumer retailer placed anywhere but referred out', () => {
+    expect(rulesFor('consumer_retail', 'domestic')).toContain('placement_outside_spectrum');
+    expect(rulesFor('consumer_retail', 'international')).toContain('placement_outside_spectrum');
+    expect(rulesFor('consumer_retail', 'referred_out')).not.toContain('placement_outside_spectrum');
+  });
+
+  it('lets a consumer-leaning business be international but never domestic', () => {
+    expect(rulesFor('consumer_leaning', 'international')).not.toContain('placement_outside_spectrum');
+    expect(rulesFor('consumer_leaning', 'domestic')).toContain('placement_outside_spectrum');
+  });
+
+  it('refuses a research-side business referred out on the spectrum alone', () => {
+    for (const spectrum of ['mixed', 'research_leaning', 'research_supplier'] as const) {
+      expect(rulesFor(spectrum, 'referred_out'), spectrum).toContain('placement_outside_spectrum');
+    }
+  });
+
+  it('names the position and what it permits, so a retry knows where to move', () => {
+    const result = validateDraft(at('consumer_retail', 'domestic'), clean);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const message = result.rejections.find((r) => r.rule === 'placement_outside_spectrum')!.message;
+    expect(message).toContain('consumer_retail');
+    expect(message).toContain('domestic');
+    expect(message).toContain('referred_out');
+  });
+
+  /*
+    A legality item overrides the table, and only one rule speaks.
+
+    `legality_not_referred_out` already fixes the recommendation, and running this as well would
+    tell one retry to move the placement in two directions at once — down to referred_out for the
+    legality item, and up off referred_out for the spectrum.
+  */
+  it('stands aside where legality has already fixed the recommendation', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, spectrum: 'research_supplier' as const, recommended: 'referred_out' as const },
+    }));
+    const result = validateDraft(draft, RUN);
+    const rules = result.ok ? [] : result.rejections.map((r) => r.rule);
+    expect(rules).not.toContain('placement_outside_spectrum');
+    expect(rules).not.toContain('legality_not_referred_out');
+  });
+
+  it('refuses a research supplier placed domestic while legality is not clean', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, spectrum: 'research_supplier' as const, recommended: 'domestic' as const },
+      routing: d.routing.map((r) => ({ ...r, status: 'met' as const, citations: [] })),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // The legality rule speaks, and the spectrum rule stays quiet — domestic is inside the table.
+    expect(result.rejections.map((r) => r.rule)).toContain('legality_not_referred_out');
+    expect(result.rejections.map((r) => r.rule)).not.toContain('placement_outside_spectrum');
+  });
+});
+
+/*
+  `not_observable` is not `met`.
+
+  A condition the crawl could not read is a condition nobody has established, and recommending the
+  programme's furthest placement over one would rest the recommendation on a surface that was never
+  established — hard constraint 9, in the placement. The two the application answers are the
+  exception, and the only one.
+*/
+describe('domestic over unobserved conditions', () => {
+  const clean = { ...RUN, legality: { clean: true, items: [] } };
+
+  const domestic = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>): EvaluationDraft =>
+    mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, spectrum: 'research_supplier' as const, recommended: 'domestic' as const },
+      routing: d.routing.map((r) => ({
+        ...r,
+        status: statuses[r.conditionId] ?? ('met' as const),
+        citations: [],
+      })),
+    }));
+
+  const rulesFor = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>): readonly string[] => {
+    const result = validateDraft(domestic(statuses), clean);
+    return result.ok ? [] : result.rejections.map((r) => r.rule);
+  };
+
+  it('refuses domestic while an observable condition is unobserved', () => {
+    const rules = rulesFor({ registration_gate: 'not_observable' });
+    expect(rules).toContain('domestic_with_unmet_routing');
+    expect(rules).toContain('domestic_with_unobserved_routing');
+  });
+
+  it.each(OBSERVABLE)('refuses domestic where %s could not be observed', (conditionId) => {
+    expect(rulesFor({ [conditionId]: 'not_observable' })).toContain('domestic_with_unmet_routing');
+  });
+
+  /*
+    The two the application answers may stand unobserved, and a draft reaching domestic over them
+    is saying they must hold. Refusing that would decline a merchant for a limit of our method.
+  */
+  it('permits domestic over the two application conditions', () => {
+    expect(
+      rulesFor({ order_minimum_150: 'not_observable', monthly_volume_70k: 'not_observable' }),
+    ).toEqual([]);
+  });
+
+  it('permits domestic with every condition met', () => {
+    expect(rulesFor({})).toEqual([]);
+  });
+
+  it('says which condition it means, and which two may stand unobserved', () => {
+    const result = validateDraft(domestic({ no_affiliate_marketing: 'not_observable' }), clean);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const message = result.rejections
+      .find((r) => r.rule === 'domestic_with_unobserved_routing')!
+      .message;
+    expect(message).toContain('no_affiliate_marketing');
+    expect(message).toContain('order_minimum_150');
+    expect(message).toContain('monthly_volume_70k');
+  });
+
+  /* The observable set is the angle set's, and this run has three of them. */
+  it('holds every observable condition to the same bar', () => {
+    expect(OBSERVABLE).toHaveLength(3);
+    expect(CONDITION_IDS.filter((id) => !OBSERVABLE.includes(id))).toEqual([
+      'order_minimum_150',
+      'monthly_volume_70k',
+    ]);
   });
 });
 

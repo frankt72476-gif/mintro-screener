@@ -18,6 +18,8 @@ import {
   loadAngleSetFile,
   ANGLES_PATH,
   LEGALITY_RULE_IDS,
+  PLACEMENT_BY_SPECTRUM,
+  SPECTRUM_IDS,
   PLACEMENT_IDS,
   type AngleSet,
 } from '@mintro/ruleset';
@@ -1239,6 +1241,70 @@ describe('the prompt states the citation scope and the lean anchor', () => {
     expect(prompt).toContain('cannot lean research');
     expect(prompt).toContain('[HEAVY]');
     expect(prompt).toContain('does not bind the lean');
+  });
+});
+
+/*
+  The prompt states the rule the validator will refuse on.
+
+  `placement_outside_spectrum` and the tightened domestic gate are both refusals, and a refusal the
+  prompt only implies is one that costs a retry to teach. Printed from `PLACEMENT_BY_SPECTRUM` and
+  from the angle set's own `observable` flag rather than written out, so the words the model reads
+  and the rule it is held to are one thing (hard constraint 1).
+*/
+describe('the prompt states how far the spectrum lets a placement go', () => {
+  const prompt = promptFor(angles, ruleset, INPUTS);
+
+  it('prints a line for every spectrum position, with what it permits', () => {
+    for (const spectrum of SPECTRUM_IDS) {
+      const permitted = PLACEMENT_BY_SPECTRUM[spectrum].map((p) => `\`${p}\``).join(' or ');
+      expect(prompt, spectrum).toContain(`\`${spectrum}\` — ${permitted}`);
+    }
+  });
+
+  /*
+    The three the rule turns on, read out of the rendered prompt rather than out of the table —
+    a test that only compared the table to itself would pass over a section that never rendered.
+  */
+  it('says a consumer retailer may only be referred out', () => {
+    expect(prompt).toContain('`consumer_retail` — `referred_out`');
+    expect(prompt).not.toContain('`consumer_retail` — `referred_out` or');
+  });
+
+  it('says a consumer-leaning business may be referred out or international', () => {
+    expect(prompt).toContain('`consumer_leaning` — `referred_out` or `international`');
+  });
+
+  it('says the research side may be international or domestic', () => {
+    for (const spectrum of ['mixed', 'research_leaning', 'research_supplier'] as const) {
+      expect(prompt, spectrum).toContain(`\`${spectrum}\` — \`international\` or \`domestic\``);
+    }
+  });
+
+  it('says an unobservable condition is not a met one', () => {
+    expect(prompt).toContain('`not_observable` is not `met`');
+    expect(prompt).toContain('nobody has established the condition');
+  });
+
+  /*
+    And names the two, from the angle set. Which conditions the application answers is data; a
+    prompt that spelled them out would be a second copy to diff against the file.
+  */
+  it('names the conditions that may stand unobserved under a domestic recommendation', () => {
+    const application = angles.routingConditions.filter((c) => !c.observable);
+    expect(application.length).toBe(2);
+    for (const condition of application) {
+      expect(prompt, condition.id).toContain(`\`${condition.id}\``);
+    }
+    for (const condition of angles.routingConditions.filter((c) => c.observable)) {
+      const at = prompt.indexOf('How far the spectrum lets you place it');
+      const section = prompt.slice(at, prompt.indexOf('\n## ', at + 1));
+      expect(section, condition.id).not.toContain(`\`${condition.id}\``);
+    }
+  });
+
+  it('tells the model what to recommend instead when a condition is open', () => {
+    expect(prompt).toContain('recommend `international` and name the open conditions as the path');
   });
 });
 

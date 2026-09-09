@@ -122,6 +122,7 @@ export function handleContext(run: RunContext, map: HandleMap): RunContext {
     angleIds: run.angleIds.map((id) => map.angle.toHandle.get(id) ?? id),
     routingConditionIds: run.routingConditionIds,
     consumerSideSpectrum: run.consumerSideSpectrum,
+    placementBySpectrum: run.placementBySpectrum,
     /*
       The legality block travels in handle space too: the model echoes it, and its evidence keys
       have to be handles like every other id it sees. An item with no capture keeps its empty key.

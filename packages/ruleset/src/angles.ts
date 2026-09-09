@@ -68,6 +68,37 @@ export type PlacementId = (typeof PLACEMENT_IDS)[number];
 export const CONSUMER_SIDE: readonly SpectrumId[] = ['consumer_retail', 'consumer_leaning'];
 
 /**
+ * How far up a merchant at each spectrum position may be placed (D-260).
+ *
+ * The spectrum is *what the business is*; the placement is *what Mintro will do about it today*.
+ * They were separate fields with nothing joining them, so a draft could read **Consumer retail ·
+ * Domestic** — a consumer storefront recommended for the placement the programme reserves for
+ * research suppliers who have met every condition — and every check would pass.
+ *
+ * A ceiling and not a mapping. Each position permits a set, and the draft picks from it:
+ *
+ * - `consumer_retail` is out of the programme. Referred out, and nothing else.
+ * - `consumer_leaning` may be referred out or placed international. Not domestic: domestic is the
+ *   research-side destination and this business is not on that side.
+ * - The three research-side positions may be placed international, or domestic once the routing
+ *   conditions hold. **They may not be referred out on the strength of the spectrum alone** —
+ *   referred out follows from a legality item (D-256), and a draft reaching for it without one
+ *   would be making the determination that is the underwriter's.
+ *
+ * Which is why a legality item overrides this table rather than being reconciled with it: an
+ * observed legality item fixes the recommendation at `referred_out` whatever the spectrum says, and
+ * `validateDraft` applies that rule first and this one only on a clean draft. Two rejections for one
+ * fact would tell a retry to move the placement in two directions at once.
+ */
+export const PLACEMENT_BY_SPECTRUM: Readonly<Record<SpectrumId, readonly PlacementId[]>> = {
+  consumer_retail: ['referred_out'],
+  consumer_leaning: ['referred_out', 'international'],
+  mixed: ['international', 'domestic'],
+  research_leaning: ['international', 'domestic'],
+  research_supplier: ['international', 'domestic'],
+};
+
+/**
  * The written sections a length limit applies to (angle set 1.1.0).
  *
  * Every one is present or the file is refused. A limit the data forgets is a section with no

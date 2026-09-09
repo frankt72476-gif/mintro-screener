@@ -247,6 +247,13 @@ export interface RunContext {
   /** Spectrum positions on the consumer side. Shore-ups are refused for these (guardrail 5). */
   readonly consumerSideSpectrum: ReadonlySet<string>;
   /**
+   * The placements each spectrum position permits — `PLACEMENT_BY_SPECTRUM` in the angle set.
+   *
+   * Passed in rather than imported, the same way `consumerSideSpectrum` is: the vocabulary is the
+   * ruleset package's and this validator is pure over what it is handed.
+   */
+  readonly placementBySpectrum: Readonly<Record<string, readonly string[]>>;
+  /**
    * The legality block as computed from the run. The draft's must equal it, notes aside.
    */
   readonly legality: DraftLegality;
@@ -402,7 +409,9 @@ export interface DraftRejection {
     | 'not_observable_row_cites'
     | 'research_lean_over_heavy_failure'
     | 'citation_outside_angle_scope'
-    | 'citation_outside_condition_scope';
+    | 'citation_outside_condition_scope'
+    | 'placement_outside_spectrum'
+    | 'domestic_with_unobserved_routing';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -614,24 +623,83 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
   }
 
   /*
-    `domestic` is a placement, and an observable routing condition that is not met is the reason it
-    is not available yet. Only observable ones gate it: order minimum and monthly volume are
-    answered by the application, and refusing a placement because a storefront cannot show them
-    would decline a merchant for a limit of the method (D-044's distinction, one document up).
+    The spectrum is what the business is; the placement is what Mintro will do about it today.
+
+    They were two fields with nothing joining them, so **Consumer retail · Domestic** passed every
+    check — a consumer storefront recommended for the placement reserved for research suppliers who
+    have met every condition. `PLACEMENT_BY_SPECTRUM` is the ceiling each position carries.
+
+    Only on a clean draft. A legality item fixes the recommendation at `referred_out` whatever the
+    spectrum says, and `legality_not_referred_out` above has already said so; running this as well
+    would tell one retry to move the placement in two directions at once.
+  */
+  if (draft.legality.clean) {
+    const permitted = run.placementBySpectrum[draft.placement.spectrum];
+    if (permitted !== undefined && !permitted.includes(draft.placement.recommended)) {
+      reject(
+        'placement_outside_spectrum',
+        'placement.recommended',
+        `places a '${draft.placement.spectrum}' business at '${draft.placement.recommended}'. ` +
+          `That position permits ${permitted.map((id) => `'${id}'`).join(' or ')}. The spectrum is ` +
+          'what the business is and the placement is what Mintro will do about it; a placement ' +
+          'above what the position allows is a recommendation the spectrum does not support.',
+      );
+    }
+  }
+
+  /*
+    `domestic` is the placement every routing condition has to hold for.
+
+    Two halves, and the second is the one that was missing.
+
+    **Every observable condition is met.** `not_met` and `not_observable` both count against it: a
+    condition the crawl could not read is a condition nobody has established, and a draft that
+    recommended the programme's furthest placement over one would be resting the recommendation on
+    a surface that was never established — hard constraint 9's shape, in the placement.
+
+    **The only conditions left unobserved are the two the application answers.** Order minimum and
+    monthly volume are not on the public site, and refusing a placement because a storefront cannot
+    show them would decline a merchant for a limit of the method (D-044). So a draft may reach
+    domestic over those two — by saying they must hold — and over nothing else.
   */
   if (draft.placement.recommended === 'domestic') {
     const observable = new Set(run.observableConditionIds);
     const unmet = draft.routing
-      .filter((row) => observable.has(row.conditionId) && row.status === 'not_met')
-      .map((row) => row.conditionId);
+      .filter((row) => observable.has(row.conditionId) && row.status !== 'met')
+      .map((row) => `${row.conditionId}/${row.status}`);
 
     if (unmet.length > 0) {
       reject(
         'domestic_with_unmet_routing',
         'placement.recommended',
         `recommends 'domestic' while ${unmet.length} observable routing condition(s) are not met: ` +
-          `${unmet.join(', ')}. Those conditions are what stands between this merchant and ` +
-          'domestic; name them as the path and recommend a placement available today.',
+          `${unmet.join(', ')}. An unobservable condition is not a met one — nobody has established ` +
+          'it. Those conditions are what stands between this merchant and domestic; name them as ' +
+          'the path and recommend a placement available today.',
+      );
+    }
+
+    /*
+      The same fact from the other side, and it catches what the first cannot.
+
+      A draft that omits a routing row entirely, or names a condition the angle set does not carry,
+      slips past a check that walks the rows it was given. This counts what is left unobserved
+      against the set of conditions that may honestly be unobserved.
+    */
+    const mayBeUnobserved = run.routingConditionIds.filter((id) => !observable.has(id));
+    const unobserved = draft.routing
+      .filter((row) => row.status === 'not_observable')
+      .map((row) => row.conditionId);
+    const extra = unobserved.filter((id) => !mayBeUnobserved.includes(id));
+
+    if (extra.length > 0) {
+      reject(
+        'domestic_with_unobserved_routing',
+        'placement.recommended',
+        `recommends 'domestic' with ${extra.length} condition(s) unobserved that this run can ` +
+          `observe: ${extra.join(', ')}. Only the ${mayBeUnobserved.length} condition(s) the ` +
+          `application answers may be unobserved under a domestic recommendation ` +
+          `(${mayBeUnobserved.join(', ')}), and the draft says they must hold.`,
       );
     }
   }

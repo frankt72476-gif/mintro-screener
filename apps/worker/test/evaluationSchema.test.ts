@@ -13,7 +13,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RunContext } from '@mintro/engine';
 import { MAX_SHORE_UPS, draftSchema, sectionWords } from '../src/evaluationSchema.js';
-import { ANGLES_PATH, loadAngleSetFile, loadRulesetFile } from '@mintro/ruleset';
+import {
+  ANGLES_PATH,
+  PLACEMENT_BY_SPECTRUM,
+  loadAngleSetFile,
+  loadRulesetFile,
+} from '@mintro/ruleset';
 
 const RUN: RunContext = {
   findingIds: new Set(['f-001', 'f-002']),
@@ -22,6 +27,7 @@ const RUN: RunContext = {
   angleIds: ['who_it_talks_to', 'products_for', 'consistency'],
   routingConditionIds: ['registration_gate', 'order_minimum_150'],
   consumerSideSpectrum: new Set(['consumer_retail']),
+  placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: { clean: true, items: [] },
   observableConditionIds: [],
   knownHandles: new Set<string>(),

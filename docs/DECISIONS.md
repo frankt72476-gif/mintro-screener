@@ -16992,3 +16992,64 @@ or legality note resolves in the stored mapping — which is the render-time key
 keeps it sufficient. The attempt-10 draft carried 103 such tokens and all 103 resolved, so the
 check costs nothing on an honest draft and catches the one case where it would have cost everything.
 
+### The spectrum decides how far a placement may go
+
+Added 2026-09-09, with the validator and the prompt.
+
+The spectrum and the placement were two fields with nothing between them. A draft could read
+**Consumer retail · Domestic** — a consumer storefront recommended for the placement the programme
+reserves for research suppliers who have met every condition — and every check in `validateDraft`
+passed it. The spectrum is *what the business is*; the placement is *what Mintro will do about it
+today*, and one has to constrain the other or the first is decoration.
+
+`PLACEMENT_BY_SPECTRUM` in `packages/ruleset/src/angles.ts` is the ceiling, beside `SPECTRUM_IDS`
+and `PLACEMENT_IDS` because it is the same ratified vocabulary. `placement_outside_spectrum`
+refuses a draft that exceeds it.
+
+| spectrum | permits |
+|---|---|
+| `consumer_retail` | `referred_out` |
+| `consumer_leaning` | `referred_out`, `international` |
+| `mixed` | `international`, `domestic` |
+| `research_leaning` | `international`, `domestic` |
+| `research_supplier` | `international`, `domestic` |
+
+Two things the table says that are easy to miss.
+
+**The research side cannot be referred out on the spectrum alone.** Referred out follows from an
+observed legality item (D-256); a draft reaching for it without one would be making the
+determination that belongs to the underwriter, which is the whole of hard constraint 7. So the
+three research-side positions omit it.
+
+**Which is why a legality item overrides the table rather than being reconciled with it.**
+`legality_not_referred_out` already fixes the recommendation at `referred_out` whatever the
+spectrum says, and it runs first. The spectrum rule applies **only to a clean draft**. Without that
+carve-out a research supplier with a legality item would be unrepresentable: one rule would demand
+`referred_out` and the other would refuse it, and no draft could satisfy both. One fact, one
+rejection — a retry told to move the placement in two directions at once learns nothing.
+
+#### `not_observable` is not `met`
+
+`domestic_with_unmet_routing` refused an observable condition that was `not_met` and said nothing
+about one that was `not_observable`. That was a gap of exactly the shape this project keeps
+rediscovering: a condition the crawl could not read is a condition **nobody has established**, and
+a recommendation resting on it rests on a surface that was never established. The rule now counts
+both against `domestic`.
+
+The two conditions the application answers — `order_minimum_150` and `monthly_volume_70k` — are the
+exception, and the only one. They are not on the public site, and refusing a placement because a
+storefront cannot show them would decline a merchant for a limit of our method (D-044). A draft may
+reach `domestic` over those two, and says so in the paragraph: the recommendation is conditional on
+them holding, and the report states the condition rather than the conclusion.
+
+`domestic_with_unobserved_routing` is the same fact checked from the other side — it counts what is
+left unobserved against the set that *may* honestly be unobserved. Both are needed: the first walks
+the rows the draft gave and would pass over a row the draft omitted or invented; the second asks
+what is unobserved and compares it to the angle set. Which conditions are observable is read from
+`angles.json`, never listed in code.
+
+The prompt prints the table and the domestic rule from the same data the validator reads. A refusal
+the prompt only implies costs a retry to teach, and a prompt that restated the rule in its own words
+would be the ratified rule and the sent rule agreeing by coincidence — the defect this repository
+has hit in four separate places.
+

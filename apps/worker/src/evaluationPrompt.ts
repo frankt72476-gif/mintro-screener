@@ -17,7 +17,12 @@
  * this repository has now hit in four different places.
  */
 
-import type { AngleSet, LimitedSection } from '@mintro/ruleset';
+import {
+  PLACEMENT_BY_SPECTRUM,
+  SPECTRUM_IDS,
+  type AngleSet,
+  type LimitedSection,
+} from '@mintro/ruleset';
 import type { EvaluationPage } from './evaluationPages.js';
 import { toHandle, type HandleMap } from './evaluationHandles.js';
 import type { DraftLegality } from '@mintro/engine';
@@ -268,6 +273,41 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
         "Describe the merchant's commerce as its **commercial posture**, **how it sells**, or its " +
         '**order structure**. Those say the same thing and cannot be read as a statement about what ' +
         'Mintro charges. The angle paragraphs are unrestricted — this applies to the placement only.',
+    ),
+  );
+
+  /*
+    The spectrum-to-placement rule, printed from the table the validator reads.
+
+    Written out here rather than described in prose, because the model has to pick a value from it
+    and a sentence saying "the consumer side cannot be domestic" leaves the middle three positions
+    to inference. `validateDraft` refuses a draft that breaks it, so a prompt that only implied the
+    rule would spend a retry teaching it.
+
+    The unobservable conditions are named from the angle set for the same reason: which two the
+    application answers is data, and a prompt that spelled them out would be a second copy to diff.
+  */
+  const application = angles.routingConditions.filter((condition) => !condition.observable);
+  parts.push(
+    section(
+      'How far the spectrum lets you place it',
+      `${SPECTRUM_IDS.map((id) => {
+        const permitted = PLACEMENT_BY_SPECTRUM[id];
+        return `- \`${id}\` — ${permitted.map((p) => `\`${p}\``).join(' or ')}`;
+      }).join('\n')}\n\n` +
+        'The spectrum is what the business **is**; the placement is what Mintro will do about it ' +
+        'today. A placement above what the position allows is refused.\n\n' +
+        '**`domestic` is the one that has to be earned.** Every routing condition this run can ' +
+        'observe must be `met`. `not_observable` is not `met` — it means nobody has established the ' +
+        'condition, and a recommendation resting on it would rest on nothing.\n\n' +
+        `The only conditions that may stand \`not_observable\` under a \`domestic\` recommendation ` +
+        `are the ${application.length} the application answers: ` +
+        `${application.map((c) => `\`${c.id}\``).join(', ')}. Those are not on the public site, and ` +
+        'refusing a placement because a storefront cannot show them would decline a merchant for a ' +
+        'limit of our method. Recommending `domestic` over them says they must hold — say so in the ' +
+        'paragraph.\n\n' +
+        'If an observable condition is `not_met` or `not_observable`, recommend `international` and ' +
+        'name the open conditions as the path.',
     ),
   );
 

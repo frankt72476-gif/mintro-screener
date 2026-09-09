@@ -25,7 +25,13 @@
  */
 
 import { createHash } from 'node:crypto';
-import { CONSUMER_SIDE, LEGALITY_RULE_IDS, type AngleSet, type Ruleset } from '@mintro/ruleset';
+import {
+  CONSUMER_SIDE,
+  LEGALITY_RULE_IDS,
+  PLACEMENT_BY_SPECTRUM,
+  type AngleSet,
+  type Ruleset,
+} from '@mintro/ruleset';
 import {
   computeLegality,
   rejectionMessage,
@@ -246,6 +252,7 @@ export function runContextFor(
     angleIds: angles.angles.map((a) => a.id),
     routingConditionIds: angles.routingConditions.map((c) => c.id),
     consumerSideSpectrum: new Set(CONSUMER_SIDE),
+    placementBySpectrum: PLACEMENT_BY_SPECTRUM,
     legality: computeLegality(inputs.findings, LEGALITY_RULE_IDS),
     observableConditionIds: angles.routingConditions.filter((c) => c.observable).map((c) => c.id),
     knownHandles,
