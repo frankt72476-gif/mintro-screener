@@ -61,6 +61,8 @@ import { mailersFor } from '../src/send.js';
 import { claimNextUpload, runUpload } from '../src/uploadJob.js';
 import { refuseIfRevoked } from '../src/capabilityGate.js';
 import { claimNextEyeTest, runEyeTestJob } from '../src/eyeTestJob.js';
+import { claimNextEvaluation, finishEvaluation } from '../src/evaluationRequestJob.js';
+import { runEvaluationRequest } from '../src/evaluationRun.js';
 import { claimNextPurgePlan, runPurgePlan } from '../src/purgePlanJob.js';
 import {
   claimNextExport, claimNextExportDiscard, runExport, runExportDiscard,
@@ -494,6 +496,20 @@ async function main(argv: readonly string[]): Promise<number> {
       const eyeTest = await claimNextEyeTest(supabase, STALE_CLAIM_MS);
       if (eyeTest !== null) {
         await runEyeTestJob(supabase, eyeTest);
+        continue;
+      }
+
+      /*
+        An operator asked for a new draft (D-261).
+
+        Last in the loop because it is the most expensive thing here — a browser, the stored DOM of
+        every sampled page, and a vendor call — and nothing else waits on it. A scan, a send or an
+        eye test queued behind a regeneration would be a person waiting on somebody else's rewrite.
+      */
+      const evaluation = await claimNextEvaluation(supabase, STALE_CLAIM_MS);
+      if (evaluation !== null) {
+        const failure = await runEvaluationRequest(supabase, evaluation.run_id);
+        await finishEvaluation(supabase, evaluation.id, failure);
         continue;
       }
 

@@ -3798,3 +3798,90 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 /* The floating position would otherwise beat the attribute's own display:none. */
 .eval-totop[hidden]{display:none}
 @media print{.eval-totop{display:none}}
+
+/* ---------- the chip key, at the head of the angles ---------- */
+.eval-key{
+  margin:0 0 20px;padding:10px 14px;border:1px solid var(--line);border-radius:6px;
+  background:var(--paper);display:grid;gap:6px;
+}
+.eval-key-row{display:flex;align-items:baseline;gap:10px}
+.eval-key dt{flex:0 0 auto}
+.eval-key dd{margin:0;font-size:11.5px;line-height:1.5;color:var(--ink-mid)}
+
+/* ---------- the operator's note (D-261) ---------- */
+.eval-row-note .eyebrow{display:block;margin-bottom:6px}
+.eval-opnote{
+  margin:0;font-size:13.5px;line-height:1.7;max-width:70ch;
+  border-left:2px solid var(--line);padding-left:14px;
+}
+
+/* ---------- edit mode ---------- */
+.eval-edit-text{
+  display:block;width:100%;max-width:70ch;font:inherit;font-size:13.5px;line-height:1.7;
+  color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;
+  padding:8px 10px;resize:vertical;
+}
+.eval-edit-text:focus{outline:2px solid var(--violet);outline-offset:1px;border-color:var(--violet)}
+.eval-edit-select{
+  font:inherit;font-size:12px;color:var(--ink);background:var(--card);
+  border:1px solid var(--line);border-radius:5px;padding:3px 6px;
+}
+.eval-edit-remove,.eval-edit-add{
+  font:inherit;font-size:11.5px;color:var(--ink-mid);background:none;
+  border:1px solid var(--line);border-radius:5px;padding:3px 9px;cursor:pointer;
+}
+.eval-edit-remove:hover{border-color:var(--rose);color:var(--rose)}
+.eval-edit-add{margin-top:12px}
+.eval-edit-add:hover{border-color:var(--violet);color:var(--violet)}
+
+/*
+  The badge becomes the choice, at the badge's own size. The unchosen two are outlined rather than
+  filled, so the answer is still the only saturated thing on the first screen.
+*/
+.eval-focal-choice{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.eval-focal-choice .eval-focal-badge{
+  margin:0;cursor:pointer;border:2px solid transparent;font:inherit;
+  font-size:40px;line-height:1.1;font-weight:700;letter-spacing:-.02em;
+  padding:14px 28px;border-radius:10px;
+}
+.eval-focal-choice .eval-focal-badge:not(.is-chosen){
+  background:var(--paper);color:var(--ink-mid);border-color:var(--line);
+}
+.eval-focal-choice .eval-focal-badge:not(.is-chosen):hover{border-color:var(--violet)}
+
+.eval-position-choose{
+  font:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;
+  cursor:pointer;width:100%;
+}
+
+/* ---------- the editor's own bar ---------- */
+.eval-editor{margin-bottom:24px}
+.eval-editor-bar{
+  position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:10px;
+  max-width:840px;margin:0 auto;padding:10px 0;background:var(--paper);
+}
+.eval-editor-save,.eval-editor-regen{
+  font:inherit;font-size:12px;font-weight:600;letter-spacing:.02em;
+  border-radius:6px;padding:7px 16px;cursor:pointer;border:1px solid var(--line);
+}
+.eval-editor-save{background:var(--violet);border-color:var(--violet);color:#fff}
+.eval-editor-save:disabled,.eval-editor-regen:disabled{opacity:.6;cursor:default}
+.eval-editor-regen{background:var(--card);color:var(--ink-mid)}
+.eval-editor-regen:hover:not(:disabled){border-color:var(--violet);color:var(--violet)}
+.eval-editor-state{font-size:11.5px;color:var(--ink-mid)}
+
+/*
+  A refused draft, shown rather than hidden. Its content is kept so it can be repaired (D-260), and
+  an operator editing a document they did not know was rejected is the failure that hiding produces.
+*/
+.eval-refused{
+  max-width:840px;margin:0 auto 16px;padding:12px 16px;border-radius:8px;
+  border:1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+  background:color-mix(in srgb, var(--amber) 8%, var(--card));
+}
+.eval-refused-head{margin:0 0 8px;font-size:13px;line-height:1.6}
+.eval-refused-why{
+  margin:0 0 10px;padding:8px 10px;border-radius:5px;background:var(--paper);
+  font-family:'JetBrains Mono', monospace;font-size:11px;line-height:1.6;
+  white-space:pre-wrap;overflow-x:auto;color:var(--ink-mid);
+}

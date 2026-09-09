@@ -15,6 +15,8 @@ import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { matchesEvaluationPreview } from './lib/evaluationRoute.js';
+import { EvaluationEditor } from './components/EvaluationEditor.js';
+import { EVALUATION_LABELS } from './lib/evaluationLabels.js';
 import { EvaluationPreview } from './components/EvaluationPreview.js';
 import { AccessLogPane, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
@@ -1224,6 +1226,26 @@ function Screener({
           {stage === 'report' && report !== null && (
             <>
               {quarantine !== null && <QuarantineNotice reason={quarantine} />}
+              {/*
+                The evaluation, above the checklist it cites into (D-261).
+
+                Both render, and that is deliberate for now: the evaluation is the document the
+                layout memo makes the report, and the checklist is the one every existing test,
+                send path and PDF is written against. Replacing one with the other is its own
+                commit, and doing it here would be doing it silently.
+
+                `showsEvaluationEditing` decides whether the controls are drawn, never whether the
+                writes are permitted — that is 0081, resolved from auth.uid(). It renders nothing on
+                a run with no draft.
+              */}
+              <EvaluationEditor
+                client={client}
+                runId={report.runId}
+                access={access}
+                labels={EVALUATION_LABELS}
+                analystId={analyst.id}
+                canEdit={shape.showsEvaluationEditing}
+              />
               <ReportView
               report={report}
               access={access}

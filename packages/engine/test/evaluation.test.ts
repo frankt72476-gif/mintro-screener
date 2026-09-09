@@ -20,6 +20,8 @@ import {
   MAX_SHORE_UPS,
   MERCHANT_COMMERCE_WORDS,
   MINTRO_COST_WORDS,
+  OPERATOR_NOTE_WORDS,
+  PRICE_SCOPED_SECTIONS,
   PRICE_SCOPES,
   PRICE_WORDS,
   rejectionMessage,
@@ -1195,6 +1197,78 @@ describe('domestic over unobserved conditions', () => {
       'order_minimum_150',
       'monthly_volume_70k',
     ]);
+  });
+});
+
+/*
+  The operator's note, held to Mintro's cost vocabulary (D-261).
+
+  It is the one part of this document a human writes freely, and it sits under the placement
+  paragraph on the first screen, in Mintro's voice, in a document that goes to an underwriter.
+  D-256 keeps what Mintro charges out of a site evaluation, and a field the model never sees is a
+  field no prompt guardrail reaches. This check is the only guard on it.
+*/
+describe('the operator note and what it may not say', () => {
+  const withNote = (operatorNote: string) => mutate((d) => ({ ...d, operatorNote }));
+
+  const rulesFor = (operatorNote: string): readonly string[] => {
+    const result = validateDraft(withNote(operatorNote), RUN);
+    return result.ok ? [] : result.rejections.map((r) => r.rule);
+  };
+
+  it('accepts a note that says something useful about the merchant', () => {
+    expect(
+      rulesFor('Spoke to the merchant on 8 September; the registration gate is being built.'),
+    ).toEqual([]);
+  });
+
+  it('accepts a draft with no note at all — the field is optional', () => {
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+    expect(rulesFor('')).toEqual([]);
+  });
+
+  it.each([...OPERATOR_NOTE_WORDS])('refuses a note mentioning %s', (word) => {
+    const rules = rulesFor(`The merchant asked about our ${word} and we said nothing.`);
+    expect(rules).toContain('price_word');
+  });
+
+  it('names the word, so an operator knows which one to change', () => {
+    const result = validateDraft(withNote('Their fee structure is unusual.'), RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const rejection = result.rejections.find((r) => r.rule === 'price_word')!;
+    expect(rejection.at).toBe('operatorNote');
+    expect(rejection.message).toContain('fee');
+  });
+
+  /*
+    Wider than the shore-up list and narrower than the placement's, and the difference is who is
+    speaking. A shore-up describes a change to the merchant's commerce and needs their vocabulary —
+    which is why `discount` survives there and here. `rate` does not: "their rate" and "our rate"
+    are one word apart, and only the second is refused by D-256, which is exactly why the note
+    cannot be trusted to the distinction.
+  */
+  it('refuses rate, which a shore-up may use', () => {
+    expect(rulesFor('Their rate is unusual.')).toContain('price_word');
+    expect(OPERATOR_NOTE_WORDS).toContain('rate');
+    expect(MINTRO_COST_WORDS).not.toContain('rate');
+  });
+
+  it('permits discount, which is the merchant describing their own commerce', () => {
+    expect(OPERATOR_NOTE_WORDS).not.toContain('discount');
+    expect(rulesFor('They run bundle discounts on the homepage.')).toEqual([]);
+  });
+
+  it('covers every word MINTRO_COST_WORDS holds, so the note is never the looser scope', () => {
+    for (const word of MINTRO_COST_WORDS) {
+      expect(OPERATOR_NOTE_WORDS, word).toContain(word);
+    }
+  });
+
+  /* The section is in the scoped list, so a reader of that list can see it is covered. */
+  it('is a scoped section rather than a special case', () => {
+    expect(PRICE_SCOPED_SECTIONS).toContain('operatorNote');
+    expect(PRICE_SCOPES.operatorNote).toEqual(OPERATOR_NOTE_WORDS);
   });
 });
 

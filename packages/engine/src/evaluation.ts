@@ -229,6 +229,19 @@ export interface EvaluationDraft {
   readonly routing: readonly DraftRouting[];
   readonly angles: readonly DraftAngle[];
   readonly shoreUps: readonly DraftShoreUp[];
+  /**
+   * The operator's own note, written after the draft was generated (D-261).
+   *
+   * **Not the model's.** It is absent from the answer schema and from the prompt, so a generation
+   * cannot produce one and cannot overwrite one — a regeneration replaces the model's work and
+   * leaves the operator's beside it. That is the whole reason it is a separate field rather than an
+   * addition to the placement paragraph: the paragraph is generated and this is not, and a reader
+   * who cannot tell them apart is reading two voices as one.
+   *
+   * Optional, and empty means absent. A note nobody wrote renders nothing rather than an empty
+   * heading, the same way shore-ups do on the consumer side.
+   */
+  readonly operatorNote?: string;
 }
 
 /**
@@ -374,19 +387,37 @@ export const MERCHANT_COMMERCE_WORDS = ['rate', 'rates', 'discount'] as const;
 export const PRICE_WORDS = [...MINTRO_COST_WORDS, ...MERCHANT_COMMERCE_WORDS] as const;
 
 /**
+ * What an operator note may not say (D-261).
+ *
+ * Mintro's costs, plus `rate` and `rates`. Wider than `MINTRO_COST_WORDS` and narrower than
+ * `PRICE_WORDS`, and the difference is who is speaking.
+ *
+ * A shore-up describes a change to the **merchant's** commerce, so it needs their vocabulary — that
+ * is why `rate` and `discount` are permitted there. An operator note is **Mintro's own prose in
+ * Mintro's own voice**, sitting under the placement paragraph in a document that goes to an
+ * underwriter. "Their rate is competitive" and "our rate is competitive" are one word apart, and
+ * only the second is refused by D-256 — which is precisely why the note cannot be trusted to the
+ * distinction. `discount` stays permitted: an operator noting the merchant's bundle discounts is
+ * describing the storefront, and that is the correction D-260 already made once.
+ */
+export const OPERATOR_NOTE_WORDS = [...MINTRO_COST_WORDS, 'rate', 'rates'] as const;
+
+/**
  * What each section may not say. Angle paragraphs are absent entirely (D-256).
  *
  *   `placement`, `routing` — both lists. These state where Mintro will place a merchant.
  *   `shoreUps`             — Mintro's costs only. The merchant's own commerce is the subject.
+ *   `operatorNote`         — Mintro's costs and rates. Mintro's own voice, in the summary block.
  */
 export const PRICE_SCOPES = {
   placement: PRICE_WORDS,
   routing: PRICE_WORDS,
   shoreUps: MINTRO_COST_WORDS,
+  operatorNote: OPERATOR_NOTE_WORDS,
 } as const satisfies Record<string, readonly string[]>;
 
 /** The sections the price rule applies to at all. */
-export const PRICE_SCOPED_SECTIONS = ['placement', 'routing', 'shoreUps'] as const;
+export const PRICE_SCOPED_SECTIONS = ['placement', 'routing', 'shoreUps', 'operatorNote'] as const;
 
 export interface DraftRejection {
   /** Which rule refused it, for grouping a retry message. */
@@ -929,6 +960,18 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     checkCitations([shoreUp.citation], `${at}.citation`);
     checkPrice(shoreUp.text, `${at}.text`, 'shoreUps');
   });
+
+  /*
+    The operator note, held to Mintro's cost vocabulary.
+
+    It is the one part of this document a human writes freely, and it sits under the placement
+    paragraph in the summary block — the first screen, in Mintro's voice, in a document that goes to
+    an underwriter. D-256 keeps what Mintro charges out of a site evaluation, and a field the model
+    never sees is a field no prompt guardrail reaches. This is the only guard on it.
+  */
+  if (draft.operatorNote !== undefined && draft.operatorNote.length > 0) {
+    checkPrice(draft.operatorNote, 'operatorNote', 'operatorNote');
+  }
 
   /*
     `routing` is in PRICE_SCOPED_SECTIONS and nothing above checks it, deliberately.

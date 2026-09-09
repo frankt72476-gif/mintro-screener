@@ -160,19 +160,29 @@ describe('the recommended placement is what the first screen is about', () => {
         })),
       );
 
-    const focal = SIZES.find((size) => size.selector.includes('.eval-focal-badge'));
+    /*
+      The badge is sized in two rules — the read-mode paragraph and the edit-mode buttons — and both
+      are the badge. Compared as a group against everything that is not the badge, so the edit-mode
+      twin cannot be mistaken for a competitor and cannot drift smaller unnoticed.
+    */
+    const isFocal = (selector: string): boolean => selector.includes('.eval-focal-badge');
+    const focal = SIZES.filter((size) => isFocal(size.selector));
 
     it('found the sizes, so this is not passing over an empty list', () => {
       expect(SIZES.length).toBeGreaterThan(20);
-      expect(focal).toBeDefined();
+      expect(focal.length).toBeGreaterThan(0);
+    });
+
+    it('is one size wherever the badge is drawn', () => {
+      expect(new Set(focal.map((size) => size.px)).size).toBe(1);
     });
 
     it('is larger than every other sized element in the evaluation', () => {
-      const others = SIZES.filter((size) => size !== focal);
+      const others = SIZES.filter((size) => !isFocal(size.selector));
       const biggest = others.reduce((a, b) => (b.px > a.px ? b : a));
       expect(
-        focal!.px,
-        `${biggest.selector} is ${biggest.px}px against the badge's ${focal!.px}px`,
+        focal[0]!.px,
+        `${biggest.selector} is ${biggest.px}px against the badge's ${focal[0]!.px}px`,
       ).toBeGreaterThan(biggest.px);
     });
   });
@@ -336,8 +346,9 @@ describe('a chip says whether it goes anywhere', () => {
       That one is an illustration of the shape rather than a citation of anything, and the sentence
       beside it is already the explanation a title would repeat.
     */
-    const withoutLegend = HTML.slice(0, HTML.indexOf('class="eval-legend"'))
-      + HTML.slice(HTML.indexOf('</p>', HTML.indexOf('class="eval-legend"')));
+    const withoutLegend =
+      HTML.slice(0, HTML.indexOf('class="eval-key"')) +
+      HTML.slice(HTML.indexOf('</dl>', HTML.indexOf('class="eval-key"')));
     const inert = [...withoutLegend.matchAll(/<span class="[^"]*is-inert"([^>]*)>/g)].map(
       (m) => m[1] ?? '',
     );
@@ -352,18 +363,27 @@ describe('a chip says whether it goes anywhere', () => {
     expect(rule).toContain('color:var(--violet)');
   });
 
-  /* One legend, under the first angle, and not seven. */
-  it('explains the two kinds once, under the first angle', () => {
-    expect([...HTML.matchAll(/class="eval-legend"/g)]).toHaveLength(1);
-    const legend = text(HTML.slice(HTML.indexOf('eval-legend')));
-    expect(legend).toContain('opens the capture behind it or jumps to the rule below');
-    expect(legend).toContain('has nowhere to go');
+  /*
+    One key, at the head of the section.
 
-    const firstAngle = HTML.indexOf('id="evaluation-angle-');
-    const secondAngle = HTML.indexOf('id="evaluation-angle-', firstAngle + 1);
-    const at = HTML.indexOf('eval-legend');
-    expect(at).toBeGreaterThan(firstAngle);
-    expect(at).toBeLessThan(secondAngle);
+    It was a paragraph under the first angle, which read as that angle's footnote: a reader who
+    started at the second one never met it, and a reader who started at the first met an explanation
+    before they had seen the thing it explained.
+  */
+  it('explains the two kinds once, at the head of the angles', () => {
+    expect([...HTML.matchAll(/class="eval-key"/g)]).toHaveLength(1);
+    const key = text(HTML.slice(HTML.indexOf('eval-key')));
+    expect(key).toContain('Opens the capture behind it, or jumps to the rule below');
+    expect(key).toContain('Goes nowhere');
+
+    const at = HTML.indexOf('class="eval-key"');
+    expect(at).toBeGreaterThan(HTML.indexOf(`id="${evaluationSectionAnchor('angles')}"`));
+    expect(at).toBeLessThan(HTML.indexOf('id="evaluation-angle-'));
+  });
+
+  /* Two examples, one line each — the shape a reader recognises as a key and stops reading. */
+  it('draws the key as two rows rather than a paragraph', () => {
+    expect([...HTML.matchAll(/class="eval-key-row"/g)]).toHaveLength(2);
   });
 });
 

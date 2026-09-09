@@ -279,3 +279,13 @@ export {
   type EyeTestRecord,
   type EyeTestRow,
 } from './eyeTestStore.js';
+
+/*
+  The evaluation's vocabulary, for the operator editor (D-261).
+
+  `MAX_SHORE_UPS` is the validator's cap and the editor reads it to know when to stop offering Add.
+  Restating the number in the web app would be two caps that happen to agree, and the second one
+  would be discovered by an operator writing a seventh shore-up and being refused at publish.
+*/
+export { MAX_SHORE_UPS, MINTRO_COST_WORDS, OPERATOR_NOTE_WORDS, PRICE_WORDS } from './evaluation.js';
+

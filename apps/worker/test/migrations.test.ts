@@ -85,11 +85,24 @@ describe('migrations', () => {
     for (const { file, sql } of files) {
       for (const table of tablesCreatedIn(sql)) {
         const taken = new Set<string>();
-        // Anchored at the start of a line. Unanchored, the leading `[\s\S]*?` will happily begin
-        // at the word "revoke" inside a preceding comment and swallow the prose between there and
-        // the real statement, so the privilege list parses as English and a correctly revoked table
-        // reports as unprotected. The anchor is what makes this read statements rather than text.
-        for (const m of sql.matchAll(/^[ 	]*revoke\s+([\s\S]*?)\s+on\s+public\.(\w+)\s+from\s+([^;]*);/gim)) {
+        /*
+          One statement, and the privilege list is privileges.
+
+          Anchored at the start of a line, because unanchored the match begins at the word "revoke"
+          inside a preceding comment and swallows the prose up to the real statement — the privilege
+          list then parses as English and a correctly revoked table reports as unprotected.
+
+          And the list itself is `[a-z, ]+`, not `[\s\S]*?`. A migration that revokes on a
+          **function** before it revokes on its table — `revoke all on function public.f() from ...`
+          — does not match `on public.<name>`, so the lazy span ran on from that statement to the
+          table's name in the next one and consumed the real revoke on the way. 0081 is the first
+          migration to do both, and it reported its own correct revoke as missing.
+
+          This is the standing shape in CLAUDE.md: a regex over SQL does not respect statement
+          boundaries, and the check is "is every match inside the statement I meant", never "did it
+          compile".
+        */
+        for (const m of sql.matchAll(/^[ 	]*revoke\s+([a-z, ]+?)\s+on\s+public\.(\w+)\s+from\s+([^;]*);/gim)) {
           if (m[2] !== table || !/\bauthenticated\b/i.test(m[3]!)) continue;
           for (const priv of m[1]!.split(',')) taken.add(priv.trim().toLowerCase());
         }

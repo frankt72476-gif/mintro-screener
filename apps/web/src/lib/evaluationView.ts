@@ -81,6 +81,14 @@ export interface StoredDraft {
   readonly routing: readonly DraftRouting[];
   readonly angles: readonly DraftAngle[];
   readonly shoreUps: readonly { readonly text: string; readonly citation: DraftCitation }[];
+  /**
+   * The operator's own note (D-261). Absent until one is written.
+   *
+   * Not the model's: it is outside the answer schema, so a regeneration replaces the model's work
+   * and leaves this beside it. Rendered as its own labelled section under the placement paragraph
+   * so a reader can tell the two voices apart.
+   */
+  readonly operatorNote?: string;
 }
 
 /** Everything about the run that turns a citation into a line a reader can follow. */

@@ -46,6 +46,21 @@ import type { EvidenceAccess } from '../lib/evidence.js';
 import { formatStamp } from '../lib/format.js';
 import { useEvidenceDisclosure } from './EvidenceDisclosure.js';
 import {
+  EDITABLE_LEANS,
+  EDITABLE_PLACEMENTS,
+  EDITABLE_ROUTING_STATUSES,
+  canAddShoreUp,
+  withLean,
+  withOperatorNote,
+  withParagraph,
+  withPlacement,
+  withRoutingStatus,
+  withShoreUp,
+  withShoreUpText,
+  withSpectrum,
+  withoutShoreUp,
+} from '../lib/evaluationEdit.js';
+import {
   INERT_REASON,
   LEAN_LABEL,
   PLACEMENT_LABEL,
@@ -97,10 +112,40 @@ interface Props {
    * report could not be read still renders, and says what it can.
    */
   readonly appendix?: JSX.Element | null;
+  /**
+   * Edit mode (D-261, addendum "Operator editor").
+   *
+   * **The same component, not a second one.** The addendum asks for exactly this: *the operator
+   * sees exactly what the reader will see*. A separate editing screen would be a second rendering
+   * of the same document, and the two would drift — which is the defect this repository has hit in
+   * four separate places, and the reason the PDF is printed from the report route.
+   *
+   * Absent means read-only, and read-only is the default. Every caller that does not pass this gets
+   * a document with no controls in it at all — not disabled controls, absent ones.
+   */
+  readonly edit?: EvaluationEdit;
 }
 
-export function EvaluationReport({ draft, run, access, labels, appendix }: Props): JSX.Element {
-  const shared = { draft, run, access, labels };
+/**
+ * How an edit reaches the caller.
+ *
+ * One callback carrying the whole next draft, rather than one per field. The editor holds the
+ * document and replaces it; `evaluationEdit.ts` holds the functions that produce the next one, so
+ * *what an edit does* is testable without rendering anything.
+ */
+export interface EvaluationEdit {
+  readonly onChange: (next: StoredDraft) => void;
+}
+
+export function EvaluationReport({
+  draft,
+  run,
+  access,
+  labels,
+  appendix,
+  edit,
+}: Props): JSX.Element {
+  const shared = { draft, run, access, labels, ...(edit === undefined ? {} : { edit }) };
   const summary = useRef<HTMLElement>(null);
   return (
     <article className="evaluation" id={TOP_ANCHOR}>
@@ -188,12 +233,14 @@ function SummaryBlock({
   access,
   labels,
   anchor,
+  edit,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
   readonly anchor: RefObject<HTMLElement>;
+  readonly edit?: EvaluationEdit;
 }): JSX.Element {
   return (
     <section className="panel eval-summary" ref={anchor}>
@@ -225,8 +272,13 @@ function SummaryBlock({
         </dl>
       </header>
 
-      <FocalPlacement draft={draft} access={access} labels={labels} />
-      <PlacementRow draft={draft} />
+      <FocalPlacement
+        draft={draft}
+        access={access}
+        labels={labels}
+        {...(edit === undefined ? {} : { edit })}
+      />
+      <PlacementRow draft={draft} {...(edit === undefined ? {} : { edit })} />
       <LegalityAndRoutingRow draft={draft} access={access} labels={labels} />
       <AngleChipsRow draft={draft} run={run} labels={labels} />
 
@@ -238,13 +290,24 @@ function SummaryBlock({
         behind the badge above, which is what a reader clicking *Placement* is after.
       */}
       <div className="eval-row eval-row-lede" id={evaluationSectionAnchor('placement')}>
-        <Paragraph
-          run={run}
-          labels={labels}
-          text={draft.placement.paragraph}
-          className="eval-lede"
-        />
+        {edit === undefined ? (
+          <Paragraph
+            run={run}
+            labels={labels}
+            text={draft.placement.paragraph}
+            className="eval-lede"
+          />
+        ) : (
+          <EditableText
+            label="Placement paragraph"
+            value={draft.placement.paragraph}
+            rows={5}
+            onChange={(text) => edit.onChange(withParagraph(draft, text))}
+          />
+        )}
       </div>
+
+      <OperatorNote draft={draft} {...(edit === undefined ? {} : { edit })} />
     </section>
   );
 }
@@ -331,10 +394,12 @@ function FocalPlacement({
   draft,
   access,
   labels,
+  edit,
 }: {
   readonly draft: StoredDraft;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
+  readonly edit?: EvaluationEdit;
 }): JSX.Element {
   const { recommended } = draft.placement;
   const { observed } = legalitySummary(draft.legality);
@@ -342,9 +407,33 @@ function FocalPlacement({
   return (
     <div className="eval-row eval-row-focal">
       <span className="eyebrow">Recommended placement</span>
-      <p className={`eval-focal-badge is-${recommended}`}>
-        {PLACEMENT_LABEL[recommended] ?? recommended}
-      </p>
+      {edit === undefined ? (
+        <p className={`eval-focal-badge is-${recommended}`}>
+          {PLACEMENT_LABEL[recommended] ?? recommended}
+        </p>
+      ) : (
+        /*
+          The badge becomes the choice, at the badge's own size.
+
+          Three buttons rather than a `<select>`: the placement is the document's conclusion and it
+          is the largest thing on the screen, so the control that sets it should look like the thing
+          it sets. A dropdown here would hide two of the three answers behind a click.
+        */
+        <div className="eval-focal-choice" role="radiogroup" aria-label="Recommended placement">
+          {EDITABLE_PLACEMENTS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={id === recommended}
+              className={`eval-focal-badge is-${id} ${id === recommended ? 'is-chosen' : ''}`}
+              onClick={() => edit.onChange(withPlacement(draft, id))}
+            >
+              {PLACEMENT_LABEL[id] ?? id}
+            </button>
+          ))}
+        </div>
+      )}
       {recommended === 'referred_out' && observed.length > 0 && (
         <ul className="eval-fixed-by">
           {observed.map((item) => (
@@ -369,7 +458,13 @@ function FocalPlacement({
  * only against the scale it sits on; a lone label would leave the reader guessing which end is
  * which.
  */
-function PlacementRow({ draft }: { readonly draft: StoredDraft }): JSX.Element {
+function PlacementRow({
+  draft,
+  edit,
+}: {
+  readonly draft: StoredDraft;
+  readonly edit?: EvaluationEdit;
+}): JSX.Element {
   const { spectrum } = draft.placement;
 
   return (
@@ -379,6 +474,11 @@ function PlacementRow({ draft }: { readonly draft: StoredDraft }): JSX.Element {
         <p className="eval-rowsub">
           Where this business sits: <strong>{SPECTRUM_LABEL[spectrum] ?? spectrum}</strong>
         </p>
+        {/*
+          In edit mode the strip is the control. The five positions are already drawn side by side
+          in order, which is what a scale control looks like — replacing it with a dropdown would
+          take the scale away in exchange for nothing.
+        */}
         <ol className="eval-spectrum" aria-label="Spectrum position">
           {SPECTRUM_ORDER.map((position) => (
             <li
@@ -387,12 +487,124 @@ function PlacementRow({ draft }: { readonly draft: StoredDraft }): JSX.Element {
               data-position={position}
               {...(position === spectrum ? { 'aria-current': 'true' as const } : {})}
             >
-              {SPECTRUM_LABEL[position]}
+              {edit === undefined ? (
+                SPECTRUM_LABEL[position]
+              ) : (
+                <button
+                  type="button"
+                  className="eval-position-choose"
+                  aria-pressed={position === spectrum}
+                  onClick={() => edit.onChange(withSpectrum(draft, position))}
+                >
+                  {SPECTRUM_LABEL[position]}
+                </button>
+              )}
             </li>
           ))}
         </ol>
       </div>
     </div>
+  );
+}
+
+/**
+ * The operator's own note, under the placement paragraph (D-261).
+ *
+ * **Its own labelled section, and never folded into the paragraph.** The paragraph is the model's
+ * and this is a person's; a reader who cannot tell them apart is reading two voices as one, and a
+ * regeneration would silently take the operator's words with it.
+ *
+ * Absent renders nothing in read mode — a heading over an empty box is a section that says a note
+ * exists. In edit mode the box is always there, because an absent control is one an operator has
+ * to discover.
+ */
+function OperatorNote({
+  draft,
+  edit,
+}: {
+  readonly draft: StoredDraft;
+  readonly edit?: EvaluationEdit;
+}): JSX.Element | null {
+  const note = draft.operatorNote ?? '';
+  if (edit === undefined && note.trim().length === 0) return null;
+
+  return (
+    <div className="eval-row eval-row-note">
+      <span className="eyebrow">Operator notes</span>
+      {edit === undefined ? (
+        <p className="eval-opnote">{note}</p>
+      ) : (
+        <EditableText
+          label="Operator notes"
+          value={note}
+          rows={3}
+          placeholder="What a reader should know that the draft does not say."
+          onChange={(text) => edit.onChange(withOperatorNote(draft, text))}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A text region an operator edits in place.
+ *
+ * A bare `<textarea>` with the document's own type, so the words look on screen the way they will
+ * look when published. The addendum's requirement is that the operator sees what the reader will
+ * see, and a control in a different typeface is a different document.
+ */
+function EditableText({
+  label,
+  value,
+  rows,
+  placeholder,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly rows: number;
+  readonly placeholder?: string;
+  readonly onChange: (text: string) => void;
+}): JSX.Element {
+  return (
+    <textarea
+      className="eval-edit-text"
+      aria-label={label}
+      value={value}
+      rows={rows}
+      {...(placeholder === undefined ? {} : { placeholder })}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
+/** One choice among a fixed few, where a badge would be too large and prose too loose. */
+function ChoiceSelect({
+  label,
+  value,
+  options,
+  labels,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly options: readonly string[];
+  readonly labels: Readonly<Record<string, string>>;
+  readonly onChange: (next: string) => void;
+}): JSX.Element {
+  return (
+    <select
+      className="eval-edit-select"
+      aria-label={label}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {labels[option] ?? option}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -614,11 +826,13 @@ function RoutingTable({
   run,
   access,
   labels,
+  edit,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
+  readonly edit?: EvaluationEdit;
 }): JSX.Element {
   const order = labels.conditionOrder;
   const rows = [...draft.routing].sort(
@@ -642,9 +856,27 @@ function RoutingTable({
             <tr key={row.conditionId} className={`is-${row.status}`}>
               <th scope="row">{labels.conditionLabel[row.conditionId] ?? row.conditionId}</th>
               <td>
-                <span className={`eval-status is-${row.status}`}>
-                  {ROUTING_STATUS_LABEL[row.status] ?? row.status}
-                </span>
+                {/*
+                  Every row is editable, the two the application answers included — those are the
+                  ones an operator is most likely to change, because the crawl cannot read them and
+                  the operator has the application in front of them. A read-only row there would
+                  leave the one person who knows the answer unable to record it.
+                */}
+                {edit === undefined ? (
+                  <span className={`eval-status is-${row.status}`}>
+                    {ROUTING_STATUS_LABEL[row.status] ?? row.status}
+                  </span>
+                ) : (
+                  <ChoiceSelect
+                    label={`Status: ${labels.conditionLabel[row.conditionId] ?? row.conditionId}`}
+                    value={row.status}
+                    options={EDITABLE_ROUTING_STATUSES}
+                    labels={ROUTING_STATUS_LABEL}
+                    onChange={(status) =>
+                      edit.onChange(withRoutingStatus(draft, row.conditionId, status))
+                    }
+                  />
+                )}
               </td>
               <td>
                 {row.citations.length === 0 ? (
@@ -678,11 +910,13 @@ function Angles({
   run,
   access,
   labels,
+  edit,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
+  readonly edit?: EvaluationEdit;
 }): JSX.Element {
   const order = labels.angleOrder;
   const angles = [...draft.angles].sort(
@@ -692,7 +926,15 @@ function Angles({
   return (
     <section className="panel eval-angles" id={evaluationSectionAnchor('angles')}>
       <SectionHeading id="angles" />
-      {angles.map((angle, index) => (
+      {/*
+        A key, at the head of the section rather than under the first angle.
+
+        Under the first angle it read as that angle's footnote — a reader who started at the second
+        one never met it, and a reader who started at the first met an explanation before they had
+        seen the thing it explained. A key belongs where a key belongs.
+      */}
+      <ChipLegend />
+      {angles.map((angle) => (
         <article
           key={angle.angleId}
           id={angleAnchor(angle.angleId)}
@@ -702,9 +944,19 @@ function Angles({
             <h3 className="eval-angle-title">
               {labels.angleTitle[angle.angleId] ?? angle.angleId}
             </h3>
-            <span className={`eval-lean is-${angle.lean}`}>
-              {LEAN_LABEL[angle.lean] ?? angle.lean}
-            </span>
+            {edit === undefined ? (
+              <span className={`eval-lean is-${angle.lean}`}>
+                {LEAN_LABEL[angle.lean] ?? angle.lean}
+              </span>
+            ) : (
+              <ChoiceSelect
+                label={`Lean: ${labels.angleTitle[angle.angleId] ?? angle.angleId}`}
+                value={angle.lean}
+                options={EDITABLE_LEANS}
+                labels={LEAN_LABEL}
+                onChange={(lean) => edit.onChange(withLean(draft, angle.angleId, lean))}
+              />
+            )}
           </header>
           {angle.nothingObserved === true && (
             <p className="eval-line">Nothing was observed for this angle.</p>
@@ -717,14 +969,6 @@ function Angles({
             access={access}
             heading="Cited"
           />
-          {/*
-            Once, under the first angle.
-
-            The chips are the document's one piece of machinery a reader has to learn, and they
-            learn it where they first meet a list of them. Repeating it under all seven would be the
-            document telling them the same thing seven times.
-          */}
-          {index === 0 && <ChipLegend />}
         </article>
       ))}
     </section>
@@ -732,22 +976,35 @@ function Angles({
 }
 
 /**
- * What the two kinds of chip mean.
+ * What the two kinds of chip mean, as a key.
  *
- * Written from the reader's side — what happens when you click — rather than from the data's. A
- * legend explaining `not_evaluable` would be a second vocabulary to hold; the muted chip says its
- * own reason on hover, and this only says that it will.
+ * Two examples, one line each, in a bordered block — the shape a reader recognises as a key and
+ * skips once they have read it. As a paragraph it read as prose about the chips, which is a thing
+ * to read rather than a thing to consult.
+ *
+ * Written from the reader's side: what happens when you click, not what the data says. A key
+ * explaining `not_evaluable` would be a second vocabulary to hold; the muted chip says its own
+ * reason on hover, and this only says that it will.
  */
 function ChipLegend(): JSX.Element {
   return (
-    <p className="eval-legend">
-      <span className="eval-chip is-finding is-linked">
-        A chip like this<ChipArrow />
-      </span>{' '}
-      opens the capture behind it or jumps to the rule below.{' '}
-      <span className="eval-chip is-inert">A chip like this</span> has nowhere to go, and says why
-      when you rest on it.
-    </p>
+    <dl className="eval-key">
+      <div className="eval-key-row">
+        <dt>
+          <span className="eval-chip is-finding is-linked">
+            A rule
+            <ChipArrow />
+          </span>
+        </dt>
+        <dd>Opens the capture behind it, or jumps to the rule below.</dd>
+      </div>
+      <div className="eval-key-row">
+        <dt>
+          <span className="eval-chip is-inert">A rule</span>
+        </dt>
+        <dd>Goes nowhere. Rest on it and it says why.</dd>
+      </div>
+    </dl>
   );
 }
 
@@ -774,36 +1031,95 @@ function ShoreUps({
   run,
   access,
   labels,
+  edit,
 }: {
   readonly draft: StoredDraft;
   readonly run: EvaluationRunContext;
   readonly access: EvidenceAccess;
   readonly labels: EvaluationLabels;
+  readonly edit?: EvaluationEdit;
 }): JSX.Element | null {
-  if (draft.shoreUps.length === 0) return null;
+  /*
+    In edit mode the section stands even when it is empty, because Add is inside it.
+
+    Read mode keeps the memo's rule: absent entirely, never "None". An operator looking for the
+    control cannot find it in a section that renders nothing.
+  */
+  if (draft.shoreUps.length === 0 && edit === undefined) return null;
 
   return (
     <section className="panel eval-shoreups" id={evaluationSectionAnchor('shoreups')}>
       <SectionHeading id="shoreups" />
       <p className="eval-line">What would close the open conditions.</p>
       <ul className="eval-shoreup-list">
-        {draft.shoreUps.map((shoreUp) => {
+        {draft.shoreUps.map((shoreUp, index) => {
           const resolved = resolveCitation(run, labels, shoreUp.citation);
           return (
-            <li key={shoreUp.text} className="eval-shoreup">
-              <Paragraph
-                run={run}
-                labels={labels}
-                text={shoreUp.text}
-                className="eval-shoreup-text"
-              />
+            <li key={`${index}:${shoreUp.citation.ref}`} className="eval-shoreup">
+              {edit === undefined ? (
+                <Paragraph
+                  run={run}
+                  labels={labels}
+                  text={shoreUp.text}
+                  className="eval-shoreup-text"
+                />
+              ) : (
+                <EditableText
+                  label={`Shore-up ${index + 1}`}
+                  value={shoreUp.text}
+                  rows={2}
+                  onChange={(text) => edit.onChange(withShoreUpText(draft, index, text))}
+                />
+              )}
               {resolved !== null && <Chip resolved={resolved} run={run} access={access} />}
+              {edit !== undefined && (
+                <button
+                  type="button"
+                  className="eval-edit-remove"
+                  onClick={() => edit.onChange(withoutShoreUp(draft, index))}
+                >
+                  Delete
+                </button>
+              )}
             </li>
           );
         })}
       </ul>
+      {/*
+        Add, up to the validator's own cap.
+
+        `canAddShoreUp` reads `MAX_SHORE_UPS` from the engine, so an operator is never offered a
+        seventh — the publish path would refuse it, and a refusal that arrives after the writing is
+        worse than a control that was never there. The new shore-up borrows the first one's
+        citation, or the placement's: every shore-up must cite something the run holds, and an
+        operator writing one already has a capture in mind. They change it by editing the text and
+        picking again is a later commit's problem, stated here so it is not mistaken for finished.
+      */}
+      {edit !== undefined && canAddShoreUp(draft) && borrowedCitation(draft) !== null && (
+        <button
+          type="button"
+          className="eval-edit-add"
+          onClick={() =>
+            edit.onChange(withShoreUp(draft, 'A change worth making.', borrowedCitation(draft)!))
+          }
+        >
+          Add a shore-up
+        </button>
+      )}
     </section>
   );
+}
+
+/**
+ * A citation a new shore-up can carry.
+ *
+ * Every shore-up must cite something the run holds — `validateDraft` refuses one that does not — so
+ * a new row cannot start empty. It borrows from an existing shore-up, or failing that from the
+ * placement, which cites angles and is present on every draft. `null` where the draft cites nothing
+ * at all, and the Add control is absent rather than producing a document the publish path refuses.
+ */
+function borrowedCitation(draft: StoredDraft): DraftCitation | null {
+  return draft.shoreUps[0]?.citation ?? draft.placement.citations[0] ?? null;
 }
 
 /* ── prose, citations and chips ──────────────────────────────────────────────────────────────── */

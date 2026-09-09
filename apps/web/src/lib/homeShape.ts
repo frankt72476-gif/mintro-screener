@@ -70,6 +70,19 @@ export interface HomeShape {
    * line telling them so is noise. Present exactly once for a partner (D-229).
    */
   readonly showsDisclosure: boolean;
+  /**
+   * The evaluation editor's controls, on a finished run (D-261).
+   *
+   * **Host organisation, and not a capability flag.** Editing an evaluation is not the same kind of
+   * permission as sending one: the document states *Mintro's* view under Mintro's name (D-256), so
+   * the question is which organisation the operator belongs to rather than which capability they
+   * were granted. A partner analyst reads it and cannot change it.
+   *
+   * Presence only, the same as every other field here. The gate of record is 0081 —
+   * `edit_evaluation_draft` and `evaluation_requests_insert`, both resolving the capability from
+   * `auth.uid()` — and a hidden control has never been a gate (D-230).
+   */
+  readonly showsEvaluationEditing: boolean;
 }
 
 export function homeShape(viewer: Viewer): HomeShape {
@@ -87,6 +100,9 @@ export function homeShape(viewer: Viewer): HomeShape {
     // read rather than special-cased — an owner whose flag were false is unrepresentable.
     showsDocumentsTab: viewer.canRunDocumentsCheck,
     showsSubmitAction: viewer.canSubmitToIqwallet,
+    // The owner is in the host organisation by construction, so `isHost` is read rather than
+    // special-cased — the same reasoning `showsDocumentsTab` carries for its flag.
+    showsEvaluationEditing: viewer.isHost,
     showsMarkReadyAction: !viewer.canSubmitToIqwallet,
     showsDisclosure: !seesEveryOrg,
   };
