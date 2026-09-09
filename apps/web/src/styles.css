@@ -67,17 +67,29 @@
     is one green and one amber in this file, so a lean dot and a passing rule share a colour but
     have nothing to be confused *with*.
 
-    **Red is a new value, and it has to be.** `--rose` is the failure state and appears in the same
-    view as a lean dot — the routing cells, the legality items and the `state-fail` chips all use it
-    in the summary block, beside the angle chips. Measured, `--rose` is L* 50.5 at hue 351 and this
-    red is L* 31.0 at hue 356: the same hue family, nineteen points of lightness apart, which is
-    what makes an 8px dot tell itself from a failure marker. Reusing `--rose` would have put two
-    meanings in one swatch at one size in one glance.
+    **Red is its own value, and it reads as red.** Measured: hue 0, L* 45.8, saturation 85 — a
+    reader names it without having anything to compare it against, which is the whole job of the
+    red end of a green/yellow/red scale.
 
-    Nineteen is above the fifteen the D-201 note uses as this palette's bar for two colours a reader
-    has to tell apart.
+    ## The requirement this replaced, and why it was wrong
+
+    The first version was `#8E1B23`, a dark brick chosen to sit nineteen L* points clear of `--rose`
+    so a dot could not be mistaken for a failure marker. Nineteen cleared the fifteen the D-201 note
+    sets — and the note was being applied to the wrong thing.
+
+    D-201's bar is for **section identity colours**, which a reader meets as a list and reads down,
+    comparing one to the next. A lean dot and a failure marker are never in a list together: they
+    are different shapes, in different rows, carrying different labels, and nothing in the document
+    puts them side by side for comparison. "Both appear on the same screen" is not the same as "a
+    reader has to tell these apart", and treating it as though it were bought a separation nobody
+    needed at the cost of the thing that mattered — at 10px on a white card, `#8E1B23` reads as
+    maroon. A scale whose red end is not namable as red has failed before any confusion with the
+    failure state could arise.
+
+    So the separation from `--rose` is no longer a constraint. It happens to be 4.7 L* points, and
+    that is fine.
   */
-  --scale-consumer:#8E1B23;
+  --scale-consumer:#D42020;
   --scale-neutral:var(--amber);
   --scale-research:var(--jade);
 
@@ -3593,7 +3605,7 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
 .eval-position:last-child{border-right:0}
 .eval-position[data-position="consumer_retail"]{background:color-mix(in srgb, var(--scale-consumer) 14%, var(--paper))}
 .eval-position[data-position="consumer_leaning"]{
-  background:color-mix(in srgb, color-mix(in srgb, var(--scale-consumer) 60%, var(--scale-neutral)) 14%, var(--paper));
+  background:color-mix(in srgb, color-mix(in srgb, var(--scale-consumer) 50%, var(--scale-neutral)) 14%, var(--paper));
 }
 .eval-position[data-position="mixed"]{background:color-mix(in srgb, var(--scale-neutral) 14%, var(--paper))}
 .eval-position[data-position="research_leaning"]{
@@ -3609,13 +3621,14 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
   the 4.5:1 a 10.5px label needs. Ink clears on the three yellow-to-green stops and white clears on
   the two red ones, so each says which it uses rather than one rule guessing for all five.
 
-  `consumer_leaning` sits at 60% red for the same reason: an even blend of red and yellow measures
-  4.31:1 against white and 4.12:1 against ink, clearing neither.
+  `consumer_leaning` is an even blend and takes ink. It was weighted 60% red while the red was a
+  dark brick, because an even blend of *that* red and yellow cleared neither text colour; with a red
+  that reads red the halfway stop measures 5.06:1 against ink and the weighting is unnecessary.
 */
 .eval-position.is-here{font-weight:600}
 .eval-position.is-here[data-position="consumer_retail"]{background:var(--scale-consumer);color:#fff}
 .eval-position.is-here[data-position="consumer_leaning"]{
-  background:color-mix(in srgb, var(--scale-consumer) 60%, var(--scale-neutral));color:#fff;
+  background:color-mix(in srgb, var(--scale-consumer) 50%, var(--scale-neutral));color:var(--ink);
 }
 .eval-position.is-here[data-position="mixed"]{background:var(--scale-neutral);color:var(--ink)}
 .eval-position.is-here[data-position="research_leaning"]{
@@ -3673,8 +3686,12 @@ a.eval-rowlabel::after{content:" \2193";font-size:9px;opacity:.6}
 /*
   The lean dot, on the same scale as the strip. The word travels beside it either way — a dot is
   never the only thing saying which way an angle came out.
+
+  10px rather than 8px. A hue is what this shape carries and 8px was not enough of it to name: the
+  smaller the patch, the more a colour reads as a smudge of its neighbours. Two more pixels is the
+  cheapest half of making the scale legible; the red was the other half.
 */
-.eval-lean-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--slate)}
+.eval-lean-dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:var(--slate)}
 .eval-lean-dot.is-consumer{background:var(--scale-consumer)}
 .eval-lean-dot.is-neutral{background:var(--scale-neutral)}
 .eval-lean-dot.is-research{background:var(--scale-research)}

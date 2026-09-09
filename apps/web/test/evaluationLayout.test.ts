@@ -253,6 +253,29 @@ describe('the lean and spectrum scale', () => {
     return 116 * f - 16;
   };
 
+  /** Degrees from pure red, whichever way round the wheel. 359 is one degree of red, not 359. */
+  const hue = (hex: string): number => {
+    const [r, g, b] = rgb(hex).map((c) => c / 255) as [number, number, number];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const span = max - min;
+    if (span === 0) return 0;
+    const degrees =
+      max === r
+        ? (((g - b) / span) % 6) * 60
+        : max === g
+          ? ((b - r) / span + 2) * 60
+          : ((r - g) / span + 4) * 60;
+    const from = ((degrees % 360) + 360) % 360;
+    return Math.min(from, 360 - from);
+  };
+
+  const saturation = (hex: string): number => {
+    const [r, g, b] = rgb(hex).map((c) => c / 255) as [number, number, number];
+    const max = Math.max(r, g, b);
+    return max === 0 ? 0 : ((max - Math.min(r, g, b)) / max) * 100;
+  };
+
   const contrast = (a: string, b: string): number => {
     const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
     return (hi! + 0.05) / (lo! + 0.05);
@@ -323,18 +346,49 @@ describe('the lean and spectrum scale', () => {
   });
 
   /*
-    The reason the red is a new value rather than `--rose`.
+    The red reads as red, which is the only thing it is held to.
 
-    Fifteen is the bar the D-201 note sets for two of this palette's colours a reader has to tell
-    apart, and these two sit side by side: a routing cell in the failure rose, an angle chip's dot
-    in the consumer red, both in the summary block.
+    An earlier version asserted it sat fifteen L* points clear of `--rose`, on the reasoning that a
+    lean dot and a failure marker appear on the same screen. That was the D-201 bar applied to the
+    wrong thing: D-201 is about **section identity colours**, which a reader meets as a list and
+    reads down. A dot and a failure marker are never in a list together — different shapes,
+    different rows, different labels, and nothing puts them side by side. "Both are on screen" is
+    not "a reader has to tell these apart".
+
+    The separation it bought was real and useless; what it cost was the red. At 10px the dark brick
+    it forced read as maroon, and a scale whose red end is not namable as red has failed before any
+    confusion with the failure state could arise. So the constraint is gone and this is what
+    replaces it: hue at the red point, saturated, and light enough to be a colour rather than a
+    shadow.
   */
-  it('keeps the consumer red clear of the failure rose', () => {
+  it('draws a red a reader would name without comparing it to anything', () => {
+    expect(hue(RED!), `scale-consumer ${RED} is not at the red point`).toBeLessThanOrEqual(10);
+    expect(saturation(RED!), `scale-consumer ${RED} is washed out`).toBeGreaterThan(70);
+    expect(lstar(RED!), `scale-consumer ${RED} is too dark to read as red`).toBeGreaterThan(40);
+    expect(lstar(RED!)).toBeLessThan(55);
+  });
+
+  /*
+    It is still its own value and not `--rose` itself — a dot and a failure marker mean different
+    things, and one token for both would make them one thing whatever the lightness.
+  */
+  it('is a value of its own, not the failure state reused', () => {
     expect(RED).not.toBe(ROSE);
-    expect(
-      Math.abs(lstar(RED!) - lstar(ROSE!)),
-      `scale-consumer ${RED} against rose ${ROSE}`,
-    ).toBeGreaterThan(15);
+  });
+
+  /*
+    Ten pixels, as a floor.
+
+    A hue is what this shape carries, and the smaller the patch the more a colour reads as a smudge
+    of its neighbours. Asserted as a minimum rather than an equality: the number may grow, and a
+    test that pinned it would be the same number written twice.
+  */
+  it('draws the dot large enough to carry a hue', () => {
+    const rule = CSS.match(/\.eval-lean-dot\{([^}]*)\}/);
+    expect(rule, 'no .eval-lean-dot rule').not.toBeNull();
+    const size = rule![1]!.match(/width:\s*(\d+)px/);
+    expect(size, 'the dot declares no width').not.toBeNull();
+    expect(Number(size![1]), 'the lean dot has shrunk').toBeGreaterThanOrEqual(10);
   });
 
   it('gives every lean its own colour from the scale', () => {
