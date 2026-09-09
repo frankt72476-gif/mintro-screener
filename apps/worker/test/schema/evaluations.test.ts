@@ -327,3 +327,58 @@ describe('what a draft cost to produce (0079)', () => {
   });
 });
 
+describe('why an earlier attempt was refused (0080)', () => {
+  const insertRetry = (runId: string, retry: string | null) =>
+    schema.query(
+      `insert into public.evaluation_drafts
+         (run_id, angles_version, ruleset_version, model, input_sha256, content, validator_status,
+          attempts, retry_message)
+       values ($1, '1.1.0', '3.9.0', 'claude-opus-5', $2, '{}'::jsonb, 'ok', 2, $3)`,
+      [runId, SHA, retry],
+    );
+
+  /*
+    The row that motivated the column: a good draft, two attempts, and no record anywhere of what
+    the discarded answer got wrong.
+  */
+  it('records the refusal on a draft that then succeeded', async () => {
+    const runId = await finishedRun();
+    await insertRetry(runId, "cites finding f-999, which this run does not hold");
+
+    const rows = await schema.query<{ validator_status: string; retry_message: string }>(
+      `select validator_status, retry_message from public.evaluation_drafts where run_id = $1`,
+      [runId],
+    );
+    expect(rows[0]?.validator_status).toBe('ok');
+    expect(rows[0]?.retry_message).toContain('f-999');
+  });
+
+  it('accepts a row with none, which is every one-attempt draft', async () => {
+    const runId = await finishedRun();
+    await expect(insertRetry(runId, null)).resolves.toBeDefined();
+  });
+
+  /*
+    Two columns, two questions. `validator_message` refuses the row; `retry_message` explains an
+    answer that no longer exists. A row carries both only when the last attempt was also refused.
+  */
+  it('is independent of the message that refuses the row', async () => {
+    const runId = await finishedRun();
+    await schema.query(
+      `insert into public.evaluation_drafts
+         (run_id, angles_version, ruleset_version, model, input_sha256, content, validator_status,
+          validator_message, attempts, retry_message)
+       values ($1, '1.1.0', '3.9.0', 'claude-opus-5', $2, '{"partial":true}'::jsonb, 'rejected',
+               'a price word in the placement', 2, 'cites finding f-999')`,
+      [runId, SHA],
+    );
+
+    const rows = await schema.query<{ validator_message: string; retry_message: string }>(
+      `select validator_message, retry_message from public.evaluation_drafts where run_id = $1`,
+      [runId],
+    );
+    expect(rows[0]?.validator_message).toContain('price word');
+    expect(rows[0]?.retry_message).toContain('f-999');
+  });
+});
+

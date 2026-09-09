@@ -127,6 +127,15 @@ export interface EvaluateResult {
   /** What the vendor reported for the accepted answer. Absent when no call was made. */
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
   /**
+   * Why the previous attempt was refused, on a result that then succeeded.
+   *
+   * Distinct from `message`, which says why *this* result is unusable. A draft can be good and
+   * still carry one of these: it is the refusal that produced the retry, and it is the only record
+   * of the validator doing its job. `attempts: 2` without it says a refusal happened and withholds
+   * the part worth reading (0080).
+   */
+  readonly retryMessage?: string;
+  /**
    * The handle mapping this generation used.
    *
    * Stored with the draft rather than recomputed: a draft citing `F12` is unreadable without
@@ -207,9 +216,29 @@ export function inputHash(
  */
 export function runContextFor(
   angles: AngleSet,
+  ruleset: Ruleset,
   inputs: EvaluationInputs,
   knownHandles: ReadonlySet<string> = new Set(),
 ): RunContext {
+  /** Findings on a set of rules. The scope maps are all this, over different rule lists. */
+  const findingsOn = (ruleIds: readonly string[]): ReadonlySet<string> => {
+    const wanted = new Set(ruleIds);
+    return new Set(inputs.findings.filter((f) => wanted.has(f.ruleId)).map((f) => f.id));
+  };
+
+  /*
+    Legality findings are citable from every angle.
+
+    A legality item ends the evaluation on its own and belongs to no angle in particular, so scoping
+    it out of all seven would forbid the one piece of evidence any angle might legitimately need to
+    account for. Exempt, exactly as the coverage rule in `angles.ts` exempts them from needing an
+    angle at all.
+  */
+  const legalityFindings = findingsOn([...LEGALITY_RULE_IDS]);
+
+  const heavyRuleIds = ruleset.rules.filter((rule) => rule.weight === 'heavy').map((rule) => rule.id);
+  const heavy = new Set(heavyRuleIds);
+
   return {
     findingIds: new Set(inputs.findings.map((f) => f.id)),
     evidenceKeys: new Set(inputs.evidence.map((e) => e.key)),
@@ -220,6 +249,32 @@ export function runContextFor(
     legality: computeLegality(inputs.findings, LEGALITY_RULE_IDS),
     observableConditionIds: angles.routingConditions.filter((c) => c.observable).map((c) => c.id),
     knownHandles,
+    /*
+      `fail` only. A `review` is D-009's human queue rather than a failure, and a `not_evaluable` is
+      an absence of observation — a lean that had to answer to either would be answering to
+      something nobody observed.
+    */
+    heavyFailingFindingIds: new Set(
+      inputs.findings.filter((f) => heavy.has(f.ruleId) && f.state === 'fail').map((f) => f.id),
+    ),
+    /*
+      An angle that declares no rules is left out of the map entirely, and the validator reads that
+      absence as unrestricted. That is the consistency angle: its subject is what the other six
+      found, so every finding in the run is legitimately in scope for it.
+    */
+    angleFindingIds: new Map(
+      angles.angles
+        .filter((angle) => angle.ruleIds.length > 0)
+        .map((angle) => [
+          angle.id,
+          new Set([...findingsOn(angle.ruleIds), ...legalityFindings]) as ReadonlySet<string>,
+        ]),
+    ),
+    conditionFindingIds: new Map(
+      angles.routingConditions
+        .filter((condition) => condition.ruleIds.length > 0)
+        .map((condition) => [condition.id, findingsOn(condition.ruleIds)]),
+    ),
   };
 }
 
@@ -312,7 +367,7 @@ export function requestParts(
   ruleset: Ruleset,
   inputs: EvaluationInputs,
 ): { readonly prompt: string; readonly schema: string; readonly system: string } {
-  const run = runContextFor(angles, inputs);
+  const run = runContextFor(angles, ruleset, inputs);
   const handles = buildHandles(run);
   const schema = draftSchema(
     handleContext(run, handles),
@@ -335,7 +390,7 @@ export function promptFor(
   inputs: EvaluationInputs,
   retryMessage?: string,
 ): string {
-  const handles = buildHandles(runContextFor(angles, inputs));
+  const handles = buildHandles(runContextFor(angles, ruleset, inputs));
   return buildPrompt(angles, promptInputsFor(ruleset, inputs, handles, retryMessage));
 }
 
@@ -403,7 +458,7 @@ export async function generateDraft(
   }
 
   const model = options.model ?? angles.model;
-  const run = runContextFor(angles, inputs);
+  const run = runContextFor(angles, ruleset, inputs);
   const spectrum = angles.spectrum.map((entry) => entry.id);
   const placements = [...angles.placements];
   const words = sectionWords(angles.limits);
@@ -576,6 +631,8 @@ export async function generateDraft(
         draft,
         handles: stored,
         ...(usage === undefined ? {} : { usage }),
+        // What the discarded answer got wrong. Absent on a first-attempt success, which had none.
+        ...(retry === undefined ? {} : { retryMessage: retry }),
       };
     }
 
@@ -635,6 +692,13 @@ export async function storeDraft(
     attempts: result.attempts,
     input_tokens: result.usage?.inputTokens ?? null,
     output_tokens: result.usage?.outputTokens ?? null,
+    /*
+      Why the discarded attempt was refused (0080).
+
+      Null on a first-attempt success, which had no earlier answer to refuse — never an empty
+      string, which would read as a refusal with no reason given.
+    */
+    retry_message: result.retryMessage ?? null,
   });
 
   if (error !== null) {

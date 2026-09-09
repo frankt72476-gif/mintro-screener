@@ -230,6 +230,12 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
         '- `{"kind":"angle","ref":"A5"}` — **placement only**. The placement names at ' +
         'least two distinct angles that drove it.\n\n' +
         'Use only handles that appear in this document. There are no others.\n\n' +
+        '**Cite a finding only where it is listed.** An angle cites the findings printed under ' +
+        'that angle, and a routing row cites the findings that observe that condition — named ' +
+        'beside it below. A finding listed under another angle belongs to that angle, and citing ' +
+        'it here offers the reader support this section does not have. Legality findings are the ' +
+        'exception and may be cited anywhere. The placement, and any angle listed with no ' +
+        'findings of its own, may cite from the whole run.\n\n' +
         'A sentence that rests on reasoning rather than on a capture is wrapped ' +
         '`[inference: ...]`. A paragraph that cites nothing must be marked throughout. Do not hedge ' +
         'instead of marking — "appears to" is not a declaration.',
@@ -292,8 +298,8 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
           .map((condition) => {
             const observed =
               condition.ruleIds.length === 0
-                ? `answered by the ${condition.source ?? 'application'}, not the site`
-                : `observed by ${condition.ruleIds.join(', ')}`;
+                ? `answered by the ${condition.source ?? 'application'}, not the site — cite nothing`
+                : `cite only findings on ${condition.ruleIds.join(', ')}`;
             return `- \`${condition.id}\` — ${condition.label} (${observed})`;
           })
           .join('\n'),
@@ -381,6 +387,10 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
       `Reply with JSON only, in exactly this shape:\n\n${ANSWER_SCHEMA}\n\n` +
         'Every angle appears, in the order above, even one that observed nothing — set ' +
         '`nothingObserved` and say so in the paragraph. Every routing condition appears. ' +
+        '**An angle citing a rule marked [HEAVY] that failed cannot lean research.** Heavy ' +
+        'evidence against the reading is what the lean answers to; lean neutral and say what the ' +
+        'failure means. A `review` or a `not_evaluable` on a heavy rule does not bind the lean — ' +
+        'neither is a failure. ' +
         'Refer to angles by their handle (`A1`, `A2`, …), exactly as headed above. '+
         'Return the legality block exactly as supplied, notes aside.',
     ),

@@ -59,6 +59,9 @@ const RUN: RunContext = {
   legality: { clean: true, items: [] },
   observableConditionIds: [],
   knownHandles: new Set<string>(),
+  heavyFailingFindingIds: new Set<string>(),
+  angleFindingIds: new Map<string, ReadonlySet<string>>(),
+  conditionFindingIds: new Map<string, ReadonlySet<string>>(),
 };
 
 const map = buildHandles(RUN);

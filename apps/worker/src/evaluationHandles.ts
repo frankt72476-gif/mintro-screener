@@ -136,7 +136,34 @@ export function handleContext(run: RunContext, map: HandleMap): RunContext {
     },
     observableConditionIds: run.observableConditionIds,
     knownHandles: run.knownHandles,
+    /*
+      The scope maps travel too, so the handle-space context is a faithful translation rather than a
+      context with three fields left in the other alphabet.
+
+      Nothing reads them here today — the answer schema constrains which ids exist, not which angle
+      may cite which, and per-angle enums would put seven copies of the finding list in a document
+      that was refused at ten kilobytes once already. Scope is `validateDraft`'s, on real ids. A
+      half-translated context would be a trap for whatever reads this next.
+    */
+    heavyFailingFindingIds: mapIds(run.heavyFailingFindingIds, map, 'finding'),
+    angleFindingIds: new Map(
+      [...run.angleFindingIds].map(([angleId, ids]) => [
+        map.angle.toHandle.get(angleId) ?? angleId,
+        mapIds(ids, map, 'finding'),
+      ]),
+    ),
+    conditionFindingIds: new Map(
+      [...run.conditionFindingIds].map(([conditionId, ids]) => [
+        conditionId,
+        mapIds(ids, map, 'finding'),
+      ]),
+    ),
   };
+}
+
+/** A set of real ids as the handles that stand for them. */
+function mapIds(ids: ReadonlySet<string>, map: HandleMap, kind: string): ReadonlySet<string> {
+  return new Set([...ids].map((id) => toHandle(map, kind, id)));
 }
 
 export function storeHandles(map: HandleMap): StoredHandles {

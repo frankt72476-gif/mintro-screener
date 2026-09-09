@@ -266,6 +266,46 @@ export interface RunContext {
    * actually read.
    */
   readonly knownHandles: ReadonlySet<string>;
+  /**
+   * Findings on a heavy-weight rule that were observed to fail.
+   *
+   * A lean is a judgment, and this is the evidence a research lean cannot be reached over. The
+   * heavy rules are the ones D-259 weights as decisive — dosing, route of administration,
+   * therapeutic categories, benefit claims, guest checkout, needles. An angle that cites one of
+   * them failing and then leans research has read its own strongest contrary evidence and
+   * concluded past it, and nothing in the paragraph has to admit that happened.
+   *
+   * `fail` only. A `review` is not a failure — D-009 puts ambiguous checks in a human queue
+   * precisely so they are not treated as one — and `not_evaluable` is an absence of observation.
+   * Neither is evidence a lean must answer to.
+   */
+  readonly heavyFailingFindingIds: ReadonlySet<string>;
+  /**
+   * Which findings each angle may cite, by angle id.
+   *
+   * An angle declares its evidence in `angles.json`, and citing outside it is either a mis-citation
+   * or an angle answering a question that belongs to another. Both reach the reader as support the
+   * angle does not have — run 9011b2d7 cited DISC-004, a footer-disclaimer rule, for the existence
+   * of a research-water product line.
+   *
+   * **An angle absent from this map is unrestricted.** That is the cross-cutting case rather than a
+   * gap: the consistency angle declares no rules of its own by design, because its subject is
+   * everything the other six found set against the site's own statements. It is keyed on the
+   * absence of declared evidence, never on the angle's id — a rule keyed on `consistency` would be
+   * rule knowledge in the engine (hard constraint 1).
+   */
+  readonly angleFindingIds: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Which findings each routing condition may cite, by condition id.
+   *
+   * A routing row states whether a condition is met, and the rules that observe it are named in the
+   * angle set. A citation from outside them is a capture of something else offered as the basis for
+   * a status — the failure `not_observable_row_cites` catches in its own corner, generalised.
+   *
+   * A condition absent from this map cites nothing at all: an unobservable condition has no rules,
+   * and `not_observable_row_cites` already refuses citations on it.
+   */
+  readonly conditionFindingIds: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /**
@@ -359,7 +399,10 @@ export interface DraftRejection {
     | 'legality_altered'
     | 'domestic_with_unmet_routing'
     | 'unresolved_prose_handle'
-    | 'not_observable_row_cites';
+    | 'not_observable_row_cites'
+    | 'research_lean_over_heavy_failure'
+    | 'citation_outside_angle_scope'
+    | 'citation_outside_condition_scope';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -668,6 +711,29 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
       The empty cell is the honest one. What belongs there is the reason it could not be observed,
       and that is a property of the condition rather than of this run.
     */
+    /*
+      A routing row cites the rules that observe its condition, and no others.
+
+      `registration_gate` is observed by GATE-002 and GATE-003; a finding from anywhere else,
+      offered as the basis for its status, is a capture of something adjacent standing in for one
+      that bears on the question. The same failure `not_observable_row_cites` catches on the rows
+      that can cite nothing at all, generalised to the rows that can cite something.
+    */
+    const allowedHere = run.conditionFindingIds.get(row.conditionId);
+    if (allowedHere !== undefined) {
+      row.citations.forEach((citation, cited) => {
+        if (citation.kind !== 'finding') return;
+        if (!run.findingIds.has(citation.ref)) return;
+        if (allowedHere.has(citation.ref)) return;
+        reject(
+          'citation_outside_condition_scope',
+          `${at}.citations[${cited}]`,
+          `'${citation.ref}' is not a finding that observes '${row.conditionId}'. This condition is ` +
+            'read by its own rules; a finding from elsewhere cannot say whether it is met.',
+        );
+      });
+    }
+
     if (row.status === 'not_observable' && row.citations.length > 0) {
       reject(
         'not_observable_row_cites',
@@ -697,6 +763,62 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     seenAngles.add(angle.angleId);
     checkCitations(angle.citations, `${at}.citations`);
     checkParagraph(angle.paragraph, angle.citations, `${at}.paragraph`, angle.nothingObserved === true);
+
+    /*
+      A finding an angle cites is a finding that angle declares.
+
+      The angle set names the rules each angle reads, and a citation from outside them is either a
+      mis-citation or an angle answering another angle's question. Both land on the reader the same
+      way: as support the angle does not actually have. Run 9011b2d7 cited DISC-004 — the footer
+      disclaimer rule — for the existence of a research-water product line, and nothing refused it.
+
+      An angle with no declared rules is unrestricted, which is the consistency angle and only it.
+      Keyed on the absence of declared evidence rather than on the id, because an id here would be
+      rule knowledge in the engine.
+    */
+    const allowed = run.angleFindingIds.get(angle.angleId);
+    if (allowed !== undefined) {
+      angle.citations.forEach((citation, cited) => {
+        if (citation.kind !== 'finding') return;
+        if (!run.findingIds.has(citation.ref)) return; // unknown_citation already has this one
+        if (allowed.has(citation.ref)) return;
+        reject(
+          'citation_outside_angle_scope',
+          `${at}.citations[${cited}]`,
+          `'${citation.ref}' is not a finding this angle reads. Cite only the findings listed under ` +
+            `'${angle.angleId}' — a finding that belongs to another angle is that angle's to weigh.`,
+        );
+      });
+    }
+
+    /*
+      A research lean cannot be reached over a heavy rule observed to fail.
+
+      Heavy is D-259's weighting of the rules that decide what a business is — dosing, route of
+      administration, therapeutic categories, benefit claims, guest checkout, needles. An angle that
+      cites one of them failing and then leans research has read its strongest contrary evidence and
+      concluded past it, and the paragraph need not say so anywhere.
+
+      This refuses the lean, not the observation. The angle keeps every citation; what it may not do
+      is call the result research. Neutral remains available, and is usually the honest answer: a
+      genuine supplier with one heavy failure is not thereby a consumer retailer.
+    */
+    if (angle.lean === 'research') {
+      const failing = angle.citations
+        .filter((c) => c.kind === 'finding' && run.heavyFailingFindingIds.has(c.ref))
+        .map((c) => c.ref);
+
+      if (failing.length > 0) {
+        reject(
+          'research_lean_over_heavy_failure',
+          `${at}.lean`,
+          `leans research while citing ${failing.length} heavy rule(s) observed to fail: ` +
+            `${failing.join(', ')}. Heavy evidence against the reading is what the lean has to ` +
+            'answer to. Lean neutral and say what the failure means, or drop the citation if it ' +
+            'does not belong to this angle.',
+        );
+      }
+    }
   });
   for (const angleId of run.angleIds) {
     if (seenAngles.has(angleId)) continue;

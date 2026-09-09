@@ -16,6 +16,7 @@ import {
   loadRulesetFile,
   loadAngleSetFile,
   ANGLES_PATH,
+  LEGALITY_RULE_IDS,
   PLACEMENT_IDS,
   type AngleSet,
 } from '@mintro/ruleset';
@@ -78,6 +79,35 @@ const INPUTS: EvaluationInputs = {
       note: 'Product pages were served without an account.',
       evidenceKey: 'run-1/layer1/bbb.png',
     },
+    /*
+      A legality-tier finding, so the "citable from every angle" exemption is exercised rather than
+      asserted over an empty list. `pass`, so the computed legality block stays clean and every
+      fixture below keeps its free choice of recommendation.
+    */
+    {
+      id: 'f-003',
+      ruleId: 'PAY-001',
+      title: 'No peer-to-peer payment methods named on public pages',
+      state: 'pass',
+      note: 'No CashApp, Venmo or Zelle wording was found.',
+      evidenceKey: 'run-1/layer1/bbb.png',
+    },
+    /*
+      A heavy rule that did **not** fail.
+
+      Without one, "the context holds the heavy failures and only those" is only half a test: every
+      heavy finding in the fixture would be a failure, so a context that ignored `state` entirely
+      would produce the same set and pass. Confirmed by mutation — widening the filter to every
+      heavy rule left the whole suite green until this row existed.
+    */
+    {
+      id: 'f-004',
+      ruleId: 'OFFS-002',
+      title: 'No testimonials or outcome stories',
+      state: 'not_evaluable',
+      note: 'No page carrying testimonials was reached on this run.',
+      evidenceKey: null,
+    },
   ],
   evidence: [
     { key: 'run-1/layer0/aaa', kind: 'sitemap', url: 'https://shop.example/sitemap.xml' },
@@ -96,10 +126,24 @@ const INPUTS: EvaluationInputs = {
  * The model answers in handle space and the job decodes before validating, so a fixture written
  * in real ids would be testing a path that no longer exists.
  */
-const HANDLES = buildHandles(runContextFor(angles, INPUTS));
+const HANDLES = buildHandles(runContextFor(angles, ruleset, INPUTS));
 const H = (kind: string, id: string): string => toHandle(HANDLES, kind, id);
 
 /** A draft that passes the validator against `INPUTS`, in handle space. */
+/**
+ * A citation the given angle may carry.
+ *
+ * Derived from the angle set rather than listed, so the fixture keeps working when a rule moves
+ * between angles — the thing being tested is the validator, not this file's memory of the data.
+ */
+function citableBy(angleId: string): { kind: 'finding' | 'eye_test'; ref: string } {
+  const declared = angles.angles.find((a) => a.id === angleId)?.ruleIds ?? [];
+  const finding = INPUTS.findings.find((f) => declared.includes(f.ruleId));
+  return finding === undefined
+    ? { kind: 'eye_test', ref: H('eye_test', 'EYE-01') }
+    : { kind: 'finding', ref: H('finding', finding.id) };
+}
+
 function validDraft(): EvaluationDraft {
   return {
     placement: {
@@ -117,11 +161,19 @@ function validDraft(): EvaluationDraft {
       status: 'not_observable' as const,
       citations: [],
     })),
+    /*
+      Each angle cites what it is allowed to cite.
+
+      `f-001` is NAME-001 and `f-002` is GATE-002, and the angle set gives each to exactly one
+      angle; the rest cite the eye-test verdict, which no angle is scoped out of. A fixture that
+      gave every angle `f-001` — as this one used to — is refused now, correctly: six of the seven
+      do not read that rule.
+    */
     angles: angles.angles.map((a) => ({
       angleId: H('angle', a.id),
       lean: 'consumer' as const,
       paragraph: 'The catalogue is organised by outcome.',
-      citations: [{ kind: 'finding' as const, ref: H('finding', 'f-001') }],
+      citations: [citableBy(a.id)],
     })),
     shoreUps: [],
   };
@@ -263,8 +315,8 @@ describe('the prompt', () => {
 
 describe('the run context the validator is given', () => {
   it('is the ids this run actually holds', () => {
-    const run = runContextFor(angles, INPUTS);
-    expect([...run.findingIds]).toEqual(['f-001', 'f-002']);
+    const run = runContextFor(angles, ruleset, INPUTS);
+    expect([...run.findingIds]).toEqual(INPUTS.findings.map((f) => f.id));
     expect(run.eyeTestItemIds.has('EYE-01')).toBe(true);
     expect(run.angleIds).toHaveLength(7);
     expect(run.routingConditionIds).toHaveLength(5);
@@ -305,7 +357,8 @@ describe('generateDraft', () => {
     expect(result.attempts).toBe(1);
     expect(result.draft?.angles).toHaveLength(7);
     // Decoded: the stored draft carries real ids, whatever the model wrote.
-    expect(result.draft?.angles[0]?.citations[0]?.ref).toBe('f-001');
+    const products = result.draft?.angles.find((a) => a.angleId === 'products_for');
+    expect(products?.citations[0]?.ref).toBe('f-001');
     expect(angles.angles.map((a) => a.id)).toContain(result.draft?.angles[0]?.angleId);
     expect(result.handles?.finding[H('finding', 'f-001')]).toBe('f-001');
     expect(calls).toHaveLength(1);
@@ -682,7 +735,7 @@ describe('the request carries the run-scoped schema', () => {
 
     const schema = requests[0]!['output_config'].format.schema;
     // Handles, not uuids: the real ids never reach the model or the schema.
-    expect(schema.$defs.findingId.enum).toEqual(['F1', 'F2']);
+    expect(schema.$defs.findingId.enum).toEqual(INPUTS.findings.map((f) => H('finding', f.id)));
     expect(JSON.stringify(schema)).not.toContain('f-001');
     expect(JSON.stringify(schema)).not.toContain('fdd0000-0000');
   });
@@ -776,7 +829,7 @@ describe('handles bound the citation space end to end', () => {
     const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
     expect(result.handles).toBeDefined();
-    expect(Object.keys(result.handles!.finding)).toEqual(['F1', 'F2']);
+    expect(Object.keys(result.handles!.finding)).toEqual(INPUTS.findings.map((f) => H('finding', f.id)));
     expect(result.handles!.finding['F1']).toBe('f-001');
     expect(result.handles!.angle[H('angle', 'consistency')]).toBe('consistency');
   });
@@ -795,9 +848,14 @@ describe('handles bound the citation space end to end', () => {
     const { impl } = fakeFetch([validDraft()]);
     const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
-    const cited = (result.draft?.angles ?? []).flatMap((a) => a.citations.map((c) => c.ref));
-    for (const ref of cited) {
-      expect(INPUTS.findings.map((f) => f.id)).toContain(ref);
+    const cited = (result.draft?.angles ?? []).flatMap((a) => a.citations);
+    expect(cited.length).toBeGreaterThan(0);
+    for (const citation of cited) {
+      const held =
+        citation.kind === 'finding'
+          ? INPUTS.findings.map((f) => f.id)
+          : INPUTS.eyeTest.map((v) => v.id);
+      expect(held, `${citation.kind} ${citation.ref}`).toContain(citation.ref);
     }
     for (const citation of result.draft?.placement.citations ?? []) {
       expect(toId(HANDLES, 'angle', H('angle', citation.ref))).toBe(citation.ref);
@@ -834,7 +892,8 @@ describe('a rejected draft keeps what was written', () => {
     const { impl } = fakeFetch([invalid, invalid]);
     const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
 
-    expect(result.draft?.angles[0]?.citations[0]?.ref).toBe('f-001');
+    const products = result.draft?.angles.find((a) => a.angleId === 'products_for');
+    expect(products?.citations[0]?.ref).toBe('f-001');
   });
 
   /*
@@ -915,22 +974,28 @@ describe('the placement vocabulary guidance', () => {
   never persisted, which is the orphan CLAUDE.md names one granularity finer than an unused import.
   This test is the consumer.
 */
-describe('storeDraft records what the generation cost', () => {
-  /** Captures the insert payload. The delete runs first and returns nothing worth asserting. */
-  function capturingSupabase(): { supabase: WorkerSupabase; rows: Record<string, unknown>[] } {
-    const rows: Record<string, unknown>[] = [];
-    const client = {
-      from: () => ({
-        delete: () => ({ eq: async () => ({ error: null }) }),
-        insert: async (row: Record<string, unknown>) => {
-          rows.push(row);
-          return { error: null };
-        },
-      }),
-    } as unknown as SupabaseClient;
-    return { supabase: { client, bucket: 'evidence' }, rows };
-  }
+/**
+ * Captures the insert payload `storeDraft` writes. The delete runs first and returns nothing worth
+ * asserting.
+ *
+ * Module scope, because two describes now need it — what a generation cost, and why an earlier
+ * attempt was refused.
+ */
+function capturingSupabase(): { supabase: WorkerSupabase; rows: Record<string, unknown>[] } {
+  const rows: Record<string, unknown>[] = [];
+  const client = {
+    from: () => ({
+      delete: () => ({ eq: async () => ({ error: null }) }),
+      insert: async (row: Record<string, unknown>) => {
+        rows.push(row);
+        return { error: null };
+      },
+    }),
+  } as unknown as SupabaseClient;
+  return { supabase: { client, bucket: 'evidence' }, rows };
+}
 
+describe('storeDraft records what the generation cost', () => {
   const angleSet = { version: '1.0.0' } as AngleSet;
 
   /** `reported: false` omits `usage` entirely, which is what a generation with no call returns. */
@@ -1054,6 +1119,205 @@ describe('the length guidance reaches the model from the file', () => {
   it('puts the limits after the guardrails they serve and before the angles', () => {
     expect(prompt.indexOf('## Rules you must follow')).toBeLessThan(prompt.indexOf('## Length'));
     expect(prompt.indexOf('## Length')).toBeLessThan(prompt.indexOf('## The seven angles'));
+  });
+});
+
+/*
+  Scope and the lean anchor, as `runContextFor` assembles them from the committed files.
+
+  The engine tests state what the validator does with these maps; these state that the maps say what
+  `rules/angles.json` and `rules/ruleset.json` say. Both halves are needed: a correct rule fed a map
+  built from the wrong rule ids refuses honest citations and admits the ones it was written for.
+*/
+describe('the scope the run context carries', () => {
+  const run = runContextFor(angles, ruleset, INPUTS);
+
+  it('gives each angle the findings on the rules that angle declares', () => {
+    for (const angle of angles.angles.filter((a) => a.ruleIds.length > 0)) {
+      const allowed = run.angleFindingIds.get(angle.id);
+      expect(allowed, angle.id).toBeDefined();
+
+      const declared = new Set(angle.ruleIds);
+      const legality = new Set<string>(LEGALITY_RULE_IDS);
+      for (const finding of INPUTS.findings) {
+        const inScope = declared.has(finding.ruleId) || legality.has(finding.ruleId);
+        expect(allowed!.has(finding.id), `${angle.id} / ${finding.ruleId}`).toBe(inScope);
+      }
+    }
+  });
+
+  /*
+    The consistency angle declares no rules, so it is left out of the map entirely and the validator
+    reads that absence as unrestricted. Expressed by what the data says, never by the id.
+  */
+  it('leaves an angle with no declared rules out of the map', () => {
+    const undeclared = angles.angles.filter((a) => a.ruleIds.length === 0).map((a) => a.id);
+    expect(undeclared).toEqual(['consistency']);
+    for (const id of undeclared) expect(run.angleFindingIds.has(id)).toBe(false);
+  });
+
+  /*
+    A legality item ends the evaluation on its own and belongs to no angle in particular. Scoping it
+    out of all seven would forbid the one finding any angle might legitimately have to account for.
+  */
+  it('lets every angle cite a legality finding', () => {
+    const legalityFindings = INPUTS.findings.filter((f) =>
+      (LEGALITY_RULE_IDS as readonly string[]).includes(f.ruleId),
+    );
+    expect(legalityFindings.length).toBeGreaterThan(0);
+
+    for (const [angleId, allowed] of run.angleFindingIds) {
+      for (const finding of legalityFindings) {
+        expect(allowed.has(finding.id), `${angleId} / ${finding.ruleId}`).toBe(true);
+      }
+    }
+  });
+
+  it('gives each routing condition the findings on its own observing rules', () => {
+    for (const condition of angles.routingConditions.filter((c) => c.ruleIds.length > 0)) {
+      const allowed = run.conditionFindingIds.get(condition.id);
+      expect(allowed, condition.id).toBeDefined();
+
+      const declared = new Set(condition.ruleIds);
+      for (const finding of INPUTS.findings) {
+        expect(allowed!.has(finding.id), `${condition.id} / ${finding.ruleId}`).toBe(
+          declared.has(finding.ruleId),
+        );
+      }
+    }
+  });
+
+  it('leaves an unobservable condition out, since it can cite nothing at all', () => {
+    for (const condition of angles.routingConditions.filter((c) => c.ruleIds.length === 0)) {
+      expect(run.conditionFindingIds.has(condition.id), condition.id).toBe(false);
+    }
+  });
+
+  /*
+    `fail` only, and read off the rule set's own `weight`. A `review` is D-009's human queue and a
+    `not_evaluable` is an absence of observation; a lean answering to either would be answering to
+    something nobody observed.
+  */
+  it('holds the heavy rules observed to fail, and only those', () => {
+    const heavy = new Set(ruleset.rules.filter((r) => r.weight === 'heavy').map((r) => r.id));
+    expect(heavy.size).toBeGreaterThan(0);
+
+    for (const finding of INPUTS.findings) {
+      const shouldBind = heavy.has(finding.ruleId) && finding.state === 'fail';
+      expect(run.heavyFailingFindingIds.has(finding.id), `${finding.ruleId} ${finding.state}`).toBe(
+        shouldBind,
+      );
+    }
+  });
+});
+
+describe('the prompt states the citation scope and the lean anchor', () => {
+  const prompt = promptFor(angles, ruleset, INPUTS);
+
+  it('tells the model to cite a finding only where it is listed', () => {
+    expect(prompt).toContain('Cite a finding only where it is listed');
+    expect(prompt).toContain('Legality findings are the exception');
+  });
+
+  /*
+    The routing block names each condition's own observing rules, from the file. A condition that
+    cannot be observed says to cite nothing, which is the same instruction
+    `not_observable_row_cites` enforces after the fact.
+  */
+  it('names the rules each routing condition may cite, from the angle set', () => {
+    for (const condition of angles.routingConditions) {
+      if (condition.ruleIds.length === 0) continue;
+      expect(prompt, condition.id).toContain(`cite only findings on ${condition.ruleIds.join(', ')}`);
+    }
+    const unobservable = angles.routingConditions.filter((c) => c.ruleIds.length === 0);
+    expect(unobservable.length).toBeGreaterThan(0);
+    expect(prompt).toContain('cite nothing');
+  });
+
+  it('states the lean anchor, and that only a failure binds it', () => {
+    expect(prompt).toContain('cannot lean research');
+    expect(prompt).toContain('[HEAVY]');
+    expect(prompt).toContain('does not bind the lean');
+  });
+});
+
+/*
+  The refusal that produced a retry, on a draft that then succeeded (0080).
+
+  `attempts: 2` says a refusal happened and withholds the only useful part. Every rule this
+  generator has gained came from reading one of these, and until now they existed on stdout — which
+  is to say, until the terminal scrolled.
+*/
+describe('a successful draft records why the first attempt failed', () => {
+  it('carries the refusal that produced the retry', async () => {
+    const bad = validDraft();
+    const invalid = {
+      ...bad,
+      angles: bad.angles.map((a, i) =>
+        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'F999' }] } : a,
+      ),
+    };
+    const { impl } = fakeFetch([invalid, validDraft()]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('ok');
+    expect(result.attempts).toBe(2);
+    expect(result.retryMessage).toContain('F999');
+    // The draft itself is good, so nothing says otherwise.
+    expect(result.message).toBeUndefined();
+  });
+
+  it('carries none when the first answer was accepted', async () => {
+    const { impl } = fakeFetch([validDraft()]);
+    const result = await generateDraft(angles, ruleset, INPUTS, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.attempts).toBe(1);
+    expect(result.retryMessage).toBeUndefined();
+  });
+
+  it('stores it, and stores null when there was none', async () => {
+    const bad = validDraft();
+    const invalid = {
+      ...bad,
+      angles: bad.angles.map((a, i) =>
+        i === 0 ? { ...a, citations: [{ kind: 'finding' as const, ref: 'F999' }] } : a,
+      ),
+    };
+
+    const retried = capturingSupabase();
+    const first = await generateDraft(angles, ruleset, INPUTS, {
+      apiKey: 'sk-test',
+      fetchImpl: fakeFetch([invalid, validDraft()]).impl,
+    });
+    await storeDraft(retried.supabase, angles, '3.9.0', 'claude-opus-5', first);
+    expect(retried.rows[0]?.['retry_message']).toContain('F999');
+
+    const clean = capturingSupabase();
+    const second = await generateDraft(angles, ruleset, INPUTS, {
+      apiKey: 'sk-test',
+      fetchImpl: fakeFetch([validDraft()]).impl,
+    });
+    await storeDraft(clean.supabase, angles, '3.9.0', 'claude-opus-5', second);
+    expect(clean.rows[0]?.['retry_message']).toBeNull();
+  });
+
+  /*
+    Distinct from `validator_message`, which says why THIS row is unusable. A row can carry a good
+    draft and a retry message about the answer that was thrown away; merging them would make a
+    stored draft ambiguous about whether its own content was refused.
+  */
+  it('is a different column from the one that refuses the row', async () => {
+    const bad = validDraft();
+    const invalid = { ...bad, placement: { ...bad.placement, paragraph: 'The pricing decides this.' } };
+    const { supabase, rows } = capturingSupabase();
+    const result = await generateDraft(angles, ruleset, INPUTS, {
+      apiKey: 'sk-test',
+      fetchImpl: fakeFetch([invalid, invalid]).impl,
+    });
+    await storeDraft(supabase, angles, '3.9.0', 'claude-opus-5', result);
+
+    expect(rows[0]?.['validator_status']).toBe('rejected');
+    expect(rows[0]?.['validator_message']).toContain("mentions 'pricing'");
   });
 });
 

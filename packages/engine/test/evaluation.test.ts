@@ -72,6 +72,33 @@ const RUN: RunContext = {
   legality: LEGALITY,
   observableConditionIds: OBSERVABLE,
   knownHandles: new Set(['F1', 'F2', 'E1', 'Y1', 'A1', 'A2']),
+  /*
+    `f-003` is the heavy failure this run holds, and it is **in scope** for
+    `operates_like_supplier`. That is deliberate: a lean test needs a citation the scope rule
+    accepts, or a scope rejection would fire alongside the lean rejection and neither test could
+    say which check refused the draft.
+
+    `f-002` is in every angle's scope, so the baseline draft — which cites it from all seven —
+    validates and each negative below changes exactly one thing.
+  */
+  heavyFailingFindingIds: new Set(['f-003']),
+  /*
+    Scope. `consistency` is absent from the map, which is how an unrestricted angle is expressed —
+    keyed on having declared no rules, never on the id.
+  */
+  angleFindingIds: new Map<string, ReadonlySet<string>>([
+    ['who_it_talks_to', new Set(['f-001', 'f-002'])],
+    ['products_for', new Set(['f-002'])],
+    ['how_it_sells', new Set(['f-002'])],
+    ['who_it_lets_buy', new Set(['f-002'])],
+    ['operates_like_supplier', new Set(['f-002', 'f-003'])],
+    ['off_site', new Set(['f-002'])],
+  ]),
+  conditionFindingIds: new Map<string, ReadonlySet<string>>([
+    ['registration_gate', new Set(['f-001'])],
+    ['no_water_or_syringes', new Set(['f-002'])],
+    ['no_affiliate_marketing', new Set(['f-002'])],
+  ]),
 };
 
 const cite = (ref: string, kind: Citation['kind'] = 'finding'): Citation => ({ kind, ref });
@@ -1074,6 +1101,217 @@ describe('not_observable_row_cites', () => {
     const offending = passing().routing.filter((r) => r.status === 'not_observable').length;
     expect(offending).toBeGreaterThan(1);
     expect(result.rejections.filter((r) => r.rule === 'not_observable_row_cites')).toHaveLength(offending);
+  });
+});
+
+describe('research_lean_over_heavy_failure', () => {
+  /** The one angle whose scope holds the heavy failure, so only the lean rule is in play. */
+  const withHeavy = (lean: 'research' | 'neutral' | 'consumer') =>
+    mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'operates_like_supplier' ? { ...a, lean, citations: [cite('f-003')] } : a,
+      ),
+    }));
+
+  /*
+    Heavy is D-259's weighting of the rules that decide what a business is. An angle that cites one
+    of them failing and then calls the result research has read its strongest contrary evidence and
+    concluded past it — and nothing in the paragraph has to admit that happened.
+  */
+  it('refuses a research lean over a heavy rule observed to fail', () => {
+    const result = validateDraft(withHeavy('research'), RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('research_lean_over_heavy_failure');
+    expect(result.rejections.some((r) => r.message.includes('f-003'))).toBe(true);
+  });
+
+  /*
+    The rule refuses the lean, not the observation. Neutral is usually the honest answer: a genuine
+    supplier with one heavy failure has not become a consumer retailer.
+  */
+  it('leaves the citation alone — neutral and consumer both stand', () => {
+    expect(validateDraft(withHeavy('neutral'), RUN)).toEqual({ ok: true });
+    expect(validateDraft(withHeavy('consumer'), RUN)).toEqual({ ok: true });
+  });
+
+  /*
+    Only `fail` binds the lean. D-009 puts ambiguous checks in a human queue precisely so they are
+    not treated as failures, and a `not_evaluable` is an absence of observation — a lean answering
+    to either would be answering to something nobody observed.
+  */
+  it('says nothing about a heavy rule that is not failing', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'operates_like_supplier'
+          ? { ...a, lean: 'research' as const, citations: [cite('f-002')] }
+          : a,
+      ),
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  it('says nothing about a research lean that cites no heavy failure at all', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) => ({ ...a, lean: 'research' as const })),
+    }));
+    expect(rejectionRules(draft)).not.toContain('research_lean_over_heavy_failure');
+  });
+
+  /*
+    The unrestricted angle is not exempt from the lean rule. Scope and lean are separate questions,
+    and `consistency` may cite anything — which makes it the one angle that could reach a research
+    lean over a heavy failure it was never scoped out of.
+  */
+  it('binds the unrestricted angle too', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'consistency'
+          ? { ...a, lean: 'research' as const, citations: [cite('f-003')] }
+          : a,
+      ),
+    }));
+    expect(rejectionRules(draft)).toContain('research_lean_over_heavy_failure');
+  });
+
+  it('names every heavy failure it cited, not the first', () => {
+    const wide = { ...RUN, heavyFailingFindingIds: new Set(['f-002', 'f-003']) };
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'operates_like_supplier'
+          ? { ...a, lean: 'research' as const, citations: [cite('f-002'), cite('f-003')] }
+          : a,
+      ),
+    }));
+    const result = validateDraft(draft, wide);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const message = result.rejections.find((r) => r.rule === 'research_lean_over_heavy_failure')?.message;
+    expect(message).toContain('f-002');
+    expect(message).toContain('f-003');
+    expect(message).toContain('2 heavy rule(s)');
+  });
+});
+
+describe('citation_outside_angle_scope', () => {
+  /*
+    Run 9011b2d7 cited DISC-004 — the footer disclaimer rule — as the evidence that a research-water
+    product line exists. True of the site, unrelated to the claim, and nothing refused it. A finding
+    from another angle reaches the reader as support this angle does not have.
+  */
+  it('refuses a finding the angle does not read', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'products_for' ? { ...a, citations: [cite('f-001')] } : a,
+      ),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('citation_outside_angle_scope');
+    expect(result.rejections.some((r) => r.message.includes("'products_for'"))).toBe(true);
+  });
+
+  it('accepts a finding the angle does read', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'who_it_talks_to' ? { ...a, citations: [cite('f-001'), cite('f-002')] } : a,
+      ),
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  /*
+    An angle absent from the map is unrestricted, and that is how the consistency angle is
+    expressed. Keyed on having declared no rules of its own — never on the id, which would be rule
+    knowledge in the engine.
+  */
+  it('lets the unrestricted angle cite anything in the run', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'consistency' ? { ...a, citations: [cite('f-001'), cite('f-002')] } : a,
+      ),
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  /*
+    Scope is about findings. An eye-test verdict or a stored capture is not a rule's output and has
+    no angle it belongs to; refusing those would forbid the observations that carry the angles which
+    have few rules of their own.
+  */
+  it('says nothing about evidence or eye-test citations', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'products_for'
+          ? { ...a, citations: [cite('EYE-01', 'eye_test'), cite('run-1/layer0/def', 'evidence')] }
+          : a,
+      ),
+    }));
+    expect(rejectionRules(draft)).not.toContain('citation_outside_angle_scope');
+  });
+
+  /*
+    A fabricated id is `unknown_citation`'s and only its. Reporting it twice would tell a retry to
+    move a citation that does not exist to an angle that could hold it.
+  */
+  it('leaves an invented finding to unknown_citation alone', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a) =>
+        a.angleId === 'products_for' ? { ...a, citations: [cite('f-999')] } : a,
+      ),
+    }));
+    const rules = rejectionRules(draft);
+    expect(rules).toContain('unknown_citation');
+    expect(rules).not.toContain('citation_outside_angle_scope');
+  });
+});
+
+describe('citation_outside_condition_scope', () => {
+  /*
+    `registration_gate` is read by its own rules. A finding from elsewhere, offered as the basis for
+    its status, is a capture of something adjacent standing in for one that bears on the question —
+    the same failure `not_observable_row_cites` catches on rows that can cite nothing at all.
+  */
+  it('refuses a finding that does not observe the condition', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        r.conditionId === 'registration_gate' ? { ...r, citations: [cite('f-002')] } : r,
+      ),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('citation_outside_condition_scope');
+    expect(result.rejections.some((r) => r.message.includes("'registration_gate'"))).toBe(true);
+  });
+
+  it('accepts the findings that do', () => {
+    expect(passing().routing.some((r) => r.citations.length > 0)).toBe(true);
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+  });
+
+  it('leaves an invented finding to unknown_citation alone', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        r.conditionId === 'registration_gate' ? { ...r, citations: [cite('f-999')] } : r,
+      ),
+    }));
+    const rules = rejectionRules(draft);
+    expect(rules).toContain('unknown_citation');
+    expect(rules).not.toContain('citation_outside_condition_scope');
   });
 });
 
