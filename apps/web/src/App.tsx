@@ -14,6 +14,8 @@ import { createEvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
+import { matchesEvaluationPreview } from './lib/evaluationRoute.js';
+import { EvaluationPreview } from './components/EvaluationPreview.js';
 import { AccessLogPane, PeoplePane, ownsTheAccount } from './components/OwnerPanes.js';
 import { SignIn, SignOutButton } from './components/SignIn.js';
 import { createLocalRunSource, createSupabaseRunSource, type RunSummary } from './lib/runs.js';
@@ -343,6 +345,28 @@ function AnalystWorkspace(): JSX.Element {
       <AccessLogPane client={state.client} analyst={state.analyst} />
     ) : (
       <NotAvailable />
+    );
+  }
+
+  /*
+    The evaluation preview — temporary, unlinked, analyst-only.
+
+    Here rather than in `Screener` because it is a whole screen rather than a pane, which is the
+    same reason the two above are here. No `ownsTheAccount` guard: these are drafts of screening
+    work and every analyst does that work, where administration is the owner's alone. The row is
+    gated by RLS on `is_analyst()` regardless of what this branch decides.
+
+    It exists so the rendering can be looked at against real drafts while the operator surface is
+    built, and it goes when that lands.
+  */
+  const evaluationRun = matchesEvaluationPreview(path);
+  if (evaluationRun !== null) {
+    return (
+      <EvaluationPreview
+        client={state.client}
+        runId={evaluationRun}
+        access={createEvidenceAccess(state.client)}
+      />
     );
   }
 

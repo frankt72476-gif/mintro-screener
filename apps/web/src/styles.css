@@ -56,6 +56,27 @@
   --sec-review:    var(--purple);
   --sec-questions: var(--violet-lift);
 
+  /*
+    The spectrum's two ends (D-256).
+
+    **A new pair, not an alias.** Every other accent in this file resolves to a token above, and the
+    D-201 note explains why: colour had one job — state — and section identity was given to it
+    without adding a sixth hue. The spectrum cannot follow that rule, because the three tokens that
+    already read as warm and cool are `--rose` (fail), `--amber` (review) and `--jade` (pass). Using
+    them here would put a merchant's *position on a scale* in the exact colours that mean *this rule
+    failed*, and a Consumer-retail label drawn in the fail red would read as a verdict. Mintro does
+    not make compliance determinations, and the palette should not imply one.
+
+    So: clay and harbour. Warm and cool at roughly equal weight, both distinct in hue from rose,
+    amber and jade, and neither carrying a state's meaning anywhere else in the document. The
+    consumer end is warm because that is the retail end; the research end is cool. Mixed takes
+    neither and is drawn in ink, which is the honest reading of the middle.
+
+    Measured L*: clay 52, harbour 46 — close enough that neither end looks like the good one.
+  */
+  --clay:#B4592E;
+  --harbour:#2C6E8F;
+
   --r:10px;
   --shadow:0 1px 2px rgba(42,15,99,.06), 0 8px 24px -12px rgba(42,15,99,.18);
 }
@@ -3473,3 +3494,229 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
   line-height: 1.6;
   color: var(--ink-mid);
 }
+
+/* ================================================================================================
+   The evaluation (D-256, layout memo sections 1-5)
+
+   Ported to the existing shell: `.panel`, `--card`, `--line`, `--r`, `--shadow`, `.eyebrow`. This
+   adds no new shape vocabulary, only the two spectrum tokens above and the chip.
+
+   The chip is the one new element. It replaces a run-scoped handle — `F16` — with the thing it
+   points at, so a sentence stays readable without a mapping beside it; where a capture sits behind
+   it, it is a button and opens it.
+   ================================================================================================ */
+
+.evaluation{max-width:840px;margin:0 auto;padding:24px 0 64px}
+.evaluation .panel{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:24px 28px;margin-bottom:20px;
+}
+
+.eval-preview-banner{
+  max-width:840px;margin:16px auto 0;padding:8px 12px;
+  background:color-mix(in srgb, var(--amber) 8%, var(--card));
+  border:1px solid color-mix(in srgb, var(--amber) 40%, var(--line));
+  border-radius:6px;font-size:12.5px;color:var(--ink-mid);
+}
+
+.eval-masthead-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 8px}
+.eval-domain{font-size:24px;line-height:1.2;margin:0;letter-spacing:-.01em}
+/*
+  The stamp. Ink on a soft line fill, and no accent — a draft is a stage, not a state, and the
+  amber and rose in this file both already mean something about a rule. Borrowing either would put
+  a verdict's colour on the word that says this document is unfinished.
+*/
+.eval-stamp{
+  font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  color:var(--ink-mid);background:var(--line-soft);border:1px solid var(--line);
+  border-radius:4px;padding:3px 8px;line-height:1;white-space:nowrap;
+}
+.eval-standing{max-width:64ch;margin:0 0 16px;color:var(--ink-mid);font-size:13px;line-height:1.6}
+.eval-meta{display:flex;flex-wrap:wrap;gap:0 28px;margin:0 0 24px;padding:0}
+.eval-meta-pair{display:flex;gap:6px;font-size:12px}
+.eval-meta dt{color:var(--ink-mid)}
+.eval-meta dd{margin:0;font-variant-numeric:tabular-nums}
+
+/* ---------- summary block: the four rows (addendum) ---------- */
+.eval-row{border-top:1px solid var(--line-soft);padding:20px 0}
+.eval-row-placement,.eval-row-status{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:start}
+.eval-row-status{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+@media (max-width:720px){
+  .eval-row-placement,.eval-row-status{grid-template-columns:1fr;gap:20px}
+}
+
+/*
+  The strip. Five segments, warm at the consumer end and cool at the research end, and the marker
+  is the only saturated element in the row — the addendum's wording, and the reason the unmarked
+  segments carry a tint rather than a fill.
+*/
+.eval-spectrum{display:flex;list-style:none;margin:6px 0 0;padding:0;border-radius:6px;overflow:hidden}
+.eval-position{
+  flex:1 1 0;min-width:0;text-align:center;
+  font-size:10.5px;letter-spacing:.03em;line-height:1.3;padding:8px 6px;
+  color:var(--ink-mid);border-right:1px solid var(--card);
+}
+.eval-position:last-child{border-right:0}
+.eval-position[data-position="consumer_retail"]{background:color-mix(in srgb, var(--clay) 14%, var(--paper))}
+.eval-position[data-position="consumer_leaning"]{background:color-mix(in srgb, var(--clay) 8%, var(--paper))}
+.eval-position[data-position="mixed"]{background:var(--paper)}
+.eval-position[data-position="research_leaning"]{background:color-mix(in srgb, var(--harbour) 8%, var(--paper))}
+.eval-position[data-position="research_supplier"]{background:color-mix(in srgb, var(--harbour) 14%, var(--paper))}
+.eval-position.is-here{color:#fff;font-weight:600}
+.eval-position.is-here[data-position="consumer_retail"],
+.eval-position.is-here[data-position="consumer_leaning"]{background:var(--clay)}
+.eval-position.is-here[data-position="research_leaning"],
+.eval-position.is-here[data-position="research_supplier"]{background:var(--harbour)}
+.eval-position.is-here[data-position="mixed"]{background:var(--ink-mid)}
+
+/* Grid children default to min-width:auto, which lets a long condition label widen the column
+   past its track and push the row sideways. */
+.eval-spectrum-cell,.eval-legality-cell,.eval-routing-cell{min-width:0}
+.eval-placement-cell{text-align:right}
+.eval-badge{
+  display:inline-block;margin:6px 0 0;padding:8px 16px;border-radius:6px;
+  font-size:16px;font-weight:600;letter-spacing:-.005em;color:#fff;background:var(--violet);
+}
+.eval-badge.is-referred_out{background:var(--rose)}
+.eval-badge.is-domestic{background:var(--jade)}
+.eval-fixed-by{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;justify-items:end}
+.eval-alert{color:var(--rose);font-size:12.5px;font-weight:500}
+
+/* Row 2. */
+.eval-badge-line{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:13.5px}
+.eval-badge-line.is-clean .eval-glyph{color:var(--jade)}
+/*
+  The icon wrapper carries the colour and the drawing inherits it through `currentColor`.
+  `line-height:0` so a 16px box does not inherit the surrounding text's leading and push its row.
+*/
+.eval-glyph{display:inline-flex;flex:0 0 auto;line-height:0}
+.eval-icon{width:16px;height:16px;display:block}
+.eval-subline{margin:4px 0 0;font-size:12px;color:var(--ink-mid)}
+.eval-legality-observed{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+
+.eval-condition-cells{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;
+  list-style:none;margin:6px 0 0;padding:0;
+}
+@media (max-width:720px){.eval-condition-cells{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.eval-condition{
+  display:flex;flex-direction:column;gap:3px;padding:8px;border-radius:6px;
+  border:1px solid var(--line);background:var(--paper);min-width:0;
+}
+.eval-condition .eval-glyph{color:var(--ink-mid)}
+.eval-condition.is-met .eval-glyph{color:var(--jade)}
+.eval-condition.is-not_met{border-color:color-mix(in srgb, var(--rose) 35%, var(--line))}
+.eval-condition.is-not_met .eval-glyph,
+.eval-condition.is-not_met .eval-condition-label{color:var(--rose)}
+.eval-condition-label{font-size:11px;line-height:1.3;font-weight:500}
+.eval-condition-status{font-size:10px;letter-spacing:.04em;color:var(--ink-mid)}
+
+/* Row 3. */
+.eval-angle-chips{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;
+  list-style:none;margin:6px 0 0;padding:0;
+}
+.eval-angle-chip a{
+  display:block;padding:10px 12px;border-radius:8px;border:1px solid var(--line);
+  background:var(--paper);text-decoration:none;color:inherit;height:100%;
+}
+.eval-angle-chip a:hover{border-color:var(--violet)}
+.eval-angle-chip-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.eval-angle-chip-title{font-size:12.5px;font-weight:600;line-height:1.25}
+.eval-lean-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--slate)}
+.eval-lean-dot.is-consumer{background:var(--clay)}
+.eval-lean-dot.is-research{background:var(--harbour)}
+.eval-weight{font-size:12px;color:var(--ink-mid);margin-left:auto}
+.eval-angle-chip-line{display:block;font-size:11.5px;line-height:1.45;color:var(--ink-mid)}
+
+/* Visually hidden, still read aloud: the lean is a dot on screen and a word to a screen reader. */
+.eval-sr{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+
+.eval-heading{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mid);margin:0 0 16px}
+.eval-lede{font-size:15px;line-height:1.65;margin:0 0 20px;max-width:68ch}
+.eval-para{font-size:13.5px;line-height:1.7;margin:0 0 12px;max-width:70ch}
+.eval-line{font-size:13.5px;line-height:1.6;margin:0 0 16px;max-width:70ch}
+.eval-aside{font-size:12.5px;line-height:1.6;color:var(--ink-mid);margin:16px 0 0;max-width:70ch}
+.eval-note{font-size:12.5px;line-height:1.6;color:var(--ink-mid);margin:4px 0;max-width:70ch}
+
+/* ---------- legality ---------- */
+.eval-legality-items{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.eval-legality-item{
+  border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;
+}
+.eval-legality-item.is-fail{border-left:3px solid var(--rose)}
+.eval-legality-item.is-not_evaluable{border-left:3px solid var(--slate)}
+.eval-item-title{font-size:13px;font-weight:600}
+.eval-state{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-mid)}
+.eval-state.is-fail{color:var(--rose)}
+.eval-legality-item .eval-note{flex-basis:100%;margin:0}
+.eval-nocapture{font-size:11.5px;color:var(--ink-mid);font-style:italic}
+
+/* ---------- routing ---------- */
+.eval-table{width:100%;border-collapse:collapse;font-size:13px}
+.eval-table th,.eval-table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.eval-table thead th{
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mid);
+  border-bottom:1px solid var(--line);font-weight:600;
+}
+.eval-table tbody th{font-weight:500}
+.eval-status{font-size:11.5px;letter-spacing:.04em;white-space:nowrap}
+.eval-status.is-met{color:var(--jade)}
+/*
+  Alert, the same as the summary cell above (addendum, row 2). It read violet here and rose there,
+  which made one condition two different-looking facts depending on where a reader met it. The
+  colour marks *the cells a reader is looking for* — the domestic path — and not a wrongdoing;
+  that reading is carried by the section's own wording, not by the hue.
+*/
+.eval-status.is-not_met{color:var(--rose)}
+.eval-status.is-not_observable{color:var(--ink-mid)}
+
+/* ---------- angles ---------- */
+.eval-angle{padding:20px 0;border-top:1px solid var(--line-soft)}
+.eval-angle:first-of-type{padding-top:0;border-top:0}
+.eval-angle-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:10px}
+.eval-angle-title{font-size:16px;margin:0;letter-spacing:-.005em}
+.eval-lean{
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-mid);
+}
+.eval-lean.is-consumer{color:var(--clay);border-color:color-mix(in srgb, var(--clay) 40%, var(--line))}
+.eval-lean.is-research{color:var(--harbour);border-color:color-mix(in srgb, var(--harbour) 40%, var(--line))}
+
+/* ---------- shore-ups ---------- */
+.eval-shoreup-list{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.eval-shoreup{border-left:2px solid var(--line);padding-left:14px}
+.eval-shoreup-text{font-size:13.5px;line-height:1.6;margin:0 0 6px;max-width:70ch}
+
+/* ---------- chips ---------- */
+.eval-cited{margin-top:12px}
+.eval-cited .eyebrow{display:block;margin-bottom:6px}
+.eval-chip-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:6px 0 0;padding:0}
+.eval-chip{
+  display:inline-block;font-size:11.5px;line-height:1.4;padding:3px 8px;border-radius:5px;
+  border:1px solid var(--line);background:var(--paper);color:var(--ink-mid);
+  max-width:52ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:baseline;
+  text-decoration:none;
+}
+a.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
+.eval-chip.is-heavy{font-weight:600}
+/* Inside a paragraph the chip sits in running text, so it loses the box and keeps the tint. */
+.eval-para .eval-chip,.eval-lede .eval-chip,.eval-note .eval-chip,.eval-shoreup-text .eval-chip{
+  border:0;background:color-mix(in srgb, var(--violet) 7%, transparent);
+  color:var(--violet);padding:1px 5px;
+}
+button.eval-chip{cursor:pointer;text-align:left}
+button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
+.eval-chip.state-fail{border-left:2px solid var(--rose)}
+.eval-chip.state-review{border-left:2px solid var(--amber)}
+.eval-chip.state-pass{border-left:2px solid var(--jade)}
+.eval-chip.is-unevaluated,.eval-chip.is-unresolved{
+  font-family:inherit;font-style:italic;background:transparent;border-style:dashed;max-width:none;
+}
+.eval-chip.is-unreachable{border-color:var(--rose);color:var(--rose)}
+.eval-chip-note{font-style:italic}
+

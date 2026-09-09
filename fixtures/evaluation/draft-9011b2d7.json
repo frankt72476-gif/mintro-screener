@@ -1,0 +1,1176 @@
+{
+  "runId": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d",
+  "merchantDomain": "www.comopeptides.com",
+  "screenedAt": "2026-09-03T19:54:44.603+00:00",
+  "rulesetVersion": "3.7.0",
+  "anglesVersion": "1.1.0",
+  "model": "claude-opus-5",
+  "inputSha256": "623677a64fe64e3e0dd3b34b0ac853aa43fb4ee5eb6b7baeb9548698e58c04ea",
+  "validatorStatus": "ok",
+  "handles": {
+    "angle": {
+      "A1": "consistency",
+      "A2": "how_it_sells",
+      "A3": "off_site",
+      "A4": "operates_like_supplier",
+      "A5": "products_for",
+      "A6": "who_it_lets_buy",
+      "A7": "who_it_talks_to"
+    },
+    "finding": {
+      "F1": "07a50ce3-285c-48a6-b5df-7fd70398b4da",
+      "F2": "0b8be212-a890-413d-ae41-b7a72b666281",
+      "F3": "0d90073c-d174-46b9-b28e-0c2b66232f0d",
+      "F4": "0dcd0acc-f610-4b9c-8698-507677a3c068",
+      "F5": "130359f3-37e6-40da-b74a-df59ad3f201d",
+      "F6": "1f5aac36-5b40-4d00-b594-affea9712e1d",
+      "F7": "25f7891b-8528-41df-a057-d31c2f23a0a3",
+      "F8": "26b62822-d152-4146-819b-07c4422c7db9",
+      "F9": "2dcb3136-bee4-427a-b71c-142895bba974",
+      "F10": "2f328532-906d-4bf6-bfab-0f7a3bd0243a",
+      "F11": "317e8f5e-012c-4611-aa48-633acf16ae16",
+      "F12": "3524d1be-c983-4701-9f4a-763299845a61",
+      "F13": "35fe9578-ae3d-4f7d-b514-d05e1dcae74b",
+      "F14": "38dc2045-cf51-4eb5-bd02-c4e4e3d6a328",
+      "F15": "400fa6a7-d5ef-4cc9-907f-8d87a971e686",
+      "F16": "406e2aa6-9bbb-4dad-a89b-6a538ddb0162",
+      "F17": "43558f9e-41c4-494f-b839-a4a9c19719e9",
+      "F18": "4ad9cc12-ddd4-4680-bbd0-411d2de5aa38",
+      "F19": "5210dfd1-6b87-4da1-9356-f683359681f2",
+      "F20": "5bb63a61-4f77-4cd2-8910-ecf196711e6c",
+      "F21": "6277e3cd-9fa6-498d-aede-2fdeb588428d",
+      "F22": "6bf4e7aa-f814-47d1-95ff-5e68c5c4bfbb",
+      "F23": "6ff6c605-966c-4d56-84b7-316b709a9995",
+      "F24": "741957a9-b26e-42c8-a419-518ce783777d",
+      "F25": "789def41-407b-40b2-b565-e74348a32084",
+      "F26": "7bb7fec4-ef12-4c89-aa15-1c1ba7507437",
+      "F27": "7d5c20f0-d9df-4881-a018-1b2ba5c6c84b",
+      "F28": "7de9cc2a-9ac0-47b3-b1b9-6955a59b5ec3",
+      "F29": "8523f46a-05b2-48e5-933b-bbc5c27e0ee2",
+      "F30": "88990ff2-991c-4c5f-8e5b-00c13b6e200a",
+      "F31": "89d3ce67-971b-4d58-af68-57dfefb5aa6e",
+      "F32": "8a4c27a2-260b-4363-ad71-d33cc75930c1",
+      "F33": "8d9c05ab-c469-4a22-b3f6-b360f8c852f2",
+      "F34": "91574bb0-12d6-423c-9260-ab80f644f09b",
+      "F35": "92aa9624-8867-4f21-9026-c4dbce63766b",
+      "F36": "95b8906b-52f5-4fdd-b371-b78364a7c2dd",
+      "F37": "97103ae2-0175-4ffc-88f0-86b0a8845826",
+      "F38": "9957442c-a1de-41a8-bb77-872aeb4c22d1",
+      "F39": "99dba9aa-5fb8-41b1-a40c-3686e1acb062",
+      "F40": "9ba94e71-6a0a-4e6e-b50c-6b2ccb93d384",
+      "F41": "9e4f3add-28ef-4f4c-b930-a5073b807211",
+      "F42": "a23ce705-e2f6-42ec-a1a9-4c73e569ac44",
+      "F43": "a3dc357c-074e-41be-b378-bf502f56afd8",
+      "F44": "a3f8dc8c-a39b-4a4f-a26c-a50397c48fc8",
+      "F45": "a5a64489-6cc6-49ca-9503-fda709f27175",
+      "F46": "aa1bd317-d7ba-471b-bcd0-b407bcfb7d49",
+      "F47": "adaef643-e826-4c7a-b9b5-287404319cc6",
+      "F48": "b4173103-8cb8-4e24-b3c5-1e421d609d2d",
+      "F49": "bdec22b1-d7af-4a27-aac4-3ef314bcdc48",
+      "F50": "c66f6ef0-5253-4c8f-974a-35d67984b1e1",
+      "F51": "c6e04f6a-5a35-4452-9c0e-10b55c3961f3",
+      "F52": "c83d2c7c-542b-4447-94e4-f6c19c633b51",
+      "F53": "cadeb217-96df-444b-aa88-ad526a06be6f",
+      "F54": "d689724c-9a12-47bf-9eb8-4a950ff5ad9f",
+      "F55": "d7f6eb46-b143-4902-bf17-993e39145422",
+      "F56": "da27f7f2-8653-4522-bc9a-870f96b8fb52",
+      "F57": "dd918652-a39b-4a29-b632-80f48865f748",
+      "F58": "e77b7874-53ff-4d98-aa0d-535300d12dff",
+      "F59": "edc8081b-75d4-4e61-a3a5-ebebfeaa2516"
+    },
+    "evidence": {
+      "E1": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/02e77d36c0be425e9c5bffad1cf33fc13fa552e2b3212afeebea832658669a1c",
+      "E2": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344",
+      "E3": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991",
+      "E4": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/f54351ddcf5a4117d0a082ab66fd19bc9371ba448d3a69017fdeac4a18c3a9f2",
+      "E5": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/02ee3365ecae60f52ad4281b8ad7ad00f1863b1d7655814c3381031f4332eae8.html",
+      "E6": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/09814e5695b828267b9201bb86bc2184f368cab79a7b800c4d274ac975cd3c38.png",
+      "E7": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0d4dd6b9ac90e8b0c8331b927ceb233c6218586fe921d501f6e5ddd6986c8812.png",
+      "E8": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0e3c1ba592ded32aef134e0a65173377ca151f44801faea2eef2037048d291eb.png",
+      "E9": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0ed5b8217e684b5908c90b0a11f1d8d393228743c3daf718a800bcef49801e2e.html",
+      "E10": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/1b05d8b150f1c89c5fdb95bd04dcdae2a112f21c300ffdc1ebcdcd39236db0a4.html",
+      "E11": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/290a1a79a492fe00663768a61a718ecb95ede0f26f55cc5925e8e1b39c17102a.html",
+      "E12": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/358007bb060c3b05d1387bf8b692363e2038acbb072d6e4ba54cc410d7edbbd4.html",
+      "E13": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3a269356e6f3ffdb428d49e66c90bcfc7e0675c60c47203a7abe955b8370e3a6.html",
+      "E14": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3b7bab10dca88ec24d45896c075e0156c96d5376c9b63ccf237d1ae0a59f320b.png",
+      "E15": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/401cd5d39738be50d27cc6f9ed970a4fff90580fee6ac74d205f9cf72b235fe1.html",
+      "E16": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/591f87695a84226ca6f1b7d2ae1449183ab4f99754692e1a7bc5d4eaba8ffa7a.png",
+      "E17": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/630bb4c44484921fabb08f4d7a1f72a37bda739f3b8731d56e54522832985cd3.html",
+      "E18": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png",
+      "E19": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/680f1bf3a628e419528bac391b7fc1e6c617c7df36280a29ea82cb33cbc487bc.png",
+      "E20": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/726d49cc522980344989da509dffbea5c2d8a2c9bce6df23bcb37ea6788374ad.png",
+      "E21": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/729db51b9d9b3afc034769faa327e285b4149b99dd5cb3dfcfa0f90dc8691988.html",
+      "E22": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/72c4ad475de5b4a396795cc1b6aa730e9672cf9f9913fe60e7aa83408cecc9c4.png",
+      "E23": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/74ecaba6f873d374c2c5469e8e02c8d52f0433eab8c52aee793cbc7bac6afb3b.png",
+      "E24": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/803ed3eb85c692dc2270f9bcfa669548e65e17bbd9bbcc84b3535c68a4cbf444.html",
+      "E25": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/918685b80981f1719adb6bdcab61d912d25cf2ac0294000f6a1f639520aa98c7.html",
+      "E26": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/96547879d4a2675413bed0e9bca5b02aa424bb363b03b082c47576082df6ac9b.html",
+      "E27": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/a33970f260b97677a75cdccd9698562f46d88f07b6bb5916be1b0eaa29f80113.png",
+      "E28": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/b990eb89a515e4432963aac104d9b4baa2bd3a8059d6d2a6d5633e7e42d270f4.html",
+      "E29": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c1e632568efd5d6f3323617a3ae34f0b96c95d816ae828e7922fe0c194289814.html",
+      "E30": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c2de1cad76dcbaa282b2bb109bb779c5114c28d010a7680cf81ea2d56274db81.png",
+      "E31": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ce9fe05f534e6ab7a807b0441e81ea3a625d2e76b509a10b61f0f4f7fff7f47e.html",
+      "E32": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/cf35364b9b9e9ecf589efca43587dcb01a4386f79346fd0ecc85a3581a86dad9.html",
+      "E33": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e091c52ab279dcc7c6b12b13d72667e3aba163f44aa8ea1decc2e275f758d025.png",
+      "E34": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e4537aeed0431603e2f1b45281f564a36a886990a51f2418a4b15ec4cf3818c4.png",
+      "E35": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ec57b40eedce64b0bdb71e65873caef47b9012f1fcc2d7e4351af7405924234a.html",
+      "E36": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ee598d5404e4dd7d6e7398ba9f1f83763555cfa4a7cc376fb99fd3ff4e9ce565.png",
+      "E37": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/eee2030b113830d23c2311fcbe727f8420facdde997f066a68c520604f98c454.png",
+      "E38": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/f9b1894c19e3b742746f1d9615ddf919e7aa567716625f9f4a5968ef26817021.html"
+    },
+    "eye_test": {
+      "Y1": "EYE-01",
+      "Y2": "EYE-02",
+      "Y3": "EYE-03",
+      "Y4": "EYE-04",
+      "Y5": "EYE-05",
+      "Y6": "EYE-06",
+      "Y7": "EYE-07",
+      "Y8": "EYE-08",
+      "Y9": "EYE-09",
+      "Y10": "EYE-10",
+      "Y11": "EYE-11",
+      "Y12": "EYE-12",
+      "Y13": "EYE-13",
+      "Y14": "EYE-14"
+    }
+  },
+  "findings": [
+    {
+      "id": "89d3ce67-971b-4d58-af68-57dfefb5aa6e",
+      "ruleId": "CATG-001",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "9ba94e71-6a0a-4e6e-b50c-6b2ccb93d384",
+      "ruleId": "CATG-002",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "25f7891b-8528-41df-a057-d31c2f23a0a3",
+      "ruleId": "CATG-003",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "43558f9e-41c4-494f-b839-a4a9c19719e9",
+      "ruleId": "CATG-004",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "a23ce705-e2f6-42ec-a1a9-4c73e569ac44",
+      "ruleId": "CATG-005",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "d7f6eb46-b143-4902-bf17-993e39145422",
+      "ruleId": "CATG-006",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "5bb63a61-4f77-4cd2-8910-ecf196711e6c",
+      "ruleId": "CATG-007",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "9957442c-a1de-41a8-bb77-872aeb4c22d1",
+      "ruleId": "CATG-008",
+      "state": "review",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "7de9cc2a-9ac0-47b3-b1b9-6955a59b5ec3",
+      "ruleId": "COA-001",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "91574bb0-12d6-423c-9260-ab80f644f09b",
+      "ruleId": "COA-002",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "317e8f5e-012c-4611-aa48-633acf16ae16",
+      "ruleId": "COA-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "97103ae2-0175-4ffc-88f0-86b0a8845826",
+      "ruleId": "COA-004",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "cadeb217-96df-444b-aa88-ad526a06be6f",
+      "ruleId": "COA-005",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "edc8081b-75d4-4e61-a3a5-ebebfeaa2516",
+      "ruleId": "COA-006",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "8d9c05ab-c469-4a22-b3f6-b360f8c852f2",
+      "ruleId": "COMM-001",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "bdec22b1-d7af-4a27-aac4-3ef314bcdc48",
+      "ruleId": "COMM-002",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "a5a64489-6cc6-49ca-9503-fda709f27175",
+      "ruleId": "COMM-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "26b62822-d152-4146-819b-07c4422c7db9",
+      "ruleId": "DISC-001",
+      "state": "review",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "130359f3-37e6-40da-b74a-df59ad3f201d",
+      "ruleId": "DISC-002",
+      "state": "not_evaluable",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "741957a9-b26e-42c8-a419-518ce783777d",
+      "ruleId": "DISC-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "5210dfd1-6b87-4da1-9356-f683359681f2",
+      "ruleId": "DISC-004",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "dd918652-a39b-4a29-b632-80f48865f748",
+      "ruleId": "FULF-001",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "38dc2045-cf51-4eb5-bd02-c4e4e3d6a328",
+      "ruleId": "FULF-002",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "c6e04f6a-5a35-4452-9c0e-10b55c3961f3",
+      "ruleId": "FULF-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "6bf4e7aa-f814-47d1-95ff-5e68c5c4bfbb",
+      "ruleId": "FULF-004",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "2dcb3136-bee4-427a-b71c-142895bba974",
+      "ruleId": "FULF-005",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "88990ff2-991c-4c5f-8e5b-00c13b6e200a",
+      "ruleId": "GATE-001",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "789def41-407b-40b2-b565-e74348a32084",
+      "ruleId": "GATE-002",
+      "state": "fail",
+      "evidenceKey": null
+    },
+    {
+      "id": "6277e3cd-9fa6-498d-aede-2fdeb588428d",
+      "ruleId": "GATE-003",
+      "state": "pass",
+      "evidenceKey": null
+    },
+    {
+      "id": "3524d1be-c983-4701-9f4a-763299845a61",
+      "ruleId": "GATE-004",
+      "state": "review",
+      "evidenceKey": null
+    },
+    {
+      "id": "adaef643-e826-4c7a-b9b5-287404319cc6",
+      "ruleId": "GATE-005",
+      "state": "review",
+      "evidenceKey": null
+    },
+    {
+      "id": "92aa9624-8867-4f21-9026-c4dbce63766b",
+      "ruleId": "GATE-006",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "1f5aac36-5b40-4d00-b594-affea9712e1d",
+      "ruleId": "GATE-007",
+      "state": "review",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/726d49cc522980344989da509dffbea5c2d8a2c9bce6df23bcb37ea6788374ad.png"
+    },
+    {
+      "id": "c66f6ef0-5253-4c8f-974a-35d67984b1e1",
+      "ruleId": "NAME-001",
+      "state": "not_evaluable",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344"
+    },
+    {
+      "id": "406e2aa6-9bbb-4dad-a89b-6a538ddb0162",
+      "ruleId": "NAME-002",
+      "state": "fail",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "95b8906b-52f5-4fdd-b371-b78364a7c2dd",
+      "ruleId": "NAME-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "7d5c20f0-d9df-4881-a018-1b2ba5c6c84b",
+      "ruleId": "OFFS-001",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "e77b7874-53ff-4d98-aa0d-535300d12dff",
+      "ruleId": "OFFS-002",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "0d90073c-d174-46b9-b28e-0c2b66232f0d",
+      "ruleId": "OFFS-003",
+      "state": "not_evaluable",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "0dcd0acc-f610-4b9c-8698-507677a3c068",
+      "ruleId": "OFFS-004",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "7bb7fec4-ef12-4c89-aa15-1c1ba7507437",
+      "ruleId": "OFFS-005",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "8523f46a-05b2-48e5-933b-bbc5c27e0ee2",
+      "ruleId": "OFFS-006",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991"
+    },
+    {
+      "id": "400fa6a7-d5ef-4cc9-907f-8d87a971e686",
+      "ruleId": "OFFS-007",
+      "state": "pass",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "da27f7f2-8653-4522-bc9a-870f96b8fb52",
+      "ruleId": "PAY-001",
+      "state": "pass",
+      "evidenceKey": null
+    },
+    {
+      "id": "2f328532-906d-4bf6-bfab-0f7a3bd0243a",
+      "ruleId": "PAY-003",
+      "state": "review",
+      "evidenceKey": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png"
+    },
+    {
+      "id": "99dba9aa-5fb8-41b1-a40c-3686e1acb062",
+      "ruleId": "PROD-001",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "d689724c-9a12-47bf-9eb8-4a950ff5ad9f",
+      "ruleId": "PROD-002",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "07a50ce3-285c-48a6-b5df-7fd70398b4da",
+      "ruleId": "PROD-003",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "6ff6c605-966c-4d56-84b7-316b709a9995",
+      "ruleId": "PROD-004",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "8a4c27a2-260b-4363-ad71-d33cc75930c1",
+      "ruleId": "PROD-005",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "4ad9cc12-ddd4-4680-bbd0-411d2de5aa38",
+      "ruleId": "PROD-006",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "aa1bd317-d7ba-471b-bcd0-b407bcfb7d49",
+      "ruleId": "PROD-007",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "b4173103-8cb8-4e24-b3c5-1e421d609d2d",
+      "ruleId": "PROD-008",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "0b8be212-a890-413d-ae41-b7a72b666281",
+      "ruleId": "PROD-009",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "a3f8dc8c-a39b-4a4f-a26c-a50397c48fc8",
+      "ruleId": "PROD-010",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "9e4f3add-28ef-4f4c-b930-a5073b807211",
+      "ruleId": "PROD-011",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "35fe9578-ae3d-4f7d-b514-d05e1dcae74b",
+      "ruleId": "PROD-012",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "a3dc357c-074e-41be-b378-bf502f56afd8",
+      "ruleId": "PROD-013",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    },
+    {
+      "id": "c83d2c7c-542b-4447-94e4-f6c19c633b51",
+      "ruleId": "PROD-014",
+      "state": "not_evaluable",
+      "evidenceKey": null
+    }
+  ],
+  "evidence": [
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/02e77d36c0be425e9c5bffad1cf33fc13fa552e2b3212afeebea832658669a1c",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/product-sitemap.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/1773644640ee36715214fd8e57f350a608b2cdb132c51e1282dc7d5ce0dd7344",
+      "kind": "robots",
+      "url": "https://www.comopeptides.com/robots.txt"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/9bdb4fbc836d032b306c22815dd09c7768a69c0e433ded3cb6e558fdcb701991",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/sitemap_index.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer0/f54351ddcf5a4117d0a082ab66fd19bc9371ba448d3a69017fdeac4a18c3a9f2",
+      "kind": "sitemap",
+      "url": "https://www.comopeptides.com/page-sitemap.xml"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/02ee3365ecae60f52ad4281b8ad7ad00f1863b1d7655814c3381031f4332eae8.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/09814e5695b828267b9201bb86bc2184f368cab79a7b800c4d274ac975cd3c38.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/tz/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0d4dd6b9ac90e8b0c8331b927ceb233c6218586fe921d501f6e5ddd6986c8812.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/klow/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0e3c1ba592ded32aef134e0a65173377ca151f44801faea2eef2037048d291eb.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/0ed5b8217e684b5908c90b0a11f1d8d393228743c3daf718a800bcef49801e2e.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-no-dac/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/1b05d8b150f1c89c5fdb95bd04dcdae2a112f21c300ffdc1ebcdcd39236db0a4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/bpc-157-tb500-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/290a1a79a492fe00663768a61a718ecb95ede0f26f55cc5925e8e1b39c17102a.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/melanotan-ii-mt2/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/358007bb060c3b05d1387bf8b692363e2038acbb072d6e4ba54cc410d7edbbd4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/rt/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3a269356e6f3ffdb428d49e66c90bcfc7e0675c60c47203a7abe955b8370e3a6.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/klow/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/3b7bab10dca88ec24d45896c075e0156c96d5376c9b63ccf237d1ae0a59f320b.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/semax/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/401cd5d39738be50d27cc6f9ed970a4fff90580fee6ac74d205f9cf72b235fe1.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/ghk-cu-copper/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/591f87695a84226ca6f1b7d2ae1449183ab4f99754692e1a7bc5d4eaba8ffa7a.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/melanotan-i-mt1/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/630bb4c44484921fabb08f4d7a1f72a37bda739f3b8731d56e54522832985cd3.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/melanotan-i-mt1/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/6779d965d771b6eb387e766d5f8cc2d903c01d180fbaceb9d099eba9b9494f3a.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/680f1bf3a628e419528bac391b7fc1e6c617c7df36280a29ea82cb33cbc487bc.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/726d49cc522980344989da509dffbea5c2d8a2c9bce6df23bcb37ea6788374ad.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/termsandconditions/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/729db51b9d9b3afc034769faa327e285b4149b99dd5cb3dfcfa0f90dc8691988.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/termsandconditions/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/72c4ad475de5b4a396795cc1b6aa730e9672cf9f9913fe60e7aa83408cecc9c4.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/rt/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/74ecaba6f873d374c2c5469e8e02c8d52f0433eab8c52aee793cbc7bac6afb3b.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/melanotan-ii-mt2/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/803ed3eb85c692dc2270f9bcfa669548e65e17bbd9bbcc84b3535c68a4cbf444.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/my-account/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/918685b80981f1719adb6bdcab61d912d25cf2ac0294000f6a1f639520aa98c7.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cagrilintide/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/96547879d4a2675413bed0e9bca5b02aa424bb363b03b082c47576082df6ac9b.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/a33970f260b97677a75cdccd9698562f46d88f07b6bb5916be1b0eaa29f80113.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/b990eb89a515e4432963aac104d9b4baa2bd3a8059d6d2a6d5633e7e42d270f4.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/account/register"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c1e632568efd5d6f3323617a3ae34f0b96c95d816ae828e7922fe0c194289814.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/semax/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/c2de1cad76dcbaa282b2bb109bb779c5114c28d010a7680cf81ea2d56274db81.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cjc-no-dac/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ce9fe05f534e6ab7a807b0441e81ea3a625d2e76b509a10b61f0f4f7fff7f47e.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/bpc-tb-ghk-cu/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/cf35364b9b9e9ecf589efca43587dcb01a4386f79346fd0ecc85a3581a86dad9.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/tz/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e091c52ab279dcc7c6b12b13d72667e3aba163f44aa8ea1decc2e275f758d025.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/cagrilintide/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/e4537aeed0431603e2f1b45281f564a36a886990a51f2418a4b15ec4cf3818c4.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/ghk-cu-copper/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ec57b40eedce64b0bdb71e65873caef47b9012f1fcc2d7e4351af7405924234a.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin-blend/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/ee598d5404e4dd7d6e7398ba9f1f83763555cfa4a7cc376fb99fd3ff4e9ce565.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/my-account/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/eee2030b113830d23c2311fcbe727f8420facdde997f066a68c520604f98c454.png",
+      "kind": "screenshot",
+      "url": "https://www.comopeptides.com/shop/bpc-tb-ghk-cu/"
+    },
+    {
+      "key": "9011b2d7-c17e-4d62-96c7-01a1a2471b1d/layer1/f9b1894c19e3b742746f1d9615ddf919e7aa567716625f9f4a5968ef26817021.html",
+      "kind": "dom",
+      "url": "https://www.comopeptides.com/shop/cjc-1295-no-dac-ipamorelin/"
+    }
+  ],
+  "draft": {
+    "angles": [
+      {
+        "lean": "neutral",
+        "angleId": "who_it_talks_to",
+        "citations": [
+          {
+            "ref": "EYE-02",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-03",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-05",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-10",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-13",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-01",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-14",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-07",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "406e2aa6-9bbb-4dad-a89b-6a538ddb0162",
+            "kind": "finding"
+          },
+          {
+            "ref": "9e4f3add-28ef-4f4c-b930-a5073b807211",
+            "kind": "finding"
+          },
+          {
+            "ref": "a3dc357c-074e-41be-b378-bf502f56afd8",
+            "kind": "finding"
+          },
+          {
+            "ref": "0b8be212-a890-413d-ae41-b7a72b666281",
+            "kind": "finding"
+          },
+          {
+            "ref": "e77b7874-53ff-4d98-aa0d-535300d12dff",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "Product bodies lead with chemical data and receptor mechanism, photography shows no people, no medical badges, and the second person is never the user (Y2, Y3, Y5, Y10, Y13). Against that, the homepage frames discovery promotionally (Y1) and two product names carry 'blend' (F16), with outcome-styled branding on some blends (Y14, Y7). The heavy claim and testimonial rules — PROD-011, PROD-013, PROD-009, OFFS-002 — went unevaluated because one sampled page never rendered, and several captures were truncated.",
+        "nothingObserved": false
+      },
+      {
+        "lean": "consumer",
+        "angleId": "products_for",
+        "citations": [
+          {
+            "ref": "9957442c-a1de-41a8-bb77-872aeb4c22d1",
+            "kind": "finding"
+          },
+          {
+            "ref": "89d3ce67-971b-4d58-af68-57dfefb5aa6e",
+            "kind": "finding"
+          },
+          {
+            "ref": "9ba94e71-6a0a-4e6e-b50c-6b2ccb93d384",
+            "kind": "finding"
+          },
+          {
+            "ref": "5bb63a61-4f77-4cd2-8910-ecf196711e6c",
+            "kind": "finding"
+          },
+          {
+            "ref": "a23ce705-e2f6-42ec-a1a9-4c73e569ac44",
+            "kind": "finding"
+          },
+          {
+            "ref": "c66f6ef0-5253-4c8f-974a-35d67984b1e1",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "The lineup centres on what people take: GLP-1 and incretin agonists (F38), melanocortin tanning peptides, GHK-Cu and recovery blends. Heavy passes cover injection accessories — no needles, syringes or wipes (F31, F40) — and no non-peptide research compounds (F20). [inference: nothing in the catalogue serves assay work as such: no reagents, controls or reference standards were seen, and a reconstitution water product exists whose labelling could not be evaluated (F42).] Collections were absent from the sitemap, so category naming is unevaluated (F50).",
+        "nothingObserved": false
+      },
+      {
+        "lean": "consumer",
+        "angleId": "how_it_sells",
+        "citations": [
+          {
+            "ref": "EYE-08",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "2f328532-906d-4bf6-bfab-0f7a3bd0243a",
+            "kind": "finding"
+          },
+          {
+            "ref": "da27f7f2-8653-4522-bc9a-870f96b8fb52",
+            "kind": "finding"
+          },
+          {
+            "ref": "EYE-12",
+            "kind": "eye_test"
+          }
+        ],
+        "paragraph": "Commerce is retail-shaped: quantity discount tiers from 10% to 40%, a 'Fire Sale', free shipping over $175, a free water gift over $200, and weekly units-sold counters (Y8). [inference: single-vial sizes with no stated order minimum and no wholesale or invoicing path mean the default buyer is one person buying a supply.] No refund or returns link was visible in the footer (F10); no peer-to-peer payment methods were named (F56). A navigation 'Competition Analyzer' was never captured (Y12).",
+        "nothingObserved": false
+      },
+      {
+        "lean": "consumer",
+        "angleId": "who_it_lets_buy",
+        "citations": [
+          {
+            "ref": "789def41-407b-40b2-b565-e74348a32084",
+            "kind": "finding"
+          },
+          {
+            "ref": "adaef643-e826-4c7a-b9b5-287404319cc6",
+            "kind": "finding"
+          },
+          {
+            "ref": "3524d1be-c983-4701-9f4a-763299845a61",
+            "kind": "finding"
+          },
+          {
+            "ref": "1f5aac36-5b40-4d00-b594-affea9712e1d",
+            "kind": "finding"
+          },
+          {
+            "ref": "6277e3cd-9fa6-498d-aede-2fdeb588428d",
+            "kind": "finding"
+          },
+          {
+            "ref": "88990ff2-991c-4c5f-8e5b-00c13b6e200a",
+            "kind": "finding"
+          },
+          {
+            "ref": "EYE-09",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "92aa9624-8867-4f21-9026-c4dbce63766b",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "Nothing requires the buyer to be a research entity. /shop served product content to an anonymous visitor (F25), and sign-up collects only email and password — no research field (F47), no terms checkbox (F12). Terms omit three required clauses, including research-restricted use and qualified-professional confirmation (F6). The heavy control that does hold is checkout: no payment form was reachable without an account (F21). An age interstitial exists but reads as formality (F30, Y9). Order-record storage needs attestation (F35).",
+        "nothingObserved": false
+      },
+      {
+        "lean": "neutral",
+        "angleId": "operates_like_supplier",
+        "citations": [
+          {
+            "ref": "99dba9aa-5fb8-41b1-a40c-3686e1acb062",
+            "kind": "finding"
+          },
+          {
+            "ref": "d689724c-9a12-47bf-9eb8-4a950ff5ad9f",
+            "kind": "finding"
+          },
+          {
+            "ref": "07a50ce3-285c-48a6-b5df-7fd70398b4da",
+            "kind": "finding"
+          },
+          {
+            "ref": "6ff6c605-966c-4d56-84b7-316b709a9995",
+            "kind": "finding"
+          },
+          {
+            "ref": "7de9cc2a-9ac0-47b3-b1b9-6955a59b5ec3",
+            "kind": "finding"
+          },
+          {
+            "ref": "97103ae2-0175-4ffc-88f0-86b0a8845826",
+            "kind": "finding"
+          },
+          {
+            "ref": "91574bb0-12d6-423c-9260-ab80f644f09b",
+            "kind": "finding"
+          },
+          {
+            "ref": "317e8f5e-012c-4611-aa48-633acf16ae16",
+            "kind": "finding"
+          },
+          {
+            "ref": "edc8081b-75d4-4e61-a3a5-ebebfeaa2516",
+            "kind": "finding"
+          },
+          {
+            "ref": "dd918652-a39b-4a29-b632-80f48865f748",
+            "kind": "finding"
+          },
+          {
+            "ref": "8d9c05ab-c469-4a22-b3f6-b360f8c852f2",
+            "kind": "finding"
+          },
+          {
+            "ref": "38dc2045-cf51-4eb5-bd02-c4e4e3d6a328",
+            "kind": "finding"
+          },
+          {
+            "ref": "6bf4e7aa-f814-47d1-95ff-5e68c5c4bfbb",
+            "kind": "finding"
+          },
+          {
+            "ref": "2dcb3136-bee4-427a-b71c-142895bba974",
+            "kind": "finding"
+          },
+          {
+            "ref": "c6e04f6a-5a35-4452-9c0e-10b55c3961f3",
+            "kind": "finding"
+          },
+          {
+            "ref": "a5a64489-6cc6-49ca-9503-fda709f27175",
+            "kind": "finding"
+          },
+          {
+            "ref": "bdec22b1-d7af-4a27-aac4-3ef314bcdc48",
+            "kind": "finding"
+          },
+          {
+            "ref": "cadeb217-96df-444b-aa88-ad526a06be6f",
+            "kind": "finding"
+          },
+          {
+            "ref": "26b62822-d152-4146-819b-07c4422c7db9",
+            "kind": "finding"
+          },
+          {
+            "ref": "130359f3-37e6-40da-b74a-df59ad3f201d",
+            "kind": "finding"
+          },
+          {
+            "ref": "741957a9-b26e-42c8-a419-518ce783777d",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "Supplier back-end evidence is largely unevaluated rather than absent. One product page timing out blocked CAS, formula, weight, storage and the whole COA set (F39, F54, F1, F23, F28, F37, F34, F11, F59). No shipping policy (F57) or FAQ (F33) was reached; PO-box handling, packing slips, ban lists, adult signature, staff conduct and lab accreditation all need attestation (F14, F22, F9, F51, F45, F49, F53). The footer disclaimer differs from required wording (F8) and could not be measured for legibility (F5, F24).",
+        "nothingObserved": false
+      },
+      {
+        "lean": "neutral",
+        "angleId": "off_site",
+        "citations": [
+          {
+            "ref": "7d5c20f0-d9df-4881-a018-1b2ba5c6c84b",
+            "kind": "finding"
+          },
+          {
+            "ref": "400fa6a7-d5ef-4cc9-907f-8d87a971e686",
+            "kind": "finding"
+          },
+          {
+            "ref": "8523f46a-05b2-48e5-933b-bbc5c27e0ee2",
+            "kind": "finding"
+          },
+          {
+            "ref": "EYE-11",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "0d90073c-d174-46b9-b28e-0c2b66232f0d",
+            "kind": "finding"
+          },
+          {
+            "ref": "0dcd0acc-f610-4b9c-8698-507677a3c068",
+            "kind": "finding"
+          },
+          {
+            "ref": "7bb7fec4-ef12-4c89-aa15-1c1ba7507437",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "No affiliate, ambassador or referral slug appeared among 15 content URLs (F27) or 57 homepage links (F15), and no therapeutic editorial slugs were found (F29, Y11). No social links were rendered on the homepage, so accounts the storefront does not link are not discoverable from it (F3). Post-level content and audit practice were not examined at all — no platform access, no attestation given (F4, F26). [inference: this is an absence of observation, not evidence of a clean off-site posture.]",
+        "nothingObserved": false
+      },
+      {
+        "lean": "consumer",
+        "angleId": "consistency",
+        "citations": [
+          {
+            "ref": "26b62822-d152-4146-819b-07c4422c7db9",
+            "kind": "finding"
+          },
+          {
+            "ref": "EYE-07",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-08",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "EYE-01",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "789def41-407b-40b2-b565-e74348a32084",
+            "kind": "finding"
+          },
+          {
+            "ref": "adaef643-e826-4c7a-b9b5-287404319cc6",
+            "kind": "finding"
+          },
+          {
+            "ref": "1f5aac36-5b40-4d00-b594-affea9712e1d",
+            "kind": "finding"
+          },
+          {
+            "ref": "88990ff2-991c-4c5f-8e5b-00c13b6e200a",
+            "kind": "finding"
+          },
+          {
+            "ref": "EYE-14",
+            "kind": "eye_test"
+          },
+          {
+            "ref": "406e2aa6-9bbb-4dad-a89b-6a538ddb0162",
+            "kind": "finding"
+          },
+          {
+            "ref": "741957a9-b26e-42c8-a419-518ce783777d",
+            "kind": "finding"
+          }
+        ],
+        "paragraph": "Three contradictions stand. The footer's research-and-development-only statement (F8) sits over urgency and volume-discount selling and weekly sold counts (Y7, Y8, Y1). Terms require buyers authorised to handle research chemicals, yet the shop is open anonymously and sign-up asks nothing of the kind (F25, F47, F6). And the entry interstitial states 21 years while the terms state 18 (F30). Outcome-styled blend naming (Y14, F16) contradicts the same per-page research-only notes it appears beside (F24 unevaluated).",
+        "nothingObserved": false
+      }
+    ],
+    "routing": [
+      {
+        "status": "not_met",
+        "citations": [
+          {
+            "ref": "789def41-407b-40b2-b565-e74348a32084",
+            "kind": "finding"
+          },
+          {
+            "ref": "6277e3cd-9fa6-498d-aede-2fdeb588428d",
+            "kind": "finding"
+          }
+        ],
+        "conditionId": "registration_gate"
+      },
+      {
+        "status": "not_met",
+        "citations": [
+          {
+            "ref": "a23ce705-e2f6-42ec-a1a9-4c73e569ac44",
+            "kind": "finding"
+          },
+          {
+            "ref": "89d3ce67-971b-4d58-af68-57dfefb5aa6e",
+            "kind": "finding"
+          },
+          {
+            "ref": "9ba94e71-6a0a-4e6e-b50c-6b2ccb93d384",
+            "kind": "finding"
+          }
+        ],
+        "conditionId": "no_water_or_syringes"
+      },
+      {
+        "status": "not_observable",
+        "citations": [],
+        "conditionId": "order_minimum_150"
+      },
+      {
+        "status": "not_observable",
+        "citations": [],
+        "conditionId": "monthly_volume_70k"
+      },
+      {
+        "status": "met",
+        "citations": [
+          {
+            "ref": "7d5c20f0-d9df-4881-a018-1b2ba5c6c84b",
+            "kind": "finding"
+          },
+          {
+            "ref": "400fa6a7-d5ef-4cc9-907f-8d87a971e686",
+            "kind": "finding"
+          }
+        ],
+        "conditionId": "no_affiliate_marketing"
+      }
+    ],
+    "legality": {
+      "clean": true,
+      "items": [
+        {
+          "note": "Unobserved, not cleared; needs a further look before any legality conclusion.",
+          "state": "not_evaluable",
+          "ruleId": "PROD-006",
+          "evidenceKey": ""
+        },
+        {
+          "note": "Unobserved, not cleared; no capture bears on it either way.",
+          "state": "not_evaluable",
+          "ruleId": "PROD-008",
+          "evidenceKey": ""
+        }
+      ]
+    },
+    "shoreUps": [
+      {
+        "text": "Require an approved account before any product page or catalogue listing renders to an anonymous visitor.",
+        "citation": {
+          "ref": "789def41-407b-40b2-b565-e74348a32084",
+          "kind": "finding"
+        }
+      },
+      {
+        "text": "Add a research-status field and institution capture to sign-up, stored against each order.",
+        "citation": {
+          "ref": "adaef643-e826-4c7a-b9b5-287404319cc6",
+          "kind": "finding"
+        }
+      },
+      {
+        "text": "Add the three missing terms clauses and a sign-up acknowledgement checkbox binding buyers to them.",
+        "citation": {
+          "ref": "1f5aac36-5b40-4d00-b594-affea9712e1d",
+          "kind": "finding"
+        }
+      },
+      {
+        "text": "Reconcile the interstitial's stated minimum age with the age stated in the terms.",
+        "citation": {
+          "ref": "88990ff2-991c-4c5f-8e5b-00c13b6e200a",
+          "kind": "finding"
+        }
+      },
+      {
+        "text": "Rename outcome-styled blends to their constituent compound designations throughout catalogue and tags.",
+        "citation": {
+          "ref": "406e2aa6-9bbb-4dad-a89b-6a538ddb0162",
+          "kind": "finding"
+        }
+      },
+      {
+        "text": "Publish the required disclaimer sentence verbatim in the footer and add a visible returns link.",
+        "citation": {
+          "ref": "26b62822-d152-4146-819b-07c4422c7db9",
+          "kind": "finding"
+        }
+      }
+    ],
+    "placement": {
+      "spectrum": "mixed",
+      "citations": [
+        {
+          "ref": "products_for",
+          "kind": "angle"
+        },
+        {
+          "ref": "how_it_sells",
+          "kind": "angle"
+        },
+        {
+          "ref": "who_it_lets_buy",
+          "kind": "angle"
+        },
+        {
+          "ref": "consistency",
+          "kind": "angle"
+        },
+        {
+          "ref": "EYE-07",
+          "kind": "eye_test"
+        },
+        {
+          "ref": "9957442c-a1de-41a8-bb77-872aeb4c22d1",
+          "kind": "finding"
+        }
+      ],
+      "paragraph": "CoMo Peptides presents genuine supplier substance on product pages — CAS numbers, formulae, molecular weights, RUO lines and a refusal to give dosing — but sells through a consumer commercial posture and lets anyone browse. A5 shows a catalogue built around GLP-1, cosmetic and recovery compounds; A2 shows promotional order structure, quantity tiers, a free-shipping threshold and weekly units-sold counters; A6 shows no research qualification anywhere in sign-up; A1 sets those against the site's own research-only statements. [inference: the technical layer is real but sits on retail mechanics, so neither end of the spectrum fits.]",
+      "recommended": "international"
+    }
+  }
+}
