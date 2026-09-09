@@ -284,7 +284,7 @@ async function loadReport(supabase: WorkerSupabase, runId: string): Promise<Scre
  * delivered (D-002), and the newest is the current document. The older rows stay because they
  * record what was delivered before.
  */
-async function latestCapture(
+export async function latestCapture(
   supabase: WorkerSupabase,
   runId: string,
 ): Promise<{ readonly storageKey: string }> {
@@ -308,5 +308,83 @@ async function latestCapture(
     );
   }
 
+  /*
+    The capture has to be of the **latest published version** (D-263).
+
+    A newest-first capture read is not enough on its own. A run can carry a checklist capture from
+    before the evaluation existed, and a run can be re-published — and in both cases the newest file
+    and the current document are different things. Sending the first would announce an evaluation
+    and link a rule checklist; sending the second would link version 1 while version 2 is what
+    Mintro now says.
+
+    So the capture request for the newest version has to have completed. That row is the only thing
+    that ties a stored file to the version it is of: `report_captures` records a file against a
+    run, and `evaluation_capture_requests` records which published version asked for it.
+  */
+  await assertCaptureIsOfLatestPublished(supabase, runId);
+
   return { storageKey: row.storage_key };
+}
+
+/**
+ * Refuses unless the newest published version has a finished capture.
+ *
+ * Three refusals, and they are different facts a sender needs told apart: nothing is published, so
+ * there is no document; the capture has not run yet, so wait; the capture failed, so it will not
+ * arrive without someone looking at why.
+ */
+async function assertCaptureIsOfLatestPublished(
+  supabase: WorkerSupabase,
+  runId: string,
+): Promise<void> {
+  const published = await supabase.client
+    .from('evaluations')
+    .select('id, version')
+    .eq('run_id', runId)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (published.error !== null) {
+    // Not "nothing is published" — a different answer, and conflating them is D-036.
+    throw new Error(
+      `could not read the published evaluations for run ${runId}: ${published.error.message}`,
+    );
+  }
+  if (published.data === null) {
+    throw new Error(
+      `run ${runId} has no published evaluation. The evaluation is the report (D-256), and a ` +
+        'draft is not sendable — publish it first.',
+    );
+  }
+
+  const latest = published.data as { id: string; version: number };
+
+  const capture = await supabase.client
+    .from('evaluation_capture_requests')
+    .select('status, error')
+    .eq('evaluation_id', latest.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (capture.error !== null) {
+    throw new Error(
+      `could not read the capture requests for run ${runId}: ${capture.error.message}`,
+    );
+  }
+
+  const request = capture.data as { status: string; error: string | null } | null;
+  if (request === null || request.status !== 'done') {
+    const why =
+      request === null
+        ? 'no capture was ever requested for it'
+        : request.status === 'failed'
+          ? `its capture failed: ${request.error ?? 'no reason recorded'}`
+          : `its capture is '${request.status}'`;
+    throw new Error(
+      `version ${latest.version} of run ${runId} has no completed capture — ${why}. The link would ` +
+        'point at a file of some other version, or at nothing.',
+    );
+  }
 }

@@ -32,7 +32,7 @@ import {
   STATE_LABEL,
   STATE_LABEL_LOWER,
 } from '@mintro/engine';
-import { formatReportDay } from '@mintro/engine';
+import { evaluationPosture, formatReportDay } from '@mintro/engine';
 import { bodyFor, subjectFor } from '../src/send.js';
 
 /** A delivered link, in the shape `reportLinkFor` builds. */
@@ -580,17 +580,27 @@ describe('the covering email', () => {
     },
   );
 
+  /*
+    Retired: the message no longer carries counts (D-256, D-263).
+
+    It asserted the failure count and the coverage line, on the reasoning that three failures out of
+    ninety-seven evaluable findings is a different fact from three out of five. Both are true of the
+    **checklist**, and the checklist is no longer what this email announces. The evaluation does not
+    count rules at all — its whole point is that a research supplier missing a registration gate and
+    a consumer retailer with tidy disclaimers can score the same — so a tally in the covering mail
+    would frame the reader in the vocabulary the document deliberately avoids.
+
+    Replaced by the assertion that matters now: no counts at all.
+  */
   it.each(reports.map((report) => [report.merchantDomain, report] as const))(
-    'body for %s keeps the counts, beside the coverage that qualifies them',
+    'body for %s states no count of rules or findings',
     (_domain, report) => {
-      // Dropped from the subject, not from the message. Three failures out of ninety-seven
-      // evaluable findings is a different fact from three out of five.
       const body = bodyFor(report, 'Captures attached.', REPORT_LINK);
-      // Read from the shared set, so this cannot go on asserting a word the report stopped using
-      // — which is how the mail and the document it announces came to name states differently
-      // in the first place (D-175).
-      expect(body).toContain(`${report.counts.fail} ${STATE_LABEL_LOWER.fail}`);
-      expect(body).toContain('findings were evaluable from this crawl');
+
+      expect(body).not.toContain(`${report.counts.fail} ${STATE_LABEL_LOWER.fail}`);
+      expect(body).not.toContain('findings were evaluable from this crawl');
+      expect(body).not.toMatch(/\d+\s+of\s+\d+/);
+      expect(body).not.toMatch(/\d+\s+findings?/i);
     },
   );
 
@@ -612,11 +622,21 @@ describe('the covering email', () => {
     },
   );
 
-  it('says findings are not determinations', () => {
+  it('says Mintro made no compliance determination', () => {
     const report = reports[0];
     if (report === undefined) return;
-    // The posture stated plainly in the one place a recipient definitely reads.
-    expect(bodyFor(report, '', REPORT_LINK)).toContain('not compliance determinations');
+    /*
+      The claim survives; the sentence carrying it moved.
+
+      It was a line of its own — "Findings state what was observed. They are not compliance
+      determinations." — in the email and nowhere in the document. So the claim hard constraint 7
+      turns on travelled with the message and not with the artifact, and the artifact is the
+      forwardable thing. It is inside the posture paragraph now, which both carry from
+      `evaluationPosture`.
+    */
+    const body = bodyFor(report, '', REPORT_LINK);
+    expect(body).toContain('not a compliance determination');
+    expect(body).toContain(evaluationPosture(report.merchantDomain));
   });
 
   it('does not let an analyst note bypass the audit unnoticed', () => {

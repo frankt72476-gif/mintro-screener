@@ -614,14 +614,37 @@ export const EYE_TEST_TERMS: readonly string[] = [
  * who Mintro is, and this is the only thing in the document that tells them. A sentence that lived
  * in a component and did not reach the artifact would be a sentence nobody reads (D-246).
  *
- * The last clause is not decoration. D-256 and hard constraint 7: Mintro states a view and the
- * decision belongs to the underwriter, and the document says so where it cannot be separated from
- * the assessment it qualifies.
+ * ## Why "not a compliance determination" is in the sentence
+ *
+ * It used to be a separate line in the covering email — *"Findings state what was observed. They
+ * are not compliance determinations."* — and nothing like it was in the document at all. So the
+ * claim hard constraint 7 turns on travelled with the email and not with the artifact, and the
+ * artifact is the forwardable thing: an underwriter passes the link on, the email stays in their
+ * inbox, and the disclaimer stays with it.
+ *
+ * Merged rather than kept alongside. Two sentences saying Mintro does not determine compliance are
+ * two wordings to keep in step, and this document has one voice. The last clause is the other half
+ * and is not decoration: D-256 and hard constraint 7 say Mintro states a view and the decision
+ * belongs to the underwriter, and the document says so where it cannot be separated from the
+ * assessment it qualifies.
  */
-export const EVALUATION_POSTURE =
-  'Mintro reviewed the public pages of this site and formed a view of what the business is and ' +
-  'where it fits. This is Mintro’s assessment. The underwriting decision belongs to the team ' +
-  'reviewing the account.';
+export function evaluationPosture(subject: string): string {
+  return (
+    `Mintro reviewed the public pages of ${subject} and formed a view of what the business is ` +
+    'and where it fits. This is Mintro’s assessment, not a compliance determination. The ' +
+    'underwriting decision belongs to the team reviewing the account.'
+  );
+}
+
+/**
+ * The sentence as the document carries it, about the site the reader is looking at.
+ *
+ * The covering email says the same thing about a named domain, through the same function, so the
+ * document and the message announcing it cannot drift. They did once — the email said findings were
+ * not compliance determinations and the document said nothing of the kind, and the two were edited
+ * in different commits by people reading different files.
+ */
+export const EVALUATION_POSTURE = evaluationPosture('this site');
 
 export const REPORT_POSTURE =
   'Mintro reviewed the public pages of this site and recorded what it found. The point is to ' +

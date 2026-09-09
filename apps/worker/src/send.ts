@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import {
   auditAnalystNote,
   describeCounts,
+  evaluationPosture,
   formatReportDay,
   type ScreeningReport,
 } from '@mintro/engine';
@@ -327,7 +328,6 @@ export function subjectFor(report: ScreeningReport): string {
 }
 
 export function bodyFor(report: ScreeningReport, note: string, reportUrl: string): string {
-  const { counts, coverage } = report;
 
   /*
     Blank lines are structure, not filler.
@@ -347,21 +347,27 @@ export function bodyFor(report: ScreeningReport, note: string, reportUrl: string
     `Rule set:  v${report.rulesetVersion}, effective ${report.rulesetEffective}`,
     `Completed: ${report.finishedAt}`,
     '',
-    // Built from the same constant the report renders, never spelled here (D-175). This line and
-    // the document it announces named the four states in different words for as long as both existed.
-    describeCounts(counts),
-    `${coverage.evaluable} of ${coverage.total} findings were evaluable from this crawl.`,
-    ...(coverage.notReachable > 0
-      ? [`${coverage.notReachable} require a surface no crawl reaches and are reported as not evaluable.`]
-      : []),
+    /*
+      What the document is, in the words the document uses (D-263).
+
+      The counts are gone. They were the checklist's summary — "3 failed, 11 for review, 26 met" —
+      and the evaluation does not count rules at all: its whole point is that a research supplier
+      missing a registration gate and a consumer retailer with tidy disclaimers can score the same.
+      An email leading with a tally would frame the reader before they opened the document, in the
+      vocabulary that document deliberately does not use.
+
+      The posture comes from `evaluationPosture`, the same function the masthead renders, so the
+      message and the artifact cannot say different things. They did: the email carried "not
+      compliance determinations" and the document carried nothing of the kind.
+    */
+    evaluationPosture(report.merchantDomain),
     '',
     // Where it is, and who serves it. Not why the format changed: that is Mintro's business and
     // the reader is here to read a report.
-    'The report is a link, served by Mintro:',
+    'The evaluation is a link, served by Mintro:',
     reportUrl,
     '',
-    'It carries a capture behind every finding.',
-    'Findings state what was observed. They are not compliance determinations.',
+    'It carries a capture behind every observation.',
     '',
     /*
       The property we chose when we chose serving over attaching, said plainly and without alarm.
