@@ -122,6 +122,20 @@ export function handleContext(run: RunContext, map: HandleMap): RunContext {
     angleIds: run.angleIds.map((id) => map.angle.toHandle.get(id) ?? id),
     routingConditionIds: run.routingConditionIds,
     consumerSideSpectrum: run.consumerSideSpectrum,
+    /*
+      The legality block travels in handle space too: the model echoes it, and its evidence keys
+      have to be handles like every other id it sees. An item with no capture keeps its empty key.
+    */
+    legality: {
+      clean: run.legality.clean,
+      items: run.legality.items.map((item) => ({
+        ...item,
+        evidenceKey:
+          item.evidenceKey === '' ? '' : (map.evidence.toHandle.get(item.evidenceKey) ?? item.evidenceKey),
+      })),
+    },
+    observableConditionIds: run.observableConditionIds,
+    knownHandles: run.knownHandles,
   };
 }
 
@@ -196,6 +210,8 @@ export function decodeDraft<T>(draft: T, map: HandleMap): DecodeResult<T> {
           legality: {
             ...legality,
             items: (legality['items'] ?? []).map((item: Record<string, any>, i: number) => {
+              // A `not_evaluable` legality rule recorded no capture, so it carries no handle either.
+              if (String(item['evidenceKey'] ?? '') === '') return { ...item, evidenceKey: '' };
               const real = toId(map, 'evidence', String(item['evidenceKey']));
               if (real === null) {
                 unknown.push({

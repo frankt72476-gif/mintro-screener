@@ -191,18 +191,25 @@ export function draftSchema(
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['ruleId', 'evidenceKey'],
+              required: ['ruleId', 'state', 'evidenceKey'],
               properties: {
-                ruleId: { type: 'string' },
-                evidenceKey:
-                  run.evidenceKeys.size === 0
-                    ? {
-                        type: 'string',
-                        description: 'This run stored no evidence, so no legality item can be backed.',
-                      }
-                    : { $ref: '#/$defs/evidenceKey' },
+                /*
+                  The rule ids are the computed ones and no others, so an item cannot be invented
+                  here any more than a citation can. `evidenceKey` is a plain string rather than the
+                  enum: an unobserved legality rule recorded no capture and carries an empty key,
+                  which no enum of real keys would admit.
+                */
+                ruleId:
+                  run.legality.items.length === 0
+                    ? { type: 'string' }
+                    : { enum: run.legality.items.map((item) => item.ruleId) },
+                state: { enum: ['fail', 'not_evaluable'] },
+                evidenceKey: { type: 'string' },
+                note: { type: 'string', description: 'One sentence. The only part you may write.' },
               },
             },
+            description:
+              'Exactly the items supplied, unchanged apart from an optional one-sentence note.',
           },
         },
       },

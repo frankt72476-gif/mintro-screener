@@ -20,6 +20,7 @@
 import type { AngleSet } from '@mintro/ruleset';
 import type { EvaluationPage } from './evaluationPages.js';
 import { toHandle, type HandleMap } from './evaluationHandles.js';
+import type { DraftLegality } from '@mintro/engine';
 
 /** One finding, as the model sees it. Ids are what a citation points at. */
 export interface PromptFinding {
@@ -59,6 +60,13 @@ export interface PromptInputs {
    * disagree about what the model is allowed to cite.
    */
   readonly handles: HandleMap;
+  /**
+   * The legality block, computed from the run.
+   *
+   * Shown so the model can echo it back and annotate it. It is not asked for and cannot be
+   * changed — `validateDraft` refuses a draft whose block differs.
+   */
+  readonly legality: DraftLegality;
 }
 
 /**
@@ -76,7 +84,7 @@ export const ANSWER_SCHEMA = `{
     "paragraph": "one paragraph placing the business and naming the angles that drove it",
     "citations": [{"kind": "angle", "ref": "A3"}]
   },
-  "legality": { "clean": true, "items": [{"ruleId": "CATG-003", "evidenceKey": "E7"}] },
+  "legality": { "clean": true, "items": [{"ruleId": "CATG-003", "state": "fail", "evidenceKey": "E7", "note": "one sentence"}] },
   "routing": [{"conditionId": "...", "status": "met | not_met | not_observable", "citations": []}],
   "angles": [{
     "angleId": "A3",
@@ -296,13 +304,46 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
     );
   }
 
+  /*
+    The legality block, given rather than asked for.
+
+    It decides the recommendation and is the first thing an underwriter reads, so it is computed
+    from the findings and injected. The model returns it unchanged apart from one sentence per item
+    — on run 9011b2d7, asked to assemble it, the model wrote `clean: true, items: []` over two
+    legality rules that were never observed.
+  */
+  const legalityRows =
+    inputs.legality.items.length === 0
+      ? '(no legality rule failed or went unobserved on this run)'
+      : inputs.legality.items
+          .map(
+            (item) =>
+              `- \`${item.ruleId}\` — **${item.state}**` +
+              `${item.evidenceKey === '' ? ' (no capture recorded)' : ` (${item.evidenceKey})`}`,
+          )
+          .join('\n');
+
+  parts.push(
+    section(
+      'Legality — supplied, not yours to decide',
+      `\`clean\`: **${inputs.legality.clean}** — meaning no legality violation was *observed*.\n\n` +
+        `${legalityRows}\n\n` +
+        'Return this block exactly as given. You may add a `note` of one sentence to any item, ' +
+        'saying what it means for this merchant. You may not add an item, remove one, change a ' +
+        "state, or change `clean`.\n\n" +
+        '`not_evaluable` is not a pass and not a violation: the rule could not be observed at all. ' +
+        'Say so where it bears on an angle rather than treating it as either.',
+    ),
+  );
+
   parts.push(
     section(
       'Answer',
       `Reply with JSON only, in exactly this shape:\n\n${ANSWER_SCHEMA}\n\n` +
         'Every angle appears, in the order above, even one that observed nothing — set ' +
         '`nothingObserved` and say so in the paragraph. Every routing condition appears. ' +
-        'Refer to angles by their handle (`A1`, `A2`, …), exactly as headed above.',
+        'Refer to angles by their handle (`A1`, `A2`, …), exactly as headed above. '+
+        'Return the legality block exactly as supplied, notes aside.',
     ),
   );
 

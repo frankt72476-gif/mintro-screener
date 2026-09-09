@@ -21,6 +21,9 @@ const RUN: RunContext = {
   angleIds: ['who_it_talks_to', 'products_for', 'consistency'],
   routingConditionIds: ['registration_gate', 'order_minimum_150'],
   consumerSideSpectrum: new Set(['consumer_retail']),
+  legality: { clean: true, items: [] },
+  observableConditionIds: [],
+  knownHandles: new Set<string>(),
 };
 
 const SPECTRUM = ['consumer_retail', 'mixed', 'research_supplier'];
@@ -76,11 +79,29 @@ describe('ids are enums of what the run holds', () => {
     expect(props['routing'].items.properties.conditionId.enum).toEqual(RUN.routingConditionIds);
   });
 
-  it('constrains a legality item to an evidence key this run holds', () => {
-    expect(props['legality'].properties.items.items.properties.evidenceKey.$ref).toBe(
-      '#/$defs/evidenceKey',
-    );
-    expect(defs['evidenceKey'].enum).toEqual(['run-1/layer1/abc.png']);
+  /*
+    The legality block is computed, so its rule ids are an enum of the computed ones and its
+    evidence key is a plain string — an unobserved rule recorded no capture and carries an empty
+    key, which no enum of real keys would admit.
+  */
+  it('constrains a legality item to the computed rule ids', () => {
+    const withItems = draftSchema(
+      {
+        ...RUN,
+        legality: {
+          clean: false,
+          items: [{ ruleId: 'CATG-003', state: 'fail', evidenceKey: 'run-1/layer1/abc.png' }],
+        },
+      },
+      SPECTRUM,
+      PLACEMENTS,
+    ) as Record<string, any>;
+
+    const item = withItems['properties'].legality.properties.items.items.properties;
+    expect(item.ruleId.enum).toEqual(['CATG-003']);
+    expect(item.state.enum).toEqual(['fail', 'not_evaluable']);
+    expect(item.evidenceKey.type).toBe('string');
+    expect(item.note.type).toBe('string');
   });
 });
 

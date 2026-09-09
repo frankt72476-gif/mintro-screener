@@ -18,6 +18,8 @@ import {
   rejectionMessage,
   sentencesOf,
   hasInferenceMarker,
+  computeLegality,
+  legalityMatches,
   publishRefusal,
   validateDraft,
   type Citation,
@@ -43,6 +45,23 @@ const CONDITION_IDS = [
   'no_affiliate_marketing',
 ];
 
+/**
+ * The legality block this run computes to: one observed violation, one unobserved rule.
+ *
+ * Both states in one fixture, because the two are the whole point — a `fail` ends the evaluation
+ * and a `not_evaluable` says nothing about the merchant.
+ */
+const LEGALITY = {
+  clean: false,
+  items: [
+    { ruleId: 'CATG-003', state: 'fail' as const, evidenceKey: 'run-1/layer0/def' },
+    { ruleId: 'PROD-008', state: 'not_evaluable' as const, evidenceKey: '' },
+  ],
+};
+
+/** Only these gate `domestic`; the other two are answered by the application. */
+const OBSERVABLE = ['registration_gate', 'no_water_or_syringes', 'no_affiliate_marketing'];
+
 const RUN: RunContext = {
   findingIds: new Set(['f-001', 'f-002', 'f-003']),
   evidenceKeys: new Set(['run-1/layer1/abc.png', 'run-1/layer0/def']),
@@ -50,6 +69,9 @@ const RUN: RunContext = {
   angleIds: ANGLE_IDS,
   routingConditionIds: CONDITION_IDS,
   consumerSideSpectrum: new Set(['consumer_retail', 'consumer_leaning']),
+  legality: LEGALITY,
+  observableConditionIds: OBSERVABLE,
+  knownHandles: new Set(['F1', 'F2', 'E1', 'Y1', 'A1', 'A2']),
 };
 
 const cite = (ref: string, kind: Citation['kind'] = 'finding'): Citation => ({ kind, ref });
@@ -64,14 +86,20 @@ function passing(): EvaluationDraft {
   return {
     placement: {
       spectrum: 'research_leaning',
-      recommended: 'domestic',
+      // Not `domestic`: registration_gate is observable and not met, which is what stands between
+      // this merchant and domestic. And legality is not clean, so the recommendation is fixed.
+      recommended: 'referred_out',
       // Plain prose, no markers: the citations below are what backs it (D-260, Carried resolved).
       paragraph:
         'The catalogue and the product data read as a supplier, while the absence of a registration ' +
         'gate is the one thing pulling the other way.',
       citations: [cite('products_for', 'angle'), cite('operates_like_supplier', 'angle')],
     },
-    legality: { clean: true, items: [] },
+    // Echoed exactly, with the one sentence the model may add.
+    legality: {
+      clean: LEGALITY.clean,
+      items: LEGALITY.items.map((item) => ({ ...item, note: 'A sentence about this item.' })),
+    },
     routing: CONDITION_IDS.map((conditionId) => ({
       conditionId,
       status: conditionId === 'registration_gate' ? ('not_met' as const) : ('not_observable' as const),
@@ -347,19 +375,14 @@ describe('legality_not_referred_out', () => {
   it('rejects a recommendation other than referred_out when legality is not clean', () => {
     const draft = mutate((d) => ({
       ...d,
-      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-1/layer0/def' }] },
+      placement: { ...d.placement, recommended: 'international' as const },
     }));
     expect(rejectionRules(draft)).toContain('legality_not_referred_out');
   });
 
   it('accepts referred_out when legality is not clean, with the angles still drafted', () => {
-    const draft = mutate((d) => ({
-      ...d,
-      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-1/layer0/def' }] },
-      placement: { ...d.placement, recommended: 'referred_out' as const },
-    }));
-    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
-    expect(draft.angles).toHaveLength(7);
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+    expect(passing().angles).toHaveLength(7);
   });
 });
 
@@ -635,26 +658,30 @@ describe('unbacked_legality_item', () => {
   it('refuses a legality item whose capture this run does not hold', () => {
     const draft = mutate((d) => ({
       ...d,
-      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-9/layer0/nope' }] },
-      placement: { ...d.placement, recommended: 'referred_out' as const },
+      legality: {
+        clean: false,
+        items: [
+          { ...LEGALITY.items[0]!, evidenceKey: 'run-9/layer0/nope' },
+          LEGALITY.items[1]!,
+        ],
+      },
     }));
     const result = validateDraft(draft, RUN);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.rejections.map((r) => r.rule)).toContain('unbacked_legality_item');
-    expect(result.rejections.some((r) => r.message.includes('CATG-003'))).toBe(true);
   });
 
   it('accepts one backed by a capture the run holds', () => {
-    const draft = mutate((d) => ({
-      ...d,
-      legality: { clean: false, items: [{ ruleId: 'CATG-003', evidenceKey: 'run-1/layer0/def' }] },
-      placement: { ...d.placement, recommended: 'referred_out' as const },
-    }));
-    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
   });
 
-  it('says nothing about a clean legality block with no items', () => {
+  /*
+    An unobserved legality rule recorded no capture, so it carries an empty key. Demanding one would
+    refuse the honest case — which is the one run 9011b2d7 actually produced, twice over.
+  */
+  it('accepts an empty key on an unobserved item', () => {
+    expect(passing().legality.items.some((i) => i.evidenceKey === '')).toBe(true);
     expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
   });
 });
@@ -715,6 +742,281 @@ describe('publishRefusal', () => {
     expect(refusal).toContain(`${result.rejections.length} reason(s)`);
     expect(result.rejections.length).toBeGreaterThan(1);
     for (const rejection of result.rejections) expect(refusal).toContain(rejection.at);
+  });
+});
+
+describe('computeLegality', () => {
+  const LEGALITY_IDS = ['CATG-003', 'CATG-004', 'PAY-001', 'PROD-006', 'PROD-008'];
+
+  /*
+    Run 9011b2d7, exactly: three legality rules passed, and PROD-006 and PROD-008 were unobservable
+    because one sampled page timed out. The model, asked to assemble this block, wrote
+    `clean: true, items: []` — a clean bill over two rules nobody checked.
+  */
+  it('reports an unobserved legality rule rather than dropping it', () => {
+    const computed = computeLegality(
+      [
+        { ruleId: 'CATG-003', state: 'pass', evidenceKey: 'k1' },
+        { ruleId: 'CATG-004', state: 'pass', evidenceKey: 'k1' },
+        { ruleId: 'PAY-001', state: 'pass', evidenceKey: null },
+        { ruleId: 'PROD-006', state: 'not_evaluable', evidenceKey: null },
+        { ruleId: 'PROD-008', state: 'not_evaluable', evidenceKey: null },
+      ],
+      LEGALITY_IDS,
+    );
+
+    expect(computed.items.map((i) => i.ruleId)).toEqual(['PROD-006', 'PROD-008']);
+    expect(computed.items.every((i) => i.state === 'not_evaluable')).toBe(true);
+    expect(computed.items.every((i) => i.evidenceKey === '')).toBe(true);
+  });
+
+  /*
+    `clean` means no violation was *observed*, not "everything passed". Two unobserved rules must
+    not refer a merchant out — that would decline a business because a page of theirs timed out.
+  */
+  it('stays clean when the only gaps are unobserved rules', () => {
+    const computed = computeLegality(
+      [
+        { ruleId: 'CATG-003', state: 'pass', evidenceKey: 'k1' },
+        { ruleId: 'PROD-008', state: 'not_evaluable', evidenceKey: null },
+      ],
+      LEGALITY_IDS,
+    );
+    expect(computed.clean).toBe(true);
+    expect(computed.items).toHaveLength(1);
+  });
+
+  it('is not clean when a violation was observed', () => {
+    const computed = computeLegality(
+      [{ ruleId: 'CATG-003', state: 'fail', evidenceKey: 'k1' }],
+      LEGALITY_IDS,
+    );
+    expect(computed.clean).toBe(false);
+    expect(computed.items[0]).toMatchObject({ ruleId: 'CATG-003', state: 'fail', evidenceKey: 'k1' });
+  });
+
+  it('ignores every rule outside the legality tier', () => {
+    const computed = computeLegality(
+      [
+        { ruleId: 'NAME-001', state: 'fail', evidenceKey: 'k1' },
+        { ruleId: 'PROD-011', state: 'fail', evidenceKey: 'k2' },
+      ],
+      LEGALITY_IDS,
+    );
+    expect(computed).toEqual({ clean: true, items: [] });
+  });
+
+  it('is sorted, so two runs over the same findings compare', () => {
+    const findings = [
+      { ruleId: 'PROD-008', state: 'fail', evidenceKey: 'k2' },
+      { ruleId: 'CATG-003', state: 'fail', evidenceKey: 'k1' },
+    ];
+    expect(computeLegality(findings, LEGALITY_IDS).items.map((i) => i.ruleId)).toEqual([
+      'CATG-003',
+      'PROD-008',
+    ]);
+  });
+});
+
+describe('legality_altered', () => {
+  it('accepts the computed block echoed back with notes', () => {
+    expect(validateDraft(passing(), RUN)).toEqual({ ok: true });
+  });
+
+  it('refuses an item the model added', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: {
+        ...d.legality,
+        items: [...d.legality.items, { ruleId: 'PAY-001', state: 'fail' as const, evidenceKey: '' }],
+      },
+    }));
+    expect(rejectionRules(draft)).toContain('legality_altered');
+  });
+
+  it('refuses an item the model dropped', () => {
+    const draft = mutate((d) => ({ ...d, legality: { ...d.legality, items: [d.legality.items[0]!] } }));
+    expect(rejectionRules(draft)).toContain('legality_altered');
+  });
+
+  it('refuses a cleared block', () => {
+    const draft = mutate((d) => ({ ...d, legality: { clean: true, items: [] } }));
+    expect(rejectionRules(draft)).toContain('legality_altered');
+  });
+
+  it('refuses a flipped clean flag', () => {
+    const draft = mutate((d) => ({ ...d, legality: { ...d.legality, clean: true } }));
+    expect(rejectionRules(draft)).toContain('legality_altered');
+  });
+
+  it('refuses a changed state', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: {
+        ...d.legality,
+        items: d.legality.items.map((i) => ({ ...i, state: 'fail' as const })),
+      },
+    }));
+    expect(rejectionRules(draft)).toContain('legality_altered');
+  });
+
+  /*
+    The note is the one thing the model may write, so changing it must never be refused — and
+    `legalityMatches` is what draws that line.
+  */
+  it('accepts a different note', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: {
+        ...d.legality,
+        items: d.legality.items.map((i) => ({ ...i, note: 'A different sentence entirely.' })),
+      },
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  it('accepts no note at all — the block bare is the block as computed', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: LEGALITY.clean, items: LEGALITY.items },
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+    expect(legalityMatches({ clean: LEGALITY.clean, items: LEGALITY.items }, RUN.legality)).toBe(true);
+  });
+});
+
+describe('domestic_with_unmet_routing', () => {
+  /*
+    The draft this rule was written for recommended `domestic` while registration_gate and
+    no_water_or_syringes were both observably not met. Those conditions are what stands between the
+    merchant and domestic; recommending it anyway states the destination as though the path were
+    already walked.
+  */
+  it('refuses domestic while an observable condition is not met', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, recommended: 'domestic' as const },
+    }));
+    const result = validateDraft(draft, { ...RUN, legality: { clean: true, items: [] } });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('domestic_with_unmet_routing');
+    expect(result.rejections.some((r) => r.message.includes('registration_gate'))).toBe(true);
+  });
+
+  it('permits domestic once every observable condition is met', () => {
+    const clean = { ...RUN, legality: { clean: true, items: [] } };
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, recommended: 'domestic' as const },
+      routing: d.routing.map((r) => ({ ...r, status: 'met' as const })),
+    }));
+    expect(validateDraft(draft, clean)).toEqual({ ok: true });
+  });
+
+  /*
+    An unobservable condition never gates a placement. Order minimum and monthly volume are
+    answered by the application, and refusing domestic because a storefront cannot show them would
+    decline a merchant for a limit of the method.
+  */
+  it('ignores a condition the crawl cannot observe', () => {
+    const clean = { ...RUN, legality: { clean: true, items: [] } };
+    const draft = mutate((d) => ({
+      ...d,
+      legality: { clean: true, items: [] },
+      placement: { ...d.placement, recommended: 'domestic' as const },
+      routing: d.routing.map((r) => ({
+        ...r,
+        status: r.conditionId === 'order_minimum_150' ? ('not_met' as const) : ('met' as const),
+      })),
+    }));
+    expect(validateDraft(draft, clean)).toEqual({ ok: true });
+  });
+
+  it('says nothing about international or referred_out', () => {
+    for (const recommended of ['international', 'referred_out'] as const) {
+      const draft = mutate((d) => ({
+        ...d,
+        legality: { clean: true, items: [] },
+        placement: { ...d.placement, recommended },
+      }));
+      const result = validateDraft(draft, { ...RUN, legality: { clean: true, items: [] } });
+      expect(result.ok, recommended).toBe(true);
+    }
+  });
+});
+
+describe('unresolved_prose_handle', () => {
+  /*
+    Nothing decodes prose. An invented `F99` in a sentence survives every other check and reaches
+    the reader as a reference they cannot follow, in the part of the document they actually read.
+  */
+  it('refuses a handle in a paragraph that the mapping does not hold', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a, i) =>
+        i === 0 ? { ...a, paragraph: 'The catalogue is organised by outcome (F99).' } : a,
+      ),
+    }));
+    const result = validateDraft(draft, RUN);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejections.map((r) => r.rule)).toContain('unresolved_prose_handle');
+    expect(result.rejections.some((r) => r.message.includes('F99'))).toBe(true);
+  });
+
+  it('accepts handles the run issued', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a, i) =>
+        i === 0 ? { ...a, paragraph: 'Outcome-organised (F1, E1, Y1, A2).' } : a,
+      ),
+    }));
+    expect(validateDraft(draft, RUN)).toEqual({ ok: true });
+  });
+
+  it('checks the placement, shore-ups and legality notes too', () => {
+    const inPlacement = mutate((d) => ({
+      ...d,
+      placement: { ...d.placement, paragraph: 'Driven by E42.' },
+    }));
+    expect(rejectionRules(inPlacement)).toContain('unresolved_prose_handle');
+
+    const inShoreUp = mutate((d) => ({
+      ...d,
+      shoreUps: [{ text: 'Close the gate (Y77).', citation: cite('f-001') }],
+    }));
+    expect(rejectionRules(inShoreUp)).toContain('unresolved_prose_handle');
+
+    const inNote = mutate((d) => ({
+      ...d,
+      legality: {
+        ...d.legality,
+        items: d.legality.items.map((i, n) => (n === 0 ? { ...i, note: 'See A9.' } : i)),
+      },
+    }));
+    expect(rejectionRules(inNote)).toContain('unresolved_prose_handle');
+  });
+
+  /*
+    The pattern must not fire on compound names and rubric ids that merely start with the same
+    letter — a false positive here would refuse honest prose.
+  */
+  it('does not mistake compound names or rubric ids for handles', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a, i) =>
+        i === 0
+          ? {
+              ...a,
+              paragraph: 'BPC-157, TB-500, GLP-1 and EYE-08 appear, alongside AOD-9604 and F1.',
+            }
+          : a,
+      ),
+    }));
+    expect(rejectionRules(draft)).not.toContain('unresolved_prose_handle');
   });
 });
 

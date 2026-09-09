@@ -118,14 +118,89 @@ export interface DraftPlacement {
   readonly citations: readonly Citation[];
 }
 
+/**
+ * One legality-tier rule that is not a clean pass.
+ *
+ * `state` is the finding's own, and the two values mean different things to a reader and to the
+ * recommendation:
+ *
+ *   `fail`          — a violation was observed. Any one of these ends the evaluation (D-256).
+ *   `not_evaluable` — the rule could not be observed at all. It says nothing about the merchant.
+ *
+ * Run 9011b2d7 is the case this distinction was built for: three legality rules passed, and
+ * PROD-006 and PROD-008 were unobservable because one sampled page timed out. The model wrote
+ * `clean: true, items: []` — a clean legality bill over two rules nobody checked, which is hard
+ * constraint 2 in the highest-stakes block of the report.
+ */
 export interface DraftLegalityItem {
   readonly ruleId: string;
+  readonly state: 'fail' | 'not_evaluable';
+  /** The capture backing it. Empty when the finding recorded no key — common for `not_evaluable`. */
   readonly evidenceKey: string;
+  /** One sentence from the model. The only part of this block it may write. */
+  readonly note?: string;
 }
 
 export interface DraftLegality {
+  /**
+   * **No legality violation was observed.** Not "every legality rule passed".
+   *
+   * The difference decides whether a merchant is referred out. A rule that could not be observed is
+   * a limit of the crawl, and refusing a merchant for it would be the D-058 conflation — declining
+   * a business because a page of theirs timed out. So `clean` tracks observed violations only, and
+   * every rule that is not a clean pass appears in `items` with its state, so a reader sees the
+   * gaps rather than inferring a bill of health from a bare boolean (D-260, amended).
+   */
   readonly clean: boolean;
+  /** Every legality rule that failed or could not be observed. Computed, never model-authored. */
   readonly items: readonly DraftLegalityItem[];
+}
+
+/** A finding, narrowed to what the legality computation reads. */
+export interface LegalityFinding {
+  readonly ruleId: string;
+  readonly state: string;
+  readonly evidenceKey: string | null;
+}
+
+/**
+ * The legality block, computed from the run.
+ *
+ * **Computed in code and injected, never asked for.** The model's only contribution is a sentence
+ * per item. It decides the recommendation, it is the one block an underwriter reads first, and a
+ * language model has no business assembling it from prose when the findings already say it exactly.
+ */
+export function computeLegality(
+  findings: readonly LegalityFinding[],
+  legalityRuleIds: readonly string[],
+): DraftLegality {
+  const wanted = new Set(legalityRuleIds);
+  const items: DraftLegalityItem[] = [];
+
+  for (const finding of findings) {
+    if (!wanted.has(finding.ruleId)) continue;
+    if (finding.state !== 'fail' && finding.state !== 'not_evaluable') continue;
+    items.push({
+      ruleId: finding.ruleId,
+      state: finding.state,
+      evidenceKey: finding.evidenceKey ?? '',
+    });
+  }
+
+  items.sort((a, b) => a.ruleId.localeCompare(b.ruleId));
+  return { clean: !items.some((item) => item.state === 'fail'), items };
+}
+
+/** The two blocks match, ignoring the note the model is allowed to add. */
+export function legalityMatches(draft: DraftLegality, computed: DraftLegality): boolean {
+  if (draft.clean !== computed.clean) return false;
+  if (draft.items.length !== computed.items.length) return false;
+
+  const key = (item: DraftLegalityItem): string =>
+    `${item.ruleId}|${item.state}|${item.evidenceKey}`;
+  const left = [...draft.items].map(key).sort();
+  const right = [...computed.items].map(key).sort();
+  return left.every((entry, index) => entry === right[index]);
 }
 
 export interface DraftRouting {
@@ -171,6 +246,26 @@ export interface RunContext {
   readonly routingConditionIds: readonly string[];
   /** Spectrum positions on the consumer side. Shore-ups are refused for these (guardrail 5). */
   readonly consumerSideSpectrum: ReadonlySet<string>;
+  /**
+   * The legality block as computed from the run. The draft's must equal it, notes aside.
+   */
+  readonly legality: DraftLegality;
+  /**
+   * Routing conditions a crawl can actually observe.
+   *
+   * Only these gate `domestic`. Order minimum and monthly volume are answered by the application,
+   * and refusing a placement because a storefront cannot show them would decline a merchant for a
+   * limit of the method.
+   */
+  readonly observableConditionIds: readonly string[];
+  /**
+   * Every handle this run issued, for the prose check.
+   *
+   * Paragraphs cite handles as text — `F16`, `Y8`, `E3` — and nothing decodes prose. A token that
+   * resolves to nothing is a reference a reader cannot follow, in the part of the document they
+   * actually read.
+   */
+  readonly knownHandles: ReadonlySet<string>;
 }
 
 /**
@@ -183,6 +278,14 @@ export interface RunContext {
  * through for being tentatively worded.
  */
 export const INFERENCE_OPEN = '[inference:';
+
+/**
+ * A handle as it appears inside prose: `F16`, `E3`, `Y8`, `A2`.
+ *
+ * Anchored at both ends so `EYE-08`, `BPC-157` and `GLP-1` are not matched — the letter must start
+ * a word and the digits must end one.
+ */
+export const PROSE_HANDLE = /\b[FEYA]\d+\b/g;
 const INFERENCE_PATTERN = /\[inference:[^\]]*\]/g;
 
 /**
@@ -252,7 +355,10 @@ export interface DraftRejection {
     | 'angle_citation_outside_placement'
     | 'placement_needs_two_angles'
     | 'too_many_shore_ups'
-    | 'unbacked_legality_item';
+    | 'unbacked_legality_item'
+    | 'legality_altered'
+    | 'domestic_with_unmet_routing'
+    | 'unresolved_prose_handle';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -437,6 +543,85 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
   }
 
   /*
+    The legality block is computed, and the draft's must equal it.
+
+    The model may add a sentence per item and nothing else. It cannot add an item, drop one, or
+    flip `clean` — that block decides the recommendation and is the first thing an underwriter
+    reads, and on run 9011b2d7 the model wrote `clean: true, items: []` over two legality rules
+    that were never observed.
+  */
+  if (!legalityMatches(draft.legality, run.legality)) {
+    const shown = draft.legality.items
+      .map((item) => `${item.ruleId}/${item.state}`)
+      .sort()
+      .join(', ');
+    const computed = run.legality.items
+      .map((item) => `${item.ruleId}/${item.state}`)
+      .sort()
+      .join(', ');
+    reject(
+      'legality_altered',
+      'legality',
+      `the legality block does not match the one computed from this run. Computed: clean=` +
+        `${run.legality.clean}, items [${computed || 'none'}]. Given: clean=${draft.legality.clean}, ` +
+        `items [${shown || 'none'}]. Return it exactly as supplied; a note per item is the only ` +
+        'change you may make.',
+    );
+  }
+
+  /*
+    `domestic` is a placement, and an observable routing condition that is not met is the reason it
+    is not available yet. Only observable ones gate it: order minimum and monthly volume are
+    answered by the application, and refusing a placement because a storefront cannot show them
+    would decline a merchant for a limit of the method (D-044's distinction, one document up).
+  */
+  if (draft.placement.recommended === 'domestic') {
+    const observable = new Set(run.observableConditionIds);
+    const unmet = draft.routing
+      .filter((row) => observable.has(row.conditionId) && row.status === 'not_met')
+      .map((row) => row.conditionId);
+
+    if (unmet.length > 0) {
+      reject(
+        'domestic_with_unmet_routing',
+        'placement.recommended',
+        `recommends 'domestic' while ${unmet.length} observable routing condition(s) are not met: ` +
+          `${unmet.join(', ')}. Those conditions are what stands between this merchant and ` +
+          'domestic; name them as the path and recommend a placement available today.',
+      );
+    }
+  }
+
+  /*
+    Every handle written into prose resolves.
+
+    Paragraphs cite handles as text and nothing decodes prose, so an invented `F99` in a sentence
+    survives every other check and reaches the reader as a reference they cannot follow. The stored
+    mapping is the render-time key; this is what keeps it sufficient.
+  */
+  const proseSites: [string, string][] = [
+    ['placement.paragraph', draft.placement.paragraph],
+    ...draft.angles.map((angle, index): [string, string] => [`angles[${index}].paragraph`, angle.paragraph]),
+    ...draft.shoreUps.map((shoreUp, index): [string, string] => [`shoreUps[${index}].text`, shoreUp.text]),
+    ...draft.legality.items.map((item, index): [string, string] => [
+      `legality.items[${index}].note`,
+      item.note ?? '',
+    ]),
+  ];
+
+  for (const [at, text] of proseSites) {
+    for (const token of text.match(PROSE_HANDLE) ?? []) {
+      if (run.knownHandles.has(token)) continue;
+      reject(
+        'unresolved_prose_handle',
+        at,
+        `writes '${token}', which is not a handle this run issued. A reader resolves the handles in ` +
+          'a paragraph through the stored mapping; one that is not there points at nothing.',
+      );
+    }
+  }
+
+  /*
     A legality item names the capture that backs it, and that capture has to exist.
 
     This was a gap: `legality.items[].evidenceKey` was the one id in the document nothing checked.
@@ -445,6 +630,11 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
     have been able to survive.
   */
   draft.legality.items.forEach((item, index) => {
+    /*
+      An empty key is legitimate and common: a `not_evaluable` legality rule recorded no capture,
+      because there was nothing to capture. Demanding one would refuse the honest case.
+    */
+    if (item.evidenceKey === '') return;
     if (run.evidenceKeys.has(item.evidenceKey)) return;
     reject(
       'unbacked_legality_item',

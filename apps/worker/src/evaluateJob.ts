@@ -25,8 +25,9 @@
  */
 
 import { createHash } from 'node:crypto';
-import { CONSUMER_SIDE, type AngleSet, type Ruleset } from '@mintro/ruleset';
+import { CONSUMER_SIDE, LEGALITY_RULE_IDS, type AngleSet, type Ruleset } from '@mintro/ruleset';
 import {
+  computeLegality,
   rejectionMessage,
   validateDraft,
   type EvaluationDraft,
@@ -196,10 +197,18 @@ export function inputHash(
   return createHash('sha256').update(material).digest('hex');
 }
 
-/** The ids a citation may point at, for `validateDraft`. */
+/**
+ * What a draft is checked against: the ids it may cite, the legality block it must echo, and the
+ * conditions that gate `domestic`.
+ *
+ * `knownHandles` is filled in by the caller that has the mapping — `runContextFor` cannot build it
+ * without assigning handles, and assigning them twice would be two assignments that happen to
+ * match. It is empty here and populated in `generateDraft`.
+ */
 export function runContextFor(
   angles: AngleSet,
   inputs: EvaluationInputs,
+  knownHandles: ReadonlySet<string> = new Set(),
 ): RunContext {
   return {
     findingIds: new Set(inputs.findings.map((f) => f.id)),
@@ -208,6 +217,9 @@ export function runContextFor(
     angleIds: angles.angles.map((a) => a.id),
     routingConditionIds: angles.routingConditions.map((c) => c.id),
     consumerSideSpectrum: new Set(CONSUMER_SIDE),
+    legality: computeLegality(inputs.findings, LEGALITY_RULE_IDS),
+    observableConditionIds: angles.routingConditions.filter((c) => c.observable).map((c) => c.id),
+    knownHandles,
   };
 }
 
@@ -241,6 +253,7 @@ function promptInputsFor(
     pages: inputs.pages,
     truncations: inputs.pageTruncations,
     handles,
+    legality: computeLegality(inputs.findings, LEGALITY_RULE_IDS),
     ...(retryMessage === undefined ? {} : { retryMessage }),
   };
 }
@@ -401,6 +414,18 @@ export async function generateDraft(
   const handles = buildHandles(run);
   const handleRun = handleContext(run, handles);
   const stored = storeHandles(handles);
+
+  /*
+    The context the validator uses knows the handles, because the prose check needs them. Built by
+    re-deriving from the same map rather than by a second assignment.
+  */
+  const knownHandles = new Set<string>([
+    ...handles.finding.toId.keys(),
+    ...handles.evidence.toId.keys(),
+    ...handles.eyeTest.toId.keys(),
+    ...handles.angle.toId.keys(),
+  ]);
+  const checkRun: RunContext = { ...run, knownHandles };
   const doFetch = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
 
@@ -540,7 +565,7 @@ export async function generateDraft(
     lastDraft = draft;
 
     // On the real ids, never the handles: the validator's whole job is checking against the run.
-    const validation = validateDraft(draft, run);
+    const validation = validateDraft(draft, checkRun);
     if (validation.ok) {
       return {
         ...base,

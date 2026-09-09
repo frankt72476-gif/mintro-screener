@@ -16928,3 +16928,67 @@ while returning as blocks whose text is empty. Two generations were cut off and 
 ceiling that was too low; raising it bought more reasoning, not more document. The fix is
 `output_config.effort`, not `max_tokens`, and every terminal outcome now records its token spend so
 the next reader of a cut-off can see where the budget went instead of guessing.
+
+### Amendment — legality is computed, not drafted, and `clean` means *no violation was observed*
+
+**2026-09-08 · engineering**
+
+The `legality` block was in the answer schema, so the model assembled it from the findings it was
+shown. On run 9011b2d7 it returned:
+
+```json
+"legality": { "clean": true, "items": [] }
+```
+
+Three legality rules had passed. Two — `PROD-006` and `PROD-008` — were `not_evaluable`, because
+`/shop/research-water/` timed out and no product page behind it was ever fetched. The block the
+model wrote is a clean bill of health over two rules nobody checked, in the field an underwriter
+reads first and the one that fixes the recommendation.
+
+Nothing in the draft was false. Each sentence elsewhere carried a capture. The failure is at the
+level of the summary: the model was asked to compress five rule outcomes into a boolean and two of
+the five had no outcome to compress. It resolved the gap the way a summariser does, by leaving it
+out. That is not a prompting problem, and a stronger instruction would not fix it — the field
+offered no way to say *"this was not observed"*, so the honest answer was unrepresentable.
+
+**Legality is now computed in code and injected.** `computeLegality(findings, LEGALITY_RULE_IDS)`
+walks the run's findings on the six legality-tier rules and returns the block. The model receives
+it, echoes it back, and may add a `note` of one sentence per item. It may not add an item, remove
+one, change a state, or change `clean`; `validateDraft` refuses the draft (`legality_altered`) when
+the block differs from the computed one in any respect but the notes. The rule ids in the answer
+schema are the computed ids and no others, so an invented item is unexpressible before it is
+refused.
+
+Two fields, and both changed meaning:
+
+- **`items`** is now *every legality rule that is not a clean pass*, each carrying its `state` —
+  `fail` or `not_evaluable`. Previously the list held observed failures only, and an unobserved rule
+  was indistinguishable from a rule that passed.
+- **`clean`** now means **no legality violation was observed**, not "everything passed". An
+  unobserved rule leaves `clean` true and appears in `items`.
+
+The asymmetry is deliberate, and it is D-256's rule about who decides, applied to our own field.
+Two rules going unobserved because a page timed out is a fact about our crawl, not about the
+merchant. Setting `clean: false` would refer that merchant out on the strength of a timeout —
+a compliance determination, made by us, on no evidence. Listing the gap with its state hands the
+underwriter both the observation and its limit and lets them decide what to do about it. An item
+with `state: "not_evaluable"` carries an empty `evidenceKey`: there is no capture, because nothing
+was captured, and demanding one would refuse the honest case.
+
+#### Two consequences, both refused where they arise
+
+**`domestic` requires the observable routing conditions to be met.** The same draft recommended
+`domestic` while `registration_gate` and `no_water_or_syringes` were both `not_met` — stating the
+destination as though the path were already walked. `domestic_with_unmet_routing` refuses it, and
+names the conditions so the retry describes them as the path. Only *observable* conditions gate the
+placement: order minimum and monthly volume are answered by the application, and refusing a
+placement because a storefront cannot show them would decline a merchant for a limit of the method.
+
+**Every handle written into prose resolves.** Citations are decoded and validated; paragraphs are
+not, and nothing decodes prose. An invented `F99` inside a sentence survived every other check and
+would reach the reader as a reference they cannot follow, in the part of the document they actually
+read. `unresolved_prose_handle` asserts that every `F`/`E`/`Y`/`A` token in any paragraph, shore-up
+or legality note resolves in the stored mapping — which is the render-time key, and this is what
+keeps it sufficient. The attempt-10 draft carried 103 such tokens and all 103 resolved, so the
+check costs nothing on an honest draft and catches the one case where it would have cost everything.
+

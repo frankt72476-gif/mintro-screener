@@ -56,6 +56,9 @@ const RUN: RunContext = {
   angleIds: ANGLE_IDS,
   routingConditionIds: ['registration_gate', 'no_water_or_syringes'],
   consumerSideSpectrum: new Set(['consumer_retail']),
+  legality: { clean: true, items: [] },
+  observableConditionIds: [],
+  knownHandles: new Set<string>(),
 };
 
 const map = buildHandles(RUN);
