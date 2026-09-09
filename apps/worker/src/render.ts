@@ -12,6 +12,8 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import type { Browser, BrowserContext } from 'playwright';
 import {
+  classifyChallenge,
+  headerLookup,
   MISSING_REGION,
   NO_GATE,
   NO_SHOP_STRUCTURE,
@@ -193,6 +195,15 @@ export async function renderPage(
 
     const status = response?.status() ?? 0;
     const finalUrl = page.url();
+    /*
+      The response headers, read here because this is the only moment they exist (D-264).
+
+      `response` goes out of scope with the page. Nothing downstream of `renderPage` has ever seen
+      a header, which is why `cf-mitigated: challenge` — the authoritative signal, sitting on every
+      one of the twenty-one interstitials this crawl stored — went unread for the whole life of the
+      renderer. The status was read into a variable and branched on nowhere.
+    */
+    const headers = response === null ? {} : response.headers();
 
     /*
       Both of these are unbounded without the wrapper (D-153).
@@ -238,8 +249,37 @@ export async function renderPage(
       The DOM snapshot is kept either way: it is cheap, and it is the record of what was actually
       served at a URL this run requested.
     */
-    const provisional = toPageContext(url, finalUrl, status, extraction, html, htmlSha256, capturedAt);
-    const keep = options.keepCapture === undefined || options.keepCapture(provisional);
+    /*
+      Was this the site, or the thing in front of it (D-264)?
+
+      Decided here, once, from everything the response carried — the header, the parsed title and
+      the served document — and recorded on the page rather than re-derived by each reader. Every
+      consequence follows from this one field: `isRendered` is false, so `renderFailure` short-
+      circuits every page-taking handler; `wasServed` is false, so the page is not counted as
+      covered; the capture is filed under `challenge` rather than `dom`, so no later reader can
+      pick it up as a page.
+    */
+    const challenge = classifyChallenge({
+      status,
+      header: headerLookup(headers),
+      title: extraction.title,
+      body: html,
+    });
+
+    const provisional: PageContext = {
+      ...toPageContext(url, finalUrl, status, extraction, html, htmlSha256, capturedAt),
+      ...(challenge === null ? {} : { challenged: challenge.marker }),
+    };
+    /*
+      A challenged response is never worth a screenshot, whatever the caller thinks (D-264).
+
+      `keepCapture` is a caller's judgement about a page, and this is not one. The interstitial's
+      DOM is retained because it is the record of what was served; a full-page PNG of it is 44 kB
+      of a spinner, and — worse — it is the sort of artifact that ends up beside a finding as
+      though it showed the merchant's site. Run 0003c814 stored exactly one.
+    */
+    const keep =
+      challenge === null && (options.keepCapture === undefined || options.keepCapture(provisional));
 
     // Captures happen before the keys are set. A key is only written onto the context once the
     // artifact actually exists, so no finding can cite a screenshot that was never taken (D-012).
@@ -250,6 +290,7 @@ export async function renderPage(
     const artifacts: EvidenceArtifact[] = [];
     let screenshotKey: string | undefined;
     let domKey: string | undefined;
+    let challengeKey: string | undefined;
 
     if (screenshot !== undefined) {
       const digest = sha256Buffer(screenshot);
@@ -270,10 +311,20 @@ export async function renderPage(
 
     {
       const gzip = gzipSync(Buffer.from(html, 'utf8'));
-      domKey = `${options.runId}/layer1/${htmlSha256}.html`;
+      const key = `${options.runId}/layer1/${htmlSha256}.html`;
+      /*
+        Stored either way; named differently (D-264).
+
+        The run has to record what happened, so the interstitial is retained exactly like any other
+        document. What changes is the key it is set on and the kind it is filed under, and both of
+        those are the whole point: `evaluationRun` selects the pages a draft reasons over with
+        `kind === 'dom'`, and the nine interstitials of run 0003c814 were `dom`.
+      */
+      if (challenge === null) domKey = key;
+      else challengeKey = key;
       artifacts.push({
-        key: domKey,
-        kind: 'dom',
+        key,
+        kind: challenge === null ? 'dom' : 'challenge',
         url: finalUrl,
         sha256: htmlSha256,
         byteLength: Buffer.byteLength(html, 'utf8'),
@@ -293,6 +344,7 @@ export async function renderPage(
         ...provisional,
         ...(screenshotKey === undefined ? {} : { screenshotKey }),
         ...(domKey === undefined ? {} : { domKey }),
+        ...(challengeKey === undefined ? {} : { challengeKey }),
       },
       artifacts,
       ...(signupForm === undefined ? {} : { signupForm }),

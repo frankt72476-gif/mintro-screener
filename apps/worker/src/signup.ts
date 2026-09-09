@@ -157,6 +157,15 @@ export interface Layer3Discovery {
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
   /**
+   * Every page this pass actually rendered, in the order it rendered them (D-264).
+   *
+   * Carried out for the challenge count, which needs a denominator covering the whole crawl rather
+   * than the homepage and the product sample alone. Most of these are conventional paths that
+   * returned a themed 404 and are established as nothing; a page's presence here says only that a
+   * navigation happened, never that a surface was found.
+   */
+  readonly pages: readonly PageContext[];
+  /**
    * Candidates the cheap probe could not decide on, and how many it saw in total (D-182).
    *
    * Carried out rather than swallowed. `undecided` renders, so a probe layer failing on every
@@ -198,6 +207,7 @@ export async function discoverLayer3(
   const say = options.onProgress ?? ((): void => undefined);
   const attempts: FetchAttempt[] = [];
   const artifacts: EvidenceArtifact[] = [];
+  const pages: PageContext[] = [];
 
   /*
     The four documents as a table, so the denominator is structural (D-173).
@@ -223,7 +233,7 @@ export async function discoverLayer3(
   };
 
   step('sign-up form');
-  const signupFound = await findSignupForm(browser, origin, options, attempts, artifacts, say);
+  const signupFound = await findSignupForm(browser, origin, options, attempts, artifacts, pages, say);
   const signup = signupFound.form;
   done += 1;
 
@@ -231,7 +241,10 @@ export async function discoverLayer3(
   const found = new Map<string, Located<PageContext>>();
   for (const what of documents) {
     step(what.label);
-    found.set(what.label, await findDocument(browser, origin, options, attempts, artifacts, say, what, probe));
+    found.set(
+      what.label,
+      await findDocument(browser, origin, options, attempts, artifacts, pages, say, what, probe),
+    );
     done += 1;
   }
   say('policy pages read', { done, total });
@@ -249,6 +262,7 @@ export async function discoverLayer3(
     payment: surface('payment or refund policy'),
     attempts,
     artifacts,
+    pages,
     probe,
   };
 }
@@ -259,6 +273,8 @@ async function findSignupForm(
   options: DiscoverOptions,
   attempts: FetchAttempt[],
   artifacts: EvidenceArtifact[],
+  /** Every page rendered here, whether or not it yielded a form (D-264). */
+  pages: PageContext[],
   say: (line: string) => void,
 ): Promise<{ readonly form: SignupForm; readonly page?: PageContext }> {
   // The most informative thing seen while looking. A page that carried a sign-in form but no
@@ -291,6 +307,7 @@ async function findSignupForm(
         candidate.httpStatus < 400,
     });
     artifacts.push(...rendered.artifacts);
+    pages.push(rendered.page);
 
     const page = rendered.page;
     if (page.renderError !== undefined) {
@@ -387,6 +404,8 @@ async function findDocument(
   options: DiscoverOptions,
   attempts: FetchAttempt[],
   artifacts: EvidenceArtifact[],
+  /** Every page rendered here, whether or not it was established as the document (D-264). */
+  pages: PageContext[],
   say: (line: string) => void,
   what: { readonly label: string; readonly paths: readonly string[]; readonly linkHints: readonly string[] },
   probeTally: { undecided: number; total: number },
@@ -480,6 +499,7 @@ async function findDocument(
       keepCapture: (page) => establishDocument(url, page, spec, []).located,
     });
     artifacts.push(...rendered.artifacts);
+    pages.push(rendered.page);
 
     const outcome = establishDocument(url, rendered.page, spec, []);
     if (!outcome.located) {

@@ -18,8 +18,28 @@ const URL_UNDER_TEST = 'https://shop.example/terms';
  * Typed as `fetch` itself rather than narrowed, so the mock stays assignable to the option it
  * fills and `mock.calls` still carries the init object the assertions read back.
  */
-const answering = (status: number, finalUrl = URL_UNDER_TEST) =>
-  vi.fn<typeof fetch>(async () => ({ status, url: finalUrl }) as unknown as Response);
+const answering = (
+  status: number,
+  finalUrl = URL_UNDER_TEST,
+  headers: Readonly<Record<string, string>> = {},
+) =>
+  vi.fn<typeof fetch>(
+    async () =>
+      ({
+        status,
+        url: finalUrl,
+        /*
+          Real headers, because the probe now reads them (D-264).
+
+          The stub used to carry none, and it was assignable because of the cast. Once
+          `probeSurface` asked for `cf-mitigated` that shape threw inside the try, every probe
+          came back `undecided` with status 0, and eleven assertions in this file failed at
+          once — which is the cast doing exactly what a cast does. A stub that answers fewer
+          questions than the thing it stands in for tests a different function.
+        */
+        headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+      }) as unknown as Response,
+  );
 
 describe('the predicate', () => {
   it.each([200, 201, 204, 299])('accepts %i, which is the origin serving something', async (status) => {

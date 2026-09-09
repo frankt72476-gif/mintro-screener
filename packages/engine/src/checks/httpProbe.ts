@@ -16,6 +16,8 @@
 import type { RuleOfType } from '@mintro/ruleset';
 import { notEvaluable, satisfied, violation, type Evidence, type FetchAttempt, type Finding } from '../findings.js';
 import { describeSession, type SessionDescriptor } from '../session.js';
+import { establishesAbsence } from '../fetcher.js';
+import { CHALLENGE_REASON } from '../challenge.js';
 
 /** One path probed, and what came back. */
 export interface ProbeResult {
@@ -26,6 +28,13 @@ export interface ProbeResult {
   readonly error?: string;
   /** Evidence store key for the retained response body, when one was retained. */
   readonly evidenceKey?: string;
+  /**
+   * Set when the site's bot protection answered this path (D-264).
+   *
+   * The probe holds the response, so it classifies; this handler reads the classification rather
+   * than re-deriving it from a status, which no status can carry.
+   */
+  readonly challenged?: string;
   readonly sha256?: string;
   readonly fetchedAt: string;
 }
@@ -110,7 +119,62 @@ export function checkHttpProbe(
   // loaded without an account" auto-fails the compliant behaviour the rule exists to reward —
   // observed on the testbed, which gates correctly and was failed for it.
   const redirected = completed.filter(isRedirected);
-  const served = completed.filter((result) => !isRedirected(result));
+  const answered = completed.filter((result) => !isRedirected(result));
+
+  /*
+    ## `served` used to mean "answered with any status at all", and that was the false pass (D-264)
+
+    Run 0003c814 probed three paths on `phoenixpeptide.com`. All three returned **403 behind a
+    Cloudflare challenge**. None of them redirected and none of them returned 0, so all three
+    landed in `served`; `fail_if_status` is `[200]`, so none was offending; `offending.length === 0`
+    returned `satisfied`, and GATE-002 — `critical` / `auto_fail`, a stopping condition — came back
+    **pass** on a run that never saw the site. Its own sentence said so and nobody could hear it:
+    *"3 path(s) served content directly, returning 403"*.
+
+    A `pass` here asserts **no probed path served products to an anonymous visitor**. Three kinds of
+    answer can support that assertion and one cannot:
+
+      - **`2xx` at the path asked for** — content was served, and it was not a violating status.
+        This is the observation the rule is built on.
+      - **a redirect away** — the request did not get what it asked for. Already handled, and
+        already understood here as the gate working.
+      - **`404` / `410`** — the origin says there is nothing at that path. `establishesAbsence`,
+        the predicate D-184 put in one place for exactly this question. Nothing is published there,
+        so nothing is published there publicly.
+      - **anything else — `401`, `403`, `429`, `5xx`** — *we were turned away*, which is not an
+        observation about what an anonymous visitor can buy. It is the same mistake D-184 corrected
+        at Layer 0, where three `403`s produced eight `not_exposed` findings, and it was still
+        being made here.
+
+    So the last group joins `unreachable`, and for the same stated reason: **never `pass`, never
+    `fail`, symmetrically.** A verdict that flips on which request happened to be refused cannot
+    gate an automatic decline.
+  */
+  const served = answered.filter((result) => result.status >= 200 && result.status < 300);
+  const absent = answered.filter((result) => establishesAbsence(result.status));
+  const obstructed = answered.filter(
+    (result) =>
+      !(result.status >= 200 && result.status < 300) && !establishesAbsence(result.status),
+  );
+
+  if (obstructed.length > 0) {
+    const challenged = obstructed.filter((result) => result.challenged !== undefined);
+    const which = obstructed.map((result) => `${result.url} returned ${result.status}`).join(', ');
+    return notEvaluable(
+      rule,
+      challenged.length > 0
+        ? `${CHALLENGE_REASON} (${challenged.length} of ${results.length} probed path(s): ${which})`
+        : `${obstructed.length} of ${results.length} probed path(s) refused the request rather ` +
+          `than serving or denying the existence of the path (${which}), so nothing was observed ` +
+          'about what an anonymous visitor is served',
+      DOCUMENT,
+      // Which party answered decides what an operator does next, and the two are not the same.
+      challenged.length > 0 ? 'challenged' : 'not_retrieved',
+      // Cited to a path that refused: that is the observation (D-215).
+      [sessionEvidence(session, results, obstructed[0])],
+    );
+  }
+
   const offending = served.filter((result) => failStatuses.has(result.status));
 
   if (offending.length === 0) {
@@ -122,8 +186,8 @@ export function checkHttpProbe(
       what `results[0]` kept naming. Served first, then a path that redirected away, since a
       redirect is itself the observation that a gate is working.
     */
-    return satisfied(rule, describeClean(served, redirected, unreachable, session), DOCUMENT, [
-      sessionEvidence(session, results, served[0] ?? redirected[0] ?? completed[0]),
+    return satisfied(rule, describeClean(served, absent, redirected, session), DOCUMENT, [
+      sessionEvidence(session, results, served[0] ?? absent[0] ?? redirected[0] ?? completed[0]),
     ]);
   }
 
@@ -161,6 +225,7 @@ function safePath(url: string): string | null {
  */
 function describeViolation(
   offending: readonly ProbeResult[],
+  /** Only the paths that actually served content — the denominator the sentence quotes (D-264). */
   served: readonly ProbeResult[],
   redirected: readonly ProbeResult[],
   session: SessionDescriptor,
@@ -170,26 +235,43 @@ function describeViolation(
   return `${offending.length} of ${served.length} path(s) served content directly with a status this rule treats as a violation: ${list}. Each was ${describeSession(session)}.${gated}`;
 }
 
+/**
+ * The sentence a clean result carries.
+ *
+ * `unreachable` is gone from the parameters, and so is the *"N further path(s) could not be
+ * reached"* clause it produced. Nothing can reach this function with an unreachable or an
+ * obstructed path any more — both return `not_evaluable` above — so the clause could only ever
+ * have described paths that no longer exist here. A sentence hedging about requests that cannot
+ * be in the result is worse than no sentence: it reads as a caveat on a verdict that was in fact
+ * decided on everything (D-264).
+ *
+ * `absent` is new and is stated, because it is a different observation from a path that served.
+ * *"/shop returned 404"* supports a clean result — there is nothing there to be public — and a
+ * reader is entitled to know that is what the result rests on.
+ */
 function describeClean(
   served: readonly ProbeResult[],
+  absent: readonly ProbeResult[],
   redirected: readonly ProbeResult[],
-  unreachable: readonly ProbeResult[],
   session: SessionDescriptor,
 ): string {
   const statuses = [...new Set(served.map((result) => result.status))].sort().join(', ');
-  const skipped =
-    unreachable.length > 0
-      ? ` ${unreachable.length} further path(s) could not be reached and were not examined.`
-      : '';
 
-  // D-018: names what was probed, what redirected away, and what was not reached, so a clean
-  // result cannot read as a claim about paths that were never served.
+  // D-018: names what was probed, what redirected away, and what the origin says is not there, so
+  // a clean result cannot read as a claim about paths that were never served.
   const servedClause =
     served.length > 0
       ? `${served.length} path(s) served content directly, returning ${statuses}; none matched the statuses this rule treats as a violation.`
       : 'No probed path served content directly.';
 
-  return `${servedClause}${describeRedirects(redirected)} Each was ${describeSession(session)}.${skipped}`;
+  const absentClause =
+    absent.length > 0
+      ? ` ${absent.length} path(s) do not exist on this site: ${absent
+          .map((result) => `${safePath(result.url) ?? result.url} → ${result.status}`)
+          .join('; ')}.`
+      : '';
+
+  return `${servedClause}${absentClause}${describeRedirects(redirected)} Each was ${describeSession(session)}.`;
 }
 
 /** Redirects are the observation that a gate is working, so they are stated, not dropped. */

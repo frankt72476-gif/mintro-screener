@@ -72,6 +72,7 @@ import {
   TOP_ANCHOR,
   angleAnchor,
   angleCitations,
+  challengeLine,
   chipAffordance,
   citesHeavy,
   evaluationSectionAnchor,
@@ -303,6 +304,25 @@ function SummaryBlock({
           email by someone who has never heard of Mintro.
         */}
         <p className="eval-standing">{EVALUATION_POSTURE}</p>
+        {/*
+          What the crawl met instead of the site (D-264).
+
+          In the masthead and above the meta row, because it qualifies the whole document rather
+          than annotating a part of it. The three phoenixpeptide runs of 2026-09-09 rendered nine
+          pages each and saw none of them; nothing on any screen said so, and a reader had only
+          a finding count that looked like an unusually bare storefront.
+
+          Descriptive, and about the crawl (hard constraint 7, D-044). It states what answered.
+          It does not say the merchant blocked us — a merchant does not choose their edge's bot
+          policy per visitor — and it tells nobody what to do about it.
+        */}
+        {challengeLine(run) !== null && (
+          <p className="eval-challenge" role="status">
+            <strong>{challengeLine(run)}</strong> The site&rsquo;s bot protection answered those
+            requests, so the pages behind it were not seen. Nothing was established about them
+            either way.
+          </p>
+        )}
         <dl className="eval-meta">
           <Meta
             label="Screened"

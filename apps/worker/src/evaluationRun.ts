@@ -135,6 +135,15 @@ export async function runEvaluationRequest(
             distinctTexts: selection.distinctTexts,
             dominantTextCount: selection.dominantTextCount,
             dominantTextSample: selection.dominantTextSample,
+            /*
+              Read from the run's own record, never recounted (D-264, D-216).
+
+              The crawl is the only party that ever saw a response header, and `report.challenge`
+              is what it wrote down. Absent on every run recorded before D-264, and absent means
+              *the distinction was not made* rather than *nothing was challenged* — so those runs
+              behave exactly as they did before, which is what D-002 requires of them.
+            */
+            ...(report.challenge === undefined ? {} : { challenged: report.challenge.challenged }),
           },
         };
       } finally {

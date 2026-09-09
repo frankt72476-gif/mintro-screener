@@ -12,6 +12,7 @@ import type { PageContext } from '../page.js';
 import { isRendered } from '../page.js';
 import { notEvaluable, type Evidence, type EvidenceKind, type Finding } from '../findings.js';
 import { establishesAbsence } from '../fetcher.js';
+import { CHALLENGE_REASON } from '../challenge.js';
 
 /** Layer 1 and above observe a rendered page. Stated, never inferred. */
 export const RENDERED: EvidenceKind = 'rendered_page';
@@ -48,7 +49,15 @@ export function renderFailureEvidence(page: PageContext): Evidence[] {
       kind: RENDERED,
       sourceUrl: page.requestedUrl,
       sourceSha256: page.htmlSha256,
-      evidenceKey: page.domKey ?? '',
+      /*
+        The interstitial, where there was one (D-264).
+
+        A challenged page has no `domKey` by construction — the document is stored under
+        `challengeKey` precisely so no verdict can cite it — and this is the one finding entitled
+        to point at it. Hard constraint 3 requires a `not_evaluable` to evidence *why*, and the
+        interstitial is the why: a reader opens it and sees what the crawler was served.
+      */
+      evidenceKey: page.domKey ?? page.challengeKey ?? '',
       capturedAt: page.capturedAt,
       attempts: [
         {
@@ -75,8 +84,11 @@ export function hasRenderedCaptures(page: PageContext): boolean {
  * `page.renderError` on the line above, printed as the reason and ignored for the kind. Fixing the
  * first and leaving three is how this became four in the first place.
  *
- * `isRendered` is false for three different things, and they are not one fact:
+ * `isRendered` is false for four different things, and they are not one fact:
  *
+ *   - **`challenged` set** — the site's bot protection answered instead of the site. Neither party
+ *     fell short in the sense the other three mean, and re-running cannot resolve it. `challenged`
+ *     (D-264), taken before any of the below.
  *   - **`renderError` set** — the browser threw. Ours. `not_retrieved`.
  *   - **`404` or `410`** — the origin answered, and its answer is that it has no such page. That is
  *     an observation about the merchant, and widening `not_retrieved` to swallow it would lose a
@@ -97,6 +109,19 @@ export function hasRenderedCaptures(page: PageContext): boolean {
  */
 export function renderFailure(rule: Rule, page: PageContext): Finding | null {
   if (isRendered(page)) return null;
+
+  /*
+    A challenge, before anything else is asked about the response (D-264).
+
+    First, because every other branch here would answer the wrong question about it. The
+    phoenixpeptide interstitial arrived as a 403, which `establishesAbsence` correctly refuses to
+    read as absence — so these rules would have filed as `not_retrieved`, *this run could not fetch
+    it*, and an operator reading that re-scans. Re-scanning reproduces it: three consecutive runs
+    returned byte-identical counts. The finding has to name the party that answered.
+  */
+  if (page.challenged !== undefined) {
+    return notEvaluable(rule, CHALLENGE_REASON, RENDERED, 'challenged', renderFailureEvidence(page));
+  }
 
   const obstructed = page.renderError !== undefined || !establishesAbsence(page.httpStatus);
 

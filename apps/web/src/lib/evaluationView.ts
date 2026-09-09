@@ -114,6 +114,14 @@ export interface EvaluationRunContext {
    * back to plain labels, which is what they were before section 6 existed.
    */
   readonly anchoredRuleIds?: ReadonlySet<string>;
+  /**
+   * How many pages the site's bot protection answered instead of the site (D-264).
+   *
+   * The run's own `report.challenge`, passed through. **Absent means the run predates the record**,
+   * not that nothing was challenged — the same rule `blocking` and `sample` follow, and the reason
+   * `challengeLine` returns null for an absent value rather than rendering a zero.
+   */
+  readonly challenge?: { readonly challenged: number; readonly pages: number };
 }
 
 /**
@@ -136,6 +144,24 @@ export interface EvaluationLabels {
   readonly eyeTestQuestion: Readonly<Record<string, string>>;
   /** The heavy-weight rules (D-259). An angle citing one carries a weight marker. */
   readonly heavyRuleIds: ReadonlySet<string>;
+}
+
+/**
+ * The masthead's bot-challenge line, or null where there is nothing to say (D-264).
+ *
+ * `null` in two different situations, deliberately collapsed to one rendering: a run recorded
+ * before the field existed, and a run that met no challenge. Neither should print anything. The
+ * alternative — *"Bot challenge on 0 of 30 pages"* on every clean report — puts a line about bot
+ * protection on documents that never met any, and a reader learns to skip it exactly where it
+ * eventually matters.
+ *
+ * A decision function rather than markup because the suite runs `environment: 'node'`: what the
+ * line says is testable, and `evaluationLayout.test.ts` asserts it reaches the document.
+ */
+export function challengeLine(run: EvaluationRunContext): string | null {
+  const challenge = run.challenge;
+  if (challenge === undefined || challenge.challenged <= 0) return null;
+  return `Bot challenge on ${challenge.challenged} of ${challenge.pages} pages`;
 }
 
 // ── vocabulary ─────────────────────────────────────────────────────────────────────────────────

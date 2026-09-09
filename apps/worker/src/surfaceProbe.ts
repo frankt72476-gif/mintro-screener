@@ -63,7 +63,7 @@
  * exactly like a run where every path answered. The count is carried out and reported.
  */
 
-import { USER_AGENT, DEFAULT_HEADERS, type Pacer } from '@mintro/engine';
+import { classifyChallenge, USER_AGENT, DEFAULT_HEADERS, type Pacer } from '@mintro/engine';
 
 /**
  * What the probe concluded.
@@ -81,6 +81,14 @@ export interface SurfaceProbe {
   readonly finalUrl: string;
   /** Why the probe could not decide. Present only on `undecided`. */
   readonly error?: string;
+  /**
+   * Set when the site's bot protection answered (D-264).
+   *
+   * The verdict is `undecided` and the render happens — see the note at the classification below
+   * for why this does not short-circuit. Recorded structurally so the caller can say what it met
+   * without reading it out of `error` prose, which hard constraint 9 forbids.
+   */
+  readonly challenged?: string;
 }
 
 export interface SurfaceProbeOptions {
@@ -137,6 +145,36 @@ export async function probeSurface(
 
     const status = response.status;
     const finalUrl = response.url === '' ? url : response.url;
+
+    /*
+      A challenge is not the origin's answer about this path (D-264).
+
+      **Headers only.** This probe aborts before the body, by design — it is a status check — so
+      the document markers cannot fire here and `cf-mitigated` is the whole test. That is enough
+      for the case that matters: the interstitial carries the header on every response.
+
+      **`undecided`, deliberately, and not a short-circuit.** The module's one rule is that a
+      reachable surface must never become a miss because a cheap check failed, and every ambiguity
+      resolves toward doing the expensive thing. `rejected` would be worse than useless here — it
+      is the origin's own answer about a path, and this is not the origin answering. So the render
+      happens, and `renderPage` classifies the full response and records the challenge properly.
+      The wasted render is the cost of never turning a challenge into an absence.
+    */
+    const challenge = classifyChallenge({
+      status,
+      header: (name) => response.headers.get(name),
+    });
+
+    if (challenge !== null) {
+      return {
+        url,
+        verdict: 'undecided',
+        status,
+        finalUrl,
+        error: `the site's bot protection answered (${challenge.marker})`,
+        challenged: challenge.marker,
+      };
+    }
 
     return {
       url,

@@ -185,6 +185,17 @@ export interface EvaluationInputs {
     readonly distinctTexts: number;
     readonly dominantTextCount: number;
     readonly dominantTextSample: string;
+    /**
+     * Pages this run rendered whose response was the site's bot protection (D-264).
+     *
+     * Read from the run's own `report.challenge`, not recounted here. The crawl is the only party
+     * that saw the headers, and a second derivation from the stored evidence would be a second
+     * answer to a question already answered (D-216).
+     *
+     * Optional, permanently: a run recorded before D-264 has no such record, and absent means the
+     * distinction was never made rather than that nothing was challenged.
+     */
+    readonly challenged?: number;
   };
 }
 
@@ -344,11 +355,41 @@ export const MIN_DISTINCT_TEXTS = 3;
  *     alone would have let it through — and a model handed that would have written a confident
  *     reading of a gate, in a document whose page list looks like broad coverage.
  *
+ *   - **The run was challenged** (D-264). Taken first and independently of the two above, because
+ *     it is a record rather than an inference, and because the repair it names is different: a
+ *     text collapse is re-scanned and a challenge cannot be.
+ *
  * Returns the message rather than a boolean, because the message is the artifact: it names the
  * text and how many pages it covered, which is what tells an operator to re-scan rather than retry.
  */
 export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string | null {
   const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = stats;
+
+  /*
+    A challenged run, before the text conditions are consulted at all (D-264).
+
+    **First, and regardless of what the distinct-text count says.** The two conditions below are
+    inferences from what the pages look like; this is a record of what happened, and it is the one
+    signal here that cannot be argued with. A run where the homepage was challenged and forty other
+    pages came back has three distinct texts and a healthy spread, and has still not seen the
+    storefront: an evaluation whose angles rest on a homepage nobody saw is a confident reading of
+    a page that was never served.
+
+    It also changes the advice. The text-collapse message ends *"re-scan the merchant"*, which is
+    right for a gate and wrong here: the three phoenixpeptide runs of 2026-09-09 were re-scans of
+    each other and returned byte-identical counts. Telling an operator to do the thing that cannot
+    work is worse than telling them nothing.
+  */
+  const challenged = stats.challenged ?? 0;
+  if (challenged > 0) {
+    return (
+      `This run did not see the storefront: the site's bot protection answered ${challenged} of ` +
+      'the pages it rendered. No prompt was sent. The pages behind the challenge were never ' +
+      'served, so nothing was established about this merchant either way — and re-scanning from ' +
+      'the same place will meet the same challenge, so a re-scan is not the repair. ' +
+      'Nothing here is an observation about the merchant.'
+    );
+  }
 
   if (distinctTexts >= MIN_DISTINCT_TEXTS && dominantTextCount * 2 <= selectedCount) return null;
 

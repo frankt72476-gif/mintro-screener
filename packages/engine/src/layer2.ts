@@ -24,6 +24,7 @@ import {
   type CertificateOutcome,
 } from './checks/docParse.js';
 import { isRendered, type PageContext } from './page.js';
+import { CHALLENGE_REASON } from './challenge.js';
 import type { ScoredUrl } from './suspicion.js';
 
 /** Check types this layer has handlers for. `doc_parse` joined at stage 4 (D-057). */
@@ -87,6 +88,17 @@ export function runLayer2(
     // No page rendered — nothing was observed, so nothing can be concluded.
     if (rendered.length === 0) {
       const noneToSample = sampled.length === 0;
+      /*
+        Which party answered, where every page was challenged (D-264).
+
+        `not_retrieved` says *this run could not fetch it*, and an operator reading that re-scans.
+        A challenge reproduces on a re-scan — phoenixpeptide returned byte-identical counts three
+        times — so the finding has to say which of the two it was.
+      */
+      if (!noneToSample && sampled.every((entry) => entry.page.challenged !== undefined)) {
+        findings.push(notEvaluable(rule, CHALLENGE_REASON, RENDERED, 'challenged'));
+        continue;
+      }
       findings.push(
         notEvaluable(
           rule,
@@ -121,6 +133,7 @@ export function runLayer2(
     */
     if (rendered.length < sampled.length) {
       const missing = sampled.length - rendered.length;
+      const challenged = sampled.filter((entry) => entry.page.challenged !== undefined).length;
       findings.push(
         notEvaluable(
           rule,
@@ -128,7 +141,9 @@ export function runLayer2(
             `${rendered.length} that did do not support a conclusion either way: ` +
             unrenderedReasons(sampled),
           RENDERED,
-          'not_retrieved',
+          // A partial sample where any page was challenged is challenged: the reader's next move
+          // is the same whether one page or all of them met the interstitial (D-264).
+          challenged > 0 ? 'challenged' : 'not_retrieved',
         ),
       );
       continue;
@@ -311,7 +326,12 @@ function unrenderedReasons(sampled: readonly SampledPage[]): string {
     .filter((entry) => !isRendered(entry.page))
     .map((entry) => {
       const where = entry.page.requestedUrl;
-      const why = entry.page.renderError ?? `HTTP ${entry.page.httpStatus}`;
+      // The interstitial first: a challenged page's status is the edge's, not the origin's,
+      // and 'HTTP 403' here would read as the merchant refusing us (D-264).
+      const why =
+        entry.page.challenged !== undefined
+          ? `bot protection answered (${entry.page.challenged})`
+          : (entry.page.renderError ?? `HTTP ${entry.page.httpStatus}`);
       return `${where} — ${why}`;
     });
   return reasons.slice(0, 3).join('; ') + (reasons.length > 3 ? ` and ${reasons.length - 3} more` : '');

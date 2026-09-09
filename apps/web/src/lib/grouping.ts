@@ -133,7 +133,7 @@ const ORDER: readonly { state: State; heading: string; lede: string }[] = [
 ];
 
 /**
- * The four reasons a rule went unevaluated, as four sections (D-044).
+ * The reasons a rule went unevaluated, one section each (D-044, D-264).
  *
  * One section headed "Not evaluable" put three unrelated facts in one pile: a check Mintro has
  * not written, a question no website can answer, and a thing this merchant's site does not carry.
@@ -168,6 +168,11 @@ const NOT_EVALUABLE_ORDER: readonly { bucket: Bucket; heading: string; lede: str
     bucket: 'not_retrieved',
     heading: 'Not retrieved on this run',
     lede: "The request for these did not complete — a timeout or a connection failure. Nothing was established either way, and in particular nothing about the merchant. A re-run may resolve them.",
+  },
+  {
+    bucket: 'challenged',
+    heading: 'Blocked by the site’s bot protection',
+    lede: "The site's bot protection answered these requests instead of the site, so the pages behind it were never seen. Nothing was established either way, and in particular nothing about the merchant. A re-run from the same place will meet the same challenge.",
   },
   {
     bucket: 'unrecorded',
@@ -795,6 +800,7 @@ const EMPTY_BUCKETS: Record<Bucket, number> = {
   not_exposed: 0,
   not_applicable: 0,
   not_retrieved: 0,
+  challenged: 0,
   unrecorded: 0,
 };
 

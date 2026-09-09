@@ -218,6 +218,8 @@ export function EvaluationEditor({
           model: row.model,
           handles: row.handles ?? { finding: {}, evidence: {}, eye_test: {}, angle: {} },
           ...(report === null ? {} : { anchoredRuleIds: anchoredRuleIds(report) }),
+          // The same run fact the published render carries, from the same place (D-264).
+          ...(report?.challenge === undefined ? {} : { challenge: report.challenge }),
           findings: (findingsRead.data ?? []).map((finding) => ({
             id: finding['id'] as string,
             ruleId: finding['rule_id'] as string,

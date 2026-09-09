@@ -262,9 +262,39 @@ export interface PageContext {
   readonly domKey?: string;
   /** Set when rendering failed. The page was not observed and rules are `not_evaluable`. */
   readonly renderError?: string;
+  /**
+   * Set when the site's bot protection answered instead of the site (D-264).
+   *
+   * Carries the marker that identified the interstitial, for the reader. Nothing branches on
+   * its wording — `isRendered` branches on the field being present, which is the whole of the
+   * classification, declared at the point the response was read rather than pattern-matched out
+   * of prose afterwards (hard constraint 9).
+   *
+   * **This is not `renderError`.** The render succeeded. A document arrived, it was captured,
+   * and it is stored. What did not happen is that anybody saw the merchant's page — which is a
+   * different fact with a different reason and a different `NotEvaluableKind`.
+   */
+  readonly challenged?: string;
+  /**
+   * Evidence key for the stored interstitial, set only alongside `challenged` (D-264).
+   *
+   * Deliberately **not** `domKey`. Every satisfied and violating finding builds its evidence
+   * from `screenshotKey ?? domKey`, so an interstitial filed under `domKey` would be citable as
+   * the capture behind a verdict about the merchant. Under its own name it is citable only by
+   * the finding that says the page was not seen, which is the one thing it evidences.
+   */
+  readonly challengeKey?: string;
 }
 
-/** True when the page rendered well enough for rules to be evaluated against it. */
+/**
+ * True when the page rendered well enough for rules to be evaluated against it.
+ *
+ * A challenged response is never rendered, whatever status it carried (D-264). Cloudflare served
+ * the phoenixpeptide interstitial with a 403, which this predicate already excluded — and the same
+ * mitigation is served at 200 elsewhere, which it would not have. The test is the classification,
+ * not the status.
+ */
 export function isRendered(page: PageContext): boolean {
+  if (page.challenged !== undefined) return false;
   return page.renderError === undefined && page.httpStatus >= 200 && page.httpStatus < 400;
 }

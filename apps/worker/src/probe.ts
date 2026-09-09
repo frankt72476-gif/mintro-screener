@@ -12,7 +12,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Browser, BrowserContext } from 'playwright';
-import type { ProbeResult } from '@mintro/engine';
+import { classifyChallenge, headerLookup, type ProbeResult } from '@mintro/engine';
 import { withDeadline } from './deadline.js';
 
 export interface ProbeOptions {
@@ -61,11 +61,28 @@ export async function probePaths(
         // to come from outside it. The `finally` below closes the page, which reaps the call.
         const bodyText = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
 
+        /*
+          What answered, classified here because only here are the headers in scope (D-264).
+
+          This is where the false pass came from. GATE-002 probed three paths on phoenixpeptide,
+          all three returned 403 behind a Cloudflare challenge, and the handler — which sees only
+          a status — read three refusals as *"served content directly"* and returned `pass` on a
+          critical stopping condition. The handler's arithmetic is fixed too, but a status alone
+          could never have carried this: it takes the header and the document to know that the
+          403 was the edge rather than the origin.
+        */
+        const challenge = classifyChallenge({
+          status: response?.status() ?? 0,
+          ...(response === null ? {} : { header: headerLookup(response.headers()) }),
+          body: bodyText,
+        });
+
         results.push({
           url,
           status: response?.status() ?? 0,
           finalUrl: page.url(),
           sha256: createHash('sha256').update(bodyText, 'utf8').digest('hex'),
+          ...(challenge === null ? {} : { challenged: challenge.marker }),
           fetchedAt,
         });
       } catch (error) {

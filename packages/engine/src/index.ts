@@ -29,6 +29,14 @@ export {
   type HttpFetcherOptions,
 } from './fetcher.js';
 
+export {
+  classifyChallenge,
+  headerLookup,
+  CHALLENGE_REASON,
+  type ChallengeSubject,
+  type ChallengeVerdict,
+} from './challenge.js';
+
 export { parseRobotsTxt, EMPTY_ROBOTS, type RobotsTxt } from './robots.js';
 
 export {
@@ -318,6 +326,7 @@ export {
   type ReportCategory,
   type ReportAccess,
   type ReportCoverage,
+  type ChallengeSummary,
   type ReportFinding,
   type SameObservationPair,
   type BlockingSummary,

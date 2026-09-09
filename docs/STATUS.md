@@ -35,11 +35,41 @@ eight inlined captures. **Nothing has been sent under the new document yet.** Th
 hold checklist captures, labelled as superseded and still reachable; they are not sendable, because
 they have no published evaluation.
 
+### Bot challenges are detected, and the crawl says so (D-264)
+
+Three runs of `phoenixpeptide.com` on 2026-09-09 rendered nine documents each and saw none of them:
+all nine were the same Cloudflare interstitial, and nothing in the crawl could tell. Each finished
+`complete` with **0 fail · 1 pass · 61 not evaluable**, identical across all three, and the `pass`
+was **GATE-002** — `critical`, `auto_fail`, a stopping condition — asserting the catalogue is not
+public on the strength of three refusals it had recorded as *"served content directly"*.
+
+A challenged response is now classified in the renderer, the Layer 0 fetcher and both probes; stored
+as an artifact of kind `challenge` and never as a page; and every rule that would have read that
+surface returns `not_evaluable` under the new kind `challenged`. The masthead reads *"Bot challenge
+on N of M pages"*. `http_probe` was corrected as well, because it never sees a page and the
+detection alone would not have stopped it: `served` meant *answered with any status*, so three
+`403`s counted as paths that served content — D-184's mistake, still uncorrected in the gate probes.
+
+**D-017 is unchanged: no stealth, no proxy, no retry-through.** The crawl reports the challenge; it
+does not try to get past it.
+
+**Migration `0084` needs production apply before the next scan.** It widens the `evidence.kind`
+check to admit `challenge` — and `coa`, which the engine has produced since the certificate fetch
+was built and which this column would have refused. Until it is applied, a run that meets bot
+protection fails its evidence insert and is left open.
+
+**The four runs already affected are not repaired and will not be.** Runs are immutable (D-002).
+They keep the counts they were written with; what changes is that the next one says what happened.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
   reached, so a run behind a login wall produces a document about a storefront nobody saw — the
   `storefrontNotSeen` guard says so rather than hiding it, which is the honest failure and not a fix.
+- **Getting past a bot challenge.** Open, and deliberately not a build task. D-264 makes the crawl
+  say what it met; it establishes nothing about `phoenixpeptide.com`, and three of the seven runs
+  on file are of a site nobody has seen. The available answers — a different egress, an arrangement
+  with the merchant, an allowlist — are not technical, and D-017 rules out the technical ones.
 - **The CoMo gate regression.** Still open. Carried into the evaluation unchanged: what the run
   observed is what the angles reason over.
 - Angle citation lists show observed states only; `not_evaluable` collapsed to a count. Done.

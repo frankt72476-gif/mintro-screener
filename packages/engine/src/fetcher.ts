@@ -9,6 +9,7 @@
 
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
+import { classifyChallenge } from './challenge.js';
 
 /**
  * Identifies the crawler to the sites it fetches from.
@@ -42,6 +43,15 @@ export interface FetchResult {
   readonly contentType: string;
   /** Why the request failed, when it did. Absent on success. */
   readonly error?: string;
+  /**
+   * Set when bot protection answered instead of the origin (D-264).
+   *
+   * Layer 0's exposure is not the 403 — `establishesAbsence` already refuses to read that as an
+   * absence. It is the **200 that is an interstitial**: a challenge page served at a sitemap URL
+   * parses to zero URLs, and this file's own header says zero URLs must never be mistaken for a
+   * clean catalogue. Nothing was watching for the case where the zero came from the edge.
+   */
+  readonly challenged?: string;
   /** SHA-256 of the body, as the evidence digest for anything derived from it. */
   readonly sha256: string;
   /** UTC, ISO 8601. */
@@ -149,17 +159,45 @@ export function createHttpFetcher(options: HttpFetcherOptions = {}): Fetcher {
       return failure(url, `body could not be read: ${(error as Error).message}`, startedAt, fetchedAt);
     }
 
+    /*
+      The same classification the renderer and the probe make (D-264).
+
+      All three markers are available here — the header, the title and the document — because this
+      is the one path that holds the whole response. `challengeTitle` is read out of the body rather
+      than parsed, since Layer 0 has no DOM and a regex over a `<title>` is not a classification of
+      the merchant's content, it is a read of the vendor's own fixed string.
+    */
+    const title = titleOf(body);
+    const challenge = classifyChallenge({
+      status: response.status,
+      header: (name) => response.headers.get(name),
+      ...(title === undefined ? {} : { title }),
+      body,
+    });
+
     return {
       url,
       finalUrl: response.url === '' ? url : response.url,
       status: response.status,
       body,
       contentType,
+      ...(challenge === null ? {} : { challenged: challenge.marker }),
       sha256: sha256(body),
       fetchedAt,
       elapsedMs: Date.now() - startedAt,
     };
   };
+}
+
+/**
+ * The `<title>` of a fetched document, when it has one.
+ *
+ * Bounded and non-greedy: this runs over every Layer 0 body, including sitemaps that are megabytes
+ * of XML with no title in them at all.
+ */
+function titleOf(body: string): string | undefined {
+  const match = /<title[^>]*>([\s\S]{0,200}?)<\/title>/i.exec(body);
+  return match?.[1];
 }
 
 /** Gzip magic number, corroborated by the URL and content type. */
@@ -182,6 +220,14 @@ export function createStubFetcher(
     }
 
     const body = canned.body ?? '';
+    /*
+      Classified, not stubbed (D-264, D-026).
+
+      A stub that let the caller *declare* a response challenged would let a Layer 0 test assert
+      the challenge handling against a flag the test itself set, rather than against the classifier
+      the crawl runs. The stub holds a body; the same function reads it.
+    */
+    const challenge = classifyChallenge({ status: canned.status ?? 200, body });
     return {
       url,
       finalUrl: canned.finalUrl ?? url,
@@ -189,6 +235,7 @@ export function createStubFetcher(
       body,
       contentType: canned.contentType ?? 'application/xml',
       ...(canned.error === undefined ? {} : { error: canned.error }),
+      ...(challenge === null ? {} : { challenged: challenge.marker }),
       sha256: sha256(body),
       fetchedAt,
       elapsedMs: 0,

@@ -114,6 +114,16 @@ export interface ReportCoverage {
    */
   readonly notRetrieved: number;
   /**
+   * The site's bot protection answered instead of the site (D-264).
+   *
+   * Counted apart from `notRetrieved` for the reason that kind is counted apart from the rest: it
+   * is the only other bucket that is about neither Mintro, nor the nature of the question, nor the
+   * merchant. Unlike `notRetrieved` a re-run does **not** resolve it, which is precisely why the
+   * two must not be added together — the coverage line is where an operator decides whether to
+   * scan again.
+   */
+  readonly challenged: number;
+  /**
    * `not_evaluable` findings from runs recorded before D-044, which carry no kind.
    *
    * Counted separately and never folded into another bucket. Those runs are immutable (D-002),
@@ -300,6 +310,33 @@ export interface ScreeningReport {
    * Absent on every run recorded before it existed, like `blocking` and `sample` before it.
    */
   readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
+  /**
+   * How many pages the site's bot protection answered instead of the site (D-264).
+   *
+   * **Optional, permanently**, like `blocking` and `sample` before it. Runs recorded before this
+   * existed are immutable and frozen without it (D-002), and a reader that finds it absent renders
+   * nothing — never *"Bot challenge on 0 of 0 pages"*, which would be an observation about the
+   * merchant drawn from the age of the file.
+   *
+   * The masthead is where it belongs and not a footnote, because it qualifies every finding under
+   * it. Run 0003c814 published 61 `not_evaluable` and one `pass` with nothing on its face to say
+   * that no page of the site had been seen.
+   */
+  readonly challenge?: ChallengeSummary;
+}
+
+/**
+ * The crawl's encounter with bot protection, counted (D-264).
+ *
+ * Two numbers rather than a boolean: *"Bot challenge on 3 of 48 pages"* and *"on 9 of 9"* are
+ * different runs and a reader has to be able to tell them apart. The first is a run whose reading
+ * is partial; the second is a run that saw nothing at all.
+ */
+export interface ChallengeSummary {
+  /** Pages whose response was the interstitial rather than the page. */
+  readonly challenged: number;
+  /** Pages the run attempted to render at Layer 1 and above. The denominator. */
+  readonly pages: number;
 }
 
 /**
@@ -400,6 +437,8 @@ export interface AssembleInput {
   readonly access?: ReportAccess;
   /** How thin the sample was, and which surfaces were read (D-162). */
   readonly sample?: SampleBasis;
+  /** How many rendered pages were answered by bot protection. Omitted where none was (D-264). */
+  readonly challenge?: ChallengeSummary;
   /** Which captures the eye test should read. Omitted where the crawl took none (D-198). */
   readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
 }
@@ -489,6 +528,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     sameObservation: pairSameObservation(enriched, ruleset),
     blocking: summariseBlocking(enriched, ruleset),
     ...(input.sample === undefined ? {} : { sample: input.sample }),
+    ...(input.challenge === undefined ? {} : { challenge: input.challenge }),
     ...(input.eyeTestCaptures === undefined ? {} : { eyeTestCaptures: input.eyeTestCaptures }),
     verdict: describeVerdict(enriched, counts),
     categories,
@@ -792,6 +832,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
   const notReachable = of('not_reachable');
   const notExposed = of('not_exposed');
   const notRetrieved = of('not_retrieved');
+  const challenged = of('challenged');
   const kindNotRecorded = unevaluated.filter((finding) => finding.notEvaluableKind === undefined).length;
 
   return {
@@ -802,6 +843,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     notExposed,
     notApplicable,
     notRetrieved,
+    challenged,
     kindNotRecorded,
     // Resolved and outstanding are derived here rather than in the renderer, for the same reason
     // coverage itself is: a renderer that computed them could get the split wrong quietly, and
@@ -809,7 +851,11 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     resolved: evaluable + notApplicable,
     // `not_retrieved` is outstanding: a request that failed established nothing, so nothing was
     // resolved. Unlike the others it may resolve on a re-run (D-058).
-    outstanding: noCheckBuilt + notReachable + notExposed + notRetrieved + kindNotRecorded,
+    //
+    // `challenged` is outstanding too, and for a harder reason: nothing was established and a
+    // re-run will not establish it either (D-264).
+    outstanding:
+      noCheckBuilt + notReachable + notExposed + notRetrieved + challenged + kindNotRecorded,
   };
 }
 

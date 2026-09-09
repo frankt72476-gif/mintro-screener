@@ -206,7 +206,17 @@ export async function discoverLayer0(
   };
 
   const attempts: FetchAttempt[] = [];
+  /*
+    How many requests this pass made and how many the edge answered (D-264).
+
+    Counted in `record`, which every request already passes through, rather than derived from
+    `attempts` afterwards — `FetchAttempt` carries no classification and could not answer it.
+  */
+  let requestsMade = 0;
+  let challengedRequests = 0;
   const record = (response: FetchResult): void => {
+    requestsMade += 1;
+    if (response.challenged !== undefined) challengedRequests += 1;
     attempts.push({
       url: response.url,
       status: response.status,
@@ -219,10 +229,21 @@ export async function discoverLayer0(
   const robotsResponse = await fetcher(robotsUrl);
   documents.push(describe(robotsResponse, 'robots'));
   record(robotsResponse);
-  if (robotsResponse.status === 200) retain(robotsResponse, 'robots');
+
+  /*
+    A challenged response is retained, and it is not parsed (D-264).
+
+    Retained under `challenge` so the run records what happened, and kept out of the parser because
+    an interstitial is not a robots.txt. `parseRobotsTxt` over one yields no `Sitemap:` lines and no
+    `Crawl-delay`, which is indistinguishable from a merchant who declared neither — a fact about
+    the edge read as a fact about the merchant, which is the whole of D-044.
+  */
+  const robotsChallenged = robotsResponse.challenged !== undefined;
+  if (robotsChallenged) retain(robotsResponse, 'challenge');
+  else if (robotsResponse.status === 200) retain(robotsResponse, 'robots');
 
   const robots =
-    robotsResponse.status === 200 && robotsResponse.body.trim() !== ''
+    !robotsChallenged && robotsResponse.status === 200 && robotsResponse.body.trim() !== ''
       ? parseRobotsTxt(robotsResponse.body, base.origin)
       : EMPTY_ROBOTS;
 
@@ -233,7 +254,8 @@ export async function discoverLayer0(
     and that is the whole story. A 403 or a timeout is different: the file may name a sitemap we
     will now never look for, so a later "no sitemap was found" is partly a fact about this request.
   */
-  const robotsUnread = robotsResponse.status !== 200 && !establishesAbsence(robotsResponse.status);
+  const robotsUnread =
+    robotsChallenged || (robotsResponse.status !== 200 && !establishesAbsence(robotsResponse.status));
 
   // A missing robots.txt is ordinary and not itself a problem — the well-known sitemap paths
   // are tried regardless.
@@ -282,6 +304,25 @@ export async function discoverLayer0(
     const response = await fetcher(next.url);
     sitemapsFetched += 1;
     record(response);
+
+    /*
+      A challenge is not a sitemap, whatever status it came with (D-264).
+
+      Taken before the status test, because the dangerous case answers **200**. A Cloudflare
+      interstitial served at a sitemap URL parses to zero URLs, and this module's own contract is
+      that zero URLs must never be mistaken for a clean catalogue. The 403 form is caught by the
+      test below anyway; this branch exists for the 200 that is not a document.
+    */
+    if (response.challenged !== undefined) {
+      acquisitionFailed = true;
+      retain(response, 'challenge');
+      documents.push(describe(response, 'sitemap'));
+      gaps.push(
+        `${next.url} was answered by the site's bot protection (${response.challenged}), so the ` +
+          'URLs it lists were not read',
+      );
+      continue;
+    }
 
     if (response.status !== 200) {
       // 404 and 410 are the origin saying nothing is there. A 403, a 429, a 5xx or no answer at
@@ -376,12 +417,25 @@ export async function discoverLayer0(
       So the party comes from `acquisitionFailed`, set where each shortfall happened. The
       declaration still shapes the sentence, because it is the useful thing to tell a reader.
     */
+    /*
+      Naming the party, one step further (D-264).
+
+      `acquisitionFailed` already says the shortfall is ours, and that is what a consumer branches
+      on. What it cannot say is **which** of ours — and the reason string is what a person reads.
+      *"no sitemap was obtained at robots.txt or the well-known paths"* over an origin that
+      challenged every request describes the merchant's publishing, which is exactly the reading
+      the paragraph above exists to prevent, arrived at one sentence later.
+    */
+    const everythingChallenged = challengedRequests > 0 && challengedRequests === requestsMade;
+
     return unusable(
       base.origin,
       robots,
-      robots.sitemaps.length > 0
-        ? 'robots.txt declared sitemaps and none of them could be read as one'
-        : 'no sitemap was obtained at robots.txt or the well-known paths',
+      everythingChallenged
+        ? "the site's bot protection answered every request, so no sitemap was ever seen"
+        : robots.sitemaps.length > 0
+          ? 'robots.txt declared sitemaps and none of them could be read as one'
+          : 'no sitemap was obtained at robots.txt or the well-known paths',
       documents,
       artifacts,
       attempts,

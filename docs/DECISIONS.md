@@ -17256,3 +17256,156 @@ capture failed.
 Reachable through *Open report*, labelled as the checklist they are. They are what was sent, and a
 run's history is not rewritten because the document changed (D-002).
 
+## D-264 — Cloudflare challenges are not pages
+**2026-09-09 · architect**
+
+Three runs of `phoenixpeptide.com` on 2026-09-09 each rendered nine documents and saw none of them.
+All nine were the same Cloudflare interstitial — a 403 carrying `cf-mitigated: challenge`, titled
+*"Just a moment..."* — and nothing in the crawl could tell. `render.ts` read `response.status()`
+into a variable and branched on nothing; the interstitial flowed through capture, storage, rule
+evaluation and the report exactly as though it were the storefront. Each run finished `complete`
+with **0 fail · 1 pass · 61 not evaluable**, and the counts were byte-identical across all three,
+because a challenge is deterministic in a way a timeout is not.
+
+This is not a new failure mode. It is the one this project keeps rediscovering — **a verdict resting
+on a surface that was never established** — arriving through a door nobody was watching, and the
+`pass` is where it bit.
+
+### What a challenge is, and why it needs its own kind
+
+A challenge is the vendor in front of the site saying *we will not show you this until you prove
+something*. It is none of the four things the crawl already knew how to say:
+
+- Not `establishesAbsence`. Nothing was said about whether the page exists.
+- Not a login wall. No stored credential opens it, and escalating to one publishes *"coverage
+  limited by a login wall"* about a site that has no wall — D-044's conflation, one layer out.
+- Not `not_retrieved`. That means *this run could not fetch it*, and its whole point (D-058) is that
+  a re-run may resolve it. A re-run cannot resolve this: the three phoenixpeptide runs were re-scans
+  of each other, twenty and sixty seconds apart, and returned identical counts.
+
+So `NotEvaluableKind` gains `challenged`, and every rule that would have read a challenged surface
+returns `not_evaluable` with one reason: *"the site's bot protection challenged the crawler; the
+page behind it was not seen."* One exported string, because the sentence is made in four modules and
+two wordings of *what happened here* is how they diverge (D-181).
+
+### Located by the vendor's own machinery, not by prose
+
+`classifyChallenge` has two independent tests, either sufficient, because the three call sites see
+different amounts of the response:
+
+1. **`cf-mitigated`** on the response. Authoritative, needs no body, and it is the signal the
+   renderer had in scope for the whole of its life and never read.
+2. **The document is the interstitial** — its own script path `/cdn-cgi/challenge-platform/`, its
+   own option object `cf_chl_opt`, or its own fixed title. This catches a challenge already stored,
+   one served at 200, and any path where the headers did not survive.
+
+Hard constraint 9 forbids locating a subject by *the compliant form of the thing being judged*.
+Nothing about the merchant is being judged here; the subject is the interstitial and these are what
+it is made of. A **bare 403 is not a challenge** — that is a refusal, and widening this to swallow
+every 403 would relabel ordinary merchant behaviour as bot protection in a document an underwriter
+reads.
+
+Every judgement leans one way. A page wrongly called a challenge becomes `not_evaluable` and says
+so. A challenge wrongly called a page becomes findings, up to and including a `pass`.
+
+### Stored as an artifact, and deliberately not as a page
+
+The interstitial is retained: the run has to record what happened, and a `not_evaluable` has to
+evidence *why* (hard constraint 3). What changes is the name it is kept under. `ArtifactKind` gains
+`challenge`, the page carries `challengeKey` rather than `domKey`, and no screenshot is taken at
+all. Both matter:
+
+- `evaluationRun` selects the documents a draft reasons over with `kind = 'dom'`. The nine
+  interstitials of run 0003c814 were `dom`.
+- Every satisfied and violating finding builds evidence from `screenshotKey ?? domKey`. Under its
+  own name the interstitial is citable only by the finding that says the page was not seen.
+
+Migration `0084` widens the `evidence.kind` check to admit it. It also admits `coa`, which the
+engine has produced since the certificate fetch was built and this column would have refused — a
+latent defect that would have failed the first run to reach a certificate, and one production has
+not hit because no `coa` row exists.
+
+### The false pass, and why detection alone would not have stopped it
+
+The one `pass` on all three runs was **GATE-002 — `critical`, `auto_fail`, a stopping condition.**
+Its own note said what happened and nobody could hear it:
+
+> 3 path(s) served content directly, returning 403; none matched the statuses this rule treats as
+> a violation.
+
+`http_probe` never sees a `PageContext`, so `renderFailure` is not on its path and the classification
+alone does not save it. The handler had a defect of its own, and it is more general than Cloudflare:
+**`served` meant *answered with any status at all***. Three 403s were counted as paths that served
+content, `fail_if_status` is `[200]`, none was offending, and the rule returned `satisfied`.
+
+A `pass` there asserts *no probed path served products to an anonymous visitor*. Three kinds of
+answer support that and one does not:
+
+- **`2xx` at the path asked for** — content served, not a violating status. The observation.
+- **a redirect away** — already handled, and already understood as the gate working.
+- **`404` / `410`** — the origin says nothing is published there. `establishesAbsence`, the
+  predicate D-184 put in one place for this exact question.
+- **`401`, `403`, `429`, `5xx`** — *we were turned away*. Not an observation about what a visitor
+  can buy.
+
+The last group now joins the unreachable one, on that block's own stated reasoning: **never `pass`,
+never `fail`, symmetrically.** A verdict that flips on which request happened to be refused cannot
+gate an automatic decline. This is D-184 at Layer 0 — where three 403s produced eight `not_exposed`
+findings — found again in the gate probes, which had never been corrected.
+
+### The reach of it
+
+Everywhere the crawl decides that something was seen:
+
+- **`isRendered`** is false, so `renderFailure` short-circuits every page-taking handler.
+- **`wasServed`** is false, so an interstitial is not counted as covered. `assessWall` gains a
+  `challenged` count and refuses to call an all-challenged sample walled — there is nothing for an
+  account to get past. A mixed sample is still walled: the refused pages may open, and the run is
+  entitled to try.
+- **Layer 0** retains a challenged robots.txt or sitemap and does not parse it. The 403 form was
+  already handled; the one that hid is the **200 that is an interstitial**, which parses to zero
+  URLs — and zero URLs must never be mistaken for a clean catalogue.
+- **`establishDocument`** refuses one before its status test, marked `obstructed`. At 200 an
+  interstitial clears the redirect rule, the path rule and the character floor, and would be
+  established as the merchant's terms page.
+- **`probeSurface`** returns `undecided`, never `rejected`. `rejected` is the origin's own answer
+  about a path and this is not the origin answering; the render then classifies the full response.
+- **`storefrontNotSeen`** refuses a challenged run before the text conditions are consulted at all,
+  and the message does not say *re-scan*.
+
+### The masthead
+
+`ScreeningReport` gains `challenge: { challenged, pages }`, and the evaluation masthead reads *"Bot
+challenge on N of M pages"* when N is above zero. Absent on runs recorded before this and absent
+renders nothing — never *"Bot challenge on 0 of 30 pages"*, which would be an observation drawn from
+the age of the file, and which would put a line about bot protection on every clean report until a
+reader learned to skip it.
+
+Two numbers rather than a flag: *"3 of 48"* is a run whose reading is partial and *"9 of 9"* is a run
+that saw nothing, and a reader has to be able to tell them apart.
+
+### D-017 is unchanged
+
+**No stealth, no proxy, no retry-through.** Nothing here evades a challenge, waits one out, or
+changes what the crawler declares itself to be. The launch options are still bare and the browser
+context still carries the polite mitigations and the declared identity. Getting past a challenge is
+a different question with an answer that is not technical — and until it is answered, the crawl says
+what happened instead of guessing what was behind it.
+
+### What the regression test found
+
+`fixtures/challenges/cloudflare-interstitial-phoenixpeptide.html` is run 0003c814's homepage capture,
+pulled out of the evidence bucket byte for byte and committed (D-106). The test asserts that no rule
+of any layer reaches `pass` against it — and, beside that, the counterfactual: the same bytes with
+the classification withheld.
+
+**Twelve rules pass.** `OFFS-007` and eleven `PROD` rules, every one of them an `expect: absent`
+product rule reporting that it looked and found nothing prohibited, on a nine-kilobyte interstitial
+with no catalogue in it. That is hard constraint 2's worst bug twelve times over, and hard constraint
+9's mechanism exactly: a search that never covered the space reporting the space as clean.
+
+Those twelve are **not** what run 0003c814 produced. Its challenge came with a 403, so `isRendered`
+was already false and the page rules landed on `not_evaluable`; its single `pass` was GATE-002, which
+never touches a page. The twelve are what the **200-served** form of the same mitigation would have
+produced, on a crawl where nothing anywhere would have caught it. The fixture carries a 200 for that
+reason: at 403 this file would pass with the whole change deleted.

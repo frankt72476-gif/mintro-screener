@@ -1996,6 +1996,8 @@ function PublishedEvaluation({
       findings: injected.findings,
       evidence: injected.evidenceRows,
       anchoredRuleIds: anchoredRuleIds(report),
+      // Absent on runs recorded before D-264, and absent renders nothing rather than a zero.
+      ...(report.challenge === undefined ? {} : { challenge: report.challenge }),
     }),
     [injected, report],
   );

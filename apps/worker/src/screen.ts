@@ -188,6 +188,16 @@ export async function screenStorefront(
       : `homepage HTTP ${rendered.page.httpStatus} · footer ${rendered.page.footer.found ? 'located' : 'NOT FOUND'}`,
   );
 
+  /*
+    Every page this run rendered, for the challenge count (D-264).
+
+    Accumulated as the crawl goes rather than reconstructed at assembly, for the reason `progress`
+    exists: a second derivation from the evidence keys would be a second answer to *how many pages
+    did the edge answer*, and D-216 is the record of what happens to second derivations. The
+    homepage, the product sample and every Layer 3 candidate all push here.
+  */
+  const renderedPages: PageContext[] = [rendered.page];
+
   const layer1 = runLayer1(rendered.page, ruleset);
 
   // ---- feed what Layer 1 learned back into the Layer 0 classifier -----------------------
@@ -255,6 +265,7 @@ export async function screenStorefront(
         ...(context === undefined ? {} : { context }),
       });
       artifacts.push(...result.artifacts);
+      renderedPages.push(result.page);
       pages.push({ selection: pick, page: result.page });
       /*
         A real denominator: the sample was chosen before the loop and its size cannot change here.
@@ -282,6 +293,21 @@ export async function screenStorefront(
 
   progress.sampleIs(sampled.filter((entry) => wasServed(entry.page)).length);
   say(wall.reason);
+
+  /*
+    Said out loud, at the point it happened (D-264).
+
+    A run that met bot protection used to look, in the log and in the report, exactly like a run
+    against a bare storefront. The three phoenixpeptide runs of 2026-09-09 each read "0 fail · 1
+    pass · 61 not evaluable" and finished `complete`, and there was nothing on any surface an
+    operator sees to say that no page of the site had been served to anybody.
+  */
+  if (wall.challenged > 0) {
+    say(
+      `  ${wall.challenged} of ${wall.attempted} sampled page(s) were answered by the site's bot ` +
+        'protection; the pages behind it were not seen',
+    );
+  }
 
   /*
     Did the sample actually cover five pages (D-062)?
@@ -379,6 +405,11 @@ export async function screenStorefront(
     onProgress: (line, count) => say(line, count),
   });
 
+  // Every Layer 3 candidate this pass rendered, for the challenge count (D-264). Most were
+  // conventional paths that returned a themed 404; being here says a navigation happened, never
+  // that a surface was found.
+  renderedPages.push(...discovered.pages);
+
   /*
     Which surfaces were actually read, recorded once (D-162, D-173).
 
@@ -462,6 +493,8 @@ export async function screenStorefront(
       `· ${artifacts.length} capture(s)`,
   );
 
+  const challengedPages = renderedPages.filter((page) => page.challenged !== undefined).length;
+
   progress.enter('assembly', 'assembling the report');
   const report = assembleReport(
     {
@@ -505,6 +538,19 @@ export async function screenStorefront(
         and the stored record cannot disagree, because there is one of each fact.
       */
       sample: progress.sampleBasis(),
+
+      /*
+        How many pages the edge answered instead of the site (D-264).
+
+        On the masthead rather than in `truncations`, because it is not a coverage limit the run
+        chose — it is a statement about whether the document below it describes the merchant at
+        all. Omitted where nothing was challenged: a line reading "Bot challenge on 0 of 30 pages"
+        on every clean report is noise on all of them, and the field is absent-means-nothing so a
+        run recorded before this reads as silence rather than as zero.
+      */
+      ...(challengedPages === 0
+        ? {}
+        : { challenge: { challenged: challengedPages, pages: renderedPages.length } }),
 
       /*
         What the eye test should read — not what it found (D-198).

@@ -145,6 +145,26 @@ export function establishDocument(
     return unreachable(`${spec.label}: ${requestedUrl} did not render — ${page.renderError}`, attempts);
   }
 
+  /*
+    Before the status test, because the dangerous form of this answers 200 (D-264).
+
+    The 403 interstitial is caught by the next guard anyway. What is not is the same mitigation
+    served at 200: an interstitial whose path names the surface and whose markup runs to 28,000
+    characters clears the redirect rule, the path rule and the character floor, and would be
+    established as the merchant's terms page.
+  */
+  if (page.challenged !== undefined) {
+    return unreachable(
+      `${spec.label}: ${requestedUrl} was answered by the site's bot protection ` +
+        `(${page.challenged}), so the document behind it was not seen`,
+      attempts,
+      // `obstructed`, because nothing was read (D-181). The default here says *the surface was
+      // read and did not carry what identifies it*, which is a statement about the merchant's
+      // publishing — and it is the exact conflation D-181 exists to end.
+      true,
+    );
+  }
+
   if (page.httpStatus < 200 || page.httpStatus >= 400) {
     return unreachable(`${spec.label}: ${requestedUrl} returned HTTP ${page.httpStatus}`, attempts);
   }

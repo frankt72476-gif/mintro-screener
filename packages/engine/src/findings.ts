@@ -48,7 +48,21 @@ export interface FetchAttempt {
  * not only its digest, because a hash proves a document has not changed without letting anyone
  * read what it said (hard constraint 3).
  */
-export type ArtifactKind = 'robots' | 'sitemap' | 'screenshot' | 'dom' | 'coa';
+export type ArtifactKind =
+  | 'robots'
+  | 'sitemap'
+  | 'screenshot'
+  | 'dom'
+  | 'coa'
+  /**
+   * A bot-protection interstitial served where a page was asked for (D-264).
+   *
+   * Stored, because the run has to record what happened, and kept **apart from `dom`** because
+   * that is what stops it being read as a page. `evaluationRun` selects the pages a draft is
+   * reasoned over with `kind === 'dom'`; the nine interstitials of run 0003c814 were stored as
+   * `dom` and were therefore, as far as every later reader could tell, the storefront.
+   */
+  | 'challenge';
 
 export interface EvidenceArtifact {
   /** Storage key. Run-scoped, so a second scan of the same merchant cannot collide (D-002). */
@@ -214,11 +228,22 @@ export function unsettled(
  *     request that never completed. Nothing was established either way, and in particular nothing
  *     was established about the merchant (D-058).
  *
+ *   - `challenged` — **the site's bot protection answered instead of the site.** The request
+ *     completed and a document came back; the document was an interstitial, and the page behind
+ *     it was never served (D-264).
+ *
  * The fifth arrived with the certificate fetch and is not a refinement of the other four. A COA
  * link returning 404 is a fact about the merchant; a COA link that times out is a fact about this
  * run. Filing the second under `not_exposed` would say a merchant published nothing because our
  * request failed — the conflation D-044 exists to end, one check further down. Re-running may
  * resolve it, which is true of no other kind here.
+ *
+ * The sixth arrived with the Cloudflare interstitials of 2026-09-09, and it is not a refinement
+ * of `not_retrieved` either. A timeout is our request failing, and re-running answers it. A
+ * challenge is a **different party answering**, and re-running from the same address reproduces
+ * it exactly — three consecutive runs of phoenixpeptide.com returned byte-identical counts. The
+ * two must not read as one, because the operator's next move differs: one is re-scanned, the
+ * other cannot be (D-264).
  *
  * **Declared where the finding is made, never derived from the reason text.** A classifier that
  * pattern-matched the wording would be locating the subject by its compliant form — hard
@@ -229,7 +254,8 @@ export type NotEvaluableKind =
   | 'not_reachable'
   | 'not_exposed'
   | 'not_applicable'
-  | 'not_retrieved';
+  | 'not_retrieved'
+  | 'challenged';
 
 /**
  * A rule that could not be observed.
