@@ -17409,3 +17409,97 @@ was already false and the page rules landed on `not_evaluable`; its single `pass
 never touches a page. The twelve are what the **200-served** form of the same mitigation would have
 produced, on a crawl where nothing anywhere would have caught it. The fixture carries a 200 for that
 reason: at 403 this file would pass with the whole change deleted.
+
+## D-265 — A refused Layer 3 surface is not a surface the merchant does not publish
+**2026-09-09 · architect**
+
+D-264 corrected the same mistake at Layer 1 and in the gate probes. This is the third place it was
+still being made, and it is the oldest: a Layer 3 document — terms, shipping policy, FAQ, payment
+policy — that **refused the crawler** was reported as a document the merchant does not publish.
+
+`unreachedSurface` reads `Located.obstructed` to choose between `not_exposed` and `not_retrieved`.
+The flag was set by `findDocument` under one condition:
+
+```ts
+if (renderFailed && probe.verdict === 'answered') obstructed = true;
+```
+
+Everything that condition missed fell through to `not_exposed` — *the merchant does not carry
+this* — which is a claim about the merchant made from a request the merchant never answered.
+
+### What it missed, and how it came to miss it
+
+The condition made *whose failure this was* conditional on *whether the path exists*, which are
+different questions. That is the conflation D-044 named and D-181 catalogued four times.
+
+- **A candidate that refused us.** `403`, `401`, `429`, `5xx`. `establishesAbsence` is the
+  predicate D-184 put in one place for exactly this, and this loop was not asking it. Every real
+  instance came from here.
+- **A render that threw where the probe could not decide.** The browser failing is ours whatever
+  the probe thought of the path.
+- **Bot protection.** D-264 gave it a kind an hour earlier and this path could not carry it: a
+  challenged terms page arrived here as `not_exposed`, so the reason string said *bot protection*
+  while the kind said *the merchant publishes nothing*.
+
+### Which findings on existing runs read differently, and why they are not being changed
+
+Read out of the stored reports, classified by the attempts each finding carries — the run's own
+record of what it asked for and what came back.
+
+**87 surface-not-reached findings across the corpus. Every one of them `not_exposed`. Not one
+`not_retrieved`.** Their attempts break down as 192 × `404`, 97 × `403`, 33 × `200`.
+
+**Eighteen rest on a refusal.** All eighteen are `403`. Under the corrected derivation none of them
+is `not_exposed`:
+
+| Run | Date | Domain | Rules | Would read |
+|---|---|---|---|---|
+| `2f146299` | 2026-09-03 | phoenixpeptide.com | GATE-007, FULF-001, COMM-001 | `challenged` |
+| `0003c814` | 2026-09-09 | phoenixpeptide.com | GATE-007, FULF-001, COMM-001 | `challenged` |
+| `da294ec8` | 2026-09-09 | phoenixpeptide.com | GATE-007, FULF-001, COMM-001 | `challenged` |
+| `34ddd1f0` | 2026-09-09 | phoenixpeptide.com | GATE-007, FULF-001, COMM-001 | `challenged` |
+| `02b29d39` | 2026-09-09 | peptidesciences.com | GATE-007, FULF-001, COMM-001 | `not_retrieved` |
+| `247343f7` | 2026-09-09 | peptidesciences.com | GATE-007, FULF-001, COMM-001 | `not_retrieved` or `challenged` |
+
+The four phoenixpeptide runs read `challenged` because **every stored document on each of them is
+an interstitial** — 9 of 9, checked against the markers, on all four including the 2026-09-03 run
+that predates the classifier. `02b29d39` stored no interstitial at all (0 of 19), so its refusals
+were the origin's own; `247343f7` stored three among forty-eight, and which of its Layer 3 `403`s
+were challenges is not decidable per finding from what was kept. It does not need to be: on the
+corrected derivation a `403` is never `not_exposed`, whichever of the two it was.
+
+**Nothing is back-filled.** Runs are immutable (D-002) and their reports are sealed at assembly.
+Those eighteen findings keep the kind they were written with, and the four affected reports keep
+saying that three merchants publish no FAQ and no shipping policy. That is wrong and it stays,
+because a stored run says what it said — the same rule that keeps a pre-D-175 verdict band reading
+in the old vocabulary. What changes is the next run.
+
+**Zero findings rest on a thrown render.** Every attempt in the corpus carries a real status, so
+the `renderError` branch — the one this decision was opened over — has never produced a misfiled
+finding. It is corrected as a latent defect, not a live one, and that is worth stating plainly:
+the live defect was the status branch beside it.
+
+### One derivation, not two
+
+The fix is not a wider condition in `findDocument`. It is deleting the condition.
+
+`establishDocument` already asked the same question of the same page, three lines above, and
+answers it with every guard the surface has — that is what D-054 moved there. It just answered into
+a field nobody read, while the loop next to it computed a worse answer from scratch. Two
+derivations of one fact, disagreeing exactly the way D-216 says they do. `findDocument` now reads
+`outcome.obstructed` and `outcome.challenged`, and the flag has a reader for the first time.
+
+`Located` gains `challenged?: string` beside `obstructed`, because the consumer has three answers
+to give and a boolean holds two. `unreachable` derives `obstructed` from the marker rather than
+asking the caller for both — a call site that recorded a challenge and forgot the flag would report
+bot protection as the merchant publishing nothing, which is this whole defect wearing a different
+hat.
+
+### What stays `not_exposed`
+
+The direction that would be wrong in the other direction. `404` and `410` are the origin saying
+nothing is published at that path — an observation about the merchant, and the layer would be
+poorer for losing it. So is a `200` that redirected away or fell under the character floor: that
+page was read, and it did not carry what identifies the surface. Both are asserted, because a
+change that made everything `not_retrieved` would satisfy every assertion about the eighteen and
+quietly delete the finding the layer exists to make.

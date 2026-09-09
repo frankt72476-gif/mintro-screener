@@ -12,7 +12,13 @@
 
 import type { Page } from 'playwright';
 import type { Located, SurfaceSpec } from '@mintro/engine';
-import { located, unreachable, endedAtWhatWasAsked, pathNamesSurface } from '@mintro/engine';
+import {
+  located,
+  unreachable,
+  endedAtWhatWasAsked,
+  establishesAbsence,
+  pathNamesSurface,
+} from '@mintro/engine';
 import type { FetchAttempt, PageContext } from '@mintro/engine';
 import { withDeadlineOr } from './deadline.js';
 
@@ -141,8 +147,20 @@ export function establishDocument(
   spec: SurfaceSpec,
   attempts: readonly FetchAttempt[],
 ): Located<PageContext> {
+  /*
+    Ours (D-265). The browser threw; nothing was read, and nothing was learned about the merchant.
+
+    The flag defaults to false, which says *the surface was read and did not carry what identifies
+    it*. **No finding on any existing run came through this branch** — every attempt recorded in
+    the corpus carries a real status — so this is a latent defect rather than a live one, and it is
+    corrected here for the caller that eventually reads it rather than left as a trap.
+  */
   if (page.renderError !== undefined) {
-    return unreachable(`${spec.label}: ${requestedUrl} did not render — ${page.renderError}`, attempts);
+    return unreachable(
+      `${spec.label}: ${requestedUrl} did not render — ${page.renderError}`,
+      attempts,
+      true,
+    );
   }
 
   /*
@@ -158,15 +176,26 @@ export function establishDocument(
       `${spec.label}: ${requestedUrl} was answered by the site's bot protection ` +
         `(${page.challenged}), so the document behind it was not seen`,
       attempts,
-      // `obstructed`, because nothing was read (D-181). The default here says *the surface was
-      // read and did not carry what identifies it*, which is a statement about the merchant's
-      // publishing — and it is the exact conflation D-181 exists to end.
-      true,
+      // `obstructed` is derived from the marker, so the two cannot be recorded apart (D-265).
+      false,
+      page.challenged,
     );
   }
 
+  /*
+    A refusal is not an absence (D-184, D-265).
+
+    `404` and `410` are the origin saying nothing is published at that path, and that is an
+    observation about the merchant. `403`, `401`, `429` and `5xx` are not — the page may well
+    exist and we were turned away. One predicate, the one D-184 put in one place, rather than a
+    second reading of the status range here.
+  */
   if (page.httpStatus < 200 || page.httpStatus >= 400) {
-    return unreachable(`${spec.label}: ${requestedUrl} returned HTTP ${page.httpStatus}`, attempts);
+    return unreachable(
+      `${spec.label}: ${requestedUrl} returned HTTP ${page.httpStatus}`,
+      attempts,
+      !establishesAbsence(page.httpStatus),
+    );
   }
 
   if (!endedAtWhatWasAsked(requestedUrl, page.finalUrl)) {

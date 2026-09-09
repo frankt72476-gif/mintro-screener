@@ -426,6 +426,8 @@ async function findDocument(
 
   /** Set when a candidate answered but could not be turned into a page we could read (D-156). */
   let obstructed = false;
+  /** The marker from the first candidate bot protection answered, if any (D-265). */
+  let challenged: string | undefined;
   /*
     Every guard now lives in `establishDocument` (D-054).
 
@@ -506,17 +508,33 @@ async function findDocument(
       const renderFailed = rendered.page.renderError !== undefined;
 
       /*
-        The probe knew this path answered, and the render then failed (D-156, D-182).
+        Which party fell short on this candidate — **read, not re-derived** (D-216, D-265).
 
-        Holding a 200 for a URL while reporting that the merchant did not carry the page is holding
-        evidence against what the report prints. The surface is `not_retrieved` — ours — and this
-        is the producer-set signal `layer3.ts` was missing when D-181 listed it among the three
-        sites that structurally could not decide.
+        This was `renderFailed && probe.verdict === 'answered'`, computed here, beside an
+        `establishDocument` call that had already asked the same question of the same page and
+        answered it more carefully. Two derivations of one fact, and they disagreed exactly the
+        way D-216 says they do. Everything the local rule missed fell through to `not_exposed` —
+        *the merchant does not publish this page* — a claim about the merchant made from a request
+        the merchant never answered.
 
-        Only when the probe actually answered. A candidate the probe could not decide on tells us
-        nothing about whose failure this is, so it does not raise the flag.
+        What the local rule missed:
+
+          - **A candidate that refused us.** A `403`, `401`, `429` or `5xx` is *you may not read
+            this*, and establishes nothing about whether the page exists. **This is where every
+            real instance came from**: eighteen findings across six runs rest on a refusal, every
+            one of them a `403`, every one filed as the merchant publishing nothing.
+          - **A render that threw where the probe could not decide.** The probe's opinion about
+            whether a path exists says nothing about whose failure a thrown render was. Making
+            "ours" conditional on a different question is the conflation D-044 and D-181 name.
+          - **Bot protection.** Its own kind, because the operator's next move differs (D-264).
+
+        `establishDocument` answers all three, because it is where the guards live (D-054), and
+        its flag had no reader until now. A `404`, a `410` and a `200` that failed a content guard
+        still leave both alone: those are the origin answering, and the answer is about the
+        merchant.
       */
-      if (renderFailed && probe.verdict === 'answered') obstructed = true;
+      if (outcome.challenged !== undefined) challenged ??= outcome.challenged;
+      else if (outcome.obstructed === true) obstructed = true;
 
       record({
         url,
@@ -537,6 +555,7 @@ async function findDocument(
     `no ${what.label} was reached: ${describeCandidates(mine)}`,
     mine,
     obstructed,
+    challenged,
   );
 }
 

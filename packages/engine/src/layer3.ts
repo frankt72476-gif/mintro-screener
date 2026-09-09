@@ -267,6 +267,11 @@ function documentFinding(
  * acquisition failing on a page the merchant demonstrably served (D-156). A report that says the
  * merchant did not carry a page, while holding a 200 for it, is contradicting its own evidence.
  *
+ * **Three answers, not two (D-265).** `obstructed` is a boolean and the question has three
+ * answers: the merchant does not publish this, this run could not fetch it, and bot protection
+ * answered instead of the site. The third arrived with D-264 and was still landing on the second
+ * here, so a challenged terms page told an operator to re-scan.
+ *
  * **The attempts are attached.** Every `not_evaluable` finding must evidence *why*, with the
  * requests made and what they returned (hard constraint 3). Seventeen findings across the
  * reference corpus stated an absence and carried nothing at all — the attempts existed, but they
@@ -278,7 +283,11 @@ function unreachedSurface(rule: Rule, surface: Located<PageContext> & { located:
     rule,
     surface.reason,
     RENDERED,
-    surface.obstructed === true ? 'not_retrieved' : 'not_exposed',
+    surface.challenged !== undefined
+      ? 'challenged'
+      : surface.obstructed === true
+        ? 'not_retrieved'
+        : 'not_exposed',
     [
       {
         kind: RENDERED,

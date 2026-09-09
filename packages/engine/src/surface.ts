@@ -56,6 +56,18 @@ export type Located<T> =
       /** Every request made looking for it, and what each returned. */
       readonly attempts: readonly FetchAttempt[];
       /**
+       * Set when the site's bot protection answered instead of the site (D-264, D-265).
+       *
+       * A sibling of `obstructed` rather than a value of it, because the consumer has three
+       * answers to give and `obstructed` is a boolean with two. Without this a challenged Layer 3
+       * surface reported `not_retrieved` — *this run could not fetch it* — and an operator reading
+       * that re-scans, which against a challenge is the one thing that cannot work.
+       *
+       * **Implies `obstructed`**, and `unreachable` sets both from this one argument so a caller
+       * cannot record a challenge and forget to say the shortfall was not the merchant's.
+       */
+      readonly challenged?: string;
+      /**
        * True when **our request failed** rather than the surface being absent (D-181).
        *
        * Same meaning as `FlowObservation.obstructed`, and it exists here for the same reason: a
@@ -89,11 +101,17 @@ export const unreachable = <T>(
   reason: string,
   attempts: readonly FetchAttempt[],
   obstructed = false,
+  /** The marker, where bot protection answered. Implies `obstructed` (D-265). */
+  challenged?: string,
 ): Located<T> => ({
   located: false,
   reason,
   attempts,
-  ...(obstructed ? { obstructed: true as const } : {}),
+  // Derived, not asked of the caller: nothing was read, so a challenge is always ours in the
+  // sense `obstructed` means, and a call site that set one and forgot the other would report a
+  // challenge as the merchant publishing nothing.
+  ...(obstructed || challenged !== undefined ? { obstructed: true as const } : {}),
+  ...(challenged === undefined ? {} : { challenged }),
 });
 
 /**

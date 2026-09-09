@@ -61,6 +61,24 @@ protection fails its evidence insert and is left open.
 **The four runs already affected are not repaired and will not be.** Runs are immutable (D-002).
 They keep the counts they were written with; what changes is that the next one says what happened.
 
+### A refused Layer 3 surface is no longer the merchant publishing nothing (D-265)
+
+The same mistake D-264 corrected at Layer 1 and in the gate probes, in the third and oldest place:
+a terms page, shipping policy or FAQ that **refused** the crawler was reported as one the merchant
+does not publish. `findDocument` raised the "ours" flag only for a thrown render whose probe had
+answered, and everything else fell through to `not_exposed`.
+
+It now reads the flag `establishDocument` already set three lines above rather than computing a
+worse one beside it (D-216), and `Located` carries `challenged` beside `obstructed` so a challenged
+surface says so instead of telling an operator to re-scan.
+
+**Eighteen findings on six runs read differently from here on, and are not being changed.** All
+eighteen rest on a `403`: GATE-007, FULF-001 and COMM-001 on four phoenixpeptide runs (every stored
+document an interstitial, so `challenged`) and on two peptidesciences runs (`not_retrieved`). Runs
+are immutable (D-002), so those reports keep saying three merchants publish no FAQ. What changes is
+the next run. **No finding anywhere in the corpus rests on a thrown render** — that branch was
+latent, and the live defect was the status test beside it.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
