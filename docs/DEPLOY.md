@@ -573,6 +573,63 @@ send as.
 
 ---
 
+## 6. Crawler egress
+
+Every request the worker makes to a merchant's site leaves from one address, and it is now a
+**dedicated static egress** rather than whatever Fly happened to assign the machine.
+
+| | |
+|---|---|
+| IPv4 | `209.71.108.21` |
+| IPv6 | `2a09:8280:e618:1:0:179:b05b:0` |
+| Scope | app-scoped, region `iad` |
+| Allocated | 2026-09-09, `fly ips allocate-egress` |
+| User-Agent | identifies as `MintroScreener` |
+
+**These are not the addresses `fly ips list` shows first.** The `2a09:8280:1::179:b05b:0` and
+`66.241.124.161` above them are *ingress* — where traffic arrives — and a merchant asked to
+allowlist one of those would allowlist nothing. Egress rows are labelled `egress` in that table.
+The distinction cost a round of investigation: the address the worker actually left from was
+measured at `152.233.48.176`, which appears nowhere in `fly ips list` because it was assigned
+per-machine and would have changed under us.
+
+Static matters for one reason: an address a merchant can allowlist has to still be the address next
+month. A per-machine assignment moves on redeploy, and an allowlist entry for it silently stops
+matching.
+
+The User-Agent is declared, not disguised (D-017). It carries a real browser token so a merchant's
+own theme renders, and names the crawler and a URL to reach us at:
+
+    Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)
+    Chrome/131.0.0.0 Safari/537.36 MintroScreener/0.1 (+https://mintro.com/screener)
+
+It lives in `packages/engine/src/fetcher.ts` as one constant, shared by the Layer 0 fetcher, the
+surface probe and the Playwright context, so all three identify the same way.
+
+### Merchant allowlist request
+
+The address exists so it can be asked for. Bot protection at the edge answers the crawler with an
+interstitial and the run then establishes nothing about the merchant (D-264) — three runs of one
+storefront rendered nine documents each and saw none of them. Allowlisting is the answer that does
+not involve evading anything.
+
+This copy goes in the application, verbatim:
+
+> As part of review, Mintro's screening tool will visit your public storefront from IP address
+> 209.71.108.21, identifying itself with the user agent MintroScreener. Please allow this address
+> through any bot protection or firewall for the duration of your application.
+
+It states who is asking, from where, and for how long. **It asks nothing of the merchant about
+their own compliance** — hard constraint 7 runs in both directions, and a request that invited
+*"confirm your site meets the requirements"* would put a determination in a Mintro document under
+the merchant's name (D-067).
+
+If the address here is ever re-allocated, this copy changes with it. A merchant allowlisting a
+stale address gets a challenge and a report about a storefront nobody saw, which is exactly the
+failure the allowlist is for.
+
+---
+
 ## Paths in config files
 
 Two deploys were lost to the same mistake, so it is written down.
@@ -610,6 +667,7 @@ repository root, so `rules/ruleset.json` and `apps/web/dist` are correct as writ
 | `CREDENTIAL_PUBLIC_KEY` | — | not needed | — | not needed |
 | `SUPABASE_EVIDENCE_BUCKET` | — | optional | — | optional |
 | `RESEND_API_KEY` | — | ✅ | **never** | optional |
+| `ANTHROPIC_API_KEY` | **never** | ✅ | **never** | ✅ |
 | `WEB_ORIGIN` | — | ✅ | — | for local invites |
 | `MAIL_FROM` | — | optional | — | optional |
 | `MAIL_REPLY_TO` | — | optional | — | optional |
@@ -623,3 +681,9 @@ holds the secrets. `.env.example` in each place is the contract.
 
 Nothing prefixed `VITE_` may ever carry a secret. A public key is not a secret — it is what makes
 a secret unreadable to everyone holding it.
+
+`ANTHROPIC_API_KEY` was missing from this table until 2026-09-09, and the table is what somebody
+sets a new environment up from. The evaluation generator reads it and, absent, returns a `failed`
+draft saying *"no ANTHROPIC_API_KEY is configured on this worker, so no prompt was sent"* — which is
+the right behaviour and is also why nobody noticed: the job does not crash, it declines, and the
+decline reads like a run that had nothing to say.
