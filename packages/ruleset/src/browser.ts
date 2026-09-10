@@ -66,3 +66,13 @@ export {
   type SlotRow,
   type Removal,
 } from './composeSet.js';
+
+/**
+ * The placement ceiling each spectrum position carries (D-272).
+ *
+ * Exported to the browser because the editor's placement selector reads it: the operator is offered
+ * what the position permits and nothing else, from the same table the validator, the prompt and
+ * `publishRefusal` read. A second copy in the web would be a second answer to *how far may this go*,
+ * and the one in the browser is the one an operator acts on.
+ */
+export { PLACEMENT_BY_SPECTRUM, type PlacementId, type SpectrumId } from './angles.js';

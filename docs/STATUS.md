@@ -151,6 +151,16 @@ page selector's own slugs and by nav/footer links or the phrases *about*, *about
 PROD-016, and carried into the eye test. Layer 2 now evaluates after Layer 3 discovers, because one
 of its surfaces is now found there.
 
+### Mixed is referred out (D-272)
+
+`mixed` used to permit `international` or `domestic`, putting a storefront selling to both audiences
+on the same footing as one selling to laboratories. It permits `referred_out` alone now. The
+research end is unchanged, and `CONSUMER_SIDE` is untouched so shore-ups still render for mixed —
+the whole point of the position is that there is something to fix.
+
+`PLACEMENT_BY_SPECTRUM` is the single source and the editor's selector now reads it, so an operator
+is offered what the position permits rather than learning at publish.
+
 ### Routing rows are derived, not asserted (D-273)
 
 Run `f6008fa9` wrote **Met** on `no_water_or_syringes` over three feeders, one of which was

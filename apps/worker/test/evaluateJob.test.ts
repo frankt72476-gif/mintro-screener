@@ -1293,9 +1293,18 @@ describe('the prompt states how far the spectrum lets a placement go', () => {
   });
 
   it('says the research side may be international or domestic', () => {
-    for (const spectrum of ['mixed', 'research_leaning', 'research_supplier'] as const) {
+    for (const spectrum of ['research_leaning', 'research_supplier'] as const) {
       expect(prompt, spectrum).toContain(`\`${spectrum}\` — \`international\` or \`domestic\``);
     }
+  });
+
+  /*
+    And that mixed is referred out (D-272). The prompt renders the table rather than restating it,
+    so this reads the line the model is actually shown.
+  */
+  it('says mixed is referred out and nothing else', () => {
+    expect(prompt).toContain('`mixed` — `referred_out`');
+    expect(prompt).not.toContain('`mixed` — `international`');
   });
 
   it('says an unobservable condition is not a met one', () => {

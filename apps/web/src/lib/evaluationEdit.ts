@@ -18,6 +18,7 @@
  */
 
 import { MAX_SHORE_UPS } from '@mintro/engine';
+import { PLACEMENT_BY_SPECTRUM } from '@mintro/ruleset';
 import type { DraftCitation, StoredDraft } from './evaluationView.js';
 
 export { MAX_SHORE_UPS };
@@ -92,6 +93,23 @@ export function generateAffordance(
 }
 
 export const EDITABLE_PLACEMENTS = ['referred_out', 'international', 'domestic'] as const;
+
+/**
+ * The placements an operator may choose, for the spectrum the draft is at (D-272).
+ *
+ * **Reads `PLACEMENT_BY_SPECTRUM`**, which is the single source the validator, the prompt and
+ * `publishRefusal` all read. The selector used to offer all three regardless of position, so an
+ * operator could put a `mixed` draft at `domestic` and learn at publish that it is refused — a
+ * round trip to be told something the screen already knew.
+ *
+ * Falls back to the full list for a spectrum the table does not carry. That is a draft holding a
+ * position the angle set has since dropped, and offering nothing at all would leave an operator
+ * with a document they cannot edit; the validator still refuses whatever they pick.
+ */
+export function placementsFor(spectrum: string): readonly string[] {
+  const permitted = (PLACEMENT_BY_SPECTRUM as Readonly<Record<string, readonly string[]>>)[spectrum];
+  return permitted ?? EDITABLE_PLACEMENTS;
+}
 
 /** The leans an angle can be changed to. */
 export const EDITABLE_LEANS = ['research', 'neutral', 'consumer'] as const;

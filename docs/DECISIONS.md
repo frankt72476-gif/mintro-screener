@@ -18055,13 +18055,60 @@ useful direction.
 Where it stops is asserted beside it: `news` does not reach `/newsletter/` and `story` does not
 reach `/history/`, so the singularising is not a licence to match anything adjacent.
 
+## D-272 — Mixed is referred out
+**2026-09-10 · Frank**
+
+`mixed` used to permit `international` or `domestic`, which put a storefront selling to both
+audiences on the same footing as one selling to laboratories. A mixed position means the consumer
+side is present, and the consumer side is what the programme refers out. The middle of the spectrum
+is not a middle of the placement.
+
+| Position | Permits |
+|---|---|
+| `consumer_retail` | `referred_out` |
+| `consumer_leaning` | `referred_out`, `international` |
+| **`mixed`** | **`referred_out`** |
+| `research_leaning` | `international`, or `domestic` once every routing condition holds |
+| `research_supplier` | `international`, or `domestic` once every routing condition holds |
+
+The research end is unchanged. Its ceiling is in the table; the earning is in
+`domestic_with_unmet_routing` and `domestic_with_unobserved_routing`, which read the rows rather
+than the position — and after D-273 those rows read their own findings.
+
+### Mixed joins the consumer positions here and nowhere else
+
+`CONSUMER_SIDE` is untouched and still holds two. That set gates shore-ups under guardrail 5, and
+shore-ups are exactly what a mixed merchant needs: the whole point of the position is that there is
+something to fix, and a document that refers them out with no route back is a decision without a
+path. Frank's ruling says so explicitly and the code keeps the two questions apart — one list
+serving both would have taken the shore-ups away as a side effect of a placement change.
+
+### One table, and the editor now reads it
+
+`PLACEMENT_BY_SPECTRUM` is the single source. The validator reads it through
+`run.placementBySpectrum`, the prompt renders it rather than restating it, and `publishRefusal`
+reaches it through the same validator.
+
+**The editor's selector did not.** `EDITABLE_PLACEMENTS` was a flat list of all three, so an
+operator could put a `mixed` draft at `domestic` and learn at publish that it is refused — a round
+trip to be told something the screen already knew. `placementsFor` reads the table, and the
+ruleset's browser entry exports it so the web builds against the real thing rather than a copy.
+`browserEntry.test.ts` caught the missing export, which is that guard doing its job.
+
+Absent rather than disabled, which is this screen's standing rule (D-230). A draft at a position the
+table does not carry falls back to all three: the validator still refuses whatever is chosen, and
+offering nothing would leave an operator holding a document they cannot edit.
+
+### What was asserted, and what was left alone
+
+`consumer_leaning` keeps `referred_out` and `international`. The ruling names `mixed` as its
+subject, so widening it to *the consumer positions permit only referred_out* would have changed a
+position nobody asked about — flagged rather than assumed.
+
 ## D-273 — A routing row states what its rules observed
 **2026-09-10 · architect · amends D-259**
 
 Three corrections, all found in run `f6008fa9` (CoMo Peptides, 2026-09-10 12:39 UTC).
-
-> **Numbering.** There is no D-272 in this file. The instruction numbered this D-273, so 272 is left
-> free rather than renumbered into a possible collision with something written elsewhere.
 
 ### 1. A row says what its feeders support
 

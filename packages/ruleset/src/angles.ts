@@ -93,7 +93,25 @@ export const CONSUMER_SIDE: readonly SpectrumId[] = ['consumer_retail', 'consume
 export const PLACEMENT_BY_SPECTRUM: Readonly<Record<SpectrumId, readonly PlacementId[]>> = {
   consumer_retail: ['referred_out'],
   consumer_leaning: ['referred_out', 'international'],
-  mixed: ['international', 'domestic'],
+  /*
+    Mixed is referred out (D-272, Frank 2026-09-10).
+
+    It used to permit `international` or `domestic`, which put a storefront selling to both
+    audiences on the same footing as one selling to laboratories. A mixed position means the
+    consumer side is present, and the consumer side is what the programme refers out — the middle
+    of the spectrum is not a middle of the placement.
+
+    **Mixed joins the consumer positions here and nowhere else.** `CONSUMER_SIDE` is untouched and
+    still holds two, because that set gates shore-ups (guardrail 5) and shore-ups are exactly what
+    a mixed merchant needs: the whole point of the position is that there is something to fix. A
+    single list serving both questions would have taken them away.
+  */
+  mixed: ['referred_out'],
+  /*
+    The research end permits `international`, and `domestic` only once every routing condition
+    holds. The ceiling is here; the earning is in `domestic_with_unmet_routing` and
+    `domestic_with_unobserved_routing`, which read the rows rather than the position.
+  */
   research_leaning: ['international', 'domestic'],
   research_supplier: ['international', 'domestic'],
 };

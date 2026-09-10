@@ -1354,9 +1354,23 @@ describe('placement_outside_spectrum', () => {
   });
 
   it('refuses a research-side business referred out on the spectrum alone', () => {
-    for (const spectrum of ['mixed', 'research_leaning', 'research_supplier'] as const) {
+    for (const spectrum of ['research_leaning', 'research_supplier'] as const) {
       expect(rulesFor(spectrum, 'referred_out'), spectrum).toContain('placement_outside_spectrum');
     }
+  });
+
+  /*
+    Mixed is referred out, and only referred out (D-272).
+
+    It used to sit with the research side and permit `international` or `domestic`, which put a
+    storefront selling to both audiences on the same footing as one selling to laboratories. A mixed
+    position means the consumer side is present, and the consumer side is what the programme refers
+    out.
+  */
+  it('permits mixed nothing but referred out', () => {
+    expect(rulesFor('mixed', 'referred_out')).not.toContain('placement_outside_spectrum');
+    expect(rulesFor('mixed', 'international')).toContain('placement_outside_spectrum');
+    expect(rulesFor('mixed', 'domestic')).toContain('placement_outside_spectrum');
   });
 
   it('names the position and what it permits, so a retry knows where to move', () => {

@@ -48,7 +48,7 @@ import { formatStamp } from '../lib/format.js';
 import { useEvidenceDisclosure } from './EvidenceDisclosure.js';
 import {
   EDITABLE_LEANS,
-  EDITABLE_PLACEMENTS,
+  placementsFor,
   EDITABLE_ROUTING_STATUSES,
   canAddShoreUp,
   withLean,
@@ -529,8 +529,19 @@ function FocalPlacement({
           is the largest thing on the screen, so the control that sets it should look like the thing
           it sets. A dropdown here would hide two of the three answers behind a click.
         */
+        /*
+          Only what the spectrum permits (D-272).
+
+          The three were drawn unconditionally, so an operator could put a `mixed` draft at
+          `domestic` and learn at publish that the validator refuses it — a round trip to be told
+          something the screen already knew. `placementsFor` reads `PLACEMENT_BY_SPECTRUM`, the same
+          table the validator, the prompt and `publishRefusal` read.
+
+          Absent rather than disabled, which is this screen's standing rule (D-230): a control a
+          reader cannot use is not drawn.
+        */
         <div className="eval-focal-choice" role="radiogroup" aria-label="Recommended placement">
-          {EDITABLE_PLACEMENTS.map((id) => (
+          {placementsFor(draft.placement.spectrum).map((id) => (
             <button
               key={id}
               type="button"
