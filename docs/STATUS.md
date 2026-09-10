@@ -236,6 +236,22 @@ the order findings arrive in rather than by the merchant — and since the rejec
 both sides as `ruleId/state`, a draft refused for a differing key was refused with two identical
 lists and told to return the block exactly as supplied.
 
+### A capture inlines every image the page displayed (D-277)
+
+The Cheat Codes capture was refused with *"inlines 1 image(s) and the page displayed 95"*. Not the
+assembler: all ninety-five markers were created and then thrown away with the elements carrying
+them. A marker is a fragment, a fragment resolves to the page, the page is not an image, so setting
+it fired `error` on every image — and `EvidenceSlip` answers that by replacing the image with
+*capture not reachable*. Each image is now replaced by a listener-free clone before it is marked.
+
+With every image inlined the run assembles to **182.7 MB against a 40 MB ceiling**, so section 6's
+images are downscaled at capture time to 560px JPEG (27.5 MB) and the ceiling is unchanged. The
+stored evidence is untouched; only the forwarded document carries the smaller bytes.
+
+Open, and not a defect: eleven distinct screenshots are written ninety-four times. Writing each once
+and referencing it would fit under the ceiling at full resolution and make the downscale
+unnecessary, but it changes what an evidence row is, which is a design ruling.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl

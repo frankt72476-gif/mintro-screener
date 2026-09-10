@@ -18560,3 +18560,113 @@ because a model that echoes the items and flips the flag is asserting something 
 rather than pages attempted — the module says so itself and says the two cannot be unified. This
 reads that field as it is defined; it does not recount anything.
 
+
+## D-277 — A capture inlines every image the page displayed
+
+**Date:** 2026-09-10
+**Status:** accepted
+**Found on:** run `50a49af8` (cheatcodespeptides.com), evaluation `877304a4`
+
+The capture was refused:
+
+```
+the captured report inlines 1 image(s) and the page displayed 95.
+A report missing a capture is not a report to deliver.
+```
+
+The guard did its job. The one image that survived was the masthead lockup.
+
+### It was not the assembler
+
+D-275 replaced the per-image `split`/`join` with a single regex pass, and the first thing to check
+was whether that pass matches every reference or only the first. **It matches every one** — the
+pattern is global, and `captureMemory.test.ts` already asserted sixty markers substituted in one
+document. The refusal came from somewhere else.
+
+Driving `renderReportPage` against the run's own report showed it exactly:
+
+```
+images displayed  : 95
+images loaded     : 95
+markers created   : 95
+"<img" in html    : 1
+"shot-missing"    : 104
+```
+
+**All ninety-five markers were created and then thrown away with the elements carrying them.**
+
+A marker is a fragment — `#mintro-capture-7` — chosen so that nothing tries to resolve it while the
+page is still open. A fragment resolves to the page itself, which is HTML and not an image, so the
+browser fires `error` on every image the instant the marker is set. `EvidenceSlip`'s `Shot` listens
+for exactly that:
+
+```tsx
+onError={() => setFailed(true)}
+```
+
+and renders *capture not reachable* in the image's place. So React removed ninety-four `<img>`
+elements in the moments between the marker step and `page.content()` four lines below it.
+
+The marker scheme was written to be inert and is not: it is a change to `src`, and the page has an
+opinion about `src` changes that fail.
+
+**The fix is one line and a half.** Each image is replaced by `cloneNode(false)` before the marker
+goes on. The clone carries the attributes and none of the listeners, and it is not in React's
+instance map, so nothing reacts to anything the marker step does. The page is being serialized and
+discarded; there is nothing left for React to render.
+
+### The ceiling does not hold at ninety-five, and thumbnails are the answer taken
+
+With every image inlined, the run was measured end to end. Ninety-four evidence images drawn from
+**eleven distinct screenshots**, 15.0 MB of PNG, one screenshot cited twenty-two times:
+
+| setting | delivered document |
+|---|---|
+| full size | 182.7 MB |
+| 700px, q 0.72 | 42.9 MB |
+| 640px, q 0.68 | 35.1 MB |
+| **560px, q 0.65** | **27.5 MB** |
+| 480px, q 0.60 | 20.1 MB |
+
+The ceiling is 40 MB. Full-size inlining exceeds it four and a half times over, so **section 6's
+images are downscaled at capture time and the ceiling is unchanged**, which is the ruling asked for.
+560px is taken rather than 640px because 640 clears the ceiling by twelve per cent, and twelve per
+cent is no margin for a merchant with more findings than this one.
+
+`apps/worker` depends on Playwright and nothing that decodes a PNG, so the downscale happens in a
+page in the browser the capture is already running in: decode, draw to a canvas at the target width,
+re-encode as JPEG. It runs against the cache, so a screenshot cited twenty-two times is re-encoded
+once. A downscale that comes back larger than its input is discarded.
+
+**What is lost, stated plainly.** A downscaled JPEG of a full-page screenshot is not a substitute
+for the screenshot: body text in a thumbnail is not readable, and a reader who wants to check a
+matched phrase against the page it came from cannot do it from the delivered file alone. The stored
+evidence is untouched — the bucket is append-only (hard constraint 5) and holds the original PNG at
+full resolution for every finding. What changed is only what the forwarded document carries.
+
+### The thing this did not fix
+
+**The document is not large because it holds a lot of evidence. It is large because it holds the
+same evidence over and over.** Eleven screenshots, written ninety-four times: 20.0 MB at full
+resolution if each were written once, against 182.7 MB as written.
+
+Writing each distinct capture once and referencing it would put the document under the ceiling at
+**full resolution, with no fidelity loss at all** — and would make the thumbnailer unnecessary. It
+cannot be done in self-contained HTML without changing what an evidence row is: a CSS background
+keyed by class, or one row per capture with the citing rules listed beside it. Both are changes to
+the document an underwriter reads, which is a design ruling rather than a defect fix. Open.
+
+### The guard is kept
+
+`assertCapturable` still counts inlined images against what the page reported and still refuses a
+short count, and a marker whose bytes could not be fetched is still left in place rather than
+blanked. Asserted in `captureEveryImage.test.ts`, at the count that failed.
+
+### Negatives
+
+| Broken | Fails |
+|---|---|
+| the clone before marking | `captureMarkers.test.ts`: forty markers, zero `<img>` in the document |
+| the single-pass substitution | one image inlined of ninety-five |
+| leaving an unfetched marker alone | a blank `src` passes for a capture |
+| the thumbnail constants | the measured table no longer clears the ceiling |

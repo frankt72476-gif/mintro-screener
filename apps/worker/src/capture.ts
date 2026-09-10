@@ -168,8 +168,25 @@ export async function renderReportPage(
 
           if (source === null) return;
 
+          /*
+            The element is replaced by a listener-free clone before the marker goes on (D-277).
+
+            A marker is a fragment, and a fragment resolves to the page itself — which is HTML and
+            not an image, so the browser fires `error` on every image the moment the marker is set.
+            `EvidenceSlip`'s `Shot` listens for exactly that and renders *capture not reachable* in
+            the image's place, so React tore all ninety-five `<img>` elements out of the document
+            between this line and `page.content()` a few lines below. The markers were all created
+            correctly and then thrown away with the elements that carried them.
+
+            `cloneNode(false)` copies the attributes and none of the listeners, and the clone is not
+            in React's instance map, so nothing reacts to anything this does. The page is being
+            serialized and discarded; there is nothing left for React to render.
+          */
+          const frozen = image.cloneNode(false) as HTMLImageElement;
+          image.replaceWith(frozen);
+
           const marker = `${prefix}${index}`;
-          image.setAttribute('src', marker);
+          frozen.setAttribute('src', marker);
           out.push([marker, source]);
         });
 
