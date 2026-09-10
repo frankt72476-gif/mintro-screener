@@ -17320,10 +17320,10 @@ all. Both matter:
 - Every satisfied and violating finding builds evidence from `screenshotKey ?? domKey`. Under its
   own name the interstitial is citable only by the finding that says the page was not seen.
 
-Migration `0084` widens the `evidence.kind` check to admit it. It also admits `coa`, which the
-engine has produced since the certificate fetch was built and this column would have refused — a
-latent defect that would have failed the first run to reach a certificate, and one production has
-not hit because no `coa` row exists.
+Migration `0084` widens the `evidence.kind` check to admit it, and is **applied to production**
+(2026-09-09). It also admits `coa`, which the engine has produced since the certificate fetch was
+built and this column would have refused — a latent defect that would have failed the first run to
+reach a certificate, and one production had not hit because no `coa` row exists.
 
 ### The false pass, and why detection alone would not have stopped it
 
@@ -17625,8 +17625,7 @@ stored artifact.
 
 ### Migration
 
-`0085` widens `evidence.kind` to admit `gate`. It must be applied before the next scan of a gated
-merchant, or the evidence insert fails and the run is left open.
+`0085` widens `evidence.kind` to admit `gate`, and is **applied to production** (2026-09-09).
 
 ### The four affected runs are not repaired
 

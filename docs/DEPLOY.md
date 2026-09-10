@@ -74,8 +74,16 @@ is the truth about them. **Send to IQwallet does nothing without it.**
 
 ### 1.1b Outstanding against production — as of 2026-08-28
 
-**Production is at 0044. `0045` and `0046` have not been applied.** Checked read-only against
-production's REST API on 2026-08-28, not assumed:
+> **Settled. This section is history, kept for the reasoning below and not as a statement of what
+> production holds.** `0045` and `0046` went on, and production has since moved through `0085`.
+> Verified read-only on 2026-09-10: `comment_submissions` (`0045`), `analyst_invites` (`0068`),
+> `report_captures` (`0072`), `evaluation_drafts` (`0075`), `evaluations` (`0076`) and
+> `evaluation_publish_requests` (`0083`) are all present, and `evidence.kind` accepts `challenge`
+> and `gate` (`0084`, `0085`). **Do not run the batch below.** What is worth keeping is the
+> *do-not-stop-at-the-first-error* rule at the end, which is general.
+
+**As of 2026-08-28: production is at 0044. `0045` and `0046` have not been applied.** Checked
+read-only against production's REST API on that date, not assumed:
 
 | Migration | Production | Verification (`wakpxbojiqgbjuxikqab`) |
 |---|---|---|

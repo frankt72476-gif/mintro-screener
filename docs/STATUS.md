@@ -53,10 +53,9 @@ detection alone would not have stopped it: `served` meant *answered with any sta
 **D-017 is unchanged: no stealth, no proxy, no retry-through.** The crawl reports the challenge; it
 does not try to get past it.
 
-**Migration `0084` needs production apply before the next scan.** It widens the `evidence.kind`
-check to admit `challenge` — and `coa`, which the engine has produced since the certificate fetch
-was built and which this column would have refused. Until it is applied, a run that meets bot
-protection fails its evidence insert and is left open.
+**Migration `0084` is applied to production** (2026-09-09). It widens the `evidence.kind` check to
+admit `challenge` — and `coa`, which the engine has produced since the certificate fetch was built
+and which this column would have refused.
 
 **The four runs already affected are not repaired and will not be.** Runs are immutable (D-002).
 They keep the counts they were written with; what changes is that the next one says what happened.
@@ -102,8 +101,8 @@ and the form submitted **once per run**, and the page behind it is read as the p
 A gate that does not take falls back to the D-266 behaviour with nothing submitted twice. The
 masthead then reads *"Entered through the merchant's consent gate"*.
 
-**Migration `0085` needs production apply before the next scan**, alongside `0084`. Run `97bf366a`
-is not repaired and will not be (D-002).
+**Migration `0085` is applied to production** (2026-09-09), alongside `0084`. Run `97bf366a` is not
+repaired and will not be (D-002).
 
 ### The 2026-09-10 stalls were memory, not network (D-268)
 
