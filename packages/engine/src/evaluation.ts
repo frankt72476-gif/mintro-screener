@@ -191,13 +191,32 @@ export function computeLegality(
   return { clean: !items.some((item) => item.state === 'fail'), items };
 }
 
-/** The two blocks match, ignoring the note the model is allowed to add. */
+/**
+ * The two blocks match, on what the block is *for*.
+ *
+ * **`(ruleId, state)`, order-insensitive, and nothing else (D-276).**
+ *
+ * The key used to carry `evidenceKey` as well, and that made the comparison sensitive to something
+ * the block does not assert. A legality rule can produce more than one finding — several product
+ * pages, several captures — and `computeLegality` takes each finding in the order the findings
+ * arrive, so which capture ends up beside a rule is a fact about iteration order rather than about
+ * the merchant. Two derivations of the same run could disagree on it and agree on everything that
+ * matters, which is D-216 exactly.
+ *
+ * The symptom was worse than the cause. `validate` renders both sides as `ruleId/state` when it
+ * rejects, so a draft refused for a differing evidence key was refused with a message showing
+ * **two identical lists** and the instruction *"Return it exactly as supplied"* — over a block the
+ * model had returned exactly as supplied.
+ *
+ * The note is ignored for the same reason it always was: a sentence per item is the model's only
+ * permitted contribution. `clean` is still compared even though the items determine it, because a
+ * model that echoes the items and flips the flag is asserting something about the run.
+ */
 export function legalityMatches(draft: DraftLegality, computed: DraftLegality): boolean {
   if (draft.clean !== computed.clean) return false;
   if (draft.items.length !== computed.items.length) return false;
 
-  const key = (item: DraftLegalityItem): string =>
-    `${item.ruleId}|${item.state}|${item.evidenceKey}`;
+  const key = (item: DraftLegalityItem): string => `${item.ruleId}|${item.state}`;
   const left = [...draft.items].map(key).sort();
   const right = [...computed.items].map(key).sort();
   return left.every((entry, index) => entry === right[index]);

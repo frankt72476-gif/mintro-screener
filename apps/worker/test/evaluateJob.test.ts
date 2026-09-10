@@ -561,13 +561,26 @@ describe('the cross-cutting angle is not an empty one', () => {
 });
 
 describe('the storefront-not-seen guard', () => {
-  const stats = (over: Partial<EvaluationInputs['pageStats']>): EvaluationInputs['pageStats'] => ({
-    selectedCount: 20,
-    distinctTexts: 18,
-    dominantTextCount: 2,
-    dominantTextSample: '',
-    ...over,
-  });
+  /*
+    The guard takes the whole inputs object now, because the challenge, gate and product-sample
+    records are read off the report rather than copied onto `pageStats` by whoever built them
+    (D-276). Only one of the two builders was copying them.
+  */
+  const stats = (
+    over: Partial<EvaluationInputs['pageStats']>,
+    report: Partial<EvaluationInputs['report']> = {},
+  ): EvaluationInputs =>
+    ({
+      // A catalogue that was read, so only the text conditions can refuse these.
+      report: { sample: { productsInScope: 20, productsSampled: 20 }, ...report },
+      pageStats: {
+        selectedCount: 20,
+        distinctTexts: 18,
+        dominantTextCount: 2,
+        dominantTextSample: '',
+        ...over,
+      },
+    }) as unknown as EvaluationInputs;
 
   it('passes a run that saw a storefront', () => {
     expect(storefrontNotSeen(stats({}))).toBeNull();

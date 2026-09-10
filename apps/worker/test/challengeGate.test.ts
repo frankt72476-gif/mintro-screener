@@ -23,7 +23,7 @@ import {
   type PageContext,
   type SurfaceSpec,
 } from '@mintro/engine';
-import { storefrontNotSeen } from '../src/evaluateJob.js';
+import { storefrontNotSeen, type EvaluationInputs } from '../src/evaluateJob.js';
 import { establishDocument } from '../src/locate.js';
 
 const REPO_ROOT = resolve(dirname(), '../../..');
@@ -44,9 +44,40 @@ const HEALTHY = {
   dominantTextSample: 'Research peptides for laboratory use',
 };
 
+/**
+ * The inputs the guard reads, assembled the way the job assembles them (D-276).
+ *
+ * The challenge, gate and product-sample counts come off the **report** now rather than off
+ * `pageStats`. They were optional fields on the stats, copied there by whoever built the inputs,
+ * and only one of the two builders did the copying — so the dry run in `bin/evaluate.ts` reported
+ * a challenged run as readable.
+ *
+ * `sample` defaults to a catalogue that was read, so a test about challenges is about challenges.
+ */
+const inputs = (
+  stats: Record<string, unknown>,
+  record: {
+    readonly challenged?: number;
+    readonly gated?: number;
+    readonly inScope?: number;
+    readonly served?: number;
+  } = {},
+): EvaluationInputs =>
+  ({
+    report: {
+      sample: {
+        productsInScope: record.inScope ?? 20,
+        productsSampled: record.served ?? 20,
+      },
+      ...(record.challenged === undefined ? {} : { challenge: { challenged: record.challenged } }),
+      ...(record.gated === undefined ? {} : { consentGate: { gated: record.gated } }),
+    },
+    pageStats: stats,
+  }) as unknown as EvaluationInputs;
+
 describe('a challenged run has not seen the storefront', () => {
   it('refuses even a run whose texts look healthy', () => {
-    const message = storefrontNotSeen({ ...HEALTHY, challenged: 1 });
+    const message = storefrontNotSeen(inputs(HEALTHY, { challenged: 1 }));
 
     expect(message).not.toBeNull();
     expect(message).toContain('bot protection');
@@ -57,20 +88,24 @@ describe('a challenged run has not seen the storefront', () => {
     reading "re-scan" against a challenge does the one thing that is guaranteed not to help.
   */
   it('does not tell the operator to re-scan', () => {
-    const message = storefrontNotSeen({ ...HEALTHY, challenged: 9 }) ?? '';
+    const message = storefrontNotSeen(inputs(HEALTHY, { challenged: 9 })) ?? '';
 
     expect(message).toContain('a re-scan is not the repair');
     expect(message).toContain('nothing was established about this merchant');
   });
 
   it('leaves the text-collapse message alone on a run that met no challenge', () => {
-    const collapsed = storefrontNotSeen({
-      selectedCount: 30,
-      distinctTexts: 2,
-      dominantTextCount: 28,
-      dominantTextSample: 'Are you 21 or older?',
-      challenged: 0,
-    });
+    const collapsed = storefrontNotSeen(
+      inputs(
+        {
+          selectedCount: 30,
+          distinctTexts: 2,
+          dominantTextCount: 28,
+          dominantTextSample: 'Are you 21 or older?',
+        },
+        { challenged: 0 },
+      ),
+    );
 
     expect(collapsed).toContain('Re-scan the merchant');
     expect(collapsed).not.toContain('bot protection');
@@ -82,7 +117,7 @@ describe('a challenged run has not seen the storefront', () => {
     (D-002).
   */
   it('passes a healthy run with no challenge record at all', () => {
-    expect(storefrontNotSeen(HEALTHY)).toBeNull();
+    expect(storefrontNotSeen(inputs(HEALTHY))).toBeNull();
   });
 
   /*
@@ -91,7 +126,7 @@ describe('a challenged run has not seen the storefront', () => {
     just deployed close to the control the programme asks for.
   */
   it('refuses a gated run, and does not describe it as a shortfall', () => {
-    const message = storefrontNotSeen({ ...HEALTHY, gated: 16 }) ?? '';
+    const message = storefrontNotSeen(inputs(HEALTHY, { gated: 16 })) ?? '';
 
     expect(message).toContain('consent gate');
     expect(message).toContain('does not attest through it');
@@ -101,8 +136,8 @@ describe('a challenged run has not seen the storefront', () => {
   });
 
   it('tells a gated run apart from a challenged one', () => {
-    expect(storefrontNotSeen({ ...HEALTHY, challenged: 9 })).toContain('bot protection');
-    expect(storefrontNotSeen({ ...HEALTHY, gated: 9 })).not.toContain('bot protection');
+    expect(storefrontNotSeen(inputs(HEALTHY, { challenged: 9 }))).toContain('bot protection');
+    expect(storefrontNotSeen(inputs(HEALTHY, { gated: 9 }))).not.toContain('bot protection');
   });
 });
 

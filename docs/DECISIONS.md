@@ -18461,3 +18461,102 @@ Each of these fails when the mechanism behind it is removed:
 | the capture line rendering | absence explains nothing |
 | the single-pass substitution | sixty images cost quadratically |
 | the marker prefix renamed | the load-time check, then the substitution test |
+
+
+## D-276 — A catalogue nobody was served, and a legality block compared on what it asserts
+
+**Date:** 2026-09-10
+**Status:** accepted
+**Found on:** run `7c7600e1-f8ea-444b-8eb7-0ab68edb5de0` (www.legendarypeptides.com)
+
+Two corrections to the evaluation path.
+
+### 1. `storefrontNotSeen` fires when no product page was served
+
+Run `7c7600e1` sampled eighteen product pages and **was served none of them**. Every product URL
+redirected to `/my-account/?redirect_to=…`, so eighteen requests produced eighteen captures of one
+login form. The run's own record says it in two numbers:
+
+```
+productsInScope: 34
+productsSampled:  0
+```
+
+A draft was generated anyway. Six of the seven angles are about the catalogue.
+
+#### Why the existing conditions could not have caught it
+
+Both ask whether the pages *read* collapse to one document. The pages read here were the homepage,
+the sign-up form, the terms and the shipping policy — the run names them itself under
+`surfacesRead` — so four distinct texts, no dominant one, a spread that looks healthy by every
+measure those conditions take.
+
+The eighteen identical product captures never reached the statistics at all. `selectPages` collapses
+byte-identical texts into a single entry before counting, so **the collapse that was the whole story
+is the thing the statistics removed.** That is why the new condition is a record rather than an
+inference, and why it is taken with the challenge and gate records rather than beside the text ones.
+
+`productsInScope > 0` guards it. Zero of zero is a catalogue we never found, which is a different
+problem with a different answer — `assessWall` already says so in those words, and naming it here
+would send an operator looking for a credential to fix a missing sitemap.
+
+The message names the limit of the crawl, never a shortfall of the merchant's. A login wall is a
+control a business is entitled to have (hard constraint 7).
+
+#### And the guard now reads the report, because only one caller was feeding it
+
+`challenged` and `gated` were optional fields on `pageStats`, copied there from the report by
+whoever assembled the inputs — and **only one of the two assemblers did the copying.**
+`evaluationRun` did. `bin/evaluate.ts`, the dry run, did not.
+
+So `npm run evaluate -- --dry-run` over a challenged run printed a clean prompt and reported the run
+as readable. That is precisely what the comment above its own guard says it must never do: *"A dry
+run that printed a clean prompt over a run nobody could have read would be the most misleading
+output this tool produces."*
+
+Two assemblers copying the same facts is two answers to one question (D-181). The report is already
+in `inputs`, so `storefrontNotSeen` takes the whole inputs object and reads all three off it. The
+fields are gone from `pageStats`, which now carries only what the page selection actually computes.
+
+All three stay optional and permanently so. A run recorded before a given record existed does not
+carry it, and absent means *the count was never taken* rather than *nothing happened* — those runs
+behave exactly as they did, which is what D-002 requires.
+
+### 2. `legalityMatches` compares `(ruleId, state)` only
+
+The key carried `evidenceKey` as well, which made the comparison sensitive to something the block
+does not assert. A legality rule can produce several findings — several product pages, several
+captures — and `computeLegality` takes them in the order the findings arrive, so which capture ends
+up beside a rule is a fact about iteration order rather than about the merchant. Two derivations of
+one run could disagree on it and agree on everything that matters. D-216, again.
+
+**The symptom was worse than the cause.** `validate` renders both sides as `ruleId/state` when it
+rejects, so a draft refused for nothing but a differing evidence key was refused with **two
+identical lists** and the instruction *"Return it exactly as supplied"* — over a block the model had
+returned exactly as supplied. An operator reading that rejection has no way to act on it.
+
+Order-insensitivity was already there and stays. What is dropped is only the key.
+
+This narrows what `legality_altered` means; it does not stop anyone noticing a bad capture.
+`unbacked_legality_item` refuses a legality item whose capture the run does not hold, and it is
+asserted here that it still does. `clean` is still compared even though the items determine it,
+because a model that echoes the items and flips the flag is asserting something about the run.
+
+### Negatives
+
+| Broken | Fails |
+|---|---|
+| the unserved-catalogue condition | run `7c7600e1` is drafted again |
+| the `productsInScope > 0` guard | a run with no catalogue found is called a wall |
+| the gate read off the report | a gated run is described by the wrong sentence |
+| the challenge read off the report | a challenged run passes |
+| `evidenceKey` back in the legality key | a restated capture is refused as an altered block |
+| the sort | the same items in a different order are refused |
+| the clean-flag check | a flipped flag over identical items passes |
+
+### Not in this change
+
+`report.sample` is written by `scanProgress`, and `productsSampled` counts pages that came back
+rather than pages attempted — the module says so itself and says the two cannot be unified. This
+reads that field as it is defined; it does not recount anything.
+

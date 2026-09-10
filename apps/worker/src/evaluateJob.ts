@@ -185,23 +185,6 @@ export interface EvaluationInputs {
     readonly distinctTexts: number;
     readonly dominantTextCount: number;
     readonly dominantTextSample: string;
-    /**
-     * Pages this run rendered whose response was the site's bot protection (D-264).
-     *
-     * Read from the run's own `report.challenge`, not recounted here. The crawl is the only party
-     * that saw the headers, and a second derivation from the stored evidence would be a second
-     * answer to a question already answered (D-216).
-     *
-     * Optional, permanently: a run recorded before D-264 has no such record, and absent means the
-     * distinction was never made rather than that nothing was challenged.
-     */
-    readonly challenged?: number;
-    /**
-     * Pages the merchant's own consent gate stood in front of (D-266).
-     *
-     * Read from `report.consentGate`, never recounted. Optional and permanent, like `challenged`.
-     */
-    readonly gated?: number;
   };
 }
 
@@ -421,8 +404,26 @@ export const MIN_DISTINCT_TEXTS = 3;
  * Returns the message rather than a boolean, because the message is the artifact: it names the
  * text and how many pages it covered, which is what tells an operator to re-scan rather than retry.
  */
-export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string | null {
-  const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = stats;
+export function storefrontNotSeen(inputs: EvaluationInputs): string | null {
+  const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = inputs.pageStats;
+
+  /*
+    The three records, read off the report rather than passed in (D-276).
+
+    `challenged` and `gated` used to be optional fields on `pageStats`, copied there from the report
+    by whoever built the inputs — and **only one of the two builders copied them**. `evaluationRun`
+    did; `bin/evaluate.ts`, the dry run, did not. So `npm run evaluate -- --dry-run` over a
+    challenged run printed a clean prompt and reported the run as readable, which is the most
+    misleading output that tool produces and is exactly what its own comment says it must not do.
+
+    Two builders copying the same three facts is two answers to one question (D-181). The report is
+    already in `inputs`, so the guard reads it directly and there is one answer.
+
+    All three are optional and permanently so. A run recorded before D-264 has no challenge record,
+    and absent means *the distinction was never made* rather than *nothing was challenged* — those
+    runs behave exactly as they did, which is what D-002 requires of them.
+  */
+  const report = inputs.report;
 
   /*
     A challenged run, before the text conditions are consulted at all (D-264).
@@ -451,7 +452,7 @@ export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string 
     Saying *"the site did not see the storefront"* without naming which of the two would send an
     operator looking for a fault in a run where the merchant did something right.
   */
-  const gated = stats.gated ?? 0;
+  const gated = report.consentGate?.gated ?? 0;
   if (gated > 0) {
     return (
       `This run did not see the storefront: the merchant's own consent gate stands in front of ` +
@@ -462,7 +463,7 @@ export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string 
     );
   }
 
-  const challenged = stats.challenged ?? 0;
+  const challenged = report.challenge?.challenged ?? 0;
   if (challenged > 0) {
     return (
       `This run did not see the storefront: the site's bot protection answered ${challenged} of ` +
@@ -470,6 +471,42 @@ export function storefrontNotSeen(stats: EvaluationInputs['pageStats']): string 
       'served, so nothing was established about this merchant either way — and re-scanning from ' +
       'the same place will meet the same challenge, so a re-scan is not the repair. ' +
       'Nothing here is an observation about the merchant.'
+    );
+  }
+
+  /*
+    Not one product page was served (D-276).
+
+    Run `7c7600e1` (www.legendarypeptides.com, 2026-09-10) sampled eighteen product pages and was
+    served **none of them**: every one redirected to `/my-account/?redirect_to=…`, so the crawl held
+    eighteen captures of one login form. `report.sample` records it exactly — `productsInScope: 34`,
+    `productsSampled: 0` — and a draft was written anyway, over a catalogue nobody saw.
+
+    The two text conditions did not catch it and were never going to. They ask whether the *pages
+    read* collapse to one document, and the pages read here were the homepage, the sign-up form, the
+    terms and the shipping policy: four distinct texts, no dominant one, a healthy-looking spread.
+    The eighteen identical product captures were collapsed into a single entry before the stats were
+    taken, so the collapse that was the whole story is the thing the statistics removed.
+
+    This is a record rather than an inference, so it is taken with the other two records and before
+    them: `productsSampled` is the crawl's own count of what came back, and the crawl is the only
+    party that ever saw those responses.
+
+    `productsInScope > 0` is the guard that keeps this from firing on a run whose catalogue was
+    never found. Zero of zero is not a wall — it is a different problem with a different answer, and
+    `assessWall` already says so in those words. Naming it here would send an operator looking for a
+    credential to fix a missing sitemap.
+  */
+  const inScope = report.sample?.productsInScope ?? 0;
+  const served = report.sample?.productsSampled ?? 0;
+  if (inScope > 0 && served === 0) {
+    return (
+      `This run did not see the storefront: none of the ${inScope} product page(s) in scope were ` +
+      'served to this crawl. No prompt was sent. Every product URL answered with something other ' +
+      'than the product — a login form, a redirect, a refusal — so the catalogue, which is what ' +
+      'six of the seven angles are about, was never read. What the run did read is the homepage ' +
+      'and the policy pages, and a draft reasoned from those alone would read as an account of a ' +
+      'catalogue. Nothing here is an observation about the merchant.'
     );
   }
 
@@ -579,7 +616,7 @@ export async function generateDraft(
     The guard runs before the key is even looked for. A run that did not see the storefront is not
     a configuration problem, and reporting it as one would send an operator to check an env var.
   */
-  const notSeen = storefrontNotSeen(inputs.pageStats);
+  const notSeen = storefrontNotSeen(inputs);
   if (notSeen !== null) {
     return { ...base, status: 'run_did_not_see_storefront', attempts: 0, message: notSeen };
   }

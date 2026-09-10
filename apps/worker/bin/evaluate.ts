@@ -165,7 +165,7 @@ async function main(argv: readonly string[]): Promise<number> {
     The guard, reported on both paths. A dry run that printed a clean prompt over a run nobody
     could have read would be the most misleading output this tool produces.
   */
-  const notSeen = storefrontNotSeen(inputs.pageStats);
+  const notSeen = storefrontNotSeen(inputs);
 
   if (dryRun) {
     const parts = requestParts(angles, ruleset, inputs);

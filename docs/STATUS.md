@@ -217,6 +217,25 @@ and the images go in last.
 Send and Open both gate on a completed capture of the newest published version. The list line reads
 `Not yet evaluated`, `Draft`, or `Consumer-leaning · Referred out · v1 published`.
 
+### A catalogue nobody was served is a storefront nobody saw (D-276)
+
+Run `7c7600e1` (www.legendarypeptides.com) sampled eighteen product pages and was served **none of
+them** — every product URL redirected to `/my-account/` — and a draft was written anyway, over a
+catalogue six of the seven angles are about. The two existing conditions ask whether the pages read
+collapse to one document, and the pages read were the homepage, the sign-up form, the terms and the
+shipping policy: four distinct texts, a healthy-looking spread. The eighteen identical product
+captures were collapsed before the statistics were taken.
+
+`storefrontNotSeen` now reads the run's own `productsSampled` and `productsInScope`, and reads the
+challenge and gate records off the report as well — they used to be copied onto `pageStats` by
+whoever assembled the inputs, and only one of the two assemblers did it, so `evaluate --dry-run`
+over a challenged run reported it as readable.
+
+`legalityMatches` compares `(ruleId, state)` only. It carried the evidence key, which is decided by
+the order findings arrive in rather than by the merchant — and since the rejection message renders
+both sides as `ruleId/state`, a draft refused for a differing key was refused with two identical
+lists and told to return the block exactly as supplied.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl

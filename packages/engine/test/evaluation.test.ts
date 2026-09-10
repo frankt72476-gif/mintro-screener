@@ -908,6 +908,98 @@ describe('unbacked_legality_item', () => {
   });
 });
 
+describe('legalityMatches compares (ruleId, state) and nothing else', () => {
+  /*
+    D-276. The key used to carry `evidenceKey`, which made the comparison sensitive to something the
+    block does not assert: a legality rule can produce several findings, and which capture ends up
+    beside the rule is a fact about the order the findings arrive in rather than about the merchant.
+    Two derivations of one run could disagree on it and agree on everything that matters (D-216).
+  */
+  it('accepts a block whose items carry a different capture of the same rule', () => {
+    const restated = {
+      clean: LEGALITY.clean,
+      items: [
+        { ...LEGALITY.items[0]!, evidenceKey: 'run-1/layer0/a-different-capture' },
+        LEGALITY.items[1]!,
+      ],
+    };
+
+    expect(legalityMatches(restated, LEGALITY)).toBe(true);
+  });
+
+  it('accepts the same items in a different order', () => {
+    const reversed = { clean: LEGALITY.clean, items: [...LEGALITY.items].reverse() };
+
+    expect(legalityMatches(reversed, LEGALITY)).toBe(true);
+  });
+
+  it('still refuses a changed state, an added item and a dropped one', () => {
+    const changed = {
+      clean: LEGALITY.clean,
+      items: [{ ...LEGALITY.items[0]!, state: 'not_evaluable' as const }, LEGALITY.items[1]!],
+    };
+    const added = {
+      clean: LEGALITY.clean,
+      items: [...LEGALITY.items, { ruleId: 'CATG-009', state: 'fail' as const, evidenceKey: '' }],
+    };
+    const dropped = { clean: LEGALITY.clean, items: [LEGALITY.items[0]!] };
+
+    expect(legalityMatches(changed, LEGALITY)).toBe(false);
+    expect(legalityMatches(added, LEGALITY)).toBe(false);
+    expect(legalityMatches(dropped, LEGALITY)).toBe(false);
+  });
+
+  /*
+    The items determine `clean`, so this is redundant arithmetic — and it is kept, because a model
+    that echoes the items and flips the flag is asserting something about the run.
+  */
+  it('still refuses a flipped clean flag over identical items', () => {
+    expect(legalityMatches({ clean: true, items: LEGALITY.items }, LEGALITY)).toBe(false);
+  });
+
+  /*
+    The symptom, which was worse than the cause.
+
+    `validate` renders both sides as `ruleId/state` when it rejects, so a draft refused for nothing
+    but a differing evidence key was refused with **two identical lists** and the instruction
+    *"Return it exactly as supplied"* — over a block the model had returned exactly as supplied.
+  */
+  it('does not reject a draft whose rendered rejection would be two identical lists', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: {
+        clean: false,
+        items: [
+          { ...LEGALITY.items[0]!, evidenceKey: 'run-1/layer0/abc' },
+          LEGALITY.items[1]!,
+        ],
+      },
+    }));
+
+    expect(rejectionRules(draft)).not.toContain('legality_altered');
+  });
+
+  /*
+    And the key is still checked, by the rule that exists for it. Dropping it from the comparison
+    narrows what `legality_altered` means; it does not stop anybody noticing a capture this run does
+    not hold.
+  */
+  it('leaves a capture the run does not hold to unbacked_legality_item', () => {
+    const draft = mutate((d) => ({
+      ...d,
+      legality: {
+        clean: false,
+        items: [
+          { ...LEGALITY.items[0]!, evidenceKey: 'run-9/layer0/nope' },
+          LEGALITY.items[1]!,
+        ],
+      },
+    }));
+
+    expect(rejectionRules(draft)).toContain('unbacked_legality_item');
+  });
+});
+
 describe('publishRefusal', () => {
   /*
     A rejected draft keeps its content now, so an operator can repair one word instead of paying

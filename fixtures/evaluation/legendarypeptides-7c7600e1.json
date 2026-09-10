@@ -1,0 +1,27 @@
+{
+  "runId": "7c7600e1-f8ea-444b-8eb7-0ab68edb5de0",
+  "merchantDomain": "www.legendarypeptides.com",
+  "finishedAt": "2026-09-10T20:49:54.166Z",
+  "sample": {
+    "notRendered": {
+      "overCap": 0,
+      "recognised": 16
+    },
+    "surfacesRead": [
+      "the homepage",
+      "the sign-up form",
+      "the terms document",
+      "the shipping policy"
+    ],
+    "productsInScope": 34,
+    "productsSampled": 0
+  },
+  "access": {
+    "mode": "public",
+    "note": "none of the 18 sampled product page(s) were served to an anonymous request. No screening account is stored for this merchant, so product-surface rules could not be observed and are reported as not observed. Coverage of those rules would be wider with a merchant-supplied login that signs in.",
+    "wall": true,
+    "usedCredential": false
+  },
+  "challenge": null,
+  "consentGate": null
+}
