@@ -95,7 +95,7 @@ describe('rules/ruleset.json', () => {
       the sentence it quotes and loses only terms, so the corpus stays at 53 lines and 52
       programme rules.
     */
-    expect(ruleset.version).toBe('3.10.0');
+    expect(ruleset.version).toBe('3.11.0');
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(62);
     expect(ruleset.attestations).toHaveLength(20);

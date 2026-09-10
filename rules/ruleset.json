@@ -1,5 +1,5 @@
 {
-  "version": "3.10.0",
+  "version": "3.11.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -937,9 +937,13 @@
       "source": "programme",
       "params": {
         "surface": "product",
-        "applies_when_title_contains": [
+        "applies_when_page_contains": [
           "bacteriostatic",
-          "sterile water"
+          "sterile water",
+          "reconstitution solution",
+          "reconstitution water",
+          "bac water",
+          "benzyl alcohol"
         ],
         "forbid": [
           "for injection",
@@ -949,7 +953,8 @@
         ],
         "require": [
           "laboratory use"
-        ]
+        ],
+        "note": "Applicability reads the whole page, not the title (D-273). A title test is blind to the merchant who renames the product, which is hard constraint 9 in its plainest form. CoMo Peptides sells bacteriostatic water as \"Reconstitution Solution\": the title carries neither ratified term, the body reads \"a sterile solution containing 0.9% benzyl alcohol\", and their own site-wide banner announces BAC Water = \"Reconstitution Water\". Run f6008fa9 sampled that page and this rule reported not_applicable on it. The four added terms are what the merchant actually calls it, plus the preservative that makes it bacteriostatic - benzyl alcohol is the thing itself rather than a name for it, so a further rename does not defeat it. CATG-006 keeps the title-scoped param: \"capsule\" read across a whole page would apply the capsule rule to any product whose related-items carousel mentions one."
       }
     },
     {

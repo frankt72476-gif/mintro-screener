@@ -326,6 +326,79 @@ export interface RunContext {
    * and `not_observable_row_cites` already refuses citations on it.
    */
   readonly conditionFindingIds: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * The state each observable condition's feeder rules actually reached (D-273).
+   *
+   * Keyed by condition id, one entry per feeder finding. This is what makes a routing row derivable
+   * rather than asserted: run `f6008fa9` wrote **Met** on `no_water_or_syringes` while one of its
+   * three feeders — CATG-005 — was `not_evaluable`, so the row announced a condition holds on
+   * evidence that established nothing about it.
+   *
+   * A condition absent from this map is not checked, which is right for the two the application
+   * answers: they have no rules and nothing to derive from.
+   */
+  readonly conditionFeederStates: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Whether the crawl affirmed a consent gate and then read the catalogue (D-273).
+   *
+   * An attestation is not a registration. When this is true the crawl reached products by ticking
+   * boxes and without creating an account, which is the observation `registration_gate` is about —
+   * and it is the opposite of the one the draft made.
+   */
+  readonly enteredConsentGateToCatalogue: boolean;
+  /**
+   * Conditions the angle set declares an attestation cannot satisfy (D-273).
+   *
+   * `registration_gate` declares it. Read from the data rather than keyed on the id here, because
+   * a routing-condition id in the engine is rule knowledge in the engine (hard constraint 1) — the
+   * same reasoning `angleFindingIds` follows for the consistency angle.
+   */
+  readonly attestationIsNotRegistrationIds: ReadonlySet<string>;
+}
+
+/**
+ * The status a routing condition's own feeders support (D-273).
+ *
+ * **A row is Met only when every feeder settled in the merchant's favour.** The three outcomes are
+ * ordered by what they establish, and the strongest claim needs the weakest to hold:
+ *
+ *   - **a violation** — any feeder at `fail` or `review` — is the condition observed *not* holding.
+ *     `not_met`, and it outranks an unobservable sibling: a rule that saw a violation saw something,
+ *     and a row that reported `not_observable` over it would drop a real finding.
+ *   - **anything unobserved** — any feeder at `not_evaluable`, whatever its kind — means the
+ *     condition was not established. `not_observable`. This is the case run `f6008fa9` got wrong,
+ *     and the kind does not soften it: `not_applicable` establishes as little about the condition
+ *     as `not_retrieved` does.
+ *   - **everything settled clean** — every feeder at `pass`. `met`.
+ *
+ * A condition with no feeders at all is `not_observable`: nothing looked.
+ *
+ * Pure and exported, so the prompt, the validator and the tests all read one definition of what a
+ * row is allowed to say.
+ */
+/**
+ * Whether this condition is the one an attestation must not satisfy (D-273).
+ *
+ * Read from the angle set's own declaration rather than from the condition's id, so the engine
+ * holds no routing-condition knowledge (hard constraint 1). A condition declares
+ * `attestationIsNotRegistration` when passing a consent gate is not the thing it asks about.
+ */
+function attestationIsNotRegistration(conditionId: string, run: RunContext): boolean {
+  return run.attestationIsNotRegistrationIds.has(conditionId);
+}
+
+export function routingStatusFromFeeders(states: readonly string[]): RoutingStatus {
+  if (states.length === 0) return 'not_observable';
+  if (states.some((state) => state === 'fail' || state === 'review')) return 'not_met';
+  /*
+    Anything that is not a `pass` leaves the condition unobserved.
+
+    Written as *not pass* rather than as *is not_evaluable*, so a state this module has never heard
+    of lands on the weaker claim. A union widened somewhere else must not quietly become a reason to
+    report a condition as holding, and the caller's finding rows carry `state` as a plain string.
+  */
+  if (states.some((state) => state !== 'pass')) return 'not_observable';
+  return 'met';
 }
 
 /**
@@ -454,7 +527,8 @@ export interface DraftRejection {
     | 'citation_outside_angle_scope'
     | 'citation_outside_condition_scope'
     | 'placement_outside_spectrum'
-    | 'domestic_with_unobserved_routing';
+    | 'domestic_with_unobserved_routing'
+    | 'routing_status_over_evidence';
   /** Where in the draft, in the document's own terms. */
   readonly at: string;
   readonly message: string;
@@ -853,6 +927,46 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
           'that cannot bear on it. A capture here reads as support for a status that has none — ' +
           'leave the citations empty and say what the status means in the angle that touches it.',
       );
+    }
+
+    /*
+      The row says what its feeders support, and no more (D-273).
+
+      Run `f6008fa9` wrote **Met** on `no_water_or_syringes` over three feeders, one of which —
+      CATG-005 — was `not_evaluable`. The row announced that a merchant carries no bacteriostatic
+      water, on evidence that established nothing about the one product in the sample that is
+      bacteriostatic water. That is the defect this whole project keeps rediscovering, in the
+      document's own summary table.
+
+      **Derived, not judged.** The status is a function of the feeders, so the draft's job on these
+      rows is to cite rather than to weigh, and a row that disagrees with its own evidence is
+      refused in both directions: `met` over an unobserved feeder overstates, and `not_observable`
+      over a violation drops a real finding.
+
+      Only conditions with feeders are checked. The two the application answers have no rules, and
+      `not_observable` is what they are.
+    */
+    const feeders = run.conditionFeederStates.get(row.conditionId);
+    if (feeders !== undefined && feeders.length > 0) {
+      const supported = routingStatusFromFeeders(feeders);
+      const overridden = run.enteredConsentGateToCatalogue && attestationIsNotRegistration(row.conditionId, run);
+      const required = overridden ? 'not_met' : supported;
+
+      if (row.status !== required) {
+        reject(
+          'routing_status_over_evidence',
+          `${at}.status`,
+          overridden
+            ? `'${row.conditionId}' is '${row.status}', and this run reached the catalogue by ` +
+              "affirming the site's consent gate without creating an account. An attestation is " +
+              'not a registration, so what was observed is the condition not holding. Only an ' +
+              'account requirement the crawl actually met makes this row met.'
+            : `'${row.conditionId}' is '${row.status}', and its ${feeders.length} feeder rule(s) ` +
+              `support '${supported}'. A row states what its rules observed: any of them ` +
+              'unobserved makes the condition unobserved, and any of them violated makes it not ' +
+              'met.',
+        );
+      }
     }
   });
   for (const conditionId of run.routingConditionIds) {

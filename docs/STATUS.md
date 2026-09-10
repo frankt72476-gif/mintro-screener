@@ -151,6 +151,19 @@ page selector's own slugs and by nav/footer links or the phrases *about*, *about
 PROD-016, and carried into the eye test. Layer 2 now evaluates after Layer 3 discovers, because one
 of its surfaces is now found there.
 
+### Routing rows are derived, not asserted (D-273)
+
+Run `f6008fa9` wrote **Met** on `no_water_or_syringes` over three feeders, one of which was
+`not_evaluable` — a verdict resting on evidence that established nothing, in the summary table an
+underwriter reads first. A row now states what its rules observed and the validator refuses one that
+disagrees, in both directions.
+
+Two corrections came with it. **CATG-005 reads the page rather than the title** (ruleset 3.11.0):
+CoMo sells bacteriostatic water as *Reconstitution Solution*, so the rule reported `not_applicable`
+on the one product it exists for. And **an attestation is not a registration** (angles 1.2.0): the
+run affirmed CoMo's consent gate, read sixteen product pages and created no account, which is
+`registration_gate` observed not to hold.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl

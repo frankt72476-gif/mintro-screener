@@ -121,6 +121,16 @@ export function handleContext(run: RunContext, map: HandleMap): RunContext {
     eyeTestItemIds: new Set(map.eyeTest.toId.keys()),
     angleIds: run.angleIds.map((id) => map.angle.toHandle.get(id) ?? id),
     routingConditionIds: run.routingConditionIds,
+    /*
+      Pass through untouched, like the condition ids themselves (D-273).
+
+      These are keyed on condition ids and carry finding *states*, not finding ids, so there is
+      nothing in them to rewrite into handle space — and the schema builder needs the same
+      derivation the validator uses.
+    */
+    conditionFeederStates: run.conditionFeederStates,
+    enteredConsentGateToCatalogue: run.enteredConsentGateToCatalogue,
+    attestationIsNotRegistrationIds: run.attestationIsNotRegistrationIds,
     consumerSideSpectrum: run.consumerSideSpectrum,
     placementBySpectrum: run.placementBySpectrum,
     /*

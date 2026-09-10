@@ -184,7 +184,9 @@ export async function runPublish(
       Object.values(draft.handles ?? {}).flatMap((space) => Object.keys(space)),
     );
 
-    const run = runContextFor(angles, ruleset, { findings, evidence, eyeTest }, knownHandles);
+    // `report` is in the slice since D-273: the routing derivation reads whether the crawl
+    // affirmed a consent gate and then read the catalogue, which only the run records.
+    const run = runContextFor(angles, ruleset, { findings, evidence, eyeTest, report }, knownHandles);
 
     const refusal = publishRefusal(draft.content, draft.validator_status, run);
     if (refusal !== null) return { kind: 'refused', refusal };

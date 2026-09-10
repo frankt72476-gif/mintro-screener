@@ -288,6 +288,46 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
     application answers is data, and a prompt that spelled them out would be a second copy to diff.
   */
   const application = angles.routingConditions.filter((condition) => !condition.observable);
+
+  /*
+    How a routing row is decided (D-273).
+
+    Stated before the placement rules that read those rows, because a draft that gets the rows wrong
+    gets the placement wrong for a reason nothing downstream can see. Run f6008fa9 wrote **Met** on
+    `no_water_or_syringes` over three feeder rules, one of which was `not_evaluable` — the row
+    announced a condition holds on evidence that established nothing about it.
+
+    The validator refuses a row that disagrees with its feeders, so this is not advice: it is the
+    rule the answer is checked against, said once here and enforced once there.
+  */
+  const attestationRows = angles.routingConditions.filter(
+    (condition) => condition.attestationIsNotRegistration === true,
+  );
+  parts.push(
+    section(
+      'How a routing row is decided',
+      'A row states what **its own rules observed**, and nothing more. Each condition names the ' +
+        'rules that observe it; look at what those findings actually reached.\n\n' +
+        '- **`met`** — every one of them is `pass`. That is the only thing that earns it.\n' +
+        '- **`not_met`** — any one of them observed a violation (`fail` or `review`). A violation ' +
+        'outranks an unobserved sibling: a rule that saw something saw something.\n' +
+        '- **`not_observable`** — any one of them is `not_evaluable`, whatever the reason. ' +
+        '`not_applicable` establishes as little about the condition as a timeout does. A row that ' +
+        'said `met` here would report a condition holding on evidence that never touched it.\n\n' +
+        'These are not judgements to weigh. Read the findings and say what they support; cite the ' +
+        'ones you read.' +
+        (attestationRows.length === 0
+          ? ''
+          : `\n\n**An attestation is not a registration.** Where this run reached the catalogue by ` +
+            `affirming the site's own consent gate — ticking boxes about who the visitor is — and ` +
+            `created no account, ${attestationRows
+              .map((c) => `\`${c.id}\``)
+              .join(', ')} is \`not_met\`. Getting past a gate without an account is that ` +
+            'condition being observed **not** to hold. Only an account requirement the crawl ' +
+            'actually met makes it `met`.'),
+    ),
+  );
+
   parts.push(
     section(
       'How far the spectrum lets you place it',

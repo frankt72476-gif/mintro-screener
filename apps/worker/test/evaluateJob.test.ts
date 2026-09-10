@@ -58,6 +58,12 @@ const page = (surface: string, text: string, source: EvaluationPage['source'] = 
 });
 
 /** A fixture run: two findings, one eye-test verdict, three pages. */
+/** What state each rule reached in `INPUTS`, so the routing rows can agree with it (D-273). */
+const INPUT_FINDING_RULES = new Map<string, string>([
+  ['NAME-001', 'fail'],
+  ['GATE-002', 'fail'],
+]);
+
 const INPUTS: EvaluationInputs = {
   report: {
     runId: '11111111-2222-4333-8444-555555555555',
@@ -159,9 +165,20 @@ function validDraft(): EvaluationDraft {
       ],
     },
     legality: { clean: true, items: [] },
+    /*
+      Each row says what this fixture's findings support (D-273).
+
+      It used to write `not_observable` on every condition, and that is now a refusal rather than a
+      neutral default: `f-002` is GATE-002 at `fail`, which feeds `registration_gate`, so this
+      fixture was asserting a draft is valid while a row reported a condition unobserved over a rule
+      that observed a violation. The other conditions have no findings here, and unobserved is what
+      no feeders means.
+    */
     routing: angles.routingConditions.map((c) => ({
       conditionId: c.id,
-      status: 'not_observable' as const,
+      status: (c.ruleIds.some((id) => INPUT_FINDING_RULES.get(id) === 'fail')
+        ? 'not_met'
+        : 'not_observable') as 'not_met' | 'not_observable',
       citations: [],
     })),
     /*

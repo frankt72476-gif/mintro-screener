@@ -18054,3 +18054,95 @@ useful direction.
 
 Where it stops is asserted beside it: `news` does not reach `/newsletter/` and `story` does not
 reach `/history/`, so the singularising is not a licence to match anything adjacent.
+
+## D-273 — A routing row states what its rules observed
+**2026-09-10 · architect · amends D-259**
+
+Three corrections, all found in run `f6008fa9` (CoMo Peptides, 2026-09-10 12:39 UTC).
+
+> **Numbering.** There is no D-272 in this file. The instruction numbered this D-273, so 272 is left
+> free rather than renumbered into a possible collision with something written elsewhere.
+
+### 1. A row says what its feeders support
+
+`f6008fa9` wrote **Met** on `no_water_or_syringes` over three feeder rules:
+
+| CATG-001 | pass | 37 URLs in scope examined, none matched |
+| CATG-002 | pass | 37 URLs in scope examined, none matched |
+| CATG-005 | **not_evaluable** | *"this rule applies only to products described as…"* |
+
+The row announced that the merchant carries no bacteriostatic water, on evidence that established
+nothing about the one product in the sample that **is** bacteriostatic water. That is a verdict
+resting on a surface nobody looked at, in the summary table an underwriter reads first.
+
+`routingStatusFromFeeders` makes the row derivable:
+
+- **`met`** — every feeder `pass`. The only thing that earns it.
+- **`not_met`** — any feeder observed a violation. A violation outranks an unobserved sibling: a
+  rule that saw something saw something, and reporting `not_observable` over it drops a real
+  finding out of the summary.
+- **`not_observable`** — any feeder `not_evaluable`, whatever the kind. `not_applicable` reads like
+  a resolved outcome and establishes as little about the *condition* as a timeout does.
+
+Written as *not pass* rather than *is not_evaluable*, so a state this module has not heard of lands
+on the weaker claim: the caller's rows carry `state` as a plain string, and a union widened
+elsewhere must not become a reason to report a condition as holding.
+
+**Enforced in both directions**, so the draft's job on these rows is to cite rather than to weigh.
+Conditions with no feeders are not checked — the two the application answers have nothing to derive
+from, and refusing them would refuse every draft.
+
+### 2. CATG-005 reads the page, not the title
+
+The rule gated on the product **title** carrying `bacteriostatic` or `sterile water`. CoMo sells
+bacteriostatic water as **Reconstitution Solution**, so `f6008fa9` sampled the page and CATG-005
+reported `not_applicable` — on that page and on all sixteen, so the run made no observation about
+the product the rule exists for.
+
+Hard constraint 9 in its plainest form: locating the subject by the compliant form, blind to every
+renamed instance. The merchant is not hiding it — their own site-wide banner reads
+`BAC Water = "Reconstitution Water"`.
+
+Ruleset **3.10.0 → 3.11.0**. Terms become `bacteriostatic`, `sterile water`, `reconstitution
+solution`, `reconstitution water`, `bac water`, `benzyl alcohol` — what the merchant calls it, plus
+the preservative that makes it bacteriostatic, which is the thing itself rather than a name for it.
+
+**A new param rather than a widened one.** `applies_when_page_contains` reads the whole rendered
+text; `applies_when_title_contains` keeps its 400-character window and CATG-006 keeps using it.
+Widening one param would have widened the capsule rule too, and `capsule` read across a whole page
+applies it to any product whose related-items carousel mentions one.
+
+The test says which half fixes this merchant: **the terms do.** `reconstitution solution` is the
+product's own title, so reverting the read leaves the CoMo assertions green. The widened read is
+defence against the next rename, and it has its own case — a constructed product naming the subject
+only in its body.
+
+### 3. An attestation is not a registration
+
+`f6008fa9` affirmed CoMo's consent gate, read sixteen product pages, and created no account. Its
+`registration_gate` feeders both passed, because the gate probes build their own session-free
+context (D-039) and met a working gate — so the derivation above would have said **met**.
+
+Getting past a gate without an account is that condition being observed **not** to hold. The row is
+`not_met`, citing the gate artifact and the catalogue capture. Only an account requirement the crawl
+actually met makes it `met`.
+
+Keyed on `attestationIsNotRegistration`, declared by the condition in `angles.json` (**1.1.0 →
+1.2.0**), never on the condition's id — a routing-condition id in the engine is rule knowledge in
+the engine (hard constraint 1), the same reasoning `angleFindingIds` follows for the consistency
+angle.
+
+### What the fixtures were asserting
+
+Three test fixtures wrote routing rows their own findings did not support, and each is now
+consistent:
+
+- `evaluation.test.ts` wrote `registration_gate: not_met` and two `not_observable` rows against a
+  run with no feeder states at all. It now states the evidence that makes those rows correct, and
+  the domestic cases that rewrite every row to `met` use a run derived from the draft under test.
+- `evaluateJob.test.ts` wrote `not_observable` on every condition while `f-002` was GATE-002 at
+  `fail`. That fixture was asserting a draft is valid while a row reported a condition unobserved
+  over a rule that observed a violation.
+
+A fixture that could not have been produced by any run is a fixture that tests nothing, and both
+had drifted into exactly that.

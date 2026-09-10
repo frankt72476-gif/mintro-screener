@@ -56,6 +56,10 @@ const RUN: RunContext = {
   eyeTestItemIds: new Set(Array.from({ length: 14 }, (_, i) => `EYE-${String(i + 1).padStart(2, '0')}`)),
   angleIds: ANGLE_IDS,
   routingConditionIds: ['registration_gate', 'no_water_or_syringes'],
+  // Nothing here turns on routing evidence; these are the empty defaults (D-273).
+  conditionFeederStates: new Map<string, readonly string[]>(),
+  enteredConsentGateToCatalogue: false,
+  attestationIsNotRegistrationIds: new Set<string>(),
   consumerSideSpectrum: new Set(['consumer_retail']),
   placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: { clean: true, items: [] },

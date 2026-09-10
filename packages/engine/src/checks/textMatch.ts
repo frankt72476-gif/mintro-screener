@@ -59,12 +59,34 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
   }
 
 
-  // Rules that apply only to certain products. CATG-005 concerns reconstitution solutions and
-  // CATG-006 capsules; on any other product they have nothing to say, and reporting `pass`
-  // would claim the product satisfied a rule that never applied to it.
-  const appliesWhen = rule.params.applies_when_title_contains;
+  /*
+    Rules that apply only to certain products (D-273).
+
+    CATG-005 concerns reconstitution solutions and CATG-006 capsules; on any other product they
+    have nothing to say, and reporting `pass` would claim the product satisfied a rule that never
+    applied to it.
+
+    **Two params, deliberately, reading different amounts of the page.**
+
+      - `applies_when_title_contains` reads the product title and the first 400 characters. It is
+        what CATG-006 uses and it stays exactly as it was: `capsule` matched across a whole page
+        would apply the capsule rule to any product whose related-items carousel mentions one.
+      - `applies_when_page_contains` reads the **whole rendered text**. CATG-005 uses it, because a
+        merchant who renames the product defeats a title test. CoMo sells bacteriostatic water as
+        *Reconstitution Solution*: the title contains neither ratified term, the body says "a
+        sterile solution containing 0.9% benzyl alcohol", and their own site-wide banner reads
+        `BAC Water = "Reconstitution Water"`. Run f6008fa9 sampled that page and CATG-005 reported
+        `not_applicable` on it, which is hard constraint 9 exactly — locating the subject by the
+        compliant form and going blind to every renamed instance.
+
+    One term list is consulted, never both: a rule declares which question it is asking.
+  */
+  const appliesWhen = rule.params.applies_when_page_contains ?? rule.params.applies_when_title_contains;
   if (appliesWhen !== undefined) {
-    const title = normalise(page.productTitle + ' ' + page.text.slice(0, 400));
+    const wholePage = rule.params.applies_when_page_contains !== undefined;
+    const title = normalise(
+      page.productTitle + ' ' + (wholePage ? page.text : page.text.slice(0, 400)),
+    );
     if (!appliesWhen.some((term) => title.includes(normalise(term)))) {
       return notEvaluable(
         rule,

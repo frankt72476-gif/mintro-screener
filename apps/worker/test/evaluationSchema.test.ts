@@ -26,6 +26,10 @@ const RUN: RunContext = {
   eyeTestItemIds: new Set(['EYE-01', 'EYE-03']),
   angleIds: ['who_it_talks_to', 'products_for', 'consistency'],
   routingConditionIds: ['registration_gate', 'order_minimum_150'],
+  // Nothing here turns on routing evidence; these are the empty defaults (D-273).
+  conditionFeederStates: new Map<string, readonly string[]>(),
+  enteredConsentGateToCatalogue: false,
+  attestationIsNotRegistrationIds: new Set<string>(),
   consumerSideSpectrum: new Set(['consumer_retail']),
   placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: { clean: true, items: [] },

@@ -230,6 +230,7 @@ export const textMatchParams = z
     word_boundary: z.boolean().optional(),
     partial_is_review: z.boolean().optional(),
     applies_when_title_contains: nonEmptyStrings.optional(),
+    applies_when_page_contains: nonEmptyStrings.optional(),
     /**
      * Match `pattern` without regard to case (D-135).
      *

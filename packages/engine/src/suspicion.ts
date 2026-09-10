@@ -342,7 +342,12 @@ function collectSignals(ruleset: Ruleset): Signal[] {
       }
     }
 
-    for (const value of rule.params.applies_when_title_contains ?? []) {
+    for (const value of [
+      ...(rule.params.applies_when_title_contains ?? []),
+      // The body-scoped form scores the same way: a page naming the subject anywhere is a
+      // page worth sampling, which is the question the scorer asks (D-273).
+      ...(rule.params.applies_when_page_contains ?? []),
+    ]) {
       signals.push({ kind: 'conditional', ruleId: rule.id, value, tokens: tokenizePath(value) });
     }
   }

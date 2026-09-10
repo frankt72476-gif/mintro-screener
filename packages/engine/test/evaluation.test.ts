@@ -77,6 +77,25 @@ const RUN: RunContext = {
   eyeTestItemIds: new Set(['EYE-01', 'EYE-03']),
   angleIds: ANGLE_IDS,
   routingConditionIds: CONDITION_IDS,
+  /*
+    Every observable condition's feeders clean, so the existing cases keep asserting what they
+    always asserted (D-273). The rows they write are `met`, and `met` is what all-pass supports —
+    the derivation is exercised on its own in `routingEvidence.test.ts`, where the fixture can say
+    what it is about.
+  */
+  /*
+    The feeders each row in the base draft is entitled to, so the existing cases keep asserting what
+    they always asserted (D-273). The draft writes `registration_gate` not met and the other two
+    unobserved, and a row now has to agree with its own evidence — so the fixture states the
+    evidence that makes those rows correct rather than leaving them unbacked.
+  */
+  conditionFeederStates: new Map<string, readonly string[]>([
+    ['registration_gate', ['fail', 'pass']],
+    ['no_water_or_syringes', ['not_evaluable', 'pass']],
+    ['no_affiliate_marketing', ['not_evaluable', 'pass']],
+  ]),
+  enteredConsentGateToCatalogue: false,
+  attestationIsNotRegistrationIds: new Set(['registration_gate']),
   consumerSideSpectrum: new Set(['consumer_retail', 'consumer_leaning']),
   placementBySpectrum: PLACEMENT_BY_SPECTRUM,
   legality: LEGALITY,
@@ -110,6 +129,39 @@ const RUN: RunContext = {
     ['no_affiliate_marketing', new Set(['f-002'])],
   ]),
 };
+
+/**
+ * A run whose feeders support exactly what a draft's routing rows claim (D-273).
+ *
+ * A row now has to agree with its own evidence, so a test that rewrites every row to `met` is also
+ * asserting something about the run — and the base fixture's feeders describe the base draft. This
+ * builds the run those rewritten rows would be correct against, which keeps each test about the
+ * rule it is named for rather than about routing arithmetic it never meant to exercise.
+ *
+ * Derived from the row, deliberately. Writing the states out per test would be the same fact in two
+ * places, and the point of the fixture is that the two agree.
+ */
+/** The routing shape the domestic cases write: every observable condition met. */
+const BASE_ALL_MET = {
+  routing: OBSERVABLE.map((conditionId) => ({ conditionId, status: 'met' })),
+};
+
+function runFor(draft: { routing: readonly { conditionId: string; status: string }[] }): RunContext {
+  const supporting: Record<string, readonly string[]> = {
+    met: ['pass'],
+    not_met: ['fail'],
+    not_observable: ['not_evaluable'],
+  };
+  return {
+    ...RUN,
+    conditionFeederStates: new Map(
+      draft.routing
+        .filter((row) => OBSERVABLE.includes(row.conditionId))
+        .map((row) => [row.conditionId, supporting[row.status] ?? ['not_evaluable']] as const),
+    ),
+  };
+}
+
 
 const cite = (ref: string, kind: Citation['kind'] = 'finding'): Citation => ({ kind, ref });
 
@@ -157,8 +209,8 @@ function mutate(change: (draft: EvaluationDraft) => EvaluationDraft): Evaluation
   return change(passing());
 }
 
-function rejectionRules(draft: EvaluationDraft): string[] {
-  const result = validateDraft(draft, RUN);
+function rejectionRules(draft: EvaluationDraft, run: RunContext = RUN): string[] {
+  const result = validateDraft(draft, run);
   return result.ok ? [] : result.rejections.map((r) => r.rule);
 }
 
@@ -599,6 +651,139 @@ describe('unknown_angle and unknown_condition', () => {
   });
 });
 
+describe('routing_status_over_evidence', () => {
+  /** A run whose feeders say exactly this, whatever the draft claims. */
+  const feeders = (states: Record<string, readonly string[]>): RunContext => ({
+    ...RUN,
+    conditionFeederStates: new Map(Object.entries(states)),
+  });
+
+  const rowsOf = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>) =>
+    mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        statuses[r.conditionId] === undefined
+          ? r
+          : { ...r, status: statuses[r.conditionId]!, citations: [] },
+      ),
+    }));
+
+  /*
+    Run f6008fa9, reproduced. CATG-001 and CATG-002 passed; CATG-005 established nothing; the draft
+    wrote Met, and the summary table told an underwriter the merchant carries no bacteriostatic
+    water.
+  */
+  it('refuses met over a feeder that established nothing', () => {
+    const draft = rowsOf({ no_water_or_syringes: 'met' });
+    const run = feeders({ no_water_or_syringes: ['pass', 'pass', 'not_evaluable'] });
+    const result = validateDraft(draft, run);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const rejection = result.rejections.find((r) => r.rule === 'routing_status_over_evidence');
+    expect(rejection?.at).toBe('routing[1].status');
+    expect(rejection?.message).toContain("support 'not_observable'");
+  });
+
+  it('accepts the same row once it says what the feeders support', () => {
+    const draft = rowsOf({ no_water_or_syringes: 'not_observable' });
+    const run = feeders({ no_water_or_syringes: ['pass', 'pass', 'not_evaluable'] });
+
+    expect(rejectionRules(draft, run)).not.toContain('routing_status_over_evidence');
+  });
+
+  /*
+    Both directions. A row that under-claims drops a real finding out of the summary, which is the
+    same defect facing the other way.
+  */
+  it('refuses not_observable over a feeder that observed a violation', () => {
+    const draft = rowsOf({ no_water_or_syringes: 'not_observable' });
+    const run = feeders({ no_water_or_syringes: ['fail', 'pass'] });
+
+    expect(rejectionRules(draft, run)).toContain('routing_status_over_evidence');
+  });
+
+  it('accepts met when every feeder passed', () => {
+    const draft = rowsOf({ no_water_or_syringes: 'met' });
+    const run = feeders({ no_water_or_syringes: ['pass', 'pass'] });
+
+    expect(rejectionRules(draft, run)).not.toContain('routing_status_over_evidence');
+  });
+
+  /*
+    The conditions the application answers have no rules and nothing to derive from. A run that
+    checked them would refuse every draft for saying `not_observable` about a question no crawl asks.
+  */
+  it('says nothing about a condition with no feeders', () => {
+    const draft = rowsOf({ order_minimum_150: 'not_observable' });
+
+    expect(rejectionRules(draft, feeders({}))).not.toContain('routing_status_over_evidence');
+  });
+});
+
+describe('an attestation is not a registration', () => {
+  const entered = (status: 'met' | 'not_met' | 'not_observable', through: boolean): RunContext => ({
+    ...RUN,
+    enteredConsentGateToCatalogue: through,
+    conditionFeederStates: new Map([['registration_gate', ['pass', 'pass']]]),
+  });
+
+  const withRow = (status: 'met' | 'not_met' | 'not_observable') =>
+    mutate((d) => ({
+      ...d,
+      routing: d.routing.map((r) =>
+        r.conditionId === 'registration_gate' ? { ...r, status, citations: [] } : r,
+      ),
+    }));
+
+  /*
+    Run f6008fa9 affirmed CoMo's consent gate, read sixteen product pages, and created no account.
+    Its feeders passed — GATE-002's own probe met the gate and read it as a working one — so without
+    this the derivation would have said `met`.
+  */
+  it('refuses met when the crawl ticked a gate and read the catalogue', () => {
+    const result = validateDraft(withRow('met'), entered('met', true));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const rejection = result.rejections.find((r) => r.rule === 'routing_status_over_evidence');
+    expect(rejection?.message).toContain('An attestation is not a registration');
+  });
+
+  it('requires not met, not merely something other than met', () => {
+    expect(rejectionRules(withRow('not_observable'), entered('not_observable', true))).toContain(
+      'routing_status_over_evidence',
+    );
+    expect(rejectionRules(withRow('not_met'), entered('not_met', true))).not.toContain(
+      'routing_status_over_evidence',
+    );
+  });
+
+  /*
+    The control. With no gate in the way, the same passing feeders earn `met` — so the override is
+    about what this run did, not a blanket refusal of the row.
+  */
+  it('leaves the row alone on a run that met no gate', () => {
+    expect(rejectionRules(withRow('met'), entered('met', false))).not.toContain(
+      'routing_status_over_evidence',
+    );
+  });
+
+  /*
+    And it is keyed on the angle set's declaration, never on the condition's id (hard constraint 1).
+  */
+  it('applies only to conditions the angle set flags', () => {
+    const unflagged: RunContext = {
+      ...RUN,
+      enteredConsentGateToCatalogue: true,
+      attestationIsNotRegistrationIds: new Set<string>(),
+      conditionFeederStates: new Map([['registration_gate', ['pass', 'pass']]]),
+    };
+
+    expect(rejectionRules(withRow('met'), unflagged)).not.toContain('routing_status_over_evidence');
+  });
+});
+
 describe('incomplete_coverage', () => {
   it('rejects a draft that omits an angle rather than saying it observed nothing', () => {
     const draft = mutate((d) => ({ ...d, angles: d.angles.slice(0, 6) }));
@@ -759,7 +944,8 @@ describe('publishRefusal', () => {
     answers hold" — so the answers exist before it is written, or it is not written.
   */
   describe('domestic needs every condition met, not only the observable ones', () => {
-    const clean = { ...RUN, legality: { clean: true, items: [] } };
+    // Feeders consistent with the all-met rows these drafts write (D-273).
+  const clean = { ...runFor(BASE_ALL_MET), legality: { clean: true, items: [] } };
 
     const domestic = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>) =>
       mutate((d) => ({
@@ -806,7 +992,13 @@ describe('publishRefusal', () => {
           legality: { clean: true, items: [] },
           placement: { ...d.placement, recommended },
         }));
-        expect(publishRefusal(draft, 'ok', clean), recommended).toBeNull();
+        /*
+          The base draft's routing rows, so the run has to be the base fixture's feeders rather than
+          the all-met ones the domestic cases in this block use. This test does not rewrite routing
+          and must not be answered by a run that assumes it did (D-273).
+        */
+        const base = { ...RUN, legality: { clean: true, items: [] } };
+        expect(publishRefusal(draft, 'ok', base), recommended).toBeNull();
       }
     });
   });
@@ -1024,7 +1216,8 @@ describe('domestic_with_unmet_routing', () => {
   });
 
   it('permits domestic once every observable condition is met', () => {
-    const clean = { ...RUN, legality: { clean: true, items: [] } };
+    // Feeders consistent with the all-met rows these drafts write (D-273).
+  const clean = { ...runFor(BASE_ALL_MET), legality: { clean: true, items: [] } };
     const draft = mutate((d) => ({
       ...d,
       legality: { clean: true, items: [] },
@@ -1040,7 +1233,8 @@ describe('domestic_with_unmet_routing', () => {
     decline a merchant for a limit of the method.
   */
   it('ignores a condition the crawl cannot observe', () => {
-    const clean = { ...RUN, legality: { clean: true, items: [] } };
+    // Feeders consistent with the all-met rows these drafts write (D-273).
+  const clean = { ...runFor(BASE_ALL_MET), legality: { clean: true, items: [] } };
     const draft = mutate((d) => ({
       ...d,
       legality: { clean: true, items: [] },
@@ -1100,7 +1294,8 @@ describe('domestic_with_unmet_routing', () => {
   ratified rule.
 */
 describe('placement_outside_spectrum', () => {
-  const clean = { ...RUN, legality: { clean: true, items: [] } };
+  // Feeders consistent with the all-met rows these drafts write (D-273).
+  const clean = { ...runFor(BASE_ALL_MET), legality: { clean: true, items: [] } };
 
   /** A clean draft at one position recommending one placement. */
   const at = (spectrum: SpectrumId, recommended: PlacementId): EvaluationDraft =>
@@ -1198,7 +1393,7 @@ describe('placement_outside_spectrum', () => {
       placement: { ...d.placement, spectrum: 'research_supplier' as const, recommended: 'domestic' as const },
       routing: d.routing.map((r) => ({ ...r, status: 'met' as const, citations: [] })),
     }));
-    const result = validateDraft(draft, RUN);
+    const result = validateDraft(draft, runFor(draft));
     expect(result.ok).toBe(false);
     if (result.ok) return;
     // The legality rule speaks, and the spectrum rule stays quiet — domestic is inside the table.
@@ -1216,7 +1411,8 @@ describe('placement_outside_spectrum', () => {
   exception, and the only one.
 */
 describe('domestic over unobserved conditions', () => {
-  const clean = { ...RUN, legality: { clean: true, items: [] } };
+  // Feeders consistent with the all-met rows these drafts write (D-273).
+  const clean = { ...runFor(BASE_ALL_MET), legality: { clean: true, items: [] } };
 
   const domestic = (statuses: Record<string, 'met' | 'not_met' | 'not_observable'>): EvaluationDraft =>
     mutate((d) => ({

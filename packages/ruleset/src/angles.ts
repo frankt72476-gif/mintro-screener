@@ -131,6 +131,15 @@ const routingConditionSchema = z
     label: z.string().min(1),
     ruleIds: z.array(z.string().regex(RULE_ID_PATTERN)),
     observable: z.boolean(),
+    /**
+     * True where passing a consent gate does not satisfy this condition (D-273).
+     *
+     * `registration_gate` declares it. A site-entry attestation is a visitor ticking boxes about
+     * themselves; a registration is an account. A crawl that reached the catalogue by the first has
+     * observed the second **not** holding, and the validator reads this flag rather than the
+     * condition's id, so the engine holds no routing-condition knowledge (hard constraint 1).
+     */
+    attestationIsNotRegistration: z.boolean().optional(),
     /** Where an unobservable condition is answered instead. Present only when `observable` is false. */
     source: z.string().min(1).optional(),
   })

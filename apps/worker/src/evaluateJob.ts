@@ -242,7 +242,15 @@ export function inputHash(
  * without assigning handles, and assigning them twice would be two assignments that happen to
  * match. It is empty here and populated in `generateDraft`.
  */
-export type RunContextInputs = Pick<EvaluationInputs, 'findings' | 'evidence' | 'eyeTest'>;
+/**
+ * What building a run context needs.
+ *
+ * `report` joined the slice with D-273: whether the crawl affirmed a consent gate and then read
+ * the catalogue is a fact about the run, recorded on the report by the crawl, and the routing
+ * derivation needs it. A `Pick` rather than the whole `EvaluationInputs` for the reason it
+ * always was — this function reasons over findings and never over page text.
+ */
+export type RunContextInputs = Pick<EvaluationInputs, 'findings' | 'evidence' | 'eyeTest' | 'report'>;
 
 export function runContextFor(
   angles: AngleSet,
@@ -279,6 +287,48 @@ export function runContextFor(
     placementBySpectrum: PLACEMENT_BY_SPECTRUM,
     legality: computeLegality(inputs.findings, LEGALITY_RULE_IDS),
     observableConditionIds: angles.routingConditions.filter((c) => c.observable).map((c) => c.id),
+    /*
+      What each observable condition's own rules reached (D-273).
+
+      Read from the run's findings against the rules the angle set names, which is the same join
+      `conditionFindingIds` makes — one traversal, two facts, so the ids a row may cite and the
+      states those ids carry cannot disagree.
+
+      A condition with no rules is left out: the two the application answers have nothing to derive
+      from, and an empty entry would read as *nothing observed* rather than as *nothing to observe*.
+    */
+    conditionFeederStates: new Map(
+      angles.routingConditions
+        .filter((condition) => condition.ruleIds.length > 0)
+        .map((condition) => {
+          const wanted = new Set(condition.ruleIds);
+          return [
+            condition.id,
+            inputs.findings
+              .filter((finding) => wanted.has(finding.ruleId))
+              .map((finding) => finding.state),
+          ] as const;
+        }),
+    ),
+    /*
+      Whether the crawl ticked a consent gate and then read the catalogue (D-273).
+
+      Both halves, because either alone says something different: a gate the crawl met and did not
+      pass leaves the catalogue unread, and a catalogue read with no gate says nothing about
+      attestations. `report.consentGate.entered` is the crawl's own record of going through, and
+      `productsSampled` is its record of what it read afterwards.
+    */
+    enteredConsentGateToCatalogue:
+      (inputs.report.consentGate?.entered ?? 0) > 0 &&
+      (inputs.report.sample?.productsSampled ?? 0) > 0,
+    /*
+      Declared in the angle set, never keyed on an id here (hard constraint 1).
+    */
+    attestationIsNotRegistrationIds: new Set(
+      angles.routingConditions
+        .filter((condition) => condition.attestationIsNotRegistration === true)
+        .map((condition) => condition.id),
+    ),
     knownHandles,
     /*
       `fail` only. A `review` is D-009's human queue rather than a failure, and a `not_evaluable` is
