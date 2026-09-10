@@ -82,9 +82,10 @@ const offered = (markup: string): string[] =>
   [...markup.matchAll(/class="eval-focal-badge is-([a-z_]+)/g)].map((m) => m[1]!);
 
 describe('what the table permits', () => {
-  it('gives mixed referred out and nothing else', () => {
+  it('reads the ruleset table rather than a copy', () => {
     expect(PLACEMENT_BY_SPECTRUM.mixed).toEqual(['referred_out']);
-    expect(placementsFor('mixed')).toEqual(['referred_out']);
+    expect(PLACEMENT_BY_SPECTRUM.consumer_leaning).toEqual(['referred_out']);
+    expect(placementsFor('mixed')).toEqual([...PLACEMENT_BY_SPECTRUM.mixed]);
   });
 
   it('leaves the research side able to be international or domestic', () => {
@@ -93,10 +94,16 @@ describe('what the table permits', () => {
     }
   });
 
-  it('leaves the consumer positions as they were', () => {
-    expect(placementsFor('consumer_retail')).toEqual(['referred_out']);
-    expect(placementsFor('consumer_leaning')).toEqual(['referred_out', 'international']);
-  });
+  /*
+    All three consumer-side positions, one placement (D-272 amendment). `consumer_leaning` used to
+    permit `international`; the ruling draws the line at whether the consumer side is present.
+  */
+  it.each(['consumer_retail', 'consumer_leaning', 'mixed'])(
+    'gives %s referred out and nothing else',
+    (spectrum) => {
+      expect(placementsFor(spectrum)).toEqual(['referred_out']);
+    },
+  );
 
   /*
     A draft at a position the angle set has since dropped still has to be editable. The validator
@@ -113,9 +120,12 @@ describe('what the table permits', () => {
 });
 
 describe('what the screen draws', () => {
-  it('offers one control for mixed', () => {
-    expect(offered(editorAt('mixed'))).toEqual(['referred_out']);
-  });
+  it.each(['consumer_retail', 'consumer_leaning', 'mixed'])(
+    'offers one control for %s',
+    (spectrum) => {
+      expect(offered(editorAt(spectrum))).toEqual(['referred_out']);
+    },
+  );
 
   it('offers two for the research side', () => {
     expect(offered(editorAt('research_supplier'))).toEqual(['international', 'domestic']);

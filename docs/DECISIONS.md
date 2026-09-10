@@ -18055,21 +18055,31 @@ useful direction.
 Where it stops is asserted beside it: `news` does not reach `/newsletter/` and `story` does not
 reach `/history/`, so the singularising is not a licence to match anything adjacent.
 
-## D-272 — Mixed is referred out
-**2026-09-10 · Frank**
+## D-272 — The consumer side is referred out
+**2026-09-10 · Frank · amended the same day**
 
-`mixed` used to permit `international` or `domestic`, which put a storefront selling to both
-audiences on the same footing as one selling to laboratories. A mixed position means the consumer
-side is present, and the consumer side is what the programme refers out. The middle of the spectrum
-is not a middle of the placement.
+Frank's ruling: *"mixed or leaning toward consumer: referred out."*
+
+`mixed` used to permit `international` or `domestic` and `consumer_leaning` used to permit
+`international`. Both put a storefront with a consumer audience somewhere on the road a research
+supplier travels. **The line is drawn at whether the consumer side is present, not at how much of it
+there is.** A storefront leaning toward consumers is a consumer storefront; one selling to both is
+too. The middle of the spectrum is not a middle of the placement.
 
 | Position | Permits |
 |---|---|
-| `consumer_retail` | `referred_out` |
-| `consumer_leaning` | `referred_out`, `international` |
+| **`consumer_retail`** | **`referred_out`** |
+| **`consumer_leaning`** | **`referred_out`** |
 | **`mixed`** | **`referred_out`** |
 | `research_leaning` | `international`, or `domestic` once every routing condition holds |
 | `research_supplier` | `international`, or `domestic` once every routing condition holds |
+
+Three positions with one placement between them, and two with the rest.
+
+**The amendment is why the first version was flagged.** It landed with `consumer_leaning` untouched
+and a note saying the ruling named `mixed` as its subject, so widening it would have changed a
+position nobody asked about. The ruling did cover it; the flag is what got that answered in one
+exchange rather than shipping a table half-right and finding out from a draft.
 
 The research end is unchanged. Its ceiling is in the table; the earning is in
 `domestic_with_unmet_routing` and `domestic_with_unobserved_routing`, which read the rows rather
@@ -18099,11 +18109,11 @@ Absent rather than disabled, which is this screen's standing rule (D-230). A dra
 table does not carry falls back to all three: the validator still refuses whatever is chosen, and
 offering nothing would leave an operator holding a document they cannot edit.
 
-### What was asserted, and what was left alone
+### `CONSUMER_SIDE` still holds two
 
-`consumer_leaning` keeps `referred_out` and `international`. The ruling names `mixed` as its
-subject, so widening it to *the consumer positions permit only referred_out* would have changed a
-position nobody asked about — flagged rather than assumed.
+Three positions now share a placement, and the set that gates shore-ups is still
+`consumer_retail` and `consumer_leaning`. Nothing about referring a merchant out says they have
+nothing to fix, and `mixed` is the position where a route back is most worth writing down.
 
 ## D-273 — A routing row states what its rules observed
 **2026-09-10 · architect · amends D-259**

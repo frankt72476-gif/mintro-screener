@@ -1288,8 +1288,15 @@ describe('the prompt states how far the spectrum lets a placement go', () => {
     expect(prompt).not.toContain('`consumer_retail` — `referred_out` or');
   });
 
-  it('says a consumer-leaning business may be referred out or international', () => {
-    expect(prompt).toContain('`consumer_leaning` — `referred_out` or `international`');
+  /*
+    The three positions with one placement between them (D-272 amendment). The prompt renders the
+    table rather than restating it, so this reads the lines the model is actually shown.
+  */
+  it('says the consumer side and mixed are referred out, and nothing else', () => {
+    for (const spectrum of ['consumer_retail', 'consumer_leaning', 'mixed'] as const) {
+      expect(prompt, spectrum).toContain(`\`${spectrum}\` — \`referred_out\``);
+      expect(prompt, spectrum).not.toContain(`\`${spectrum}\` — \`referred_out\` or`);
+    }
   });
 
   it('says the research side may be international or domestic', () => {

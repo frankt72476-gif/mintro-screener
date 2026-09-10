@@ -77,10 +77,11 @@ export const CONSUMER_SIDE: readonly SpectrumId[] = ['consumer_retail', 'consume
  *
  * A ceiling and not a mapping. Each position permits a set, and the draft picks from it:
  *
- * - `consumer_retail` is out of the programme. Referred out, and nothing else.
- * - `consumer_leaning` may be referred out or placed international. Not domestic: domestic is the
- *   research-side destination and this business is not on that side.
- * - The three research-side positions may be placed international, or domestic once the routing
+ * - **`consumer_retail`, `consumer_leaning` and `mixed` are referred out, and nothing else**
+ *   (D-272, Frank 2026-09-10: *"mixed or leaning toward consumer: referred out"*). The line is
+ *   drawn at whether the consumer side is present at all, not at how much of it there is — a
+ *   storefront leaning toward consumers is a consumer storefront, and one selling to both is too.
+ * - The two research-side positions may be placed international, or domestic once the routing
  *   conditions hold. **They may not be referred out on the strength of the spectrum alone** —
  *   referred out follows from a legality item (D-256), and a draft reaching for it without one
  *   would be making the determination that is the underwriter's.
@@ -91,21 +92,25 @@ export const CONSUMER_SIDE: readonly SpectrumId[] = ['consumer_retail', 'consume
  * fact would tell a retry to move the placement in two directions at once.
  */
 export const PLACEMENT_BY_SPECTRUM: Readonly<Record<SpectrumId, readonly PlacementId[]>> = {
-  consumer_retail: ['referred_out'],
-  consumer_leaning: ['referred_out', 'international'],
   /*
-    Mixed is referred out (D-272, Frank 2026-09-10).
+    Three positions, one placement (D-272, Frank 2026-09-10).
 
-    It used to permit `international` or `domestic`, which put a storefront selling to both
-    audiences on the same footing as one selling to laboratories. A mixed position means the
-    consumer side is present, and the consumer side is what the programme refers out — the middle
-    of the spectrum is not a middle of the placement.
+    `mixed` used to permit `international` or `domestic` and `consumer_leaning` used to permit
+    `international`. Both put a storefront with a consumer audience somewhere on the road a research
+    supplier travels, and the ruling draws the line earlier: *"mixed or leaning toward consumer:
+    referred out."*
 
-    **Mixed joins the consumer positions here and nowhere else.** `CONSUMER_SIDE` is untouched and
-    still holds two, because that set gates shore-ups (guardrail 5) and shore-ups are exactly what
-    a mixed merchant needs: the whole point of the position is that there is something to fix. A
-    single list serving both questions would have taken them away.
+    The question is whether the consumer side is present, not how much of it there is. A storefront
+    leaning toward consumers is a consumer storefront; one selling to both is too. The middle of the
+    spectrum is not a middle of the placement.
+
+    **These three join here and nowhere else.** `CONSUMER_SIDE` still holds two, because that set
+    gates shore-ups (guardrail 5) and shore-ups are exactly what a mixed merchant needs: the whole
+    point of the position is that there is something to fix. A single list serving both questions
+    would have taken them away.
   */
+  consumer_retail: ['referred_out'],
+  consumer_leaning: ['referred_out'],
   mixed: ['referred_out'],
   /*
     The research end permits `international`, and `domestic` only once every routing condition

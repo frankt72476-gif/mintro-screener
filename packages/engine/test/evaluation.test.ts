@@ -1348,8 +1348,16 @@ describe('placement_outside_spectrum', () => {
     expect(rulesFor('consumer_retail', 'referred_out')).not.toContain('placement_outside_spectrum');
   });
 
-  it('lets a consumer-leaning business be international but never domestic', () => {
-    expect(rulesFor('consumer_leaning', 'international')).not.toContain('placement_outside_spectrum');
+  /*
+    Consumer-leaning is referred out (D-272 amendment).
+
+    It used to permit `international`, which put a storefront leaning toward consumers on the road a
+    research supplier travels. The line is drawn at whether the consumer side is present at all, not
+    at how much of it there is.
+  */
+  it('permits consumer-leaning nothing but referred out', () => {
+    expect(rulesFor('consumer_leaning', 'referred_out')).not.toContain('placement_outside_spectrum');
+    expect(rulesFor('consumer_leaning', 'international')).toContain('placement_outside_spectrum');
     expect(rulesFor('consumer_leaning', 'domestic')).toContain('placement_outside_spectrum');
   });
 
@@ -1367,7 +1375,7 @@ describe('placement_outside_spectrum', () => {
     position means the consumer side is present, and the consumer side is what the programme refers
     out.
   */
-  it('permits mixed nothing but referred out', () => {
+  it('permits mixed nothing but referred out either', () => {
     expect(rulesFor('mixed', 'referred_out')).not.toContain('placement_outside_spectrum');
     expect(rulesFor('mixed', 'international')).toContain('placement_outside_spectrum');
     expect(rulesFor('mixed', 'domestic')).toContain('placement_outside_spectrum');
