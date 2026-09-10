@@ -48,7 +48,7 @@ function messages(mutated: AngleSet): string {
 
 describe('rules/angles.json', () => {
   it('loads and validates against the committed rule set', () => {
-    expect(angles.version).toBe('1.2.0');
+    expect(angles.version).toBe('1.3.0');
     expect(angles.model).toBe('claude-opus-5');
     expect(checkAngleSet(angles, ruleset, items)).toEqual([]);
   });

@@ -26,7 +26,7 @@ import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { extractPage } from '../src/extract.js';
 import { selectLinkedCandidates } from '../src/signup.js';
-import { aboutSlugs, surfaceFromSlug } from '../src/evaluationPages.js';
+import { slugsNaming, surfaceFromSlug } from '../src/evaluationPages.js';
 
 const HOMEPAGE = resolve(process.cwd(), 'fixtures/homepages/comopeptides-2f39223a.html');
 const ORIGIN = 'https://www.comopeptides.com';
@@ -198,15 +198,20 @@ describe('what the surface reaches, and what it refuses', () => {
 
 describe('the crawler and the page selector agree on what an about page is', () => {
   /*
-    The paths the crawl guesses are derived from the selector's own slugs, so this asserts the
-    derivation rather than a list. Two lists would be two answers to one question (D-181).
+    There are no paths to guess any more — a candidate is a URL the merchant linked or listed, and
+    the selector's table is what says which surface it names. So this asserts the band itself:
+    every slug in it resolves to `about`, and the two that left it stayed gone (D-181, D-274).
   */
-  it('derives its candidate paths from the selector’s slugs', () => {
-    const slugs = aboutSlugs();
+  it('agrees with the selector on every about slug', () => {
+    const slugs = slugsNaming('about');
 
     expect(slugs).toContain('about-us');
     expect(slugs).toContain('our-story');
-    expect(slugs).toContain('blog');
+    expect(slugs).toContain('mission');
+    // `blog` and `news` left this band for `editorial`: a blog is not a page a site wrote about
+    // itself, it is a page a site wrote to be read (D-274).
+    expect(slugs).not.toContain('blog');
+    expect(slugs).not.toContain('news');
     for (const slug of slugs) {
       expect(surfaceFromSlug(`${ORIGIN}/${slug}/`), slug).toBe('about');
     }

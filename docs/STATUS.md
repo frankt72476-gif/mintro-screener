@@ -177,6 +177,29 @@ on the one product it exists for. And **an attestation is not a registration** (
 run affirmed CoMo's consent gate, read sixteen product pages and created no account, which is
 `registration_gate` observed not to hold.
 
+### A surface is found, never guessed (D-274)
+
+Run `f6008fa9` made **fourteen full browser navigations to learn that CoMo does not use a path** —
+`/blog`, `/mission`, `/news`, `/our-story`, `/story`, `/why-us` and their `/pages/` twins, every one
+answered by the storefront's themed 404, which is a 200 and so registered as nothing. That is about
+half a run's sampling budget spent on the hypothesis that a merchant names pages the way we would.
+
+A storefront that publishes a page links to it or lists it. Candidates now come from the homepage's
+nav and footer and from the sitemap Layer 0 already fetched, and from nowhere else.
+
+Alongside about, the crawl now reads an **editorial** surface: up to eight pages of the prose a
+storefront publishes to be read rather than to describe itself, ordered by the same suspicion scorer
+the product sampler uses. The FAQ leads that list, taken from the surface that already read it
+rather than rendered again — it keeps its own surface, because COMM-001 reads that document
+specifically. Both surfaces join `all_sampled`, go to the eye test, and enter evaluation page
+selection. Angles 1.3.0 records that the reasoning reads them.
+
+What CoMo has shaped the slug list. **They publish no blog, no articles, no research pages and no
+FAQ page** — their FAQ is a section inside `/about-us/`, which the about surface captures. What they
+do publish is `/quality-promise/`, `/how-to-read-a-coa/` and `/certificates-of-analysis/`, so
+`quality`, `coa`, `certificates` and `promise` are on the list. A slug set matching nothing on the
+one merchant we can test against would be a surface that renders on no run.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
@@ -186,12 +209,13 @@ run affirmed CoMo's consent gate, read sixteen product pages and created no acco
   that the crawler passes the gate itself, so a token or header a merchant issues would spare them
   the form submission rather than unblock the crawl. Worth offering if a merchant asks; not worth
   building unprompted.
-- **Static egress IP and allowlist copy. In progress.** The worker's outbound address is
-  `152.233.48.176` and is not one Fly reports under `ips list` — those are ingress. A dedicated
-  static egress makes the address something a merchant can allowlist, and the allowlist request
-  needs copy that says who is asking, from what address, and why, without asking anyone to
-  characterise their own compliance (hard constraint 7, D-067). Neither exists yet. This is the
-  answer to a bot challenge that does not touch D-017.
+- **Static egress IP and allowlist copy. Done, unused.** The worker's outbound address is
+  `209.71.108.21` (IPv6 `2a09:8280:e618:1:0:179:b05b:0`), allocated app-scoped in `iad` on
+  2026-09-09, and the crawler identifies as `MintroScreener`. `docs/DEPLOY.md` carries both the
+  address and the allowlist copy for the application, written to say who is asking, from what
+  address and why, without asking anyone to characterise their own compliance (hard constraint 7,
+  D-067). No merchant has been asked yet. This is the answer to a bot challenge that does not touch
+  D-017.
 - **Getting past a bot challenge.** Open, and deliberately not a build task. D-264 makes the crawl
   say what it met; it establishes nothing about `phoenixpeptide.com`, and three of the seven runs
   on file are of a site nobody has seen. The available answers — a different egress, an arrangement

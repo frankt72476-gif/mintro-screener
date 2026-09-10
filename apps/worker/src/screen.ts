@@ -43,6 +43,8 @@ import {
   runLayer2,
   runLayer3,
   scoreProductUrls,
+  toSlugUrl,
+  type SlugUrl,
   selectSample,
   tally,
   assessWall,
@@ -462,6 +464,29 @@ export async function screenStorefront(
     context: crawl,
     ...gateOptions(),
     /*
+      The listing half of the candidate sources (D-274).
+
+      A storefront that publishes a page links to it or lists it. `improved.urls` is what Layer 0
+      obtained from the sitemaps, already slug-parsed, and it replaces sixteen guesses at
+      conventional paths that produced fourteen themed 404s on run f6008fa9.
+    */
+    sitemapUrls: improved.urls.map((slug) => slug.url),
+    /*
+      Ranking is the caller's because it needs the rule set, and `signup.ts` holds no rule knowledge
+      (hard constraint 1). The same scorer the product sampler uses: it reads rule signals out of
+      slug tokens, which is as true of `/blog/bpc-157-guide` as of a product URL.
+    */
+    rankCandidates: (urls) => {
+      const scored = scoreProductUrls(
+        urls
+          .map((url) => toSlugUrl(url, overrides))
+          .filter((slug): slug is SlugUrl => slug !== null),
+        ruleset,
+      );
+      const order = new Map(scored.map((entry, index) => [entry.url.url, index]));
+      return [...urls].sort((a, b) => (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity));
+    },
+    /*
       With the nav and footer flags (D-271).
 
       An about page is located by exact link text *in the chrome*: the same words in body copy are
@@ -495,6 +520,13 @@ export async function screenStorefront(
   if (discovered.faq.located) progress.surfaceRead('the FAQ');
   if (discovered.payment.located) progress.surfaceRead('the payment or refund policy');
   if (discovered.about.located) progress.surfaceRead('the about page');
+  if (discovered.editorial.length > 0) {
+    progress.surfaceRead(
+      discovered.editorial.length === 1
+        ? 'one editorial page'
+        : `${discovered.editorial.length} editorial pages`,
+    );
+  }
   artifacts.push(...discovered.artifacts);
 
   /*
@@ -509,8 +541,16 @@ export async function screenStorefront(
     render order is untouched: the sample is still rendered before the policy pages, and the pacer
     still spaces every request.
   */
+  /*
+    The surfaces the product rules read besides the product sample (D-274).
+
+    About first, then the editorial pages in the order they were read. Both are prose a storefront
+    publishes about itself and to its readers, and PROD-011, PROD-013, PROD-016 and PROD-017 ask
+    questions that do not stop at the catalogue.
+  */
   const aboutPages = discovered.about.located ? [discovered.about.value] : [];
-  const layer2 = runLayer2(sampled, ruleset, coa?.outcome, aboutPages);
+  const alsoRead = [...aboutPages, ...discovered.editorial];
+  const layer2 = runLayer2(sampled, ruleset, coa?.outcome, alsoRead);
 
   const layer3 = runLayer3(
     {
@@ -682,6 +722,7 @@ export async function screenStorefront(
         ...(discovered.signupPage === undefined ? {} : { signup: discovered.signupPage }),
         // The rubric asks how a site presents itself, and this is where it answers (D-271).
         ...(aboutPages[0] === undefined ? {} : { about: aboutPages[0] }),
+        editorial: discovered.editorial,
       }),
     },
     ruleset,

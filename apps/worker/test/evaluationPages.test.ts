@@ -27,6 +27,7 @@ import {
   readPages,
   normalizeUrl,
   SURFACE_SLUGS,
+  slugsNaming,
   surfaceFromSlug,
   surfacesByUrl,
   type EvidenceRow,
@@ -299,11 +300,14 @@ describe('the slug locator, the second source', () => {
     from two bands is read as the earlier band. `/pages/shipping-policy` is a shipping policy, not
     terms; `/about-our-return-policy` is a policy page, not an about page.
   */
-  it('orders the slug table specific, then general, then about', () => {
+  it('orders the slug table specific, then general, then about, then editorial', () => {
     const ids = SURFACE_SLUGS.map(([slug]) => slug);
     const general = ['policy', 'policies', 'terms', 'account'];
-    const about = ['about-us', 'about', 'our-story', 'story', 'mission', 'why-us', 'blog', 'news'];
-    const specific = ids.filter((slug) => !general.includes(slug) && !about.includes(slug));
+    const about = ['about-us', 'about', 'our-story', 'story', 'mission', 'why-us'];
+    const editorial = SURFACE_SLUGS.filter(([, s]) => s === 'editorial').map(([slug]) => slug);
+    const specific = ids.filter(
+      (slug) => !general.includes(slug) && !about.includes(slug) && !editorial.includes(slug),
+    );
 
     const band = (slugs: readonly string[]): { first: number; last: number } => ({
       first: Math.min(...slugs.map((slug) => ids.indexOf(slug))),
@@ -312,9 +316,14 @@ describe('the slug locator, the second source', () => {
 
     // Every slug is in exactly one band, so a slug added without a band fails here rather than
     // silently landing wherever it was typed.
-    expect(specific.length + general.length + about.length).toBe(ids.length);
+    expect(specific.length + general.length + about.length + editorial.length).toBe(ids.length);
     expect(band(specific).last).toBeLessThan(band(general).first);
     expect(band(general).last).toBeLessThan(band(about).first);
+    /*
+      Editorial is loosest of all and goes last (D-274). `blog` and `news` moved here from the about
+      band: a blog is not a page a site wrote about itself, it is a page a site wrote to be read.
+    */
+    expect(band(about).last).toBeLessThan(band(editorial).first);
   });
 
   /*
@@ -326,18 +335,45 @@ describe('the slug locator, the second source', () => {
   });
 
   it('locates the about surface from each of its slugs', () => {
-    for (const path of [
-      '/about/',
-      '/about-us/',
-      '/our-story/',
-      '/story/',
-      '/mission/',
-      '/why-us/',
-      '/blog/',
-      '/news/',
-    ]) {
+    for (const path of ['/about/', '/about-us/', '/our-story/', '/story/', '/mission/', '/why-us/']) {
       expect(surfaceFromSlug(`https://shop.example${path}`), path).toBe('about');
     }
+  });
+
+  /*
+    Editorial, including the four added for CoMo (D-274). They have no blog, no articles and no
+    research pages, and do have `/quality-promise/`, `/how-to-read-a-coa/` and
+    `/certificates-of-analysis/` — a list matching nothing on the merchant we can test against would
+    be a surface that renders on no run.
+  */
+  it('locates the editorial surface from each of its slugs', () => {
+    for (const path of [
+      '/blog/',
+      '/news/',
+      '/articles/',
+      '/research/',
+      '/learn/',
+      '/guides/',
+      '/resources/',
+      '/education/',
+      '/quality-promise/',
+      '/how-to-read-a-coa/',
+      '/certificates-of-analysis/',
+    ]) {
+      expect(surfaceFromSlug(`https://shop.example${path}`), path).toBe('editorial');
+    }
+  });
+
+  /*
+    The FAQ keeps its own surface. COMM-001 reads that document specifically, and relabelling it
+    `editorial` would take a rule's subject away from it. It still reaches the editorial sample —
+    `editorialSample` puts the page the FAQ surface already read at the head of the list — but it
+    gets there as the FAQ, not by a slug that would have hidden it from COMM-001.
+  */
+  it('leaves the FAQ its own surface', () => {
+    expect(surfaceFromSlug('https://shop.example/faq/')).toBe('faq');
+    expect(slugsNaming('editorial')).not.toContain('faq');
+    expect(slugsNaming('editorial')).not.toContain('help');
   });
 
   /*

@@ -97,17 +97,29 @@ export const ALWAYS_INCLUDED_SURFACES = [
    * unusual* is an observation the evaluation needs to be able to make.
    */
   'about',
+  /**
+   * What a storefront publishes to teach, persuade or reassure (D-271).
+   *
+   * A FAQ, a blog, an article, a research page, a quality promise. Angles 1 and 2 turn on how a site
+   * talks to whoever is reading and who it says its products are for, and editorial prose is where
+   * a storefront answers both at length — a catalogue can read as research throughout while the
+   * blog explains what to stack.
+   *
+   * After `about` for the same reason `about` is after the policy pages: the further down this list
+   * a surface sits, the more of the 25-page budget has already been spent when it is reached.
+   */
+  'editorial',
 ] as const;
 
 /**
- * The slugs that name an about page, read out of the table below (D-271).
+ * The slugs that name a surface, read out of the table below (D-274).
  *
- * Derived, never written twice. `discoverLayer3` builds its candidate paths from this, so the
- * crawler looks for exactly the pages the selector knows how to label — a second list would be two
- * answers to *what is an about page*, and D-181 is the record of what happens to those.
+ * Derived, never written twice. The crawler decides a candidate by asking `surfaceFromSlug` what a
+ * URL names, so a second list would be two answers to *what is an about page* — D-181 is the record
+ * of what happens to those. This exists so a reader, and a test, can see a whole band at once.
  */
-export const aboutSlugs = (): readonly string[] =>
-  SURFACE_SLUGS.filter(([, surface]) => surface === 'about').map(([slug]) => slug);
+export const slugsNaming = (surface: string): readonly string[] =>
+  SURFACE_SLUGS.filter(([, named]) => named === surface).map(([slug]) => slug);
 
 /**
  * Path tokens that name a surface, for the second locator.
@@ -170,8 +182,35 @@ export const SURFACE_SLUGS: readonly (readonly [string, string])[] = [
   ['story', 'about'],
   ['mission', 'about'],
   ['why-us', 'about'],
-  ['blog', 'about'],
-  ['news', 'about'],
+
+  /*
+    Editorial, last of all (D-274).
+
+    `blog` and `news` moved here from the about band: a blog is not a page a site wrote about
+    itself, it is a page a site wrote to be read, and the two answer different angles. `faq` is
+    **not** here — it keeps its own surface, because COMM-001 reads that document specifically and a
+    FAQ relabelled `editorial` would take a rule's subject away from it.
+
+    `quality`, `coa`, `certificates` and `promise` are on the list because CoMo has no blog, no
+    articles and no research pages, and does have `/quality-promise/`, `/how-to-read-a-coa/` and
+    `/certificates-of-analysis/`. A list that matched nothing on the one merchant we can test
+    against would be a surface that renders on no run.
+  */
+  ['articles', 'editorial'],
+  ['article', 'editorial'],
+  ['research', 'editorial'],
+  ['learn', 'editorial'],
+  ['guides', 'editorial'],
+  ['guide', 'editorial'],
+  ['resources', 'editorial'],
+  ['education', 'editorial'],
+  ['blog', 'editorial'],
+  ['news', 'editorial'],
+  ['quality', 'editorial'],
+  ['coa', 'editorial'],
+  ['certificates', 'editorial'],
+  ['certificate', 'editorial'],
+  ['promise', 'editorial'],
 ];
 
 /**

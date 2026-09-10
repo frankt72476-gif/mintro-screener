@@ -36,7 +36,7 @@ import type {
   SurfaceSpec,
 } from '@mintro/engine';
 import { located, NO_SIGNUP_FORM, unreachable, withoutFragment } from '@mintro/engine';
-import { aboutSlugs, surfaceFromSlug } from './evaluationPages.js';
+import { surfaceFromSlug } from './evaluationPages.js';
 import { probeSurface } from './surfaceProbe.js';
 import { establishDocument } from './locate.js';
 import { PROBE_IDLE_MS, renderPage } from './render.js';
@@ -88,16 +88,31 @@ const FAQ_PATHS = ['/pages/faq', '/pages/faqs', '/faq', '/faqs', '/frequently-as
 const FAQ_LINK_HINTS = ['faq', 'faqs', 'frequently asked', 'frequently-asked'];
 
 /**
- * How a storefront talks about itself (D-271).
+ * Nothing is guessed any more (D-274).
  *
- * **Paths derived from the page selector's own about slugs**, in both the bare and `/pages/` forms
- * every platform uses. Writing the list twice would be two answers to *what is an about page*, and
- * the selector's copy is the one that also has to label the capture afterwards.
+ * The about surface shipped with a path list built from every about slug in both the bare and
+ * `/pages/` forms — sixteen guesses at a conventional URL. Run `f6008fa9` rendered **fourteen themed
+ * 404s** from it: `/blog`, `/mission`, `/news`, `/our-story`, `/story`, `/why-us` and their
+ * `/pages/` twins, every one a full browser navigation to learn that CoMo does not use that path.
+ *
+ * A storefront that publishes a page **links to it or lists it**. Candidates now come from the
+ * homepage's nav and footer and from the sitemap, and from nowhere else. Both are the merchant
+ * telling us what they have; a path list is us telling them what they ought to have.
+ *
+ * The policy surfaces keep their path lists, and that is deliberate rather than an oversight: a
+ * terms page that no page links and no sitemap lists still has to be found, because *the merchant
+ * publishes no terms* is a finding and *we did not look hard enough* is not. An about page that
+ * nothing links and nothing lists is a page with no readers.
  */
-const ABOUT_PATHS: readonly string[] = aboutSlugs().flatMap((slug) => [
-  `/${slug}`,
-  `/pages/${slug}`,
-]);
+
+/**
+ * How many editorial pages one run reads.
+ *
+ * Eight, because a storefront with a blog has dozens and the point is a sample of how it writes,
+ * not an archive. What is left over is recorded rather than dropped: a reader has to be able to see
+ * that the run chose, and which way (D-076).
+ */
+const MAX_EDITORIAL_PAGES = 8;
 
 /**
  * The phrases an about link says, for a link that is not in the chrome (D-271).
@@ -110,6 +125,29 @@ const ABOUT_PATHS: readonly string[] = aboutSlugs().flatMap((slug) => [
  * refused by the page selector's own band ordering rather than by a rule written twice.
  */
 const ABOUT_LINK_TEXTS: readonly string[] = ['about', 'about us', 'our story', 'mission'];
+
+/**
+ * The phrases an editorial link says, for one outside the chrome (D-274).
+ *
+ * Short and literal, like the about list, and for the same reason: these are the words a site puts
+ * on a nav item. Anything looser reads a body link saying *learn more about shipping* as an
+ * editorial page.
+ */
+const EDITORIAL_LINK_TEXTS: readonly string[] = [
+  'faq',
+  'faqs',
+  'help',
+  'blog',
+  'news',
+  'articles',
+  'research',
+  'learn',
+  'guides',
+  'resources',
+  'education',
+  'quality promise',
+  'certificates of analysis',
+];
 
 /** A payment-methods or refund policy page - public, and where payment rails get advertised. */
 const PAYMENT_PATHS = [
@@ -186,6 +224,14 @@ export interface Layer3Discovery {
    * the site makes it, and the about page is where it is made in prose rather than in a spec table.
    */
   readonly about: Located<PageContext>;
+  /**
+   * The editorial pages this run read, up to eight (D-274).
+   *
+   * A FAQ, a blog, an article, a quality promise — prose a storefront publishes to be read. They
+   * join `all_sampled`, so the product rules read them, and they go to the eye test as their own
+   * captures. Empty on a storefront that publishes none, which is most of them.
+   */
+  readonly editorial: readonly PageContext[];
   /** Every navigation made looking for any of them, and what it returned. */
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
@@ -218,6 +264,21 @@ export interface DiscoverOptions {
    * through, rather than a second submission of a merchant's form. Optional, because a caller with
    * no shared context is still correct — it simply pays the pass again.
    */
+  /**
+   * Every URL Layer 0 obtained from the sitemaps (D-274).
+   *
+   * The second source of candidates for the surfaces that are found rather than guessed. A
+   * storefront that publishes a page links to it or lists it, and this is the listing half.
+   */
+  readonly sitemapUrls?: readonly string[];
+  /**
+   * Puts a set of candidate URLs in the order they should be read (D-274).
+   *
+   * Supplied by the caller because ranking by suspicion needs the rule set, and this module holds
+   * no rule knowledge (hard constraint 1). Absent, the order is the order they were found — which
+   * is correct for every surface that renders one page, and only matters for editorial.
+   */
+  readonly rankCandidates?: (urls: readonly string[]) => readonly string[];
   readonly context?: BrowserContext;
   /** True when the crawl has already entered a gate on `context` (D-267). */
   readonly alreadyEnteredGate?: boolean;
@@ -287,10 +348,25 @@ export async function discoverLayer3(
     */
     {
       label: 'about page',
-      paths: ABOUT_PATHS,
+      paths: [],
       linkHints: [],
       linkTexts: ABOUT_LINK_TEXTS,
       surface: 'about',
+    },
+    /*
+      Editorial, last and capped (D-274).
+
+      Located the same way the about page is — chrome links and the sitemap, no guesses — and unlike
+      every other surface here it renders more than one page. `limit` is what makes it a sample
+      rather than an archive.
+    */
+    {
+      label: 'editorial page',
+      paths: [],
+      linkHints: [],
+      linkTexts: EDITORIAL_LINK_TEXTS,
+      surface: 'editorial',
+      limit: MAX_EDITORIAL_PAGES,
     },
   ] as const;
 
@@ -309,12 +385,15 @@ export async function discoverLayer3(
 
   const probe = { undecided: 0, total: 0 };
   const found = new Map<string, Located<PageContext>>();
+  /** Every page each surface established, for the surfaces that yield more than one (D-274). */
+  const established = new Map<string, readonly PageContext[]>();
   for (const what of documents) {
     step(what.label);
-    found.set(
-      what.label,
-      await findDocument(browser, origin, options, attempts, artifacts, pages, say, what, probe),
+    const outcome = await findDocument(
+      browser, origin, options, attempts, artifacts, pages, say, what, probe,
     );
+    found.set(what.label, outcome.located);
+    established.set(what.label, outcome.pages);
     done += 1;
   }
   say('policy pages read', { done, total });
@@ -331,6 +410,8 @@ export async function discoverLayer3(
     faq: surface('FAQ'),
     payment: surface('payment or refund policy'),
     about: surface('about page'),
+    // Every editorial page, not the first, and the FAQ ahead of them (D-274).
+    editorial: editorialSample(established.get('FAQ') ?? [], established.get('editorial page') ?? []),
     attempts,
     artifacts,
     pages,
@@ -423,6 +504,47 @@ async function findSignupForm(
       : `  no sign-up form reached · closest: ${closest}`,
   );
   return { form: closest === '' ? NO_SIGNUP_FORM : { ...NO_SIGNUP_FORM, locatedBy: closest } };
+}
+
+/**
+ * The editorial sample a run reads, FAQ first (D-274).
+ *
+ * `editorial` is the one surface that yields a set: the question it answers is *how does this site
+ * write*, and one blog post is an anecdote. So the surface renders up to `MAX_EDITORIAL_PAGES` and
+ * what the rules read is the list, not its first entry.
+ *
+ * The FAQ leads it, and comes from the surface that already read it rather than a second render. A
+ * FAQ carrying dosing guidance is the clearest single signal angle 1 has, and suspicion ranking is
+ * the wrong question for it: it must not fall off the end of the cap because its slug tripped no
+ * rule. It cannot arrive as an editorial candidate on its own, because `surfaceFromSlug` labels it
+ * `faq` — COMM-001 reads that document specifically and relabelling it would take a rule's subject
+ * away from it. It keeps its surface and joins the list here, which is what puts it in
+ * `all_sampled` and in front of the eye test.
+ */
+export function editorialSample(
+  faq: readonly PageContext[],
+  editorial: readonly PageContext[],
+): readonly PageContext[] {
+  return [...faq, ...editorial].slice(0, MAX_EDITORIAL_PAGES);
+}
+
+/**
+ * The sitemap entries that name a surface (D-274).
+ *
+ * The listing half of the candidate sources, and pure for the same reason `selectLinkedCandidates`
+ * is: it is the part worth testing against a real sitemap, and it needs no browser to do it.
+ *
+ * The surface is decided by `surfaceFromSlug` — the page selector's own table — so the two doors
+ * cannot disagree about what an about page is. An entry that names no surface is somebody else's
+ * page, and an entry on another origin is somebody else's site.
+ */
+export function selectListedCandidates(
+  sitemapUrls: readonly string[],
+  origin: string,
+  surface: string | undefined,
+): readonly string[] {
+  if (surface === undefined) return [];
+  return sitemapUrls.filter((url) => url.startsWith(origin) && surfaceFromSlug(url) === surface);
 }
 
 /**
@@ -537,9 +659,11 @@ async function findDocument(
     readonly linkTexts?: readonly string[];
     /** The surface name the href must resolve to, read from the page selector's table (D-271). */
     readonly surface?: string;
+    /** How many pages of this surface one run reads. Absent means one (D-271). */
+    readonly limit?: number;
   },
   probeTally: { undecided: number; total: number },
-): Promise<Located<PageContext>> {
+): Promise<{ readonly located: Located<PageContext>; readonly pages: readonly PageContext[] }> {
   /*
     This surface's own attempts, kept separately from the run-wide list (D-182).
 
@@ -553,6 +677,16 @@ async function findDocument(
     mine.push(attempt);
     attempts.push(attempt);
   };
+
+  /**
+   * Every page of this surface that was established, in the order they were read (D-271).
+   *
+   * One entry for every surface but editorial, which reads up to its `limit`. `first` is what the
+   * existing four callers consume, unchanged: a `Located<PageContext>` naming the page and how it
+   * was identified.
+   */
+  const establishedPages: PageContext[] = [];
+  let first: Located<PageContext> | null = null;
 
   /** Set when a candidate answered but could not be turned into a page we could read (D-156). */
   let obstructed = false;
@@ -589,7 +723,36 @@ async function findDocument(
     say(`  ${line}`);
   }
 
-  const candidates = [...new Set([...linked, ...what.paths.map((path) => `${origin}${path}`)])];
+  /*
+    The sitemap, as the second source (D-274).
+
+    Filtered by the same `surfaceFromSlug` the link door uses, so the crawler looks for exactly the
+    pages the page selector knows how to label — one definition, two sources. A sitemap entry that
+    names no surface is somebody else's page.
+  */
+  const listed = selectListedCandidates(options.sitemapUrls ?? [], origin, what.surface);
+
+  const found = [...new Set([...linked, ...listed])];
+  const ordered = options.rankCandidates === undefined ? found : [...options.rankCandidates(found)];
+
+  const limit = what.limit ?? Infinity;
+  const candidates = [
+    ...new Set([...ordered, ...what.paths.map((path) => `${origin}${path}`)]),
+  ];
+
+  /*
+    What the cap left, declared rather than dropped (D-076).
+
+    A surface that read eight of nineteen pages and said nothing would give a reader a sample with
+    no denominator.
+  */
+  if (candidates.length > limit) {
+    const line =
+      `${what.label}: ${candidates.length} candidate(s) were found and the first ${limit} were ` +
+      `read; ${candidates.length - limit} were not requested`;
+    attempts.push({ url: origin, status: 0, error: line });
+    say(`  ${line}`);
+  }
 
   for (const url of candidates) {
     if (!url.startsWith(origin)) continue;
@@ -683,17 +846,35 @@ async function findDocument(
 
     record({ url, status: rendered.page.httpStatus });
     say(`  ${what.label} located at ${outcome.how}`);
-    return located(outcome.value, outcome.url, outcome.how);
+    establishedPages.push(outcome.value);
+    if (first === null) first = located(outcome.value, outcome.url, outcome.how);
+
+    /*
+      One page is enough for every surface but editorial (D-274).
+
+      The four policy surfaces are singular by nature — a storefront has one terms page — so they
+      stop here exactly as they did. Editorial declares a `limit` and keeps going until it has that
+      many, because the question there is *how does this site write*, and one blog post is an
+      anecdote.
+    */
+    if (establishedPages.length >= limit) {
+      return { located: first, pages: establishedPages };
+    }
   }
 
+  if (first !== null) return { located: first, pages: establishedPages };
+
   say(`  no ${what.label} reached`);
-  return unreachable(
-    `no ${what.label} was reached: ${describeCandidates(mine)}`,
-    mine,
-    obstructed,
-    challenged,
-    gated,
-  );
+  return {
+    located: unreachable(
+      `no ${what.label} was reached: ${describeCandidates(mine)}`,
+      mine,
+      obstructed,
+      challenged,
+      gated,
+    ),
+    pages: [],
+  };
 }
 
 /**

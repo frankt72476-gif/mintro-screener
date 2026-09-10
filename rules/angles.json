@@ -1,11 +1,12 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "effective": "2026-09-09",
   "source_document": "docs/angle-set-design.md, ratified under D-256; structure under D-260",
   "changelog": [
     "1.0.0 — initial set: seven angles, five-position spectrum, three placements, five routing conditions, five guardrails (D-256, D-259, D-260).",
     "1.1.0 — concision. Per-section word limits under `limits`, and two guardrails saying each thing is said once, in the section that owns it. The first real draft (run 9011b2d7) ran to roughly 1,100 words, with seven angles that each re-summarised the business before saying what they observed.",
-    "1.2.0 — `attestationIsNotRegistration` on `registration_gate` (D-273). A site-entry attestation is a visitor ticking boxes about themselves; a registration is an account. Run f6008fa9 affirmed CoMo's consent gate, read the catalogue without creating an account, and the draft still wrote the row `not_observable` — the flag is what lets the validator say the condition was observed not holding, without the engine knowing a condition id."
+    "1.2.0 — `attestationIsNotRegistration` on `registration_gate` (D-273). A site-entry attestation is a visitor ticking boxes about themselves; a registration is an account. Run f6008fa9 affirmed CoMo's consent gate, read the catalogue without creating an account, and the draft still wrote the row `not_observable` — the flag is what lets the validator say the condition was observed not holding, without the engine knowing a condition id.",
+    "1.3.0 — angles 1 and 2 note that editorial pages are read (D-274). The crawl now establishes an about surface and up to eight editorial pages — a FAQ, a blog, an article, a quality promise — and they join the product sample for PROD-011, PROD-013, PROD-016, PROD-017 and OFFS-002. No angle changed its question; what changed is how much of the site answers it. Run f6008fa9 read sixteen product pages and nothing a storefront wrote in prose."
   ],
   "model": "claude-opus-5",
   "spectrum": [
@@ -21,7 +22,7 @@
       "id": "who_it_talks_to",
       "title": "Who the site is talking to",
       "question": "is the copy and imagery addressed to a lab or to a person who will use the product?",
-      "reasoning": "a supplier writes to a buyer who already knows what the compound is. A retailer has to sell the outcome. Second-person benefit language, lifestyle imagery, \"how it works\" explainers, reviews and testimonials all exist to persuade an end user.",
+      "reasoning": "a supplier writes to a buyer who already knows what the compound is. A retailer has to sell the outcome. Second-person benefit language, lifestyle imagery, \"how it works\" explainers, reviews and testimonials all exist to persuade an end user. The run now reads the pages a storefront publishes to be read as well as its catalogue: the about page and up to eight editorial pages - a FAQ, a blog, an article, a quality promise. Those are where a site addresses its reader at length and in its own voice, and a catalogue can read as research throughout while the blog explains what to stack.",
       "ruleIds": [
         "PROD-009",
         "PROD-011",
@@ -52,7 +53,7 @@
       "id": "products_for",
       "title": "What the products are for",
       "question": "does the catalogue look like a research inventory or a consumer lineup?",
-      "reasoning": "a research supplier stocks what assays need. A retailer stocks what people want to take: the GLP-1, cosmetic and recovery lineup, plus everything that helps them take it.",
+      "reasoning": "a research supplier stocks what assays need. A retailer stocks what people want to take: the GLP-1, cosmetic and recovery lineup, plus everything that helps them take it. Editorial pages are read alongside the product pages, because what a site tells a reader a compound is for is often plainer in a guide than on a spec sheet.",
       "ruleIds": [
         "NAME-001",
         "NAME-003",

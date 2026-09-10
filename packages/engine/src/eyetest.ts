@@ -269,6 +269,13 @@ export function eyeTestManifest(pages: {
    * words. Absent where the crawl did not reach one, which is most storefronts.
    */
   readonly about?: PageContext;
+  /**
+   * The editorial pages this run read (D-274).
+   *
+   * A FAQ, a blog, a quality promise. The rubric asks how a site talks to whoever is reading, and
+   * editorial prose is where a storefront answers at length. Empty on most storefronts.
+   */
+  readonly editorial?: readonly PageContext[];
 }): readonly EyeTestCaptureRequest[] {
   const of = (surface: string, page: PageContext): EyeTestCaptureRequest => ({
     surface,
@@ -282,6 +289,7 @@ export function eyeTestManifest(pages: {
     ...pages.products.map((page) => of('product', page)),
     ...(pages.signup === undefined ? [] : [of('signup', pages.signup)]),
     ...(pages.about === undefined ? [] : [of('about', pages.about)]),
+    ...(pages.editorial ?? []).map((page) => of('editorial', page)),
   ];
 }
 

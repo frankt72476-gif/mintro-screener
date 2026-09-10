@@ -18203,3 +18203,125 @@ consistent:
 
 A fixture that could not have been produced by any run is a fixture that tests nothing, and both
 had drifted into exactly that.
+
+
+## D-274 — A surface is found, never guessed; editorial pages are one
+
+**Date:** 2026-09-10
+**Amends:** D-271 (about pages are a surface)
+**Status:** accepted
+
+D-271 gave the crawl an about surface and located it two ways: exact link text in the homepage
+chrome, and a list of candidate paths built from every about slug in both the bare and `/pages/`
+forms. The second half was wrong, and run `f6008fa9` is the record of it.
+
+### The fourteen renders
+
+That run made **fourteen full browser navigations to learn that CoMo does not use a path**:
+
+```
+/blog  /mission  /news  /our-story  /story  /why-us
+/pages/blog  /pages/mission  /pages/news  /pages/our-story  /pages/story  /pages/why-us
+/pages/about  /pages/about-us
+```
+
+Every one returned the storefront's themed 404 — a 200 with the site's own chrome, which is why
+none of them registered as a failure. Fourteen renders is roughly half the sampling budget of a
+run, spent on the hypothesis that a merchant might have named a page the way the crawler would
+have. It also cost memory, which D-268 is the record of.
+
+**A storefront that publishes a page links to it or lists it.** Candidates now come from the
+homepage's nav and footer and from the sitemap Layer 0 already fetched, and from nowhere else.
+`ABOUT_PATHS` is deleted; both new surfaces carry `paths: []`.
+
+This is hard constraint 9 in its ordinary form. Guessing `/pages/our-story` is locating a subject
+by the shape a compliant, conventionally-built storefront would give it — it finds the merchants
+who name things the way we expected, and is blind to the rest.
+
+### Editorial as a surface
+
+Alongside about, the crawl now establishes an **editorial** surface: the prose a storefront
+publishes to be read rather than to describe itself. It is the only Layer 3 surface that yields a
+set — the question it answers is *how does this site write*, and one blog post is an anecdote — so
+it renders up to eight pages, ordered by the same suspicion scorer the product sampler uses.
+
+The slugs, in `SURFACE_SLUGS` as a fourth band after about:
+
+```
+articles  article  research  learn  guides  guide  resources  education  blog  news
+quality  coa  certificates  certificate  promise
+```
+
+`blog` and `news` moved out of the about band to get here. A blog is not a page a site wrote about
+itself; the two answer different angles.
+
+The last four are on the list because of what CoMo does and does not have. **They publish no blog,
+no articles and no research pages.** What they publish is `/quality-promise/`,
+`/how-to-read-a-coa/` and `/certificates-of-analysis/`. A slug set that matched nothing on the one
+merchant we can test against would be a surface that renders on no run — a mechanism asserted by
+tests and exercised by nothing, which is the shape D-246 describes.
+
+**CoMo has no FAQ page either.** Their FAQ is a section inside `/about-us/`, which D-271's about
+surface captures — so on this merchant the about page is carrying the document COMM-001 wants, and
+the editorial surface reads their quality and COA pages. The general case is asserted against a
+constructed sitemap that carries the research and FAQ shapes, rather than by pretending CoMo has
+pages they do not.
+
+### The FAQ leads the sample, without leaving its own surface
+
+`surfaceFromSlug` labels a FAQ `faq`, not `editorial`, and that stays: COMM-001 reads that document
+specifically, and relabelling it would take a rule's subject away from it (D-014).
+
+So the FAQ cannot arrive as an editorial candidate. It reaches the sample the other way — the FAQ
+surface renders it once, and `editorialSample` puts that page at the head of the list. That is what
+puts the FAQ in `all_sampled`, where the product rules read it, and in front of the eye test, and
+it costs no second render.
+
+The ordering matters because suspicion ranking is the wrong question for a FAQ. A FAQ carrying
+dosing guidance is the clearest single signal angle 1 has, and it must not fall off the end of the
+cap because its slug tripped no rule.
+
+### What reads them
+
+Both surfaces join `all_sampled`, so PROD-005, PROD-008, PROD-009, PROD-011, PROD-013, PROD-016,
+PROD-017 and OFFS-002 read them. Both go to the eye test as their own captures. Both enter
+evaluation page selection through `ALWAYS_INCLUDED_SURFACES`, editorial directly after about.
+
+`angles.json` goes to 1.3.0: `who_it_talks_to` and `products_for` note that editorial pages are
+among what the reasoning reads.
+
+### Two things this change removed rather than added
+
+- **`slugs` on the surface descriptors.** Written, and read by nothing — the surface is decided by
+  `surfaceFromSlug`, and the slug list beside it was a second answer to the same question. Deleted,
+  with `aboutSlugs()` and `editorialSlugs()` folded into one `slugsNaming(surface)` that exists so a
+  test can see a whole band at once.
+- **FAQ-first ordering inside `findDocument`.** It filtered editorial candidates for the `faq`
+  surface, which no editorial candidate can ever have. It was a line that could never fire, and the
+  test covering it passed on the constructed union the test itself built. The ordering now lives at
+  the one point where it is real.
+
+### What is asserted, and what breaking it costs
+
+`editorialSurface.test.ts` reads run `f6008fa9`'s actual sitemap, unedited, and calls the crawler's
+own `selectListedCandidates` rather than a copy of the filter — a re-implementation would have made
+every assertion true of the test file and stayed green with the sitemap source deleted (D-026).
+Each of these fails when the mechanism behind it is removed:
+
+| Broken | Fails |
+|---|---|
+| the four new editorial slugs | CoMo's three editorial pages resolve to nothing |
+| `blog`/`news` returned to the about band | the about band asserts they left it |
+| the sitemap filter's origin check | a third-party `/blog/` URL becomes this merchant's editorial voice |
+| the sitemap filter's surface check | product and account URLs become candidates |
+| the FAQ's place at the head | the sample orders posts first |
+| the eight-page cap | twelve articles are all read |
+
+And the fourteen paths are named individually: not one is a URL CoMo lists, so not one can be
+reached from a sitemap-and-links crawl.
+
+### D-002
+
+Runs already made are not re-crawled. Every run before this one read no about page and no editorial
+page, and their PROD-011/013/016/017 findings rest on the product sample and homepage alone. Nothing
+is back-filled.
