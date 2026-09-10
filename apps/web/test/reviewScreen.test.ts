@@ -150,7 +150,19 @@ describe('a run with no evaluation says so', () => {
     expect(EDITOR).toContain('eval-empty');
   });
 
+  /*
+    One **enqueue** path, not one mention.
+
+    This counted every reference to the table and broke when D-269 added a *read* of the outstanding
+    request — which is not a second path, it is the screen learning whether one already exists. What
+    the test is for is that Generate and Regenerate queue the same job, and that is a claim about
+    inserts. Both call sites are now `GenerateControl`, so it is also asserted structurally: one
+    component, one callback, one insert.
+  */
   it('queues the same job Regenerate does, rather than a second path', () => {
-    expect([...EDITOR.matchAll(/from\('evaluation_requests'\)/g)]).toHaveLength(1);
+    // Anchored to the table: the publish insert carries the same field shape, and matching
+    // that shape alone counted it too.
+    expect([...EDITOR.matchAll(/evaluation_requests'\)\s*\.insert/g)]).toHaveLength(1);
+    expect([...EDITOR.matchAll(/<GenerateControl/g)]).toHaveLength(2);
   });
 });

@@ -17812,3 +17812,80 @@ be less than or equal to 1*, which is the leak with a number on it.
 
 The owned-context case passes with or without the fix, and is kept as the control: it says the path
 that was never broken is still not broken, and locates the defect precisely on the borrowed one.
+
+## D-269 — One evaluation request per run at a time
+**2026-09-10 · architect**
+
+Run `2f39223a` finished at 03:05:30 and acquired **two** rows in `evaluation_requests` six seconds
+apart: `d7f8d569` claimed and running at 03:06:55, `3a5be521` queued behind it. The second is a
+second draft generation of the same run — a browser, the stored DOM of every sampled page, a vendor
+charge — producing a document that overwrites the first.
+
+### What made it possible
+
+The button flipped a local `regenerating` flag true for the duration of one insert and false again
+as soon as it returned. It reflected the **request** and nothing about the **queue**, so a second
+click a second later was a second row, and the screen had no opinion about it at all.
+
+### The refusal is an index, not a screen
+
+`0086` adds a partial unique index on `evaluation_requests (run_id)` where the status is `queued` or
+`running`. That is the guard of record, because every alternative fails on a case the screen cannot
+see:
+
+- two operators on one run are two browsers, and neither sees the other's local flag;
+- a retry, a double submit, or a reload mid-request are one browser doing it twice;
+- the queue is drained by a worker that has no idea a screen exists.
+
+**Scoped to the two in-flight states, and that is the whole design.** A run is regenerated many
+times over its life — that is what the button is for — so `done` and `failed` rows must not block a
+new request. The constraint is *one outstanding request per run*, never a limit on how often a run
+may be evaluated. A test breaks the index down to `queued` alone and the suite catches it, because
+that version would let through exactly the pair that occurred.
+
+### The screen explains the refusal before it happens
+
+Same division `canEdit` already draws against 0081's function guard: the database refuses, and the
+screen's job is to make sure nobody meets that refusal as an error.
+
+`generateAffordance` reads the outstanding row and returns whether the control is disabled, what it
+says, and whether the pending line shows. It names which of the two states it is — *Queued…* against
+*Generating…* — because "somebody will get to this" and "this is happening now" are different facts
+and an operator watching a run wants the second one. The pending line says the screen updates by
+itself, which is the honest thing about a queue.
+
+`IN_FLIGHT_REQUEST_STATUSES` is exported and asserted against the index's own scope, because the two
+must agree: a screen scoped to `queued` alone would offer a button the database refuses the moment
+a worker claims the row, which is the round trip this exists to remove.
+
+**The local flag survives** and covers the one thing no read of the queue can see: the moment
+between the click and the row existing.
+
+### An insert refused by the index is not an error
+
+It reloads instead. The operator asked for a draft of this run and a draft of this run is being
+made; a red banner would be the screen reporting a failure to do something that is already
+happening. Matched on the index name, which is the part of a unique-violation message that is ours.
+
+### Both call sites are one component
+
+Generate on an empty run and Regenerate in the editor bar were two copies of the same markup with
+their own `disabled` expressions. They are one `GenerateControl` now, differing in a word.
+
+**The `absent` state carries the pending row too**, and that is the case that actually occurred: a
+run with nothing drafted is exactly where Generate lives, and the draft does not exist until the job
+finishes, so the absence of one says nothing about whether somebody already asked.
+
+### The rows already on production
+
+`0086` cannot create its index over the pair `2f39223a` carries, so it cancels the duplicate first.
+The **queued** one is failed with a reason; the claimed one is untouched, because work has been done
+for it. Failed rather than deleted: a request is a record of somebody asking, and a queue row that
+vanishes is one nobody can account for.
+
+### What the work found
+
+`reviewScreen.test.ts` asserted *one enqueue path* by counting every mention of the table, and broke
+when this added a **read** of the outstanding request. The intent was right and the mechanism was
+not: the claim is about inserts. Narrowed to an insert anchored to the table — the publish insert
+carries the same field shape and the first narrowing counted that one too.

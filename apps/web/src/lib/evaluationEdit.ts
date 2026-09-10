@@ -23,6 +23,74 @@ import type { DraftCitation, StoredDraft } from './evaluationView.js';
 export { MAX_SHORE_UPS };
 
 /** The placement a badge can be changed to. Ordered as the badge offers them. */
+/**
+ * An evaluation request as the screen watches it (D-269).
+ *
+ * Only the two fields the affordance turns on. The row carries more; a screen typed on the whole
+ * of it would compile against `requested_by` and `error` and the constraint that it renders
+ * neither would rest on nobody reaching for them.
+ */
+export interface PendingEvaluationRequest {
+  readonly status: string;
+  readonly createdAt: string;
+}
+
+/**
+ * The states an evaluation request occupies while work is outstanding.
+ *
+ * The same two the partial unique index in `0086` is scoped to, and they have to be the same two:
+ * a screen that disabled on `queued` alone would offer a button the database refuses the moment a
+ * worker claims the row — which is the round trip D-269 exists to remove.
+ */
+export const IN_FLIGHT_REQUEST_STATUSES: ReadonlySet<string> = new Set(['queued', 'running']);
+
+/** What Generate or Regenerate offers right now. */
+export interface GenerateAffordance {
+  readonly disabled: boolean;
+  readonly label: string;
+  /** True when a request is outstanding, so the screen shows the pending state instead. */
+  readonly pending: boolean;
+}
+
+/**
+ * Whether a run may be asked for another draft, and what the control says (D-269).
+ *
+ * ## Why this reads the queue rather than a local flag
+ *
+ * The button used to flip a `regenerating` boolean true for the duration of one insert and false
+ * again as soon as it returned. It reflected the *request* and nothing about the *queue*, so a
+ * second click a second later was a second row — and on 2026-09-10 run `2f39223a` got exactly that:
+ * one request claimed and running, a second queued six seconds behind it, each a browser, the
+ * stored DOM of every sampled page and a vendor charge, the second overwriting the first's draft.
+ *
+ * ## The refusal of record is the index, not this
+ *
+ * `0086` is what makes a duplicate impossible, including from a second operator whose browser
+ * cannot see this one's state. What this does is explain the refusal *before* it happens, so an
+ * operator meets a disabled control and a pending line rather than an insert error — the same
+ * division `canEdit` already draws against 0081's function guard.
+ *
+ * `submitting` is still here and still local: it covers the moment between the click and the row
+ * existing, which no read of the queue can see.
+ */
+export function generateAffordance(
+  pending: PendingEvaluationRequest | null,
+  submitting: boolean,
+  label: string,
+): GenerateAffordance {
+  if (pending !== null && IN_FLIGHT_REQUEST_STATUSES.has(pending.status)) {
+    return {
+      disabled: true,
+      pending: true,
+      // What the queue is doing, not what the button would do. "Queued…" on a claimed request would
+      // tell an operator it is waiting when it is running.
+      label: pending.status === 'running' ? 'Generating…' : 'Queued…',
+    };
+  }
+  if (submitting) return { disabled: true, pending: false, label: 'Queued…' };
+  return { disabled: false, pending: false, label };
+}
+
 export const EDITABLE_PLACEMENTS = ['referred_out', 'international', 'domestic'] as const;
 
 /** The leans an angle can be changed to. */

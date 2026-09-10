@@ -121,6 +121,23 @@ renderer, which only closing the page does.
 **Any run started between D-267 and D-268 degraded the machine this way.** A worker deploy carries
 the fix.
 
+### One evaluation request per run at a time (D-269)
+
+Run `2f39223a` acquired two evaluation requests six seconds apart on 2026-09-10, one claimed and
+running and one queued behind it. The second would have drafted the same run again — a browser, the
+stored DOM of every sampled page, a vendor charge — and overwritten the first. The button reflected
+the request and nothing about the queue, so a second click was a second row.
+
+A partial unique index on `evaluation_requests (run_id)` where the status is `queued` or `running`
+is the refusal of record, because a second operator's browser cannot see the first one's state. The
+screen reads the outstanding row, disables the control and shows the pending state with which of
+the two it is. An insert the index refuses reloads rather than erroring: the operator asked for a
+draft and a draft is being made.
+
+**Migration `0086` needs production apply.** It cancels the queued duplicate `2f39223a` still
+carries — failed with a reason, not deleted — before creating the index, which cannot be created
+over the pair.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl

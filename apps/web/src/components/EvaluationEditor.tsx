@@ -48,6 +48,11 @@ import {
   type StoredDraft,
   type StoredHandles,
 } from '../lib/evaluationView.js';
+import {
+  generateAffordance,
+  IN_FLIGHT_REQUEST_STATUSES,
+  type PendingEvaluationRequest,
+} from '../lib/evaluationEdit.js';
 
 interface DraftRow {
   readonly content: StoredDraft | null;
@@ -62,7 +67,15 @@ interface DraftRow {
 
 type Load =
   | { readonly status: 'loading' }
-  | { readonly status: 'absent' }
+  /**
+   * No draft and no published version.
+   *
+   * Carries `pending` for the same reason `ready` does, and it is the case that matters most: a run
+   * with nothing drafted yet is exactly where Generate lives, so pressing it twice is the duplicate
+   * D-269 was opened over. The draft does not exist until the job finishes, so the absence of one
+   * says nothing about whether somebody already asked.
+   */
+  | { readonly status: 'absent'; readonly pending: PendingEvaluationRequest | null }
   | { readonly status: 'error'; readonly message: string }
   | {
       readonly status: 'ready';
@@ -71,6 +84,14 @@ type Load =
       readonly report: ScreeningReport | null;
       /** The newest published version, or `null` while the run is still a draft. */
       readonly published: PublishedRow | null;
+      /**
+       * The run's outstanding evaluation request, or `null` when nothing is in flight (D-269).
+       *
+       * Read with everything else rather than polled into existence, so the first paint already
+       * knows: an operator arriving at a run mid-generation meets the pending state, not a button
+       * that looks available and is not.
+       */
+      readonly pending: PendingEvaluationRequest | null;
     };
 
 /** What Save is doing, so the button says it rather than appearing inert. */
@@ -100,6 +121,82 @@ interface PublishedRow {
 
 /** How long between polls of the publish request. The job is seconds, not minutes. */
 const POLL_MS = 2_000;
+
+/**
+ * Whether an insert was refused because a request is already outstanding (D-269).
+ *
+ * Matched on the index name, which is the one part of a Postgres unique-violation message that is
+ * ours: `0086` names it and this reads that name. The alternative — matching the prose Postgres
+ * wraps it in — would break on a server upgrade.
+ *
+ * A refusal here is not an error to show. The operator asked for a draft of this run and a draft of
+ * this run is being made; the screen reloads and says so.
+ */
+function isAlreadyInFlight(message: string): boolean {
+  return message.includes('evaluation_requests_one_in_flight_per_run');
+}
+
+/** The pending row as read, narrowed to what the affordance turns on. `null` when nothing is in flight. */
+function pendingRowOf(data: unknown): PendingEvaluationRequest | null {
+  const row = data as { status?: string; created_at?: string } | null;
+  if (row === null || row === undefined || typeof row.status !== 'string') return null;
+  return { status: row.status, createdAt: row.created_at ?? '' };
+}
+
+/**
+ * Generate, or Regenerate, or the pending state that replaces it (D-269).
+ *
+ * **One component for both call sites.** They differ in a word and they were two copies of the same
+ * markup, each with its own `disabled` expression — which is how the empty-run button and the
+ * editor-bar button would have come to disagree about what "in flight" means.
+ *
+ * Exported so it can be rendered in a test with plain props. `EvaluationEditor` itself needs a
+ * Supabase client and five chained reads to draw anything, so the assertions that matter here —
+ * *the control is disabled* and *the pending state is shown instead* — are made against this.
+ * `reviewScreen.test.ts` reads the editor's source as text, and a source scan is not a screen
+ * (D-246).
+ */
+export function GenerateControl({
+  label,
+  pending,
+  submitting,
+  onGenerate,
+}: {
+  readonly label: string;
+  readonly pending: PendingEvaluationRequest | null;
+  readonly submitting: boolean;
+  readonly onGenerate: () => void;
+}): JSX.Element {
+  const affordance = generateAffordance(pending, submitting, label);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="eval-editor-regen"
+        onClick={onGenerate}
+        disabled={affordance.disabled}
+      >
+        {affordance.label}
+      </button>
+      {/*
+        The reason, beside the control rather than instead of it.
+
+        A disabled button with nothing next to it is a screen that has stopped explaining itself:
+        the operator's question is *why can I not press this*, and "somebody already asked" is the
+        answer. It also says what happens next, because the honest thing about a queue is that it
+        drains without anyone doing anything.
+      */}
+      {affordance.pending && (
+        <p className="eval-editor-pending" role="status">
+          An evaluation of this run is already{' '}
+          {pending?.status === 'running' ? 'being generated' : 'queued'}. This screen updates when it
+          finishes; a second request would draft the same run twice and overwrite the first.
+        </p>
+      )}
+    </>
+  );
+}
 
 export function EvaluationEditor({
   client,
@@ -134,7 +231,8 @@ export function EvaluationEditor({
   useEffect(() => {
     let live = true;
     void (async () => {
-      const [draftRead, publishedRead, runRead, findingsRead, evidenceRead] = await Promise.all([
+      const [draftRead, publishedRead, pendingRead, runRead, findingsRead, evidenceRead] =
+        await Promise.all([
         client
           .from('evaluation_drafts')
           .select(
@@ -167,6 +265,21 @@ export function EvaluationEditor({
           .order('version', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        /*
+          Anything already in flight for this run (D-269).
+
+          Ordered newest-first and limited to one: the index in `0086` allows at most one, and
+          reading it this way means a screen written before that index still shows the newest
+          rather than an arbitrary row.
+        */
+        client
+          .from('evaluation_requests')
+          .select('status, created_at')
+          .eq('run_id', runId)
+          .in('status', [...IN_FLIGHT_REQUEST_STATUSES])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
         client.from('runs').select('report').eq('id', runId).maybeSingle(),
         client.from('findings').select('id, rule_id, state, evidence_key').eq('run_id', runId),
         client.from('evidence').select('key, kind, url').eq('run_id', runId),
@@ -183,7 +296,7 @@ export function EvaluationEditor({
       // No draft and no published version is not an error. Most runs have never been evaluated, and
       // this screen sits above a report that stands on its own.
       if (draftRead.data === null && publishedRow === null) {
-        setLoad({ status: 'absent' });
+        setLoad({ status: 'absent', pending: pendingRowOf(pendingRead.data) });
         return;
       }
 
@@ -209,6 +322,7 @@ export function EvaluationEditor({
         row,
         report,
         published: publishedRow,
+        pending: pendingRowOf(pendingRead.data),
         run: {
           runId,
           merchantDomain: report?.merchantDomain ?? null,
@@ -240,6 +354,24 @@ export function EvaluationEditor({
       live = false;
     };
   }, [client, runId, reloads]);
+
+  /*
+    While a request is outstanding, look again (D-269).
+
+    Without this the pending state is permanent until somebody reloads: the row that clears it is
+    written by a worker, and nothing tells the browser. Two seconds is the same cadence the publish
+    watch uses, and for the same reason — the job is seconds, not minutes.
+
+    Bounded by there being something to wait for. A screen with no request in flight polls nothing.
+  */
+  const outstanding =
+    load.status === 'ready' || load.status === 'absent' ? load.pending !== null : false;
+
+  useEffect(() => {
+    if (!outstanding) return undefined;
+    const timer = setInterval(() => setReloads((count) => count + 1), POLL_MS);
+    return () => clearInterval(timer);
+  }, [outstanding]);
 
   const save = useCallback(async () => {
     if (draft === null) return;
@@ -304,13 +436,28 @@ export function EvaluationEditor({
     };
   }, [client, publishing]);
 
+  /*
+    Generate and Regenerate are the same request, and the queue is what answers (D-269).
+
+    The insert can be refused by `0086`'s partial unique index — a second operator, a double click,
+    a reload mid-request — and that refusal is not a failure worth a red banner: somebody already
+    asked, which is what the operator wanted. So it reloads instead, and the reload paints the
+    pending state the other request produced.
+
+    `setReloads` rather than a local flag on success, for the same reason: the truth about whether
+    a request is outstanding is a row, and the screen should go and read it.
+  */
   const regenerate = useCallback(async () => {
     setRegenerating(true);
     const { error } = await client
       .from('evaluation_requests')
       .insert({ run_id: runId, requested_by: analystId, status: 'queued' });
     setRegenerating(false);
-    if (error !== null) setSaving({ failed: error.message });
+    if (error !== null && !isAlreadyInFlight(error.message)) {
+      setSaving({ failed: error.message });
+      return;
+    }
+    setReloads((count) => count + 1);
   }, [analystId, client, runId]);
 
   /*
@@ -351,14 +498,12 @@ export function EvaluationEditor({
           crawl captured, and drafts the evaluation for review.
         </p>
         {canEdit && (
-          <button
-            type="button"
-            className="eval-editor-regen"
-            onClick={() => void regenerate()}
-            disabled={regenerating}
-          >
-            {regenerating ? 'Queued…' : 'Generate'}
-          </button>
+          <GenerateControl
+            label="Generate"
+            pending={load.pending}
+            submitting={regenerating}
+            onGenerate={() => void regenerate()}
+          />
         )}
       </div>
     );
@@ -419,14 +564,12 @@ export function EvaluationEditor({
           <button type="button" className="eval-editor-save" onClick={() => void save()} disabled={saving === 'saving'}>
             {saving === 'saving' ? 'Saving…' : 'Save'}
           </button>
-          <button
-            type="button"
-            className="eval-editor-regen"
-            onClick={() => void regenerate()}
-            disabled={regenerating}
-          >
-            {regenerating ? 'Queued…' : 'Regenerate'}
-          </button>
+          <GenerateControl
+            label="Regenerate"
+            pending={load.pending}
+            submitting={regenerating}
+            onGenerate={() => void regenerate()}
+          />
           {/*
             Publish is offered on an accepted draft only. A rejected one is repaired first, and a
             button that queued a request the worker would refuse would be a round trip to learn what
