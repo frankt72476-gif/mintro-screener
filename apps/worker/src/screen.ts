@@ -447,8 +447,6 @@ export async function screenStorefront(
   }
   artifacts.push(...coa.artifacts);
 
-  const layer2 = runLayer2(sampled, ruleset, coa?.outcome);
-
   // ---- Layer 3: the surfaces reached by doing something ----------------------------------
   //
   // The sign-up form and the terms document (D-048). Anonymous, and through the same pacer as
@@ -463,7 +461,18 @@ export async function screenStorefront(
     pacer,
     context: crawl,
     ...gateOptions(),
-    homepageLinks: rendered.page.links.map((link) => ({ href: link.href, text: link.text })),
+    /*
+      With the nav and footer flags (D-271).
+
+      An about page is located by exact link text *in the chrome*: the same words in body copy are
+      a blog post. The flags were already on `PageLink` and were being dropped here.
+    */
+    homepageLinks: rendered.page.links.map((link) => ({
+      href: link.href,
+      text: link.text,
+      inNav: link.inNav,
+      inFooter: link.inFooter,
+    })),
     onProgress: (line, count) => say(line, count),
   });
 
@@ -485,7 +494,23 @@ export async function screenStorefront(
   if (discovered.shipping.located) progress.surfaceRead('the shipping policy');
   if (discovered.faq.located) progress.surfaceRead('the FAQ');
   if (discovered.payment.located) progress.surfaceRead('the payment or refund policy');
+  if (discovered.about.located) progress.surfaceRead('the about page');
   artifacts.push(...discovered.artifacts);
+
+  /*
+    The about page, and the Layer 2 rules that read it (D-271).
+
+    **Layer 2 evaluates after Layer 3 discovers**, which is the one ordering change here. It used
+    to run the moment the product sample was rendered, and it could: every surface it read came
+    from the sample. The about page does not — it is located by the same pass that finds the terms
+    page — so the rules that read it cannot run until that pass has happened.
+
+    Nothing between the two consumed `layer2`, so this is a move rather than a restructure. The
+    render order is untouched: the sample is still rendered before the policy pages, and the pacer
+    still spaces every request.
+  */
+  const aboutPages = discovered.about.located ? [discovered.about.value] : [];
+  const layer2 = runLayer2(sampled, ruleset, coa?.outcome, aboutPages);
 
   const layer3 = runLayer3(
     {
@@ -655,6 +680,8 @@ export async function screenStorefront(
         homepage: rendered.page,
         products: sampled.map((entry) => entry.page),
         ...(discovered.signupPage === undefined ? {} : { signup: discovered.signupPage }),
+        // The rubric asks how a site presents itself, and this is where it answers (D-271).
+        ...(aboutPages[0] === undefined ? {} : { about: aboutPages[0] }),
       }),
     },
     ruleset,

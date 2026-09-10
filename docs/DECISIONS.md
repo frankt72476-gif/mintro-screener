@@ -17981,3 +17981,76 @@ change and is not in this one.
 classification withheld. It was twelve; it is thirteen, because PROD-016 now reads pages. A rule that
 can report a page clean is a rule that can be wrong about an interstitial. Gaining detection gains a
 way to be wrong, and pinning the number rather than asserting `> 0` is what made that visible.
+
+## D-271 — About pages are a surface
+**2026-09-10 · architect**
+
+D-270 taught the page selector to label an about page and to always include one. It was inert,
+because nothing fetched one: Layer 3 knew four surfaces and none of them was about. `/about-us/` is
+linked three times from CoMo's homepage and listed in their sitemap, and run `2f39223a` fetched 29
+documents and none was it. This is the crawl half.
+
+### One definition, in the page selector
+
+`discoverLayer3` builds its candidate paths from `aboutSlugs()` — derived from the selector's own
+table rather than written again — in the bare and `/pages/` forms. **And the href decides the
+surface**: a link is only an about candidate when `surfaceFromSlug` agrees its href names one.
+
+That is what refuses `/about-our-return-policy/`, which carries an about token and a policy token
+and is a policy page. The selector's band ordering already ruled on it (D-270) and this reads that
+ruling. A second definition of *what an about page is* would be two answers to one question, which
+is D-181's whole subject.
+
+### Two doors, because CoMo needs both
+
+A link is a candidate when its href names the surface **and** either it sits in the nav or footer,
+or its text says one of *about*, *about us*, *our story*, *mission*.
+
+The fixture is why both halves exist. CoMo links its about page three times and each is reached by
+a different half:
+
+| Link | Where | Reached by |
+|---|---|---|
+| *About Us* | nav | the chrome |
+| *About Como Peptides* | nav and footer | the chrome — **no phrase list would have it** |
+| *Read Our Story →* | body copy | the phrase, once the lead-in verb and arrow are trimmed |
+
+An exact-phrase rule alone would miss the second; a chrome-only rule would miss the third. Each is
+asserted on its own, because a combined assertion passes on any one of them.
+
+### What it reads
+
+Rendered like the other four Layer 3 surfaces, then:
+
+- **`all_sampled`**, so PROD-011, PROD-013, PROD-016 and PROD-017 read it. A lifestyle claim is a
+  lifestyle claim wherever the site makes it, and the about page is where it is made in prose rather
+  than in a spec table — which is the gap D-270 named and could not close.
+- **The eye test**, as its own `about` capture. The rubric asks how a site presents itself; this is
+  the page where it answers.
+- **Page selection**, which needed no change: the slug locator labels the capture and `about` is
+  already in the always-included band.
+
+**A separate parameter to `runLayer2`, not appended to `sampled`.** `sampled` means *the product
+pages this run sampled*, and three things depend on that meaning: the partial-sample guard that
+refuses a verdict when fewer rendered than were selected, `assessWall`'s served count, and
+`sampleBasis`'s denominator. Smuggling a policy page in would inflate all three and quietly weaken
+the guard that exists to stop a partial sample supporting a verdict.
+
+### One ordering change
+
+**Layer 2 now evaluates after Layer 3 discovers.** It used to run the moment the product sample was
+rendered, and it could: every surface it read came from the sample. The about page does not — it is
+located by the pass that finds the terms page — so the rules reading it cannot run until that pass
+has happened. Nothing between the two consumed `layer2`, so it is a move rather than a restructure,
+and the render order is untouched.
+
+### What the fixture found
+
+`story` singularises in the tokeniser, so `/success-stories/` resolves to the about surface. The
+first draft of the test asserted that as a false positive to be refused. It is not one: a
+success-stories page is customer testimonials, which is where a storefront makes lifestyle claims in
+the plainest language it ever uses, and PROD-016 now reads it. The slug over-reaches in exactly the
+useful direction.
+
+Where it stops is asserted beside it: `news` does not reach `/newsletter/` and `story` does not
+reach `/history/`, so the singularising is not a licence to match anything adjacent.

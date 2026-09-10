@@ -262,6 +262,13 @@ export function eyeTestManifest(pages: {
   readonly homepage: PageContext;
   readonly products: readonly PageContext[];
   readonly signup?: PageContext;
+  /**
+   * The page the storefront wrote about itself (D-271).
+   *
+   * The rubric asks how a site presents itself, and this is the page where it answers in its own
+   * words. Absent where the crawl did not reach one, which is most storefronts.
+   */
+  readonly about?: PageContext;
 }): readonly EyeTestCaptureRequest[] {
   const of = (surface: string, page: PageContext): EyeTestCaptureRequest => ({
     surface,
@@ -274,6 +281,7 @@ export function eyeTestManifest(pages: {
     of('homepage', pages.homepage),
     ...pages.products.map((page) => of('product', page)),
     ...(pages.signup === undefined ? [] : [of('signup', pages.signup)]),
+    ...(pages.about === undefined ? [] : [of('about', pages.about)]),
   ];
 }
 

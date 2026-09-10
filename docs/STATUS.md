@@ -145,10 +145,11 @@ pages run `2f39223a` read: every one scores zero, and every single-word candidat
 legitimate uses — "energy" in "energy-homeostasis pathways", "glow" as the product name
 "BPC+TB+GHK-Cu (GLOW)", "performance" inside a refund clause disclaiming performance claims.
 
-**About pages are not crawled, so the about half of that rule is not live.** `/about-us/` is linked
-three times from CoMo's homepage and listed in their sitemap, and no run has ever fetched it: Layer 3
-discovery knows four surfaces and none of them is about. The slug work lands so an about page travels
-once one exists; teaching `discoverLayer3` to fetch one is the next change and is not in this one.
+**About pages are crawled as of D-271.** `discoverLayer3` gained an `about` surface, located by the
+page selector's own slugs and by nav/footer links or the phrases *about*, *about us*, *our story*,
+*mission*. It is rendered like the other four, read by the `all_sampled` product rules including
+PROD-016, and carried into the eye test. Layer 2 now evaluates after Layer 3 discovers, because one
+of its surfaces is now found there.
 
 ### Open, and not addressed by cluster 4
 

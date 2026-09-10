@@ -100,6 +100,16 @@ export const ALWAYS_INCLUDED_SURFACES = [
 ] as const;
 
 /**
+ * The slugs that name an about page, read out of the table below (D-271).
+ *
+ * Derived, never written twice. `discoverLayer3` builds its candidate paths from this, so the
+ * crawler looks for exactly the pages the selector knows how to label — a second list would be two
+ * answers to *what is an about page*, and D-181 is the record of what happens to those.
+ */
+export const aboutSlugs = (): readonly string[] =>
+  SURFACE_SLUGS.filter(([, surface]) => surface === 'about').map(([slug]) => slug);
+
+/**
  * Path tokens that name a surface, for the second locator.
  *
  * Keyed by the token sequence a path is tokenised into, so `sign-up` is `['sign', 'up']` and

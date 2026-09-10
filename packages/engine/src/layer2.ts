@@ -71,6 +71,21 @@ export function runLayer2(
    * COA rules never read `pass` from a missing certificate.
    */
   certificate?: CertificateOutcome,
+  /**
+   * Pages that are not product pages but that the `all_sampled` rules read anyway (D-271).
+   *
+   * The about page. A lifestyle claim is a lifestyle claim wherever the site makes it, and the
+   * about page is where it is made in prose rather than in a spec table — so PROD-011, PROD-013,
+   * PROD-016 and PROD-017 read it.
+   *
+   * **A separate parameter, not appended to `sampled`.** `sampled` means *the product pages this
+   * run sampled*, and three things downstream depend on that meaning: the partial-sample guard
+   * below refuses a verdict when fewer rendered than were selected, `assessWall` counts served
+   * product pages, and `sampleBasis` reports the denominator. Smuggling a policy page in would
+   * inflate all three and quietly weaken the guard that exists to stop a partial sample supporting
+   * a verdict.
+   */
+  alsoRead: readonly PageContext[] = [],
 ): Layer2Run {
   const rules = layer2Rules(ruleset);
   const rendered = sampled.filter((entry) => isRendered(entry.page));
@@ -189,7 +204,11 @@ export function runLayer2(
       continue;
     }
 
-    findings.push(...evaluate(rule, rendered, ruleset));
+    // The sample decides whether a verdict is supportable; these are extra surfaces the same
+    // rules read once it is (D-271).
+    findings.push(
+      ...evaluate(rule, [...rendered, ...alsoRead.filter(isRendered).map(asSampled)], ruleset),
+    );
   }
 
   return {
@@ -363,6 +382,25 @@ function unrenderedReasons(sampled: readonly SampledPage[]): string {
       return `${where} — ${why}`;
     });
   return reasons.slice(0, 3).join('; ') + (reasons.length > 3 ? ` and ${reasons.length - 3} more` : '');
+}
+
+/**
+ * A page that is not from the sample, in the shape the evaluator takes (D-271).
+ *
+ * `selection` exists so a finding can say why a page was picked, and this one was not picked by
+ * the scorer — it was located by surface. `slugClass: 'unrecognised'` is the honest value: nothing
+ * classified its slug, because nothing scored it.
+ */
+function asSampled(page: PageContext): SampledPage {
+  return {
+    selection: {
+      url: { url: page.finalUrl, path: '', segments: [], scope: 'other' },
+      score: 0,
+      slugClass: 'unrecognised',
+      reasons: ['located by surface, not by the product sampler'],
+    } as unknown as SampledPage['selection'],
+    page,
+  };
 }
 
 /** Ordering for "worst state wins". `not_evaluable` outranks `pass`: it is less of a claim. */

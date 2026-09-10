@@ -36,6 +36,7 @@ import type {
   SurfaceSpec,
 } from '@mintro/engine';
 import { located, NO_SIGNUP_FORM, unreachable, withoutFragment } from '@mintro/engine';
+import { aboutSlugs, surfaceFromSlug } from './evaluationPages.js';
 import { probeSurface } from './surfaceProbe.js';
 import { establishDocument } from './locate.js';
 import { PROBE_IDLE_MS, renderPage } from './render.js';
@@ -85,6 +86,30 @@ const SHIPPING_LINK_HINTS = ['shipping', 'delivery', 'shipping-policy'];
 
 const FAQ_PATHS = ['/pages/faq', '/pages/faqs', '/faq', '/faqs', '/frequently-asked-questions', '/help'];
 const FAQ_LINK_HINTS = ['faq', 'faqs', 'frequently asked', 'frequently-asked'];
+
+/**
+ * How a storefront talks about itself (D-271).
+ *
+ * **Paths derived from the page selector's own about slugs**, in both the bare and `/pages/` forms
+ * every platform uses. Writing the list twice would be two answers to *what is an about page*, and
+ * the selector's copy is the one that also has to label the capture afterwards.
+ */
+const ABOUT_PATHS: readonly string[] = aboutSlugs().flatMap((slug) => [
+  `/${slug}`,
+  `/pages/${slug}`,
+]);
+
+/**
+ * The phrases an about link says, for a link that is not in the chrome (D-271).
+ *
+ * A link in the nav or footer whose href names the about surface is followed whatever it says —
+ * *About Como Peptides* is a real one and no phrase list would have it. This is the other door: a
+ * link in body copy saying the phrase outright, which is how *Read Our Story →* is reached.
+ *
+ * Neither door decides the surface. `surfaceFromSlug` does, so `/about-our-return-policy` is
+ * refused by the page selector's own band ordering rather than by a rule written twice.
+ */
+const ABOUT_LINK_TEXTS: readonly string[] = ['about', 'about us', 'our story', 'mission'];
 
 /** A payment-methods or refund policy page - public, and where payment rails get advertised. */
 const PAYMENT_PATHS = [
@@ -153,6 +178,14 @@ export interface Layer3Discovery {
   readonly shipping: Located<PageContext>;
   readonly faq: Located<PageContext>;
   readonly payment: Located<PageContext>;
+  /**
+   * The page a storefront wrote about itself (D-271).
+   *
+   * Angle 1's subject in the merchant's own words. Rendered like the other four and, unlike them,
+   * also read by the `all_sampled` product rules — a lifestyle claim is a lifestyle claim wherever
+   * the site makes it, and the about page is where it is made in prose rather than in a spec table.
+   */
+  readonly about: Located<PageContext>;
   /** Every navigation made looking for any of them, and what it returned. */
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
@@ -191,8 +224,19 @@ export interface DiscoverOptions {
   /** Called when a render here submitted a gate, so the caller can stop re-passing it. */
   readonly onEnteredGate?: (description: string) => void;
   readonly timeoutMs?: number;
-  /** Links seen on the rendered homepage, used to find the terms document. */
-  readonly homepageLinks?: readonly { readonly href: string; readonly text: string }[];
+  /**
+   * Links seen on the rendered homepage, used to find the linked surfaces.
+   *
+   * `inNav` and `inFooter` arrived with D-271: an about page is located by exact link text *in the
+   * chrome*, because the same words in body copy are a blog post. Optional so a caller that has
+   * only href and text still works — it simply locates no surface that asks for the chrome.
+   */
+  readonly homepageLinks?: readonly {
+    readonly href: string;
+    readonly text: string;
+    readonly inNav?: boolean;
+    readonly inFooter?: boolean;
+  }[];
   /**
    * Progress within the surfaces phase (D-173).
    *
@@ -234,6 +278,20 @@ export async function discoverLayer3(
     { label: 'shipping policy', paths: SHIPPING_PATHS, linkHints: SHIPPING_LINK_HINTS },
     { label: 'FAQ', paths: FAQ_PATHS, linkHints: FAQ_LINK_HINTS },
     { label: 'payment or refund policy', paths: PAYMENT_PATHS, linkHints: PAYMENT_LINK_HINTS },
+    /*
+      The about page (D-271).
+
+      Last, because it is the newest and because the four above answer angles that decide routing
+      while this one answers angle 1 — what the business says it is. `linkHints` is empty: this
+      surface is located by exact link text in the chrome, not by a substring of an href.
+    */
+    {
+      label: 'about page',
+      paths: ABOUT_PATHS,
+      linkHints: [],
+      linkTexts: ABOUT_LINK_TEXTS,
+      surface: 'about',
+    },
   ] as const;
 
   const total = documents.length + 1; // the sign-up form is the first of them
@@ -272,6 +330,7 @@ export async function discoverLayer3(
     shipping: surface('shipping policy'),
     faq: surface('FAQ'),
     payment: surface('payment or refund policy'),
+    about: surface('about page'),
     attempts,
     artifacts,
     pages,
@@ -374,10 +433,60 @@ async function findSignupForm(
  * in a header and a footer.
  */
 export function selectLinkedCandidates(
-  homepageLinks: readonly { readonly href: string; readonly text: string }[],
+  homepageLinks: readonly {
+    readonly href: string;
+    readonly text: string;
+    readonly inNav?: boolean;
+    readonly inFooter?: boolean;
+  }[],
   linkHints: readonly string[],
   origin: string,
+  /**
+   * A surface located by where a link sits and what it says, with the **href deciding** (D-271).
+   *
+   * A second, stricter door into the same candidate list, and the two halves do different jobs.
+   *
+   * **The href decides the surface**, through `surfaceFromSlug` — the page selector's own table, so
+   * the crawler looks for exactly the pages the selector knows how to label. That is what refuses
+   * `/about-our-return-policy`, which carries an about token and a policy token and is a policy
+   * page: the selector's band ordering already ruled on it (D-270), and this reads that ruling
+   * rather than re-deciding it. A second definition of *what an about page is* would be two answers
+   * to one question (D-181).
+   *
+   * **The text and the chrome decide whether to look at all.** A link is a candidate when it sits
+   * in the nav or the footer — where a site links the page it wrote about itself — or when its text
+   * is one of the phrases outright. CoMo needs both halves: *About Us* and *About Como Peptides*
+   * are in the chrome and say different things, and *Read Our Story →* says the phrase from body
+   * copy. All three point at `/about-us/`.
+   *
+   * Deduped with the hint matches by the same `Set`, so a link satisfying both is one candidate
+   * rather than two renders of one page.
+   */
+  linkTexts: readonly string[] = [],
+  /** The surface `surfaceFromSlug` must agree the href names, when `linkTexts` is in play. */
+  surface?: string,
 ): { readonly followed: readonly string[]; readonly dropped: number; readonly matched: number } {
+  const wanted = new Set(linkTexts.map((text) => text.toLowerCase()));
+
+  /** Trailing punctuation and lead-in verbs are chrome, not text: "Read Our Story →" is "our story". */
+  const said = (text: string): string =>
+    text
+      .toLowerCase()
+      .replace(/^(read|see|learn|view)\s+(more\s+)?/, '')
+      .replace(/[^a-z\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const namesTheSurface = (link: {
+    readonly href: string;
+    readonly text: string;
+    readonly inNav?: boolean;
+    readonly inFooter?: boolean;
+  }): boolean => {
+    if (wanted.size === 0 || surface === undefined) return false;
+    if (surfaceFromSlug(link.href) !== surface) return false;
+    return link.inNav === true || link.inFooter === true || wanted.has(said(link.text));
+  };
   /*
     Deduped on the URL a request would actually carry (D-219).
 
@@ -394,7 +503,7 @@ export function selectLinkedCandidates(
       homepageLinks
         .filter((link) => {
           const haystack = `${link.href} ${link.text}`.toLowerCase();
-          return linkHints.some((hint) => haystack.includes(hint));
+          return linkHints.some((hint) => haystack.includes(hint)) || namesTheSurface(link);
         })
         .map((link) => withoutFragment(link.href)),
     ),
@@ -420,7 +529,15 @@ async function findDocument(
   /** Every page rendered here, whether or not it was established as the document (D-264). */
   pages: PageContext[],
   say: (line: string) => void,
-  what: { readonly label: string; readonly paths: readonly string[]; readonly linkHints: readonly string[] },
+  what: {
+    readonly label: string;
+    readonly paths: readonly string[];
+    readonly linkHints: readonly string[];
+    /** Link text or chrome placement, for a surface a substring hint would over-match (D-271). */
+    readonly linkTexts?: readonly string[];
+    /** The surface name the href must resolve to, read from the page selector's table (D-271). */
+    readonly surface?: string;
+  },
   probeTally: { undecided: number; total: number },
 ): Promise<Located<PageContext>> {
   /*
@@ -460,6 +577,8 @@ async function findDocument(
     options.homepageLinks ?? [],
     what.linkHints,
     origin,
+    what.linkTexts ?? [],
+    what.surface,
   );
 
   if (dropped > 0) {
