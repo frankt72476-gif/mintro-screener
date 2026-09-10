@@ -25,7 +25,7 @@
  * for.
  */
 
-import type { Browser } from 'playwright';
+import type { Browser, BrowserContext } from 'playwright';
 import type {
   EvidenceArtifact,
   FetchAttempt,
@@ -178,6 +178,18 @@ export interface Layer3Discovery {
 export interface DiscoverOptions {
   readonly runId: string;
   readonly pacer: Pacer;
+  /**
+   * The crawl's shared anonymous context (D-267).
+   *
+   * Passed through so a consent gate this pass meets is the *same* gate the homepage already went
+   * through, rather than a second submission of a merchant's form. Optional, because a caller with
+   * no shared context is still correct — it simply pays the pass again.
+   */
+  readonly context?: BrowserContext;
+  /** True when the crawl has already entered a gate on `context` (D-267). */
+  readonly alreadyEnteredGate?: boolean;
+  /** Called when a render here submitted a gate, so the caller can stop re-passing it. */
+  readonly onEnteredGate?: (description: string) => void;
   readonly timeoutMs?: number;
   /** Links seen on the rendered homepage, used to find the terms document. */
   readonly homepageLinks?: readonly { readonly href: string; readonly text: string }[];
@@ -301,6 +313,7 @@ async function findSignupForm(
       timeoutMs: options.timeoutMs ?? 30_000,
       idleMs: PROBE_IDLE_MS,
       readSignupForm: true,
+      ...gatePassOptions(options),
       keepCapture: (candidate) =>
         candidate.renderError === undefined &&
         candidate.httpStatus >= 200 &&
@@ -501,6 +514,7 @@ async function findDocument(
       timeoutMs: options.timeoutMs ?? 30_000,
       idleMs: PROBE_IDLE_MS,
       keepCapture: (page) => establishDocument(url, page, spec, []).located,
+      ...gatePassOptions(options),
     });
     artifacts.push(...rendered.artifacts);
     pages.push(rendered.page);
@@ -561,6 +575,27 @@ async function findDocument(
     challenged,
     gated,
   );
+}
+
+/**
+ * The context and gate settings a render here inherits from the crawl (D-267).
+ *
+ * One helper rather than two spread literals, because the two call sites in this module must agree:
+ * a policy-page render that built its own context would meet a gate the homepage had already been
+ * through and submit the merchant's form a second time.
+ */
+function gatePassOptions(options: DiscoverOptions): {
+  readonly context?: BrowserContext;
+  readonly alreadyEnteredGate?: boolean;
+  readonly onEnteredGate?: (description: string) => void;
+} {
+  return {
+    ...(options.context === undefined ? {} : { context: options.context }),
+    ...(options.alreadyEnteredGate === undefined
+      ? {}
+      : { alreadyEnteredGate: options.alreadyEnteredGate }),
+    ...(options.onEnteredGate === undefined ? {} : { onEnteredGate: options.onEnteredGate }),
+  };
 }
 
 /** What the loop tried, in one clause, for a reason a reader can check against the attempts. */

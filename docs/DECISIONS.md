@@ -17507,6 +17507,12 @@ quietly delete the finding the layer exists to make.
 ## D-266 — A merchant's consent gate is not the page behind it
 **2026-09-09 · architect**
 
+> **The conduct rule here was reversed the same day. See D-267.** The classification, the artifact
+> kind, the `gated` outcome and GATE-001's reading of a document-level gate all stand and are what
+> D-267 builds on. What no longer holds is the refusal to pass the gate: Frank ruled that the gate
+> is a bank preference rather than a legal requirement, that its presence is itself the finding,
+> and that looking behind it is the screener's purpose.
+
 The third member of the family D-264 opened, and the only one where the document standing in the
 way is a credit to the merchant.
 
@@ -17626,3 +17632,104 @@ merchant, or the evidence insert fails and the run is left open.
 
 Run `97bf366a` keeps its fifteen `not_exposed` findings and its GATE-002 auto-fail. Runs are
 immutable (D-002). What changes is the next run of that merchant.
+
+## D-267 — The crawler passes a merchant consent gate
+**2026-09-09 · Frank**
+
+**This reverses D-266's conduct rule.** That decision declined to answer a consent gate, on the
+reasoning that ticking boxes reading *I am 21, I am a laboratory, I am acting institutionally* would
+be Mintro asserting things about itself that are not true. It raised the question as a business one
+and `docs/STATUS.md` carried it as open, pending Frank. This is the ruling.
+
+### The ruling
+
+The crawler passes the gate. Three grounds:
+
+- **The gate is a bank preference, not a legal requirement.** It is there because acquirers like to
+  see it, not because a statute puts it there. D-266 reasoned as though the affirmation carried the
+  weight of a legal attestation; it does not.
+- **Its presence is itself the finding.** GATE-001 records the gate whether or not anyone walks
+  through it, so nothing is lost by continuing. The observation the programme wants is *this
+  merchant gates entry*, and that is captured before the gate is touched.
+- **Looking behind it is the screener's purpose.** A pre-underwriting screener that reports only
+  the gate has reported the one thing the merchant chose to show and left the catalogue — which is
+  what the rule set is about — unread. Run `97bf366a` is the demonstration: sixteen product pages
+  behind one gate, and a report with fifteen `not_exposed` findings about pages nobody looked at.
+
+**No merchant authorisation step.** The alternative D-266 preferred — a merchant-supplied bypass —
+is not required for this. It stays on the open list as a courtesy option, not a precondition.
+
+### What D-266 keeps
+
+Everything except the refusal. The classification is unchanged, the gate is still captured under
+its own `ArtifactKind` **before** it is passed, and GATE-001 still cites it with the
+acknowledgements verbatim. A reader can see exactly what was affirmed on the way in, which is what
+makes this auditable rather than merely permitted.
+
+`gated` also survives, and is still reachable: a gate that does not take, or takes and
+re-presents, gets the D-266 behaviour unchanged. Nothing is submitted a second time.
+
+### The limits, in code rather than in prose
+
+The gate is passed by ticking checkboxes and pressing one button, and `consentGatePass.ts` is not
+capable of more:
+
+- **Checkbox and submit only.** `check()` on required checkboxes, one `click()`. There is no code
+  path there that types.
+- **No text input.** The classifier already refuses a form carrying a text, email, password, select
+  or textarea control. The pass **re-asserts it at the point of acting**, because that guarantee
+  lives in `packages/engine` and the action happens in the worker: a check where the irreversible
+  thing happens is the only one a change to the other module cannot bypass.
+- **No account creation, no add-to-cart.** Every interaction is scoped to the located form. The
+  test's page behind the gate carries an add-to-cart control with a quantity field, and the crawl
+  reads that page without touching either.
+- **One submission.** Per browser context, not per page.
+
+### Once per run, not once per page
+
+The gate sets a cookie, and a context created and closed inside each render throws it away sixteen
+times. `screen.ts` now builds **one anonymous context for the whole crawl** and hands it to the
+homepage render, the product sample and the Layer 3 discovery. Sixteen product pages behind one
+gate submit that form once.
+
+`alreadyEnteredGate` is the caller saying *this context has been through*, and it earns its place
+on the merchants the cookie does not cover: a gate that re-presents on every request would
+otherwise be submitted once per page. It is tested against a server that never takes the
+acknowledgement, because on a server that honours its own cookie the flag is never consulted — the
+first version of that test passed with the flag deleted.
+
+`enteredGate` on the page is the **opposite** of `gated` and the two are mutually exclusive. A page
+read behind a gate is a page: `isRendered` is true, `wasServed` is true, nothing is blinded, and
+every rule evaluates against the catalogue, because the catalogue is what came back.
+
+### What the reader is told
+
+The masthead says **"Entered through the merchant's consent gate"** where the pass succeeded,
+replacing the count. A count of doors is the wrong shape once you are through them; what a reader
+needs is how this crawl got in, said once. `Consent gate on N of M pages` remains for a gate that
+held, where the number *is* the coverage story.
+
+The sentence beneath it says Mintro affirmed the statements and that the findings below describe
+the catalogue rather than the gate. A run that walked through a gate and said nothing about it
+would be describing a catalogue the merchant does not show a visitor without asking first.
+
+### GATE-002 is unchanged, and that is not a contradiction
+
+The gate probes build their own context with no session (D-039), so they still meet the gate and
+still read a gated `200` as not public. Both observations are true and the report carries both: an
+anonymous visitor meets a gate, and the gate opens to anyone who ticks four boxes. Making the probe
+share the crawl's context would answer a different question from the one GATE-002 asks.
+
+### D-017 unchanged
+
+No stealth. The crawler declares itself, carries the same User-Agent, honours `Crawl-delay`.
+Passing a gate that any visitor passes by ticking four boxes is not evasion — it is the merchant's
+own front door, used the way a visitor uses it.
+
+### What the work found
+
+**A test that passed for the wrong reason, twice.** The once-per-context test passed with the flag
+deleted, because the fixture server's cookie was doing the work. And a check that four boxes stayed
+ticked after the pass returned zero — not because the pass failed, but because submitting navigates
+and the document was gone. Both are now asserted where the fact actually lives: the flag against a
+gate that re-presents, and the acknowledgements against the POST body a server received.

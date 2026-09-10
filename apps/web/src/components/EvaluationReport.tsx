@@ -75,6 +75,7 @@ import {
   challengeLine,
   chipAffordance,
   consentGateLine,
+  enteredConsentGate,
   citesHeavy,
   evaluationSectionAnchor,
   legalitySummary,
@@ -338,10 +339,21 @@ function SummaryBlock({
         */}
         {consentGateLine(run) !== null && (
           <p className="eval-consent-gate" role="status">
-            <strong>{consentGateLine(run)}</strong> The site asks a visitor to affirm who they are
-            before showing those pages. Mintro does not answer that on a visitor&rsquo;s behalf, so
-            what sits behind the gate was not read. The gate itself is reported under the gate
-            rules.
+            <strong>{consentGateLine(run)}</strong>{' '}
+            {enteredConsentGate(run) ? (
+              <>
+                The site asks a visitor to affirm their age and research purpose before showing the
+                catalogue. Mintro affirmed those statements and read what is behind the gate, so the
+                findings below describe the catalogue rather than the gate. The gate itself is
+                reported under the gate rules.
+              </>
+            ) : (
+              <>
+                The site asks a visitor to affirm who they are before showing those pages, and this
+                run did not get through, so what sits behind the gate was not read. The gate itself
+                is reported under the gate rules.
+              </>
+            )}
           </p>
         )}
         <dl className="eval-meta">

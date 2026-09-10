@@ -38,6 +38,7 @@ import {
   type RawStyledText,
 } from './extract.js';
 import { withDeadline } from './deadline.js';
+import { passConsentGate } from './consentGatePass.js';
 
 /** Payment method names looked for in the footer, carried forward for Layer 3 (PAY-001). */
 const PAYMENT_TERMS = [
@@ -106,6 +107,25 @@ export interface RenderOptions {
    * sign-up probe pays, and the second navigation goes away.
    */
   readonly readSignupForm?: boolean;
+  /**
+   * This context has already been through a consent gate on this origin (D-267).
+   *
+   * The gate is passed **once per browser context**, not once per page: it sets a cookie and the
+   * context outlives the render. A run whose sixteen product pages sit behind one gate submits the
+   * form once and walks through fifteen times.
+   *
+   * The caller owns this because the caller owns the context. `screen.ts` builds one for the whole
+   * crawl and flips this after the first pass; a caller with no shared context leaves it unset and
+   * gets a pass per render, which is correct for a context that starts empty.
+   */
+  readonly alreadyEnteredGate?: boolean;
+  /**
+   * Called when this render actually submitted a gate, with the gate's description.
+   *
+   * How the caller learns to set `alreadyEnteredGate` on the next one, and how the run records
+   * that it entered at all. Absent, the pass still happens and is simply not reported upward.
+   */
+  readonly onEnteredGate?: (description: string) => void;
 }
 
 /**
@@ -138,6 +158,32 @@ export const DEFAULT_IDLE_MS = 8_000;
  * finding is a regression, not an optimisation.
  */
 export const PROBE_IDLE_MS = 3_000;
+
+/**
+ * The anonymous context every crawl render uses (D-017, D-267).
+ *
+ * Extracted so a caller can build **one for the whole run** and hand it to every render. That is
+ * what makes a consent gate a once-per-run event rather than a once-per-page one: the gate sets a
+ * cookie, and a context created and closed inside each render throws it away sixteen times.
+ *
+ * D-017 unchanged: polite mitigations, not stealth. A standard desktop viewport, a real
+ * accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who inspects
+ * their logs still sees who we are and can reach us.
+ */
+export async function createCrawlContext(
+  browser: Browser,
+  viewport?: { width: number; height: number },
+): Promise<BrowserContext> {
+  return browser.newContext({
+    viewport: viewport ?? { width: 1440, height: 900 },
+    userAgent: USER_AGENT,
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    extraHTTPHeaders: { 'accept-language': 'en-US,en;q=0.9' },
+    ignoreHTTPSErrors: false,
+    javaScriptEnabled: true,
+  });
+}
 
 export interface RenderResult {
   readonly page: PageContext;
@@ -174,15 +220,7 @@ export async function renderPage(
     // D-017: polite mitigations, not stealth. A standard desktop viewport, a real
     // accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who
     // inspects their logs still sees who we are and can reach us.
-    context = options.context ?? await browser.newContext({
-      viewport: options.viewport ?? { width: 1440, height: 900 },
-      userAgent: USER_AGENT,
-      locale: 'en-US',
-      timezoneId: 'America/New_York',
-      extraHTTPHeaders: { 'accept-language': 'en-US,en;q=0.9' },
-      ignoreHTTPSErrors: false,
-      javaScriptEnabled: true,
-    });
+    context = options.context ?? (await createCrawlContext(browser, options.viewport));
 
     const page = await context.newPage();
     page.setDefaultTimeout(timeout);
@@ -217,23 +255,57 @@ export async function renderPage(
       flow. A failure here already has a home: it throws, the catch below returns a `PageContext`
       carrying `renderError`, and the layer above turns that into `not_evaluable` with a reason.
     */
-    const extraction = (await withDeadline(
-      page.evaluate(extractPage, {
-        paymentTerms: [...PAYMENT_TERMS],
-        selectors: [...(options.selectors ?? [])],
-      }),
-      timeout,
-      `page.evaluate() extracting ${url}`,
-    )) as RawExtraction;
-    const html = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
-    const htmlSha256 = sha256(html);
+    /*
+      One read, performed twice on a gated URL (D-267).
+
+      The crawler now ticks a consent gate's boxes and reads what is behind it, so the same document
+      has to be extracted, classified and possibly extracted again. Pulling the read into a closure
+      rather than copying it is the whole of what keeps the two passes identical — a second copy is
+      how the four render-failure blocks of D-181 drifted.
+    */
+    const read = async (): Promise<{
+      readonly extraction: RawExtraction;
+      readonly html: string;
+      readonly htmlSha256: string;
+    }> => {
+      const observed = (await withDeadline(
+        page.evaluate(extractPage, {
+          paymentTerms: [...PAYMENT_TERMS],
+          selectors: [...(options.selectors ?? [])],
+        }),
+        timeout,
+        `page.evaluate() extracting ${url}`,
+      )) as RawExtraction;
+      const body = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
+      return { extraction: observed, html: body, htmlSha256: sha256(body) };
+    };
+
+    /*
+      The gate classification, also performed twice on a gated URL (D-267).
+
+      The structural observation comes from the DOM pass, which is the only thing that can answer
+      *are this form's only editable controls required checkboxes*. Read a second time after the
+      pass to answer a different question: is it still there.
+    */
+    const readGate = async (): Promise<ReturnType<typeof classifyConsentGate>> =>
+      classifyConsentGate({
+        status,
+        ...((await withDeadline(
+          page.evaluate(extractConsentGate),
+          timeout,
+          `page.evaluate() reading the consent gate at ${url}`,
+        )) as Awaited<ReturnType<typeof extractConsentGate>>),
+      });
+
+    let { extraction, html, htmlSha256 } = await read();
 
     /*
       The sign-up form, read in this same visit when the caller asked for it (D-155).
 
-      Before the capture, so the page is in the state the screenshot will show.
+      Deferred behind the gate pass (D-267): on a gated URL the form that matters is the one on the
+      page behind the gate, and reading it before entering would read the gate's own checkboxes.
     */
-    const signupForm =
+    const readSignup = async (): Promise<RawSignupForm | undefined> =>
       options.readSignupForm === true
         ? ((await withDeadline(
             page.evaluate(extractSignupForm),
@@ -274,26 +346,79 @@ export async function renderPage(
 
       Asked only where there was no challenge, because the two cannot both be true and a challenge
       is the more basic fact: an interstitial from the edge never reached the merchant's own gate.
-
-      The structural observation comes from the DOM pass, which is the only thing that can answer
-      *are this form's only editable controls required checkboxes*. Nothing here submits it.
     */
-    const gate =
-      challenge === null
-        ? classifyConsentGate({
-            status,
-            ...((await withDeadline(
-              page.evaluate(extractConsentGate),
-              timeout,
-              `page.evaluate() reading the consent gate at ${url}`,
-            )) as Awaited<ReturnType<typeof extractConsentGate>>),
-          })
-        : null;
+    let gate = challenge === null ? await readGate() : null;
+
+    /*
+      The gate is captured **before** it is passed (D-267).
+
+      Whatever happens next, this is the document the merchant served at this URL and it is what
+      GATE-001 cites: the acknowledgements verbatim, so a reader can see exactly what was affirmed
+      on the way in. Capturing it afterwards would be capturing the catalogue and calling it a gate.
+    */
+    let gateCapture: { readonly html: string; readonly sha256: string } | undefined;
+    let enteredGate: string | undefined;
+    let finalUrlNow = finalUrl;
+    let statusNow = status;
+
+    if (gate !== null) {
+      gateCapture = { html, sha256: htmlSha256 };
+      const description = describeConsentGate(gate);
+
+      /*
+        Passed once per context, not once per page (D-267).
+
+        The gate sets a cookie, and the context outlives this render — `screen.ts` builds one for
+        the whole crawl — so the second gated URL of a run arrives already through. `alreadyEntered`
+        is how a caller says *this context has been through*, which keeps the run to one submission
+        even when sixteen product pages are behind the same gate.
+      */
+      const outcome =
+        options.alreadyEnteredGate === true
+          ? { submitted: false, acknowledged: 0, refusal: 'this context has already entered' }
+          : await passConsentGate(page, timeout);
+
+      if (outcome.submitted) {
+        options.onEnteredGate?.(description);
+
+        /*
+          Land on the page that was asked for, not wherever the gate sent us.
+
+          The gate carries a return path and most implementations honour it, but "most" is not a
+          contract. A plain `goto` back to the requested URL costs one GET, is not a second
+          submission, and makes the guarantee unconditional: what comes back is the page for *this*
+          URL or it is nothing.
+        */
+        if (page.url() !== url) {
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout }).catch(() => undefined);
+        }
+        await page
+          .waitForLoadState('networkidle', { timeout: options.idleMs ?? DEFAULT_IDLE_MS })
+          .catch(() => undefined);
+
+        ({ extraction, html, htmlSha256 } = await read());
+        finalUrlNow = page.url();
+
+        /*
+          Still a gate? Then it is a gate, and nothing is submitted a second time (D-267).
+
+          A merchant whose gate does not take, or takes and re-presents, gets the D-266 behaviour
+          unchanged: the page is `gated`, every rule pointed at it is blinded, and GATE-001 still
+          passes on the gate that is there. A retry loop would be hammering a merchant's form to
+          get a result the run does not need.
+        */
+        gate = await readGate();
+        if (gate === null) enteredGate = description;
+      }
+    }
+
+    const signupForm = await readSignup();
 
     const provisional: PageContext = {
-      ...toPageContext(url, finalUrl, status, extraction, html, htmlSha256, capturedAt),
+      ...toPageContext(url, finalUrlNow, statusNow, extraction, html, htmlSha256, capturedAt),
       ...(challenge === null ? {} : { challenged: challenge.marker }),
       ...(gate === null ? {} : { gated: describeConsentGate(gate) }),
+      ...(enteredGate === undefined ? {} : { enteredGate }),
     };
     /*
       A challenged response is never worth a screenshot, whatever the caller thinks (D-264).
@@ -366,6 +491,33 @@ export async function renderPage(
         contentType: 'text/html',
         fetchedAt: capturedAt,
         body: html,
+        gzip,
+        gzipByteLength: gzip.byteLength,
+      });
+    }
+
+    /*
+      The gate itself, stored beside the page it stood in front of (D-267).
+
+      Two artifacts for one URL, and both are needed. The `dom` capture is the catalogue page every
+      product rule now evaluates; this one is the gate, and it is what GATE-001 cites — the record
+      of what a visitor is asked to affirm, and of what this crawl affirmed on the way in.
+
+      Only where the gate was actually passed. A gate that stayed shut is stored once, under
+      `gate`, by the block above: there is no page behind it to store.
+    */
+    if (gateCapture !== undefined && enteredGate !== undefined) {
+      const gzip = gzipSync(Buffer.from(gateCapture.html, 'utf8'));
+      gateKey = `${options.runId}/layer1/${gateCapture.sha256}.html`;
+      artifacts.push({
+        key: gateKey,
+        kind: 'gate',
+        url: finalUrl,
+        sha256: gateCapture.sha256,
+        byteLength: Buffer.byteLength(gateCapture.html, 'utf8'),
+        contentType: 'text/html',
+        fetchedAt: capturedAt,
+        body: gateCapture.html,
         gzip,
         gzipByteLength: gzip.byteLength,
       });

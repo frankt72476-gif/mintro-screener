@@ -336,6 +336,7 @@ export {
   type ReportAccess,
   type ReportCoverage,
   type ChallengeSummary,
+  type ConsentGateSummary,
   type ReportFinding,
   type SameObservationPair,
   type BlockingSummary,

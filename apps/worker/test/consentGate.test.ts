@@ -28,6 +28,7 @@ import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { classifyConsentGate, describeConsentGate } from '@mintro/engine';
 import { extractConsentGate } from '../src/extract.js';
+import { passConsentGate } from '../src/consentGatePass.js';
 
 const GATE = resolve(process.cwd(), 'fixtures/challenges/consent-gate-comopeptides.html');
 const PRODUCT = resolve(process.cwd(), 'fixtures/product-pages/comopeptides-real-product.html');
@@ -117,17 +118,20 @@ describe('the document CoMo served in place of sixteen product pages', () => {
   });
 });
 
-describe('the crawler does not attest through it', () => {
-  /*
-    A rule about conduct, asserted rather than trusted. Ticking four boxes that say *I am 21, I am
-    a laboratory, I am acting institutionally* would be Mintro asserting things about itself that
-    are not true, to reach a catalogue the merchant put a control in front of — and every page the
-    crawl then described would rest on that.
-
-    Driven by watching the network: the gate posts to its own URL, so any submission is a request
-    this page did not otherwise make.
-  */
-  it('issues no request of any kind while reading the gate', async () => {
+/**
+ * Reading the gate changes nothing; passing it is a separate, deliberate act (D-266, D-267).
+ *
+ * These two were written under D-266 as *no POST, no box ticked, ever*. Frank's ruling of
+ * 2026-09-09 reverses the conduct rule, so they are inverted rather than deleted — but the split
+ * they were really testing survives and is worth keeping: **classification does not act**. The
+ * reader is pure, the pass is a function you have to call, and `consentGatePass.test.ts` is where
+ * the one submission is counted.
+ *
+ * Keeping that boundary is what makes the limit auditable. If reading a gate could submit it, no
+ * count anywhere would mean anything.
+ */
+describe('reading the gate does not act on it', () => {
+  it('issues no request while classifying', async () => {
     const page = await context.newPage();
     const requests: string[] = [];
     page.on('request', (request) => {
@@ -145,7 +149,7 @@ describe('the crawler does not attest through it', () => {
     expect(requests).toEqual([]);
   });
 
-  it('leaves every acknowledgement unchecked', async () => {
+  it('leaves every acknowledgement unchecked until the pass runs', async () => {
     const page = await context.newPage();
     try {
       await page.setContent(readFileSync(GATE, 'utf8'));
@@ -157,11 +161,92 @@ describe('the crawler does not attest through it', () => {
         ).length,
       );
       expect(checked).toBe(0);
+    } finally {
+      await page.close();
+    }
+  });
 
-      // The merchant's own script keeps Enter disabled until all four are ticked. It still is.
-      expect(await page.evaluate(() => document.querySelector('#cg-enter')?.hasAttribute('disabled'))).toBe(
-        true,
-      );
+  /*
+    And the inversion: the pass ticks all four and submits, which is what the ruling asks for.
+
+    **Asserted on the outcome, not on the DOM afterwards.** Submitting navigates — that is what a
+    gate does — so by the time this could query the document, the document is gone and every
+    checkbox with it. A first draft asserted four boxes still checked and got zero, which is the
+    page having moved on rather than the pass having failed.
+
+    What was actually sent is proved where it can be: `consentGatePass.test.ts` reads the POST body
+    off a server and asserts all four acknowledgements arrived.
+  */
+  it('ticks every required box and submits once the pass runs', async () => {
+    const page = await context.newPage();
+    try {
+      await page.setContent(readFileSync(GATE, 'utf8'));
+      const outcome = await passConsentGate(page, 5_000);
+
+      expect(outcome.acknowledged).toBe(4);
+      expect(outcome.submitted).toBe(true);
+      expect(outcome.refusal).toBeUndefined();
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+/**
+ * The limit that guards against a change somewhere else (D-267).
+ *
+ * `classifyConsentGate` already refuses a form carrying a typeable control, so this branch should
+ * be unreachable. It exists because *should be unreachable* is how a crawler ends up filling in an
+ * email address: the classifier lives in `packages/engine` and the acting lives in the worker, and
+ * a check at the point of acting is the only one a change to the other module cannot bypass.
+ */
+describe('the pass refuses a form it could type into', () => {
+  const withText = (extra: string): string =>
+    `<form method="post">
+       <input type="hidden" name="_return" value="/shop/x/">
+       <input type="checkbox" name="ack" required>
+       ${extra}
+       <button type="submit">Enter</button>
+     </form>`;
+
+  it.each([
+    ['a text input', '<input type="text" name="email">'],
+    ['a password input', '<input type="password" name="pw">'],
+    ['a select', '<select name="role"><option>lab</option></select>'],
+    ['a textarea', '<textarea name="why"></textarea>'],
+  ])('refuses %s, and ticks nothing', async (_label, control) => {
+    const page = await context.newPage();
+    try {
+      await page.setContent(withText(control));
+      const outcome = await passConsentGate(page, 5_000);
+
+      expect(outcome.submitted).toBe(false);
+      expect(outcome.acknowledged).toBe(0);
+      expect(outcome.refusal).toContain('not checkboxes');
+
+      // Nothing was touched on the way to refusing.
+      expect(
+        await page.evaluate(
+          () => (document.querySelector('input[type=checkbox]') as HTMLInputElement).checked,
+        ),
+      ).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /*
+    The control. A form of the right shape is passed, so the refusals above are about the typeable
+    control rather than about a function that refuses everything.
+  */
+  it('passes the same form with no typeable control', async () => {
+    const page = await context.newPage();
+    try {
+      await page.setContent(withText(''));
+      const outcome = await passConsentGate(page, 5_000);
+
+      expect(outcome.submitted).toBe(true);
+      expect(outcome.acknowledged).toBe(1);
     } finally {
       await page.close();
     }

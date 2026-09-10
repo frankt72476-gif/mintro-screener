@@ -432,19 +432,35 @@ function gateFinding(rule: RuleOfType<'dom_assert'>, page: PageContext): Finding
     standard the overlay branch meets, and hard constraint 3's requirement that a `pass` carry what
     a violation would.
   */
-  if (page.gated !== undefined) {
-    return satisfied(rule, `${page.gated} The page it stands in front of was not read.`, RENDERED, [
+  const consentGate = page.gated ?? page.enteredGate;
+  if (consentGate !== undefined) {
+    /*
+      Observed either way (D-266, D-267).
+
+      The gate is the finding, and whether the crawler then walked through it changes what the
+      sentence says and nothing about whether a gate is there. Reading only `gated` would have made
+      GATE-001 stop passing on the very merchants the crawler can now see behind — a rule losing its
+      observation because a different part of the system got better at looking.
+    */
+    return satisfied(
+      rule,
+      page.enteredGate === undefined
+        ? `${consentGate} The page it stands in front of was not read.`
+        : `${consentGate} The crawler affirmed the statements and read the page behind it.`,
+      RENDERED,
+      [
       {
         kind: RENDERED,
         sourceUrl: page.finalUrl,
         sourceSha256: page.htmlSha256,
         evidenceKey: page.gateKey ?? '',
         capturedAt: page.capturedAt,
-        matchedValue: signals.filter((signal) =>
-          page.gated?.toLowerCase().includes(signal.toLowerCase()),
-        ).join(', '),
+        matchedValue: signals
+          .filter((signal) => consentGate.toLowerCase().includes(signal.toLowerCase()))
+          .join(', '),
       },
-    ]);
+      ],
+    );
   }
 
   const inGate = page.gate.found

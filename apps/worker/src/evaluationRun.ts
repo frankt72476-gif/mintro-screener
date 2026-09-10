@@ -144,9 +144,7 @@ export async function runEvaluationRequest(
               behave exactly as they did before, which is what D-002 requires of them.
             */
             ...(report.challenge === undefined ? {} : { challenged: report.challenge.challenged }),
-            ...(report.consentGate === undefined
-              ? {}
-              : { gated: report.consentGate.challenged }),
+            ...(report.consentGate === undefined ? {} : { gated: report.consentGate.gated }),
           },
         };
       } finally {

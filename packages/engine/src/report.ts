@@ -341,7 +341,23 @@ export interface ScreeningReport {
    *
    * **Optional, permanently**, like every field before it. Absent renders nothing.
    */
-  readonly consentGate?: ChallengeSummary;
+  readonly consentGate?: ConsentGateSummary;
+}
+
+/**
+ * The crawl's encounter with the merchant's own consent gate (D-266, D-267).
+ *
+ * Its own type rather than `ChallengeSummary`, because the field names of that one lie about it and
+ * because a gate has an outcome a challenge does not: **it can be passed**. Three numbers, and the
+ * masthead says something different depending on which is non-zero.
+ */
+export interface ConsentGateSummary {
+  /** Pages the gate stood in front of and was not passed. Nothing behind them was read. */
+  readonly gated: number;
+  /** Pages read **behind** a gate the crawler went through (D-267). */
+  readonly entered: number;
+  /** Pages the run attempted to render at Layer 1 and above. The denominator. */
+  readonly pages: number;
 }
 
 /**
@@ -458,8 +474,8 @@ export interface AssembleInput {
   readonly sample?: SampleBasis;
   /** How many rendered pages were answered by bot protection. Omitted where none was (D-264). */
   readonly challenge?: ChallengeSummary;
-  /** How many rendered pages were the merchant's consent gate. Omitted where none was (D-266). */
-  readonly consentGate?: ChallengeSummary;
+  /** The merchant's consent gate, met and possibly passed. Omitted where none was (D-266). */
+  readonly consentGate?: ConsentGateSummary;
   /** Which captures the eye test should read. Omitted where the crawl took none (D-198). */
   readonly eyeTestCaptures?: readonly EyeTestCaptureRequest[];
 }

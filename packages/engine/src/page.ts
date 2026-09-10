@@ -285,6 +285,20 @@ export interface PageContext {
    */
   readonly gated?: string;
   /**
+   * Set when a consent gate stood here and the crawler went through it (D-267).
+   *
+   * **The opposite of `gated`, and the two are mutually exclusive.** `gated` says the page behind
+   * the gate was never read; this says it was, and that the document on this context *is* that
+   * page. Nothing is blinded, `wasServed` is true, and every rule evaluates normally — because the
+   * catalogue is what came back.
+   *
+   * It is kept rather than discarded because the gate is still a finding: GATE-001 cites it,
+   * `gateKey` still points at the stored gate, and the masthead says the crawl entered through one.
+   * A run that walked through a gate and said nothing about it would be describing a catalogue the
+   * merchant does not show a visitor without asking first.
+   */
+  readonly enteredGate?: string;
+  /**
    * Evidence key for the stored consent gate, set only alongside `gated` (D-266).
    *
    * Its own key rather than `domKey`, for the reason `challengeKey` has one: every satisfied

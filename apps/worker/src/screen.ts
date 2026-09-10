@@ -58,7 +58,7 @@ import {
   type ScreeningReport,
   type WallAssessment,
 } from '@mintro/engine';
-import { renderPage } from './render.js';
+import { createCrawlContext, renderPage } from './render.js';
 import { runGateRules, type AnonymousAccess } from './gate.js';
 import { discoverLayer3 } from './signup.js';
 import { coaLinkVocabulary, fetchCertificate } from './coa.js';
@@ -163,6 +163,34 @@ export async function screenStorefront(
   const startedAt = new Date().toISOString();
   const artifacts: EvidenceArtifact[] = [];
 
+  /*
+    One anonymous context for the whole crawl (D-267).
+
+    Every render used to build and close its own, which is right until something a page does has to
+    survive to the next one. A consent gate is exactly that: it sets a cookie, and a per-render
+    context means sixteen product pages behind one gate submit that gate sixteen times. One context
+    submits it once and walks through fifteen times.
+
+    It is anonymous and stays anonymous. The escalation path below hands the product sample a
+    *different* context carrying a merchant session when one is needed (D-040), and the gate rules
+    build their own with no session at all (D-039). Neither is touched by this.
+  */
+  const crawl = await createCrawlContext(browser);
+  /** Set once the crawl has been through a consent gate on this context (D-267). */
+  let enteredGate: string | undefined;
+  const gateOptions = (): {
+    readonly alreadyEnteredGate: boolean;
+    readonly onEnteredGate: (description: string) => void;
+  } => ({
+    alreadyEnteredGate: enteredGate !== undefined,
+    onEnteredGate: (description) => {
+      enteredGate = description;
+      say(`  entered through the merchant's consent gate: ${description}`);
+    },
+  });
+
+  try {
+
   // ---- Layer 0, which also tells us how politely to behave from here on ----------------
   const fetcher = createHttpFetcher({ timeoutMs: 15_000 });
   const layer0 = await discoverLayer0(target, fetcher, { runId });
@@ -178,7 +206,13 @@ export async function screenStorefront(
   // Anonymous, always. The homepage is where the footer disclosure rules are read, and those
   // describe what a customer sees — reading them while signed in would answer a different
   // question. Escalation, if it happens at all, reaches the product sample and nothing else.
-  const rendered = await renderPage(browser, homepage, { runId, pacer, timeoutMs: 30_000 });
+  const rendered = await renderPage(browser, homepage, {
+    runId,
+    pacer,
+    timeoutMs: 30_000,
+    context: crawl,
+    ...gateOptions(),
+  });
   artifacts.push(...rendered.artifacts);
 
   progress.enter(
@@ -262,7 +296,10 @@ export async function screenStorefront(
         pacer,
         selectors,
         timeoutMs: 30_000,
-        ...(context === undefined ? {} : { context }),
+        // The merchant session where one was established, the run's own anonymous context
+        // otherwise. Either way it is shared across the sample, so a gate is passed once.
+        context: context ?? crawl,
+        ...gateOptions(),
       });
       artifacts.push(...result.artifacts);
       renderedPages.push(result.page);
@@ -302,6 +339,15 @@ export async function screenStorefront(
     pass · 61 not evaluable" and finished `complete`, and there was nothing on any surface an
     operator sees to say that no page of the site had been served to anybody.
   */
+  if (enteredGate !== undefined) {
+    /*
+      Said out loud, because it is a thing the crawler did rather than a thing that happened to it
+      (D-267). A reader who sees a full catalogue on a merchant who gates it is entitled to know
+      how the crawl got there, and the masthead says so too.
+    */
+    say(`  the catalogue below was read after affirming the gate's statements`);
+  }
+
   if (wall.consentGated > 0) {
     /*
       Said out loud, and said as the credit it is (D-266).
@@ -415,6 +461,8 @@ export async function screenStorefront(
   const discovered = await discoverLayer3(browser, layer0.origin, {
     runId,
     pacer,
+    context: crawl,
+    ...gateOptions(),
     homepageLinks: rendered.page.links.map((link) => ({ href: link.href, text: link.text })),
     onProgress: (line, count) => say(line, count),
   });
@@ -509,6 +557,7 @@ export async function screenStorefront(
 
   const challengedPages = renderedPages.filter((page) => page.challenged !== undefined).length;
   const gatedPages = renderedPages.filter((page) => page.gated !== undefined).length;
+  const enteredPages = renderedPages.filter((page) => page.enteredGate !== undefined).length;
 
   progress.enter('assembly', 'assembling the report');
   const report = assembleReport(
@@ -574,9 +623,22 @@ export async function screenStorefront(
         the merchant and a masthead that merged them would report a compliance control as an
         obstruction.
       */
-      ...(gatedPages === 0
+      /*
+        The gate, and what the crawl did about it (D-266, D-267).
+
+        Reported whenever a gate was met, whether or not it was passed — the two are different
+        sentences on the masthead and the second one is the interesting one. Omitted only where no
+        gate was seen at all.
+      */
+      ...(gatedPages === 0 && enteredPages === 0
         ? {}
-        : { consentGate: { challenged: gatedPages, pages: renderedPages.length } }),
+        : {
+            consentGate: {
+              gated: gatedPages,
+              entered: enteredPages,
+              pages: renderedPages.length,
+            },
+          }),
 
       /*
         What the eye test should read — not what it found (D-198).
@@ -599,6 +661,10 @@ export async function screenStorefront(
   );
 
   return { report, artifacts, layer0: improved, homepage: rendered.page, sampled, findings };
+  } finally {
+    // Ours, so ours to close. A merchant-session context belongs to `escalate` and is not touched.
+    await crawl.close().catch(() => undefined);
+  }
 }
 
 /**

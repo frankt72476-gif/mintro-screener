@@ -24,6 +24,7 @@ import { EvaluationReport } from '../src/components/EvaluationReport.js';
 import {
   challengeLine,
   consentGateLine,
+  enteredConsentGate,
   type EvaluationLabels,
   type EvaluationRunContext,
   type FindingState,
@@ -154,11 +155,48 @@ describe('the bot-challenge line', () => {
 });
 
 describe('the consent-gate line', () => {
-  it('reaches the rendered document, with both numbers', () => {
-    const markup = render({ ...BASE, consentGate: { challenged: 16, pages: 30 } });
+  it('reaches the rendered document, with both numbers, where the gate held', () => {
+    const markup = render({ ...BASE, consentGate: { gated: 16, entered: 0, pages: 30 } });
 
     expect(text(markup)).toContain('Consent gate on 16 of 30 pages');
     expect(markup).toContain('eval-consent-gate');
+  });
+
+  /*
+    The ruling's copy (D-267). A run that went through the gate read the catalogue, so a count of
+    doors is the wrong shape — what a reader needs is how this crawl got in, said once.
+  */
+  it('says the crawl entered, without a count, where the gate was passed', () => {
+    const markup = render({ ...BASE, consentGate: { gated: 0, entered: 16, pages: 30 } });
+
+    expect(text(markup)).toContain("Entered through the merchant's consent gate");
+    expect(text(markup)).not.toContain('Consent gate on');
+    expect(enteredConsentGate({ ...BASE, consentGate: { gated: 0, entered: 16, pages: 30 } })).toBe(
+      true,
+    );
+  });
+
+  it('says the findings describe the catalogue, not the gate', () => {
+    const line = lineOf(
+      render({ ...BASE, consentGate: { gated: 0, entered: 16, pages: 30 } }),
+      'eval-consent-gate',
+    );
+
+    expect(line).toContain('Mintro affirmed those statements');
+    expect(line).toContain('describe the catalogue rather than the gate');
+    // And not the sentence for a gate that held, which says the opposite.
+    expect(line).not.toContain('was not read');
+  });
+
+  /*
+    Both, when a gate took on one context and not another. Entering is the more consequential fact
+    and is the line that shows.
+  */
+  it('prefers the entered line when a run carries both', () => {
+    const markup = render({ ...BASE, consentGate: { gated: 3, entered: 13, pages: 30 } });
+
+    expect(text(markup)).toContain("Entered through the merchant's consent gate");
+    expect(text(markup)).not.toContain('Consent gate on 3');
   });
 
   /*
@@ -166,13 +204,13 @@ describe('the consent-gate line', () => {
     anyone; they are asking a question we decline to answer on a visitor's behalf. A line that said
     the merchant blocked the crawler would take a compliance control and report it as obstruction.
   */
-  it('names Mintro’s choice, never the merchant blocking us', () => {
+  it('does not describe the merchant as blocking us', () => {
     const rendered = lineOf(
-      render({ ...BASE, consentGate: { challenged: 16, pages: 30 } }),
+      render({ ...BASE, consentGate: { gated: 16, entered: 0, pages: 30 } }),
       'eval-consent-gate',
     );
 
-    expect(rendered).toContain('does not answer that on a visitor');
+    expect(rendered).toContain('did not get through');
     expect(rendered).toContain('was not read');
     /*
       Plain substrings rather than a word-boundary regex.
@@ -195,7 +233,7 @@ describe('the consent-gate line', () => {
     const markup = render({
       ...BASE,
       challenge: { challenged: 3, pages: 30 },
-      consentGate: { challenged: 16, pages: 30 },
+      consentGate: { gated: 16, entered: 0, pages: 30 },
     });
 
     expect(markup).toContain('eval-challenge');
@@ -205,9 +243,9 @@ describe('the consent-gate line', () => {
   });
 
   it('prints nothing on a run that met no gate, or one recorded before the field', () => {
-    expect(render({ ...BASE, consentGate: { challenged: 0, pages: 30 } })).not.toContain(
-      'eval-consent-gate',
-    );
+    expect(
+      render({ ...BASE, consentGate: { gated: 0, entered: 0, pages: 30 } }),
+    ).not.toContain('eval-consent-gate');
     expect(render(BASE)).not.toContain('eval-consent-gate');
     expect(consentGateLine(BASE)).toBeNull();
   });

@@ -66,8 +66,14 @@ export function wasServed(page: PageContext): boolean {
   // What came back was the interstitial, not the page (D-264). The status it carried is not the
   // question — the same mitigation is served at 200, which the test below would have passed.
   if (page.challenged !== undefined) return false;
-  // What came back was the merchant's consent gate, not the page (D-266). The status is 200 and
-  // the URL is right, so nothing else here would have caught it.
+  /*
+    What came back was the merchant's consent gate, not the page (D-266). The status is 200 and the
+    URL is right, so nothing else here would have caught it.
+
+    `enteredGate` is deliberately not tested: a page read **behind** a gate the crawler went
+    through is the page, and it was served (D-267). Coverage counts it, because the catalogue is
+    what came back.
+  */
   if (page.gated !== undefined) return false;
   if (page.httpStatus < 200 || page.httpStatus >= 300) return false;
 

@@ -129,7 +129,11 @@ export interface EvaluationRunContext {
    * single line covering both would file a compliance control as an obstruction. Absent means
    * the run predates the record, not that nothing was gated.
    */
-  readonly consentGate?: { readonly challenged: number; readonly pages: number };
+  readonly consentGate?: {
+    readonly gated: number;
+    readonly entered: number;
+    readonly pages: number;
+  };
 }
 
 /**
@@ -182,8 +186,27 @@ export function challengeLine(run: EvaluationRunContext): string | null {
  */
 export function consentGateLine(run: EvaluationRunContext): string | null {
   const gate = run.consentGate;
-  if (gate === undefined || gate.challenged <= 0) return null;
-  return `Consent gate on ${gate.challenged} of ${gate.pages} pages`;
+  if (gate === undefined) return null;
+
+  /*
+    Entered wins over gated, and it is not a count (D-267).
+
+    A run that went through the gate read the catalogue, so a number of pages is the wrong shape:
+    what a reader needs is *how this crawl got in*, once, not a tally of doors. The gated form keeps
+    its numerator and denominator because there the number is the coverage story — three of forty
+    eight unread is a different run from sixteen of sixteen.
+
+    A run can be both, when a gate took on one context and not another. Entering is the more
+    consequential fact, so it is the line that shows.
+  */
+  if (gate.entered > 0) return "Entered through the merchant's consent gate";
+  if (gate.gated > 0) return `Consent gate on ${gate.gated} of ${gate.pages} pages`;
+  return null;
+}
+
+/** True when the line above is reporting a gate the crawler went through (D-267). */
+export function enteredConsentGate(run: EvaluationRunContext): boolean {
+  return (run.consentGate?.entered ?? 0) > 0;
 }
 
 // ── vocabulary ─────────────────────────────────────────────────────────────────────────────────

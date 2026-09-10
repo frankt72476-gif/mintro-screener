@@ -93,10 +93,14 @@ the programme asks for and the report got worse in every direction.
 
 A consent gate is now classified like a challenge and reported as the opposite of one: its own
 `ArtifactKind` and `NotEvaluableKind`, GATE-001 reading it as an observed gate and passing on it,
-GATE-002 reading a gated `200` as not public, and a masthead line in the pass colour. **The crawler
-does not attest through it**, and that is a rule about conduct rather than a limitation: ticking
-four boxes that say *I am 21, I am a laboratory* would be Mintro asserting things about itself that
-are not true to reach a catalogue the merchant put a control in front of.
+GATE-002 reading a gated `200` as not public, and a masthead line in the pass colour.
+
+**And the crawler goes through it (D-267).** Frank ruled the same day that the gate is a bank
+preference rather than a legal requirement, that its presence is itself the finding, and that
+looking behind it is the screener's purpose. The gate is captured first, then its boxes are ticked
+and the form submitted **once per run**, and the page behind it is read as the page for that URL.
+A gate that does not take falls back to the D-266 behaviour with nothing submitted twice. The
+masthead then reads *"Entered through the merchant's consent gate"*.
 
 **Migration `0085` needs production apply before the next scan**, alongside `0084`. Run `97bf366a`
 is not repaired and will not be (D-002).
@@ -106,16 +110,10 @@ is not repaired and will not be (D-002).
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
   reached, so a run behind a login wall produces a document about a storefront nobody saw — the
   `storefrontNotSeen` guard says so rather than hiding it, which is the honest failure and not a fix.
-- **Consent-gate access: merchant-supplied bypass vs crawler attestation. Pending Frank.** Two
-  ways past a gate the crawler will not answer itself. A **merchant-supplied bypass** — a token, a
-  header, an allowlisted address the merchant issues knowing what it is for — leaves the assertion
-  with the party entitled to make it, and the report can say the catalogue was read with the
-  merchant's cooperation. **Crawler attestation** means Mintro ticks the boxes, which is Mintro
-  asserting things about itself that are not true, and every finding downstream would rest on that.
-  D-266 declines the second by default; whether the first is offered, and on what terms, is a
-  business ruling and not a build task.
-- **Re-screening CoMo behind the gate.** The next run of that merchant will report the gate and
-  read nothing behind it, which is correct and is not coverage. It waits on the ruling above.
+- **A merchant-supplied bypass.** Open as a courtesy, no longer as a precondition. D-267 rules
+  that the crawler passes the gate itself, so a token or header a merchant issues would spare them
+  the form submission rather than unblock the crawl. Worth offering if a merchant asks; not worth
+  building unprompted.
 - **Static egress IP and allowlist copy. In progress.** The worker's outbound address is
   `152.233.48.176` and is not one Fly reports under `ips list` — those are ingress. A dedicated
   static egress makes the address something a merchant can allowlist, and the allowlist request
