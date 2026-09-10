@@ -17636,6 +17636,12 @@ immutable (D-002). What changes is the next run of that merchant.
 ## D-267 — The crawler passes a merchant consent gate
 **2026-09-09 · Frank**
 
+> **The shared context introduced here leaked a page per render. See D-268.** `renderPage` had
+> never closed its page and had never needed to, because closing a per-render context reaped it.
+> Giving the run one context removed that reaper, and the next day's crawl exhausted a 985 MB
+> machine. The ruling and everything else below stand; the context is unchanged and the page is now
+> closed on every path.
+
 **This reverses D-266's conduct rule.** That decision declined to answer a consent gate, on the
 reasoning that ticking boxes reading *I am 21, I am a laboratory, I am acting institutionally* would
 be Mintro asserting things about itself that are not true. It raised the question as a business one
@@ -17733,3 +17739,77 @@ deleted, because the fixture server's cookie was doing the work. And a check tha
 ticked after the pass returned zero — not because the pass failed, but because submitting navigates
 and the document was gone. Both are now asserted where the fact actually lives: the flag against a
 gate that re-presents, and the acknowledgements against the POST body a server received.
+
+## D-268 — A render closes its page, whoever owns the context
+**2026-09-10 · architect**
+
+`renderPage` never closed its page. Not before D-267 and not after; the line was simply absent for
+the whole life of the function. What changed on 2026-09-09 is that it started to matter.
+
+### Two lifetimes decided by one flag
+
+The `finally` closed the context when `borrowed` was false, and closing a context takes its pages
+with it. So the page *was* reaped — as a side effect of context ownership, by a decision that was
+not about pages at all.
+
+**D-267 gave the run one shared context** so a consent gate could be passed once instead of once per
+page. Every render then borrowed, `borrowed` was true on every path, and the one thing that had been
+reaping pages stopped happening. Each render leaked a Chromium renderer process for the rest of the
+crawl: a homepage, up to twenty-five product pages and roughly two dozen Layer 3 candidates, all
+resident at once.
+
+`borrowed` is a fact about the **context**. It was silently deciding the **page** as well, and the
+two have different owners: the context may belong to a caller, and the page is created here on
+every path, used by nothing else, and outlives this function on no reading of it. It is now closed
+unconditionally, before the context, and the failure to close is swallowed — a cleanup error must
+not discard a good render.
+
+### Memory, not network
+
+The stalls of 2026-09-10 were read as a connectivity fault and were not one. Measured from the
+worker while a CoMo run was stuck:
+
+| | |
+|---|---|
+| `MemTotal` | 985,220 kB |
+| `MemAvailable` | **19,304 kB** |
+| `SwapTotal` | 0 |
+| Resident `headless_shell` | 9+, largest at 173 / 138 / 136 / 134 MB |
+
+Those plus node accounted for roughly 856 MB of 962 MB. Everything reported as a network symptom
+followed from it, and none of it was a network fault:
+
+- **TLS handshakes of 3.8 to 7.3 seconds on four unrelated hosts** — Supabase, the merchant,
+  `api.anthropic.com`, `api.ipify.org` — while TCP connect stayed near a second. A TLS handshake is
+  CPU-bound; that gap is contention, not distance.
+- **The surface probe aborting at 5 seconds** on `comopeptides.com/termsandconditions/`, a page that
+  returns `200` in well under a second from a healthy host. The progress line read *"the probe could
+  not decide … (This operation was aborted); rendering it"*, which is D-182 behaving correctly on a
+  machine that could not complete a handshake in time.
+- **`fetch failed`** on the stale-claim sweep at 02:05:43 and the credential read at 00:24, which is
+  Node unable to finish a handshake inside its own budget.
+
+Four unrelated destinations degrading identically was the tell. A network fault does not pick every
+host at once and leave TCP alone.
+
+### What the deadlines could and could not do
+
+The per-step bounds were all correct and all firing: `page.goto` at 30s, `page.evaluate` and
+`page.content()` through `withDeadline` at 30s, the surface probe at 5s, the run watchdog at 30
+minutes. None of them was the problem, and none of them was the fix.
+
+**A `withDeadline` rejection stops us waiting. It does not stop the renderer.** The call keeps
+running in the page until something closes it, and that reaping used to arrive with the context
+close. After D-267 it arrived from nowhere, so a wedged page stayed wedged and stayed resident. That
+is why the timeout test here uses a page that fires `DOMContentLoaded` and then spins its main
+thread forever: it is the one case where closing the page is the only thing that ends the work.
+
+### The test that would have caught it
+
+Counted across the browser rather than one context, because the owned case closes its context before
+returning and leaves nothing to ask. Thirty renders on a shared context leave **at most one page
+open at any point**, and none between renders. Without the fix that assertion reads *expected 30 to
+be less than or equal to 1*, which is the leak with a number on it.
+
+The owned-context case passes with or without the fix, and is kept as the control: it says the path
+that was never broken is still not broken, and locates the defect precisely on the borrowed one.

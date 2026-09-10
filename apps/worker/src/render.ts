@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import type { Browser, BrowserContext } from 'playwright';
+import type { Browser, BrowserContext, Page } from 'playwright';
 import {
   classifyChallenge,
   classifyConsentGate,
@@ -209,6 +209,19 @@ export async function renderPage(
   const capturedAt = new Date().toISOString();
 
   let context: BrowserContext | undefined;
+  /**
+   * This render's page, held where the `finally` can reach it (D-268).
+   *
+   * It used to live inside the `try`, and nothing closed it. That was survivable only because a
+   * context created here was closed on the way out and took its page with it — so the reaping was
+   * a side effect of context ownership rather than anything this function did on purpose.
+   *
+   * D-267 gave the run **one shared context** and handed it to every render. Every render then
+   * borrowed, nothing was closed, and each one leaked a Chromium renderer process for the life of
+   * the crawl. On 2026-09-10 a CoMo run left nine-plus `headless_shell` processes resident on a
+   * 985 MB machine with 19 MB available and no swap.
+   */
+  let opened: Page | undefined;
   // A caller-supplied context is borrowed, never closed: it holds the merchant session and the
   // run needs it for the next page too.
   const borrowed = options.context !== undefined;
@@ -223,6 +236,9 @@ export async function renderPage(
     context = options.context ?? (await createCrawlContext(browser, options.viewport));
 
     const page = await context.newPage();
+    // Handed to the `finally` immediately, so a throw anywhere below still closes it. The body
+    // keeps its own `const` so the closures above narrow: a captured `let` does not (D-268).
+    opened = page;
     page.setDefaultTimeout(timeout);
 
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
@@ -543,6 +559,24 @@ export async function renderPage(
       artifacts: [],
     };
   } finally {
+    /*
+      The page is always ours, so it is always closed (D-268).
+
+      **Before the context**, and unconditionally. Two separate lifetimes were being managed by one
+      decision: `borrowed` is a fact about the *context*, and it was silently deciding the *page*
+      too. The page is created here on every path, is used by nothing else, and outlives this
+      function on no reading of it.
+
+      This is also what re-arms the deadlines. `withDeadline` bounds `page.evaluate` and
+      `page.content()`, but a rejection there only stops *us* waiting — the call keeps running in
+      the renderer until something closes the page. That reaping used to come free with the context
+      close; since D-267 it came from nowhere, so a wedged page stayed wedged and resident.
+
+      Swallowed, because a failure to close is not a failure to render: the caller has a
+      `PageContext` either way, and throwing here would discard a good result over a cleanup error.
+    */
+    await opened?.close().catch(() => undefined);
+
     // Only ours. Closing a borrowed context would take the merchant session with it and turn the
     // rest of the run anonymous without saying so.
     if (!borrowed) await context?.close().catch(() => undefined);

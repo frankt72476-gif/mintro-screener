@@ -105,6 +105,23 @@ masthead then reads *"Entered through the merchant's consent gate"*.
 **Migration `0085` needs production apply before the next scan**, alongside `0084`. Run `97bf366a`
 is not repaired and will not be (D-002).
 
+### The 2026-09-10 stalls were memory, not network (D-268)
+
+A CoMo run hung on `/termsandconditions/` and the worker logged `fetch failed` twice. It read as a
+connectivity fault and was not one. `renderPage` had never closed its page; D-267's shared context
+removed the context close that had been reaping it, so every render leaked a Chromium renderer
+process. Measured mid-stall: 19 MB available of 985 MB, no swap, nine-plus `headless_shell`
+processes resident.
+
+Everything that looked like network followed from that. TLS handshakes ran 3.8 to 7.3 seconds
+against four unrelated hosts while TCP connect stayed near a second, the 5-second surface probe
+aborted on a page that answers `200` instantly, and Node's `fetch` could not finish a handshake.
+The per-step timeouts were all correct and all firing; what they could not do is reap a wedged
+renderer, which only closing the page does.
+
+**Any run started between D-267 and D-268 degraded the machine this way.** A worker deploy carries
+the fix.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
