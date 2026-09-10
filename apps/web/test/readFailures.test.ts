@@ -44,6 +44,7 @@ const RUN = {
   quarantine: null,
   responded: false,
   awaitingReview: false,
+  evaluation: { kind: 'none' } as const,
 };
 
 describe('a failed read', () => {

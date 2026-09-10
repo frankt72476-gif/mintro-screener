@@ -12,6 +12,7 @@
 import { useState, type JSX } from 'react';
 import type { DomainGroup } from '../lib/domainGroups.js';
 import { formatReportDate } from '../lib/format.js';
+import { evaluationLine } from '../lib/runs.js';
 
 interface Props {
   readonly groups: readonly DomainGroup[];
@@ -140,8 +141,17 @@ function DomainRow({
               <span className="drun-when">
                 {run.finishedAt === null ? 'unfinished' : formatReportDate(run.finishedAt)}
               </span>
-              <span className="drun-counts">
-                {run.counts.fail} not met · {run.counts.review} unclear
+              {/*
+                Where the run stands as a document, not how its rules scored (D-275).
+
+                This said `N not met · M unclear`, a count of rule states — the layer beneath what
+                an agent opening this list is after. She wants to know what we concluded and whether
+                it has gone out; a run with a published Referred-out evaluation and one with no
+                evaluation at all read identically under counts. The rule states are on the report,
+                one click away, where they have their evidence beside them.
+              */}
+              <span className={`drun-eval drun-eval-${run.evaluation.kind}`}>
+                {evaluationLine(run.evaluation)}
               </span>
               {/*
                 Run by (D-228, D-229, D-233).

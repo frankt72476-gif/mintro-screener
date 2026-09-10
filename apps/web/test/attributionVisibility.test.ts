@@ -43,10 +43,10 @@ const RUN: RunSummary = {
   runId: 'run-1',
   domain: 'shop.example',
   finishedAt: '2026-09-02T12:00:00.000Z',
-  counts: { fail: 0, review: 1 },
   quarantine: null,
   responded: false,
   awaitingReview: false,
+  evaluation: { kind: 'none' } as const,
   runBy: 'A Colleague',
 };
 
@@ -98,7 +98,8 @@ describe('a partner home shows no run attribution', () => {
 
   it('still renders the run, so the absence is the column and not the row', () => {
     expect(markup).toContain('shop.example');
-    expect(markup).toContain('0 not met');
+    // The row's own content, which is the evaluation state since D-275 rather than rule tallies.
+    expect(markup).toContain('Not yet evaluated');
   });
 
   it('shows no org filter either, and no chip naming an organisation', () => {

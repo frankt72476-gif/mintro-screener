@@ -45,6 +45,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { readCredentialState, normaliseDomain, type CredentialState } from './lib/credentialState.js';
 import { readReportCapture, type CapturedReport } from './lib/reportCapture.js';
+import {
+  canDeliver,
+  captureStateLine,
+  readEvaluationCaptureState,
+  type EvaluationCaptureState,
+} from './lib/evaluationCaptureState.js';
 import { createInviteQueue, describeInvite } from './lib/inviteQueue.js';
 import { createSendQueue, describeSend } from './lib/sendQueue.js';
 import { invitedFindings } from './lib/grouping.js';
@@ -599,6 +605,17 @@ function Screener({
   const [capture, setCapture] = useState<CapturedReport | null>(null);
   /** True while the only stored capture predates the evaluation (D-263). */
   const [captureIsChecklist, setCaptureIsChecklist] = useState(false);
+  /**
+   * Whether the newest published version has been captured (D-275).
+   *
+   * Send and Open both hang off this. `'unreadable'` until the read answers, which is the
+   * conservative start: a Send drawn on an assumption and withdrawn a moment later is worse than
+   * one that appears when the fact is known.
+   */
+  const [evaluationCapture, setEvaluationCapture] = useState<EvaluationCaptureState>({
+    kind: 'unreadable',
+    reason: 'not read yet',
+  });
   const sends = useMemo(() => createSendQueue(client, analyst.id), [client, analyst.id]);
   const review = useMemo(() => createReviewPath(client), [client]);
   /*
@@ -903,6 +920,14 @@ function Screener({
         .eq('run_id', runId)
         .limit(1);
       setCaptureIsChecklist((published.data ?? []).length === 0);
+      /*
+        Whether the current document can be delivered at all (D-275).
+
+        Read here with the rest, and read whether or not a published row was found: `'none'` is the
+        answer for a run that has never been evaluated, and it is what leaves the pre-evaluation
+        checklist path exactly as it was.
+      */
+      setEvaluationCapture(await readEvaluationCaptureState(client, runId, window.location.origin));
 
       const stored = await readRunAttestations(client, runId);
       // A rule set that failed to parse renders no report at all a few lines down, so there is
@@ -1293,7 +1318,22 @@ function Screener({
                     the same decision the rail makes about the Documents Check tab. Absent, not
                     disabled: a partner without the capability never sees Send.
                   */
-                  ...(shape.showsSubmitAction ? { onSend: () => setSending(true) } : {}),
+                  /*
+                    Two conditions, and they answer different questions (D-275).
+
+                    `showsSubmitAction` is whether this reader may submit at all — a capability,
+                    absent rather than disabled (D-230). `canDeliver` is whether there is anything
+                    to submit: what reaches IQwallet is the stored capture of the published
+                    evaluation, and `send.ts` refuses to compose without one. A Send pressed before
+                    the capture lands could only fail, several screens later, in front of somebody
+                    who had every reason to think the document was ready.
+
+                    A run with no published evaluation is `'none'` and unaffected. Its checklist
+                    capture is what was sent and stays sendable; nothing is back-filled (D-002).
+                  */
+                  ...(shape.showsSubmitAction && canDeliver(evaluationCapture, capture !== null)
+                    ? { onSend: () => setSending(true) }
+                    : {}),
                   ...(shape.showsMarkReadyAction && reviewState === 'complete'
                     ? { onMarkReadyForReview: () => void markReady(report.runId), marking }
                     : {}),
@@ -1304,8 +1344,25 @@ function Screener({
                           : `${reviewStateLabel(shape)}. ${MARK_READY_NOTE}`,
                       }
                     : {}),
-                  reportUrl: capture?.url ?? null,
+                  /*
+                    The link opens the capture of the newest published version, or the checklist
+                    capture on a run that predates evaluations (D-275).
+
+                    It used to open the newest row in `report_captures` regardless, which on a run
+                    published a second time was the previous version's file under a control labelled
+                    *Open report*. `evaluationCapture` is keyed on the version; `capture` answers
+                    only the pre-evaluation case, which is the one it was written for.
+                  */
+                  reportUrl:
+                    evaluationCapture.kind === 'ready'
+                      ? evaluationCapture.url
+                      : evaluationCapture.kind === 'none'
+                        ? (capture?.url ?? null)
+                        : null,
                   supersededCapture: captureIsChecklist,
+                  ...(captureStateLine(evaluationCapture) === null
+                    ? {}
+                    : { captureLine: captureStateLine(evaluationCapture) as string }),
                   /*
                     No `onInvite`. The invitation flow leaves the analyst surface with the checklist
                     (layout memo, "What leaves the report"); `MerchantRoute` stays routable, so a

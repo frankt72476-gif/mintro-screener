@@ -3148,7 +3148,15 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 }
 
 .drun-when { color: var(--ink-mid); flex: 0 0 auto; }
-.drun-counts { color: var(--slate); flex: 1 1 auto; }
+/*
+  The run's evaluation state (D-275). Replaces `.drun-counts`, which stated rule tallies.
+
+  `none` and `unreadable` are quieter than a published conclusion, because a list of ten runs where
+  two are published should read as two conclusions and eight blanks rather than ten equal lines.
+*/
+.drun-eval { color: var(--slate); flex: 1 1 auto; }
+.drun-eval-published { color: var(--ink); font-weight: 600; }
+.drun-eval-none, .drun-eval-unreadable { color: var(--ink-mid); }
 .drun-flag { color: #A5620E; font-size: 11px; }
 .drun-open { flex: none; }
 .drun-none { color: var(--slate); }
@@ -3990,3 +3998,5 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 
 /* A capture that predates the evaluation, still reachable and saying so (D-263). */
 .capture-superseded{font-size:11px;color:var(--ink-mid);align-self:center}
+/* Why Send and Open are absent (D-275). Sits where they would be, in the actions row. */
+.capture-pending{font-size:12px;color:var(--ink-mid);align-self:center;max-width:34ch;line-height:1.35}

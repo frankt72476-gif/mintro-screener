@@ -112,6 +112,17 @@ export interface ReportActions {
    */
   readonly onRescan?: () => void;
   /**
+   * Why the controls are not drawn, when they are not (D-275).
+   *
+   * A composed string, for the same reason `reviewLine` is one: what a missing capture means to a
+   * reader depends on which state it is in, and the states are resolved where the read happens.
+   * Absent when the capture is ready — there is nothing to explain about a control that is there.
+   *
+   * Rendered inside the actions block, so it is **never in the print payload**. Whether Mintro has
+   * finished capturing its own document is not something an underwriter's copy should carry.
+   */
+  readonly captureLine?: string;
+  /**
    * The stored capture is of the checklist, not the evaluation (D-263).
    *
    * True for every run captured before the evaluation existed. The link stays — it is what was

@@ -104,6 +104,19 @@ export function RunActions({
             </button>
           )}
           {/*
+            What stands where Send and Open would be (D-275).
+
+            The document that reaches IQwallet is the stored capture of the published evaluation,
+            and until it exists there is nothing to open and nothing to attach. Absent rather than
+            disabled is the rule here, so without this line the controls would simply not be there
+            and an analyst would have no way to tell *not yet* from *not for you*.
+          */}
+          {actions.captureLine !== undefined && (
+            <span className="capture-pending" role="status">
+              {actions.captureLine}
+            </span>
+          )}
+          {/*
             The review path, in place of Send (0070). A partner who cannot submit finishes a run
             and needs somewhere to put it.
           */}

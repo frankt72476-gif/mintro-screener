@@ -18325,3 +18325,139 @@ reached from a sitemap-and-links crawl.
 Runs already made are not re-crawled. Every run before this one read no about page and no editorial
 page, and their PROD-011/013/016/017 findings rest on the product sample and homepage alone. Nothing
 is back-filled.
+
+
+## D-275 — A published evaluation says what it was read against, and is offered only when it exists
+
+**Date:** 2026-09-10
+**Status:** accepted
+**Found on:** run `50a49af8-ec24-46de-870a-cf3ff8401a79` (cheatcodespeptides.com), evaluation
+`877304a4`, version 1, published 2026-09-10T20:46:30Z (16:46:30 ET)
+
+Three defects on one screen, all the same shape: the app stating something the database could have
+told it, or offering something the database says is not there.
+
+### 1. The masthead was blank, and no migration was needed
+
+`evaluations` already carries `ruleset_version`, `angles_version` and `model` — `publish_evaluation`
+copies all three off the draft it publishes (`0082`, lines 153–156) and deletes that draft in the
+same statement. The row for version 1 holds `3.11.0`, `1.3.0` and `claude-opus-5`.
+
+**The read never asked for them.** `EvaluationEditor`'s select was
+`version, content, published_at, analysts(…)`, and the fallback that builds the run context for a
+published run — the branch taken by every published run, because publishing deletes the draft —
+filled in three empty strings under a comment saying the versions come off whichever row exists.
+
+So the masthead of every published evaluation stated an empty rule set and an empty angle set: the
+two facts on that document that change what a finding means, missing from the document whose whole
+purpose is to say what a merchant was read against.
+
+The select now names the three columns and `documentVersions(draft, published)` resolves them,
+exported and pure. That it is pure is the point rather than a convenience: what shipped was a
+fallback nobody could assert.
+
+### 2. Send was offered over a document that could not be sent, and the capture was OOM-killing the worker
+
+`evaluation_capture_requests` for this version read `status: 'running'`, `storage_key: null`,
+`error: null`, claimed at 20:46:31 and never finished. `report_captures` held no row for the run, so
+`reportUrl` was null and **Open report was correctly absent** — while **Send was drawn**, over a
+document that `send.ts` refuses to compose without a stored file. Pressing it could only fail, some
+screens later, in front of somebody with every reason to think the report was ready.
+
+#### Why the capture never finished
+
+The worker was **OOM-killed**, twice, at the same point:
+
+```
+20:46:53  Out of memory: Killed process 635 (node) total-vm:12475592kB, anon-rss:786940kB
+21:02:10  Out of memory: Killed process 635 (node) total-vm:12489444kB, anon-rss:789812kB
+```
+
+786 MB of anonymous memory on a `shared-cpu-1x:1024MB` machine. The stale-claim reaper did exactly
+what it exists to do — reclaimed at 21:01:32, fifteen minutes after the first claim to the second —
+and the job died the same way. A capture that OOMs is a capture that loops.
+
+#### The cause, which is in the assembler
+
+The run carries **sixty captures**. `substituteImages` was one `split(marker).join(dataUri)` per
+image over a single growing string: each iteration copies the whole document, and the document grows
+by most of a megabyte of base64 every time. Sixty images means sixty ever-larger copies plus the
+array of parts each `split` allocates. And the substitution ran **first**, so `stripExecutable`,
+`stripResourceLinks` and `injectHead` each rewrote the inflated document afterwards — three more
+copies of the finished size.
+
+Two changes:
+
+- **One traversal.** A single regex over the marker scheme replaces every marker in one pass, so
+  the document is built once.
+- **Images last.** With markers still in place the document is a few hundred kilobytes, so the three
+  strip-and-inject passes are cheap and exactly one pass sees the full size.
+
+The second changes the output not at all, and no test asserts it. Base64 is `[A-Za-z0-9+/=]`, so a
+data URI can hold neither the `<` those passes match nor a quoted `on…=` attribute. A test claiming
+to observe the ordering would be a test of nothing, and the first attempt at one was exactly that —
+it passed with the order reverted. What is asserted is that the stripping still happens, which is
+what the reorder could plausibly break.
+
+`MARKER_PREFIX` is exported from `capture.ts` and checked against the pattern at load, because two
+spellings of one prefix would fail silently in the direction that matters: markers left unreplaced
+in a document nobody looked at.
+
+#### And the affordance now knows
+
+`readEvaluationCaptureState` answers whether the **newest published version** has been captured.
+Keyed on the version, because `report_captures` records the file and the run and not which version
+the file is of — so on a run published twice, *Open report* opened the previous version's file.
+
+Five states, and `unreadable` is one of them on purpose. This would have been the fourth instance of
+the class D-036, D-200 and D-213 record: a failed read rendered as the absence of what it failed to
+read would hand an analyst a Send button over an undeliverable document.
+
+Runs that predate evaluations are untouched. `'none'` is permanent — nothing is back-filled (D-002)
+— and those runs are sendable exactly when their checklist capture exists, which is what they were.
+
+Absent rather than disabled stays the rule (D-230), so a line stands where the controls would be.
+Without it *not yet* and *not for you* look identical. It renders in the actions block, so it never
+reaches the print payload: whether Mintro has finished capturing its own document is not something
+an underwriter's copy carries.
+
+### 3. The run list stated rule tallies
+
+`1 not met · 6 unclear` — a count of rule states, which is the layer beneath what an agent opening a
+list of past screenings wants. A run with a published Referred-out evaluation and one with no
+evaluation at all read identically.
+
+The line is now the evaluation state: **Not yet evaluated**, **Draft**, or
+**Consumer-leaning · Referred out · v1 published**. Two named embeds, both projected rather than
+fetched whole — a hundred rows of full evaluation JSON to render a hundred short lines is a page's
+worth of payload for two strings each.
+
+`RunSummary.counts` went with it. Nothing rendered it any more, and a field nothing renders is the
+shape D-246 describes. The one test that used it built its own label from it, over two runs of one
+merchant on one day that carried identical tallies — which is precisely why the day-precision stamp
+was the whole of D-045. Dropping the counts leaves that assertion testing the thing that fixed it.
+
+### What was not done
+
+- **No migration.** The columns exist and are populated. The first draft of this change was going to
+  add a carry-at-publish step; the row said it was already there.
+- **The worker is not redeployed.** The fix is in `apps/worker`, so the capture for `50a49af8` will
+  keep being reclaimed and keep dying on the deployed image until it ships.
+- **The machine is still 1024 MB.** The assembler was the defect and raising memory would have
+  hidden it. Worth revisiting: the capture branch launches a second Chromium while the crawl browser
+  is open, which is real pressure this did not touch.
+
+### Negatives
+
+Each of these fails when the mechanism behind it is removed:
+
+| Broken | Fails |
+|---|---|
+| `documentVersions` falling back to the published row | the masthead is blank again |
+| the three columns in the evaluations select | the source assertion |
+| `canDeliver` refusing a pending capture | Send is offered over a running capture |
+| `unreadable` rendering as its own line | a failed read reads as an unevaluated run |
+| the list drawing the evaluation line | nothing is stated |
+| the capture line rendering | absence explains nothing |
+| the single-pass substitution | sixty images cost quadratically |
+| the marker prefix renamed | the load-time check, then the substitution test |

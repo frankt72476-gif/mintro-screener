@@ -70,8 +70,14 @@ export interface RenderedPage {
   readonly images: { readonly loaded: number; readonly total: number };
 }
 
-/** The marker scheme. A fragment, so nothing tries to resolve it while the page is still open. */
-const MARKER_PREFIX = '#mintro-capture-';
+/**
+ * The marker scheme. A fragment, so nothing tries to resolve it while the page is still open.
+ *
+ * Exported because `substituteImages` matches on it (D-275). Two spellings of one prefix would
+ * be two answers to *what is a marker*, and the failure would be silent in the direction that
+ * matters: markers left unreplaced in a document nobody looked at.
+ */
+export const MARKER_PREFIX = '#mintro-capture-';
 
 /**
  * Renders the report route and returns everything the assembler needs.

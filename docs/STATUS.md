@@ -200,6 +200,23 @@ do publish is `/quality-promise/`, `/how-to-read-a-coa/` and `/certificates-of-a
 `quality`, `coa`, `certificates` and `promise` are on the list. A slug set matching nothing on the
 one merchant we can test against would be a surface that renders on no run.
 
+### A published evaluation carries its versions, and the capture gates Send (D-275)
+
+Run `50a49af8` (cheatcodespeptides.com), published 2026-09-10 16:46:30 ET, showed three things at
+once. The masthead stated an **empty rule set and an empty angle set** — the row held 3.11.0 and
+1.3.0 all along and the read never asked for them, so no migration was needed. **Send was drawn over
+a document that could not be sent**, because its capture had not finished. And the run list stated
+`1 not met · 6 unclear`, a rule tally where an agent wants a conclusion.
+
+The capture had not finished because it was **OOM-killing the worker**: 786 MB of anonymous memory
+on a 1024 MB machine, twice, at the same point, fifteen minutes apart as the stale-claim reaper
+handed the job back. The run carries sixty captures and the assembler substituted them one at a
+time into a growing string, then rewrote the inflated document three more times. It is one pass now,
+and the images go in last.
+
+Send and Open both gate on a completed capture of the newest published version. The list line reads
+`Not yet evaluated`, `Draft`, or `Consumer-leaning · Referred out · v1 published`.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl
@@ -222,6 +239,14 @@ one merchant we can test against would be a surface that renders on no run.
   with the merchant, an allowlist — are not technical, and D-017 rules out the technical ones.
 - **The CoMo gate regression.** Still open. Carried into the evaluation unchanged: what the run
   observed is what the angles reason over.
+- **The worker needs a deploy.** It is behind by the D-268 page-leak fix, the D-274 editorial
+  surface and the D-275 capture-assembler fix. Until it ships, the capture for run `50a49af8` is
+  reclaimed every fifteen minutes and OOM-kills the machine every time.
+- **Migration `0086` is not applied to production.** The one-evaluation-request-per-run index.
+- **The worker machine is 1024 MB and the capture branch launches a second Chromium** while the
+  crawl browser is open. D-275 fixed the assembler rather than raising the ceiling, deliberately —
+  raising it would have hidden the defect — but the second browser is real pressure nobody has
+  measured.
 - Angle citation lists show observed states only; `not_evaluable` collapsed to a count. Done.
 - Removing the dormant attestation and invitation code is its own decision (architecture memo,
   cluster 5). It is unmounted, not deleted.

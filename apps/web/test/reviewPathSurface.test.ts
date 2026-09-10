@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync, readdirSync } from 'node:fs';
 import { ReportView } from '../src/components/ReportView.js';
 import { PastReports } from '../src/components/PastReports.js';
+import { RunActions } from '../src/components/RunActions.js';
 import {
   MARK_READY_NOTE,
   PARTNER_DISCLOSURE,
@@ -117,6 +118,40 @@ describe('Send to IQwallet is ABSENT, not disabled', () => {
   });
 });
 
+/*
+  Absent, not disabled, and something says why (D-275).
+
+  Rendered through `RunActions`, which is the component the analyst screen actually mounts — `App`
+  passes `ReportView` no actions at all, only `print`. `App` decides whether to hand over `onSend`
+  and `reportUrl`; this is the other half, that the line explaining their absence is drawn where
+  they would have been and nothing inert is left behind.
+*/
+describe('the capture line stands where Send and Open would be', () => {
+  const LINE = 'Version 1 is being captured. The report can be opened and sent once it is.';
+
+  const acts = (actions: Record<string, unknown>): string =>
+    renderToStaticMarkup(
+      createElement(RunActions, { report: REPORT, actions: actions as never } as never),
+    );
+
+  it('is rendered when the controls are not', () => {
+    const markup = acts({ captureLine: LINE });
+
+    expect(markup).toContain(LINE);
+    expect(markup).not.toContain('Send to IQwallet');
+    expect(markup).not.toContain('Open report');
+    expect(markup).not.toMatch(/<button[^>]*disabled/);
+  });
+
+  it('is absent once the capture is, so a ready document explains nothing', () => {
+    const markup = acts({ onSend: () => {}, reportUrl: '/r/abc' });
+
+    expect(markup).toContain('Send to IQwallet');
+    expect(markup).toContain('Open report');
+    expect(markup).not.toContain('is being captured');
+  });
+});
+
 describe('the review state line', () => {
   it('reads as With Mintro to the partner and Ready for review to the host', () => {
     // One fact, two readings, and each is the plain truth from where that person stands (D-229).
@@ -181,10 +216,10 @@ const RUN: RunSummary = {
   runId: 'run-1',
   domain: 'shop.example',
   finishedAt: '2026-09-02T12:00:00.000Z',
-  counts: { fail: 0, review: 1 },
   quarantine: null,
   responded: false,
   awaitingReview: false,
+  evaluation: { kind: 'none' } as const,
 };
 
 const list = (runs: readonly RunSummary[], props: Record<string, unknown> = {}): string =>
@@ -214,6 +249,49 @@ describe('the run list badge', () => {
     const markup = list([{ ...RUN, awaitingReview: true }]);
     expect(markup).not.toContain(REVIEW_STATE_LABEL.host);
     expect(markup).not.toContain(REVIEW_STATE_LABEL.partner);
+  });
+});
+
+/*
+  A pure function's output is a fact about an object; only markup is a fact about a screen (D-246).
+  `evaluationLine` is asserted in `publishedDocumentState.test.ts`; this is whether anything draws
+  it, and whether the rule tallies it replaced actually left.
+*/
+describe('the run list speaks evaluation', () => {
+  it('states the conclusion, the placement and the version for a published run', () => {
+    const markup = list([
+      {
+        ...RUN,
+        evaluation: {
+          kind: 'published',
+          version: 1,
+          spectrum: 'consumer_leaning',
+          placement: 'referred_out',
+        },
+      },
+    ]);
+
+    expect(markup).toContain('Consumer-leaning · Referred out · v1 published');
+  });
+
+  it('says so for a run that has never been evaluated, and for one still in draft', () => {
+    expect(list([RUN])).toContain('Not yet evaluated');
+    expect(list([{ ...RUN, evaluation: { kind: 'draft' } }])).toContain('Draft');
+  });
+
+  /*
+    The line this replaced. Asserted absent in the markup rather than inferred from the JSX, because
+    the defect the list had was that a run with a published evaluation and one with none read the
+    same — and they read the same again the moment both lines are drawn.
+  */
+  it('states no rule tallies', () => {
+    const markup = list([
+      { ...RUN, evaluation: { kind: 'published', version: 1, spectrum: 'mixed', placement: 'referred_out' } },
+    ]);
+
+    expect(markup).not.toContain('not met ·');
+    expect(markup).not.toContain('unclear');
+    expect(markup).not.toContain('drun-counts');
   });
 });
 

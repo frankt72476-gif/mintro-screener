@@ -26,10 +26,10 @@ function run(runId: string, domain: string, finishedAt: string): RunSummary {
     runId,
     domain,
     finishedAt,
-    counts: { fail: 5, review: 18 },
     quarantine: null,
     responded: false,
     awaitingReview: false,
+    evaluation: { kind: 'none' } as const,
   };
 }
 
@@ -44,11 +44,17 @@ const NEWER = run('c0ffee00', 'swisschems.is', '2026-08-22T22:00:41.000Z');
  */
 describe('run labels', () => {
   it('distinguishes two runs of the same merchant on the same day', () => {
+    /*
+      The label as it was when the bug was reproduced, minus the rule counts the list no longer
+      states (D-275). They were never what separated these two rows — both runs of one merchant on
+      one day carried the same tallies, which is exactly why the day-precision stamp was the whole
+      defect. Dropping them leaves the assertion testing the thing that fixed it.
+    */
     const label = (summary: RunSummary): string =>
-      `${summary.domain} — ${summary.counts.fail} failed, ${summary.counts.review} for review — ${summary.finishedAt}`;
+      `${summary.domain} — ${summary.finishedAt}`;
 
     const toTheDay = (summary: RunSummary): string =>
-      `${summary.domain} — ${summary.counts.fail} failed, ${summary.counts.review} for review — ${summary.finishedAt?.slice(0, 10)}`;
+      `${summary.domain} — ${summary.finishedAt?.slice(0, 10)}`;
 
     // What the selector used to render: identical.
     expect(toTheDay(OLDER)).toBe(toTheDay(NEWER));

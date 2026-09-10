@@ -23,6 +23,7 @@
  */
 
 import { EVALUATION_POSTURE } from '@mintro/engine';
+import { MARKER_PREFIX } from '../capture.js';
 
 /** What the assembler needs. Everything is already fetched; nothing here reaches for anything. */
 export interface CaptureInput {
@@ -43,10 +44,27 @@ export interface CaptureInput {
 export function assembleCapture(input: CaptureInput): string {
   let html = input.html;
 
-  html = substituteImages(html, input.images);
+  /*
+    The images go in **last**, and this order is a memory constraint rather than a preference
+    (D-275).
+
+    It used to be first, and the three passes below then each rewrote the inflated document: a run
+    with sixty full-page screenshots assembles to tens of megabytes, so `stripExecutable`,
+    `stripResourceLinks` and `injectHead` were each allocating another copy of all of it. Run
+    `50a49af8` OOM-killed the worker twice at this point — 786 MB of anonymous memory on a 1024 MB
+    machine — and the stale-claim reaper handed the job straight back for it to die again.
+
+    With markers still in place the document is a few hundred kilobytes, so the three passes are
+    cheap and exactly one pass sees the full size.
+
+    The output is identical either way — base64 carries neither the `<` those passes match nor a
+    quoted `on…=` attribute — so nothing observes this order and no test asserts it. It is a memory
+    property, stated here because that is the only place it can be stated.
+  */
   html = stripExecutable(html);
   html = stripResourceLinks(html);
   html = injectHead(html, input);
+  html = substituteImages(html, input.images);
 
   return html;
 }
@@ -63,13 +81,43 @@ export function assembleCapture(input: CaptureInput): string {
  * A marker with no replacement is left alone rather than blanked. The assertions then refuse the
  * document, which is the honest outcome: a report missing a capture is not a report to deliver,
  * and a blank `src` would have made it look like one.
+ *
+ * ## One pass, because sixty were quadratic (D-275)
+ *
+ * This was `split(marker).join(dataUri)` per image. Each iteration copies the whole document, and
+ * the document grows by a megabyte or so of base64 every time — so sixty images meant sixty copies
+ * of an ever-larger string, plus the array of parts `split` allocates to build each one. The peak
+ * was several times the finished file, and on run `50a49af8` that peak was what the kernel killed.
+ *
+ * A single regex over the marker scheme replaces every one in a single traversal, so the document
+ * is built once. `#mintro-capture-` is this system's own prefix and the numbers are its own, which
+ * is why the pattern can be a literal rather than an alternation of sixty escaped keys.
  */
+const MARKER_PATTERN = /"(#mintro-capture-\d+)"/g;
+
+/*
+  One definition of the prefix, checked rather than restated (D-181).
+
+  `MARKER_PATTERN` has to be a literal — a pattern built by escaping a string at every call is a
+  second thing to get wrong, and this one runs over a document that may be tens of megabytes. So the
+  literal is checked against the exported prefix at load. If `capture.ts` renames the scheme this
+  throws on import, which is the loud failure; without it the substitution would quietly match
+  nothing and the document would go out with markers where its evidence should be.
+*/
+if (!MARKER_PATTERN.source.includes(MARKER_PREFIX)) {
+  throw new Error(
+    `the capture marker prefix is now ${MARKER_PREFIX}; MARKER_PATTERN in capture/document.ts ` +
+      'still matches the old one and would substitute nothing',
+  );
+}
+
 function substituteImages(html: string, images: ReadonlyMap<string, string>): string {
-  let out = html;
-  for (const [marker, dataUri] of images) {
-    out = out.split(`"${marker}"`).join(`"${dataUri}"`);
-  }
-  return out;
+  MARKER_PATTERN.lastIndex = 0;
+
+  return html.replace(MARKER_PATTERN, (whole, marker: string) => {
+    const dataUri = images.get(marker);
+    return dataUri === undefined ? whole : `"${dataUri}"`;
+  });
 }
 
 /** Anything that executes, or that would show itself because nothing executes. */

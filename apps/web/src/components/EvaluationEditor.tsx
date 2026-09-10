@@ -65,6 +65,31 @@ interface DraftRow {
   readonly edited_at: string | null;
 }
 
+/**
+ * What the document was written against, from whichever row survives (D-275).
+ *
+ * Publishing copies these three onto `evaluations` and deletes the draft in the same statement, so
+ * exactly one of the two rows holds them and which one depends on whether the run is published.
+ *
+ * It was three empty strings for the published case, under a comment saying they came off whichever
+ * row exists. So every published evaluation's masthead stated an empty rule set and an empty angle
+ * set — the two facts on it that change what a finding means, missing from the document whose whole
+ * job is to say what a merchant was read against.
+ *
+ * Pure and exported because that is the whole of the defect: a fallback nobody could assert.
+ */
+export function documentVersions(
+  draft: Pick<DraftRow, 'ruleset_version' | 'angles_version' | 'model'> | null,
+  published: Pick<PublishedRow, 'ruleset_version' | 'angles_version' | 'model'> | null,
+): { readonly rulesetVersion: string; readonly anglesVersion: string; readonly model: string } {
+  const row = draft ?? published;
+  return {
+    rulesetVersion: row?.ruleset_version ?? '',
+    anglesVersion: row?.angles_version ?? '',
+    model: row?.model ?? '',
+  };
+}
+
 type Load =
   | { readonly status: 'loading' }
   /**
@@ -116,6 +141,16 @@ interface PublishedRow {
   readonly version: number;
   readonly content: StoredDraft;
   readonly published_at: string;
+  /**
+   * What the document was written against, carried onto the row at publish (D-275).
+   *
+   * Not optional and not nullable: `0082` copies all three from the draft it is publishing, and a
+   * published version that could not say which rule set it read is a document nobody can weigh.
+   * The draft is deleted in the same statement, so these are the only surviving copy.
+   */
+  readonly ruleset_version: string;
+  readonly angles_version: string;
+  readonly model: string;
   readonly analysts: { readonly full_name: string | null; readonly email: string } | null;
 }
 
@@ -258,8 +293,18 @@ export function EvaluationEditor({
             arrives. D-213 is that bug, and `embeds.test.ts` reads this line out of the source and
             asks the database about it.
           */
+          /*
+            The versions come off the published row, because the draft is gone (D-275).
+
+            `publish_evaluation` copies `ruleset_version`, `angles_version` and `model` onto the
+            row and then deletes the draft they came from. A read that omitted them left the only
+            surviving copy unread, and the masthead of every published evaluation stated no rule
+            set and no angle set — on the document whose whole purpose is to say what a merchant
+            was read against.
+          */
           .select(
-            'version, content, published_at, analysts!evaluations_published_by_fkey (full_name, email)',
+            'version, content, published_at, ruleset_version, angles_version, model, ' +
+              'analysts!evaluations_published_by_fkey (full_name, email)',
           )
           .eq('run_id', runId)
           .order('version', { ascending: false })
@@ -304,14 +349,16 @@ export function EvaluationEditor({
         A published run has no draft. The row below is the draft's metadata, and a published version
         carries its own — so the versions and the model come off whichever exists.
       */
-      const row = (draftRead.data as unknown as DraftRow | null) ?? {
+      const draftRow = (draftRead.data as unknown as DraftRow | null) ?? null;
+      const versions = documentVersions(draftRow, publishedRow);
+      const row = draftRow ?? {
         content: publishedRow!.content,
         handles: null,
         validator_status: 'ok',
         validator_message: null,
-        ruleset_version: '',
-        angles_version: '',
-        model: '',
+        ruleset_version: versions.rulesetVersion,
+        angles_version: versions.anglesVersion,
+        model: versions.model,
         edited_at: null,
       };
       const report = (runRead.data as { report?: ScreeningReport } | null)?.report ?? null;
@@ -327,9 +374,9 @@ export function EvaluationEditor({
           runId,
           merchantDomain: report?.merchantDomain ?? null,
           screenedAt: report?.finishedAt ?? null,
-          rulesetVersion: row.ruleset_version,
-          anglesVersion: row.angles_version,
-          model: row.model,
+          rulesetVersion: versions.rulesetVersion,
+          anglesVersion: versions.anglesVersion,
+          model: versions.model,
           handles: row.handles ?? { finding: {}, evidence: {}, eye_test: {}, angle: {} },
           ...(report === null ? {} : { anchoredRuleIds: anchoredRuleIds(report) }),
           // The same run fact the published render carries, from the same place (D-264).
