@@ -17889,3 +17889,95 @@ vanishes is one nobody can account for.
 when this added a **read** of the outstanding request. The intent was right and the mechanism was
 not: the claim is about inserts. Narrowed to an insert anchored to the table — the publish insert
 carries the same field shape and the first narrowing counted that one too.
+
+## D-270 — Lifestyle claims have patterns; about pages always travel; the masthead drops the model
+**2026-09-10 · architect · amends D-259**
+
+Three changes to what the evaluation reads and says.
+
+### The masthead drops the model name
+
+It stays on the row. `evaluation_drafts.model` and `evaluations.model` are written on every draft
+and every published version, so which model wrote a document is answerable for any run, forever.
+
+What the masthead states is what a reader needs to weigh the document: the domain, when the site was
+screened, and which rule set and angle set it was read against. Those change what the findings mean.
+A model identifier does not — it neither qualifies an observation nor helps anyone check one — and
+on a forwardable document it invites the reading that the *tool* is the author. Mintro is the author.
+The model is how Mintro drafted it, which belongs in the record rather than on the face of the
+report.
+
+### About pages always travel
+
+`about`, `about-us`, `our-story`, `story`, `mission`, `why-us`, `blog`, `news` join the slug table
+and `about` joins `ALWAYS_INCLUDED_SURFACES`. It is where a merchant says what they are for in their
+own words, which is angle 1's whole question: a catalogue can read as research throughout while the
+about page says the founder built this after his own transformation.
+
+Always-included rather than sampled, for the reason the terms page is: an about page that trips no
+rule would drop off the end of a suspicion-ordered cap, and *the about page says nothing unusual* is
+an observation the evaluation needs to be able to make.
+
+**The slug table now has three bands, not two.** It was *specific before general*; about is neither,
+it is the loosest reading of all. `/about-our-return-policy` and `/blog/terms-of-service` are both
+real shapes and both are what they are about rather than where they live, so the order is specific,
+then general, then about. The ordering test asserted *everything not general comes first*, which
+counted the about band as specific and failed; it states the three bands now.
+
+### PROD-016 gets patterns — and the pages it needs are not being crawled
+
+The rule leaves the manual set: `text_match`, layer 2, `surface: all_sampled`, `expect: absent`,
+`word_boundary`, still `review_only`, still `evidence`/`heavy`. Terms:
+
+    stay active · active lifestyle · more energy · vitality · wellness ·
+    feel your best · look and feel
+
+**Phrases, not words, and the corpus is why.** Checked against the 29 pages run `2f39223a` read of
+`www.comopeptides.com`. Every term above scores **zero**. Every single-word candidate scored hits,
+and every hit was legitimate:
+
+| Candidate | Hits | What they actually were |
+|---|---|---|
+| `energy` | 2 | "energy-homeostasis pathways", "energy expenditure pathways" |
+| `glow` | 10 | the product name "BPC+TB+GHK-Cu (GLOW)" |
+| `performance` | 1 | a refund clause **disclaiming** performance claims |
+| `focus` | 1 | "a research focus in melanogenesis-pathway studies" |
+| `skin` | 1 | "skin and connective-tissue research" |
+
+A research storefront uses those words properly. Listing one would report the vocabulary rather than
+the claim, which is D-177's lesson and PROD-012's whole subject. `vitality` and `wellness` are
+single words and are here because a research storefront has no use for either — both score zero.
+
+**No overlap, asserted rather than assumed.** A test compares the term list against PROD-011,
+PROD-013, PROD-014 and PROD-017 out of the rule set, so a term added to any of the five is checked
+against the other four. `anti-aging` and `longevity` are deliberately absent: NAME-001 and PROD-011
+carry them already, and one claim reported twice reads to an underwriter as two.
+
+`feel better`, `look younger` and `quality of life` were considered, score zero here, and are named
+in the rule's note rather than added. They are not in the ratified list.
+
+#### The part that does not work yet, stated plainly
+
+The instruction asked for `surface: all_sampled` **plus the new about/blog pages**. It is
+`all_sampled` alone, because **nothing crawls an about page**:
+
+- Layer 3 discovery fetches four surfaces — terms, shipping policy, FAQ, payment/refund policy.
+  There is no about candidate list.
+- The product sampler only renders URLs Layer 0 classified `products`.
+
+Run `2f39223a` is the proof. `/about-us/` is linked from the homepage three times — *About Como
+Peptides*, *About Us*, *Read Our Story →* — and is listed in the sitemap, and the run fetched 29
+documents, none of them it. So a surface declaring that PROD-016 reads about pages would be a
+declaration nothing can fill, which is D-246's shape: a rule pointed at a page no run captures
+reports `not_evaluable` forever while looking like coverage.
+
+The slug work above is still right and still necessary — it is what makes an about page travel *once
+one exists* — but on its own it is inert. Teaching `discoverLayer3` an about surface is the next
+change and is not in this one.
+
+### The counterfactual moved, and that is the point
+
+`challenge.test.ts` pins how many rules pass against a Cloudflare interstitial with the D-264
+classification withheld. It was twelve; it is thirteen, because PROD-016 now reads pages. A rule that
+can report a page clean is a rule that can be wrong about an interstitial. Gaining detection gains a
+way to be wrong, and pinning the number rather than asserting `> 0` is what made that visible.

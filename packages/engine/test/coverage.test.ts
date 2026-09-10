@@ -148,9 +148,10 @@ describe('every finding is accounted for', () => {
     // them — neither is observable from a public surface without transacting or being let past a
     // gate the program requires — and eleven since PAY-004 left the rule set entirely (D-142).
     expect(coverage.notReachable).toBe(ruleset.rules.filter((r) => r.type === 'manual').length);
-    // Ten since PAY-002 stopped being a manual rule and became a question (D-226); twelve since
-    // PROD-015 and PROD-016 joined as manual rules awaiting patterns in cluster 2 (D-259).
-    expect(coverage.notReachable).toBe(12);
+    // Ten since PAY-002 stopped being a manual rule and became a question (D-226); twelve when
+    // PROD-015 and PROD-016 joined awaiting patterns (D-259); eleven since PROD-016 got its own
+    // and became a `text_match` at layer 2 (D-270).
+    expect(coverage.notReachable).toBe(11);
     // Nothing is left in the pre-D-044 bucket for a report assembled now.
     expect(coverage.kindNotRecorded).toBe(0);
   });

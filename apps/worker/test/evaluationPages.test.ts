@@ -288,12 +288,72 @@ describe('the slug locator, the second source', () => {
     expect(surfaceFromSlug('https://shop.example/my-account/')).toBe('register');
   });
 
-  it('orders every specific slug ahead of every general one', () => {
+  /*
+    Three bands, in order, since D-270 added the third.
+
+    It used to be two — specific before general — and the assertion was written as *every slug that
+    is not general comes first*. The about slugs are not general and are deliberately **last**, so
+    that formulation counted them as specific and failed.
+
+    The invariant it was protecting is unchanged and is what this states: a path carrying tokens
+    from two bands is read as the earlier band. `/pages/shipping-policy` is a shipping policy, not
+    terms; `/about-our-return-policy` is a policy page, not an about page.
+  */
+  it('orders the slug table specific, then general, then about', () => {
     const ids = SURFACE_SLUGS.map(([slug]) => slug);
     const general = ['policy', 'policies', 'terms', 'account'];
-    const lastSpecific = Math.max(...ids.filter((s) => !general.includes(s)).map((s) => ids.indexOf(s)));
-    const firstGeneral = Math.min(...general.map((s) => ids.indexOf(s)));
-    expect(lastSpecific).toBeLessThan(firstGeneral);
+    const about = ['about-us', 'about', 'our-story', 'story', 'mission', 'why-us', 'blog', 'news'];
+    const specific = ids.filter((slug) => !general.includes(slug) && !about.includes(slug));
+
+    const band = (slugs: readonly string[]): { first: number; last: number } => ({
+      first: Math.min(...slugs.map((slug) => ids.indexOf(slug))),
+      last: Math.max(...slugs.map((slug) => ids.indexOf(slug))),
+    });
+
+    // Every slug is in exactly one band, so a slug added without a band fails here rather than
+    // silently landing wherever it was typed.
+    expect(specific.length + general.length + about.length).toBe(ids.length);
+    expect(band(specific).last).toBeLessThan(band(general).first);
+    expect(band(general).last).toBeLessThan(band(about).first);
+  });
+
+  /*
+    The reason the about band is last, as behaviour rather than as a comment.
+  */
+  it('reads a path carrying both an about token and a policy token as the policy', () => {
+    expect(surfaceFromSlug('https://shop.example/about-our-return-policy')).toBe('shipping_policy');
+    expect(surfaceFromSlug('https://shop.example/blog/terms-of-service')).toBe('terms');
+  });
+
+  it('locates the about surface from each of its slugs', () => {
+    for (const path of [
+      '/about/',
+      '/about-us/',
+      '/our-story/',
+      '/story/',
+      '/mission/',
+      '/why-us/',
+      '/blog/',
+      '/news/',
+    ]) {
+      expect(surfaceFromSlug(`https://shop.example${path}`), path).toBe('about');
+    }
+  });
+
+  /*
+    The page that started this. `/about-us/` is linked three times from CoMo's homepage and listed
+    in their sitemap, and no run has ever read it.
+  */
+  it('locates CoMo’s own about page, and not its unseparated one', () => {
+    expect(surfaceFromSlug('https://www.comopeptides.com/about-us/')).toBe('about');
+
+    /*
+      `/aboutcomopeptides/` is one token, so the slug locator cannot reach it — the same limit
+      `/termsandconditions/` has and for the same reason, recorded above. It is not a gap to paper
+      over: a page like that is recovered by the structural join when a rule reads it, and the slug
+      band is explicitly the fallback. Asserted so the limit is known rather than discovered.
+    */
+    expect(surfaceFromSlug('https://www.comopeptides.com/aboutcomopeptides/')).toBeNull();
   });
 
   it('places a slug-located page into the always-included band', () => {

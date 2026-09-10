@@ -45,14 +45,17 @@ const findingFor = (rule: (typeof ruleset.rules)[number], state: 'fail' | 'revie
   }) as never;
 
 describe('the split, as the rule set actually stands', () => {
-  it('is 33 with a declarable boundary and 27 without', () => {
+  it('is 35 with a declarable boundary and 27 without', () => {
     // 26 without, since PAY-002 left the rule set for the questions (D-226). 28 since D-259 added
-    // PROD-015 and PROD-016: both are `manual`, and a manual rule declares no `expect`, so neither
-    // has a boundary to name. They lead in plain English by the same path the other 26 do.
+    // PROD-015 and PROD-016: both were `manual`, and a manual rule declares no `expect`, so neither
+    // had a boundary to name. They lead in plain English by the same path the other 26 do.
     // 34 with, since D-259's amendment added PROD-017 — a text_match rule, so it declares
     // `expect: absent` and does have a boundary to name.
-    expect(WITH_POLARITY).toHaveLength(34);
-    expect(WITHOUT_POLARITY).toHaveLength(28);
+    // 35 and 27 since PROD-016 got patterns in 3.10.0 (D-270): it declares `expect: absent` now, so
+    // it crossed from one side to the other. The total is unchanged, which is the point of the
+    // third assertion.
+    expect(WITH_POLARITY).toHaveLength(35);
+    expect(WITHOUT_POLARITY).toHaveLength(27);
     expect(WITH_POLARITY.length + WITHOUT_POLARITY.length).toBe(ruleset.rules.length);
   });
 });

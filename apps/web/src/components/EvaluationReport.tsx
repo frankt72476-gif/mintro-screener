@@ -363,7 +363,22 @@ function SummaryBlock({
           />
           <Meta label="Rule set" value={run.rulesetVersion} />
           <Meta label="Angle set" value={run.anglesVersion} />
-          <Meta label="Model" value={run.model} />
+          {/*
+            The model is **not** on the masthead.
+
+            It stays on the row — `evaluation_drafts.model` and `evaluations.model` are written on
+            every draft and every published version, and `EvaluationRunContext.model` still carries
+            it — so which model wrote a document is answerable for any run, forever. What it is not
+            is a fact the document leads with.
+
+            The masthead states what a reader needs to weigh the document: the domain, when the site
+            was screened, and which rule set and angle set it was read against. Those change what
+            the findings mean. A model identifier does not: it neither qualifies an observation nor
+            helps anyone check one, and on a document that is forwardable to an underwriter it
+            invites the reading that the *tool* is the author. Mintro is the author; the model is
+            how Mintro drafted it, which is a fact about our process and belongs in the record
+            rather than on the face of the report.
+          */}
         </dl>
       </header>
 

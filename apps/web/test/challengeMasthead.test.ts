@@ -105,6 +105,42 @@ const text = (markup: string): string =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
+/**
+ * What the masthead states, and what it deliberately does not (D-270).
+ *
+ * The model name left. It stays on the row — `EvaluationRunContext.model` still carries it and the
+ * draft and published rows still record it — so *which model wrote this* is answerable for any run.
+ * What it is not is a fact the document leads with.
+ *
+ * Asserted both ways round, because "we removed a line" is the claim that rots quietest: a later
+ * edit putting it back would otherwise be green.
+ */
+describe('the masthead', () => {
+  it('states what qualifies the findings', () => {
+    const shown = text(render(BASE));
+
+    expect(shown).toContain('Screened');
+    expect(shown).toContain('Rule set');
+    expect(shown).toContain('Angle set');
+  });
+
+  it('does not name the model', () => {
+    const markup = render(BASE);
+
+    expect(markup).not.toContain('>Model<');
+    expect(text(markup)).not.toContain(BASE.model);
+  });
+
+  /*
+    And the run still knows it. The removal is from the document, not from the record: a reader
+    asking which model drafted a run gets an answer, from the row rather than the masthead.
+  */
+  it('leaves the model on the run', () => {
+    expect(BASE.model).not.toBe('');
+    expect(typeof BASE.model).toBe('string');
+  });
+});
+
 describe('the bot-challenge line', () => {
   it('reaches the rendered document, with both numbers', () => {
     const markup = render({ ...BASE, challenge: { challenged: 9, pages: 9 } });

@@ -286,16 +286,69 @@ describe('the two rules D-259 adds', () => {
     expect(rule('PROD-012').weight).toBe('ordinary');
   });
 
-  it('are Mintro-authored, manual, and settle nothing yet', () => {
-    for (const id of ['PROD-015', 'PROD-016']) {
-      const r = rule(id);
-      expect(r.source).toBe('mintro');
-      expect(r.type).toBe('manual');
-      expect(r.layer).toBeNull();
-      expect(r.tier).toBe('review_only');
-      expect(r.sev).toBe('major');
-      expect(r.cat).toBe('product');
-      expect(r.params).toMatchObject({ reason: 'Detected by text patterns in cluster 2; manual until then.' });
+  /*
+    One of the two still is. PROD-016 got patterns in 3.10.0 and left the manual set (D-270); this
+    is what remains of the pair, asserted the same way so the day PROD-015 follows is a visible
+    edit rather than a silent one.
+  */
+  it('leaves PROD-015 Mintro-authored, manual, and settling nothing yet', () => {
+    const r = rule('PROD-015');
+    expect(r.source).toBe('mintro');
+    expect(r.type).toBe('manual');
+    expect(r.layer).toBeNull();
+    expect(r.tier).toBe('review_only');
+    expect(r.sev).toBe('major');
+    expect(r.cat).toBe('product');
+    expect(r.params).toMatchObject({ reason: 'Detected by text patterns in cluster 2; manual until then.' });
+  });
+
+  /*
+    PROD-016, now that it reads pages (D-270).
+
+    What did **not** change is asserted beside what did: it is still Mintro-authored, still
+    review_only, still major, still `evidence`/`heavy`. Only the detection moved, which is what a
+    rule getting patterns is supposed to mean.
+  */
+  it('gives PROD-016 patterns without changing what kind of rule it is', () => {
+    const r = rule('PROD-016');
+    expect(r.source).toBe('mintro');
+    expect(r.tier).toBe('review_only');
+    expect(r.sev).toBe('major');
+    expect(r.cat).toBe('product');
+    expect(r.evaluation_tier).toBe('evidence');
+    expect(r.weight).toBe('heavy');
+
+    expect(r.type).toBe('text_match');
+    expect(r.layer).toBe(2);
+    const params = r.params as { surface: string; expect: string; word_boundary: boolean; terms: string[] };
+    expect(params.surface).toBe('all_sampled');
+    expect(params.expect).toBe('absent');
+    expect(params.word_boundary).toBe(true);
+    expect(params.terms).toEqual([
+      'stay active',
+      'active lifestyle',
+      'more energy',
+      'vitality',
+      'wellness',
+      'feel your best',
+      'look and feel',
+    ]);
+  });
+
+  /*
+    The terms belong to this rule alone.
+
+    Four neighbours read the same pages for adjacent claims, and one claim reported twice reads to
+    an underwriter as two. Asserted against the rule set rather than against a list written here,
+    so a term added to any of the five is checked against the other four.
+  */
+  it('shares no term with the rules that read the same pages', () => {
+    const mine = (rule('PROD-016').params as { terms: string[] }).terms;
+    for (const id of ['PROD-011', 'PROD-013', 'PROD-014', 'PROD-017']) {
+      const theirs = ((rule(id).params as { terms?: string[] }).terms ?? []).map((t) => t.toLowerCase());
+      for (const term of mine) {
+        expect(theirs, `${term} also belongs to ${id}`).not.toContain(term.toLowerCase());
+      }
     }
   });
 

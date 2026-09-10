@@ -52,15 +52,16 @@ describe('PAY-002 has left the crawl set', () => {
       crawl cannot reach — but PAY-002's reason said "requires merchant attestation" while an
       attestation section sat in the same report, which is the duplication this closes.
 
-      Ten of the twelve are the standing set. PROD-015 and PROD-016 are the two D-259 added, manual
-      for a different reason: not unreachable, just not yet given patterns. Cluster 2 gives them
-      some, and this count drops back to ten.
+      Ten of the eleven are the standing set. PROD-015 is what remains of the two D-259 added, manual
+      for a different reason: not unreachable, just not yet given patterns. PROD-016 got its
+      patterns in 3.10.0 (D-270) and left, which is the drop from twelve; the count reaches ten when
+      PROD-015 follows.
 
       The others stay rules for now; whether any follows is a separate ruling, and this asserts only
       that PAY-002 is not among them.
     */
     const manual = ruleset.rules.filter((rule) => rule.type === 'manual');
-    expect(manual).toHaveLength(12);
+    expect(manual).toHaveLength(11);
     expect(manual.map((rule) => rule.id)).not.toContain('PAY-002');
   });
 });

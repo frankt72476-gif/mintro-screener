@@ -85,6 +85,18 @@ export const ALWAYS_INCLUDED_SURFACES = [
    * guidance is the clearest single signal angle 1 has.
    */
   'faq',
+  /**
+   * The pages a storefront writes about itself (D-270).
+   *
+   * About, our story, mission, why us, and the blog. They are where a merchant says what they are
+   * for in their own words, and that is angle 1's whole question — a catalogue can read as research
+   * throughout while the about page says the founder built this after his own transformation.
+   *
+   * Always-included rather than sampled, for the reason the terms page is: an about page that trips
+   * no rule would drop off the end of a suspicion-ordered cap, and *the about page says nothing
+   * unusual* is an observation the evaluation needs to be able to make.
+   */
+  'about',
 ] as const;
 
 /**
@@ -124,7 +136,32 @@ export const SURFACE_SLUGS: readonly (readonly [string, string])[] = [
   ['policy', 'terms'],
   ['policies', 'terms'],
   ['terms', 'terms'],
+
   ['account', 'register'],
+
+  /*
+    How a storefront talks about itself — a third band, **after** the general one (D-270).
+
+    The table used to be two bands and the ordering rule was *specific before general*. About is
+    neither: it is the loosest reading of all, and a path carrying an about token and a policy token
+    is a policy page. `/about-our-return-policy` and `/blog/terms-of-service` are both real shapes,
+    and both should be read as what they are about rather than where they live.
+
+    So the rule is now *specific, then general, then about*, and `slugBands` in the test file is
+    what holds it.
+
+    `about-us` precedes `about` and `our-story` precedes `story` for the reason the shipping note
+    above records: these are token sequences, and the longer one has to be tried first or the
+    shorter one swallows it.
+  */
+  ['about-us', 'about'],
+  ['about', 'about'],
+  ['our-story', 'about'],
+  ['story', 'about'],
+  ['mission', 'about'],
+  ['why-us', 'about'],
+  ['blog', 'about'],
+  ['news', 'about'],
 ];
 
 /**

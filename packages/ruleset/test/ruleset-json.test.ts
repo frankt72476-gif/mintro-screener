@@ -95,7 +95,7 @@ describe('rules/ruleset.json', () => {
       the sentence it quotes and loses only terms, so the corpus stays at 53 lines and 52
       programme rules.
     */
-    expect(ruleset.version).toBe('3.9.0');
+    expect(ruleset.version).toBe('3.10.0');
     expect(ruleset.effective).toBe('2026-08-26');
     expect(ruleset.rules).toHaveLength(62);
     expect(ruleset.attestations).toHaveLength(20);
@@ -111,8 +111,9 @@ describe('rules/ruleset.json', () => {
   it('holds the category and manual-rule counts D-142 left', () => {
     // Two payment rules since PAY-002 became a question (D-226): it was both.
     expect(ruleset.rules.filter((rule) => rule.cat === 'payment')).toHaveLength(2);
-    // Ten, plus PROD-015 and PROD-016 which are manual until cluster 2 gives them patterns (D-259).
-    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(12);
+    // Ten, plus PROD-015, which is manual until it is given patterns (D-259). PROD-016 was the
+    // twelfth and left the manual set in 3.10.0 when it got its own (D-270).
+    expect(ruleset.rules.filter((rule) => rule.type === 'manual')).toHaveLength(11);
     expect(ruleset.rules.map((rule) => rule.id)).not.toContain('PAY-004');
   });
 

@@ -138,6 +138,18 @@ draft and a draft is being made.
 carries — failed with a reason, not deleted — before creating the index, which cannot be created
 over the pair.
 
+### Ruleset 3.10.0: PROD-016 has patterns (D-270)
+
+PROD-016 leaves the manual set as a layer-2 `text_match`. Seven phrases, checked against the 29
+pages run `2f39223a` read: every one scores zero, and every single-word candidate scored only
+legitimate uses — "energy" in "energy-homeostasis pathways", "glow" as the product name
+"BPC+TB+GHK-Cu (GLOW)", "performance" inside a refund clause disclaiming performance claims.
+
+**About pages are not crawled, so the about half of that rule is not live.** `/about-us/` is linked
+three times from CoMo's homepage and listed in their sitemap, and no run has ever fetched it: Layer 3
+discovery knows four surfaces and none of them is about. The slug work lands so an about page travels
+once one exists; teaching `discoverLayer3` to fetch one is the next change and is not in this one.
+
 ### Open, and not addressed by cluster 4
 
 - **Authenticated crawl (`test-login`).** Still open. The evaluation reads whatever the crawl

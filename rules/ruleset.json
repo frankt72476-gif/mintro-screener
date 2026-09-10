@@ -1,5 +1,5 @@
 {
-  "version": "3.9.0",
+  "version": "3.10.0",
   "source_document": "RUO Peptide Program Compliance Standards, v1.1 (August 2026)",
   "effective": "2026-08-26",
   "states": [
@@ -1724,9 +1724,9 @@
     {
       "id": "PROD-016",
       "cat": "product",
-      "layer": null,
+      "layer": 2,
       "sev": "major",
-      "type": "manual",
+      "type": "text_match",
       "tier": "review_only",
       "evaluation_tier": "evidence",
       "weight": "heavy",
@@ -1735,7 +1735,19 @@
       "subject": "the pages associate a compound with a lifestyle or appearance outcome",
       "source": "mintro",
       "params": {
-        "reason": "Detected by text patterns in cluster 2; manual until then."
+        "surface": "all_sampled",
+        "terms": [
+          "stay active",
+          "active lifestyle",
+          "more energy",
+          "vitality",
+          "wellness",
+          "feel your best",
+          "look and feel"
+        ],
+        "expect": "absent",
+        "word_boundary": true,
+        "note": "Phrases, not words. Checked against the 29 pages run 2f39223a read of www.comopeptides.com: every one of these scores zero, and every single-word candidate scored hits that were legitimate — \"energy\" twice in \"energy-homeostasis pathways\" and \"energy expenditure pathways\", \"focus\" in \"a research focus\", \"skin\" in \"skin and connective-tissue research\", \"performance\" inside a refund clause disclaiming performance claims, and \"glow\" ten times as the product name \"BPC+TB+GHK-Cu (GLOW)\". A research storefront uses those words properly, so listing one would report the vocabulary rather than the claim. \"vitality\" and \"wellness\" are single words and are here because a research storefront has no use for either. No overlap with PROD-011 (named outcomes), PROD-013 (addressing the reader as the person who takes it), PROD-014 (uptake) or PROD-017 (therapeutic framing); \"anti-aging\" and \"longevity\" are deliberately absent because NAME-001 and PROD-011 already carry them and one claim reported twice reads as two. review_only and heavy for the reason PROD-017 is: a single phrase is a sentence a person reads, and a cluster of them is what a consumer-facing site looks like. Considered and left for a later ruling: \"feel better\", \"look younger\", \"quality of life\". They are the same claim in the same register and score zero here too; they are not in the ratified list, so they are named rather than added."
       }
     },
     {

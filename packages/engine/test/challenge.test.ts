@@ -215,12 +215,17 @@ describe('no rule can pass against a challenge', () => {
     The same bytes with the classification withheld. This is the state the crawler was in on
     2026-09-09, and it is what says the assertions above are load-bearing rather than incidental.
   */
-  it('passed twelve rules before the classification existed', () => {
+  it('passed thirteen rules before the classification existed', () => {
     const unclassified = findingsAgainst(interstitialPage({ classify: false }));
     const passed = unclassified.filter((finding) => finding.state === 'pass');
 
     /*
-      Twelve `pass` findings and four `review`, drawn from a document nobody was ever served.
+      Thirteen `pass` findings and four `review`, drawn from a document nobody was ever served.
+
+      It was twelve until PROD-016 got patterns in ruleset 3.10.0 (D-270). A rule that reads pages
+      for a claim is a rule that can report a page clean, so gaining detection gained a way to be
+      wrong about an interstitial — which is the point of keeping this count pinned rather than
+      asserting `> 0`.
 
       Every one of the twelve is an `expect: absent` product rule reporting that it looked and
       found nothing prohibited — on a nine-kilobyte interstitial with no catalogue in it at all.
@@ -248,6 +253,7 @@ describe('no rule can pass against a challenge', () => {
       'PROD-012',
       'PROD-013',
       'PROD-014',
+      'PROD-016',
       'PROD-017',
     ]);
     expect(
