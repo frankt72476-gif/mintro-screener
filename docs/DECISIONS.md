@@ -18615,58 +18615,84 @@ goes on. The clone carries the attributes and none of the listeners, and it is n
 instance map, so nothing reacts to anything the marker step does. The page is being serialized and
 discarded; there is nothing left for React to render.
 
-### The ceiling does not hold at ninety-five, and thumbnails are the answer taken
+### And then the document was 182.7 MB
 
 With every image inlined, the run was measured end to end. Ninety-four evidence images drawn from
-**eleven distinct screenshots**, 15.0 MB of PNG, one screenshot cited twenty-two times:
+**eleven distinct screenshots**, 15.0 MB of PNG, one screenshot cited twenty-two times — and the
+assembler wrote the bytes into every `src`.
 
-| setting | delivered document |
+**The document was not large because it held a lot of evidence. It was large because it held the
+same evidence over and over.**
+
+| | delivered document |
 |---|---|
-| full size | 182.7 MB |
-| 700px, q 0.72 | 42.9 MB |
-| 640px, q 0.68 | 35.1 MB |
-| **560px, q 0.65** | **27.5 MB** |
-| 480px, q 0.60 | 20.1 MB |
+| before — the bytes in every `src` | **182.7 MB** |
+| after — each capture written once | **20.0 MB** |
 
-The ceiling is 40 MB. Full-size inlining exceeds it four and a half times over, so **section 6's
-images are downscaled at capture time and the ceiling is unchanged**, which is the ruling asked for.
-560px is taken rather than 640px because 640 clears the ceiling by twelve per cent, and twelve per
-cent is no margin for a merchant with more findings than this one.
+The ceiling is 40 MB and is unchanged. The captures are at **full resolution**.
 
-`apps/worker` depends on Playwright and nothing that decodes a PNG, so the downscale happens in a
-page in the browser the capture is already running in: decode, draw to a canvas at the target width,
-re-encode as JPEG. It runs against the cache, so a screenshot cited twenty-two times is re-encoded
-once. A downscale that comes back larger than its input is discarded.
+Between those two measurements this briefly shipped a thumbnailer, which downscaled each capture to
+560px JPEG for 27.5 MB. It is gone. It was buying a fidelity loss — body text in a thumbnail is not
+readable, and a reader checking a matched phrase against the page it came from could not have done
+it from the delivered file — to solve a problem that deduplication solves for nothing.
 
-**What is lost, stated plainly.** A downscaled JPEG of a full-page screenshot is not a substitute
-for the screenshot: body text in a thumbnail is not readable, and a reader who wants to check a
-matched phrase against the page it came from cannot do it from the delivered file alone. The stored
-evidence is untouched — the bucket is append-only (hard constraint 5) and holds the original PNG at
-full resolution for every finding. What changed is only what the forwarded document carries.
+### How one capture is shown ninety-four times
 
-### The thing this did not fix
+Each distinct capture becomes one `<style>` rule, `background-image:url("data:image/png;base64,…")`,
+and every element that shows it points at that rule by class. Grouped on the data URI itself rather
+than on a hash of it: two markers share a capture exactly when they were inlined from the same
+source, and `inlineImages` already caches by source, so identical strings *are* the same string.
 
-**The document is not large because it holds a lot of evidence. It is large because it holds the
-same evidence over and over.** Eleven screenshots, written ninety-four times: 20.0 MB at full
-resolution if each were written once, against 182.7 MB as written.
+**The element stays an `<img>`.** `.shot-img` sizes and crops itself off the image's intrinsic
+ratio — `height:auto`, three different `max-height`s for screen, slip and print, and
+`object-fit:cover; object-position:top`. A `<div>` has no intrinsic ratio, so it would need a
+hard-coded height and would lose all four. So the element keeps its tag, its classes and its `alt`,
+gains `width`/`height` read from the PNG header, and carries a transparent 1×1 pixel as its `src`.
+`background-size:cover` and `background-position:top` are what `object-fit:cover` and
+`object-position:top` mean.
 
-Writing each distinct capture once and referencing it would put the document under the ceiling at
-**full resolution, with no fidelity loss at all** — and would make the thumbnailer unnecessary. It
-cannot be done in self-contained HTML without changing what an evidence row is: a CSS background
-keyed by class, or one row per capture with the citing rules listed beside it. Both are changes to
-the document an underwriter reads, which is a design ruling rather than a defect fix. Open.
+Two details that are load-bearing and would fail silently:
 
-### The guard is kept
+- **The capture rules go last in the head.** `.shot-img` sets `background:#fff` — the shorthand,
+  which resets `background-image` to none. Same specificity, so the later rule wins; earlier and
+  every screenshot in the file is a white box.
+- **`print-color-adjust: exact`.** Every browser's print path drops background images by default,
+  and this file is delivered as a PDF as often as it is opened. Without it the evidence is in the
+  bytes and blank on the page, which is the worst available failure: a document that looks complete
+  and shows nothing.
 
-`assertCapturable` still counts inlined images against what the page reported and still refuses a
-short count, and a marker whose bytes could not be fetched is still left in place rather than
-blanked. Asserted in `captureEveryImage.test.ts`, at the count that failed.
+Dimensions are read from the PNG header — IHDR is the first twenty-four bytes, so only the first
+characters of the base64 are decoded rather than the whole megabyte. Anything that is not a PNG is
+refused rather than laid out at a guess.
+
+### The guard is kept, and asks a better question
+
+`assertCapturable` still compares what the file holds against what the *page* reported, and a
+marker whose bytes could not be fetched is still left exactly as it is rather than blanked.
+
+**What is counted changed with the deduplication.** The bytes used to be in each `src`, so counting
+`src="data:image/` counted captures. They are in the stylesheet now and every `src` is the same
+transparent pixel, so that count would be satisfied by ninety-four placeholders and nothing behind
+them. It counts references and definitions instead:
+
+- every `<img>` the page displayed carries a capture class, and
+- every class an `<img>` carries is defined **exactly once** in the document.
+
+The second half is what the old count could not have asked at all. A third check refuses any
+document still containing a marker, and it is taken before the external-reference sweep so the
+operator gets *a capture was not written* rather than *there is a stray URL*.
 
 ### Negatives
 
 | Broken | Fails |
 |---|---|
 | the clone before marking | `captureMarkers.test.ts`: forty markers, zero `<img>` in the document |
-| the single-pass substitution | one image inlined of ninety-five |
-| leaving an unfetched marker alone | a blank `src` passes for a capture |
-| the thumbnail constants | the measured table no longer clears the ceiling |
+| one class per distinct capture | ninety-four rules instead of eleven |
+| the capture rules going last in the head | `background:#fff` blanks every screenshot |
+| the dimensions on the element | a capture with no ratio to lay out by |
+| leaving an unwritten marker in place | a blank `src` passes for a capture |
+| the reference count | a short document is delivered |
+| the definition-exists check | a reference with no rule behind it |
+| the marker-left-behind check | a marker reaches the file |
+| the PNG header check | a non-PNG is laid out at a guess |
+

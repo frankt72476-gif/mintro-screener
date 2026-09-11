@@ -244,13 +244,14 @@ them. A marker is a fragment, a fragment resolves to the page, the page is not a
 it fired `error` on every image — and `EvidenceSlip` answers that by replacing the image with
 *capture not reachable*. Each image is now replaced by a listener-free clone before it is marked.
 
-With every image inlined the run assembles to **182.7 MB against a 40 MB ceiling**, so section 6's
-images are downscaled at capture time to 560px JPEG (27.5 MB) and the ceiling is unchanged. The
-stored evidence is untouched; only the forwarded document carries the smaller bytes.
+Then the document was 182.7 MB against a 40 MB ceiling — because eleven distinct screenshots were
+written ninety-four times, one of them twenty-two times. Each capture is written once now, as a
+`<style>` rule that every element showing it points at by class: **20.0 MB, at full resolution**,
+ceiling unchanged. The element stays an `<img>` with the capture's own dimensions, because
+`.shot-img` sizes and crops off the intrinsic ratio.
 
-Open, and not a defect: eleven distinct screenshots are written ninety-four times. Writing each once
-and referencing it would fit under the ceiling at full resolution and make the downscale
-unnecessary, but it changes what an evidence row is, which is a design ruling.
+A thumbnailer shipped briefly between those two measurements and is gone. It cost readable evidence
+to solve a problem deduplication solves for nothing.
 
 ### Open, and not addressed by cluster 4
 

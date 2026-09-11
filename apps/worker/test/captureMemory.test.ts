@@ -31,11 +31,25 @@
 
 import { describe, expect, it } from 'vitest';
 import { assembleCapture } from '../src/capture/document.js';
+import { CAPTURE_CLASS } from '../src/capture/images.js';
 import { MARKER_PREFIX } from '../src/capture.js';
 
-/** A base64 payload of a given size, deterministic so a failure is reproducible (D-106). */
-const payload = (bytes: number): string =>
-  `data:image/png;base64,${'QUJDRA'.repeat(Math.ceil(bytes / 6)).slice(0, bytes)}`;
+/**
+ * A real PNG of a given size, deterministic so a failure is reproducible (D-106).
+ *
+ * A valid IHDR since D-277: the assembler reads each capture's dimensions out of the header to put
+ * them on the element, and refuses anything it cannot read rather than laying it out at a guess.
+ */
+const payload = (bytes: number, id = 1): string => {
+  const head = Buffer.alloc(24);
+  Buffer.from('89504e470d0a1a0a', 'hex').copy(head, 0);
+  head.writeUInt32BE(13, 8);
+  head.write('IHDR', 12, 'ascii');
+  head.writeUInt32BE(1280, 16);
+  head.writeUInt32BE(2000 + (id % 97), 20);
+
+  return `data:image/png;base64,${Buffer.concat([head, Buffer.alloc(bytes, id % 251)]).toString('base64')}`;
+};
 
 function document(images: number, bytesEach: number): {
   readonly html: string;
@@ -46,7 +60,7 @@ function document(images: number, bytesEach: number): {
 
   for (let index = 0; index < images; index += 1) {
     const marker = `${MARKER_PREFIX}${index}`;
-    map.set(marker, payload(bytesEach));
+    map.set(marker, payload(bytesEach, index + 1));
     tags.push(`<img src="${marker}" alt="capture ${index}">`);
   }
 
@@ -67,11 +81,13 @@ const assemble = (input: { html: string; images: Map<string, string> }): string 
   });
 
 describe('every marker is replaced', () => {
-  it('substitutes all sixty, which is what run 50a49af8 carried', () => {
+  it('writes all sixty, which is what run 50a49af8 carried', () => {
     const built = assemble(document(60, 512));
 
     expect(built).not.toContain(MARKER_PREFIX);
-    expect(built.split('data:image/png;base64,')).toHaveLength(61);
+    // Sixty distinct captures, so sixty rules. `PLACEHOLDER_PIXEL` is the only repeated URI.
+    expect(built.match(/url\("data:image\/png;base64,/g) ?? []).toHaveLength(60);
+    expect(built.match(new RegExp(`class="${CAPTURE_CLASS}\\d+`, 'g')) ?? []).toHaveLength(60);
   });
 
   /*

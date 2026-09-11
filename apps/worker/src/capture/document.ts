@@ -24,6 +24,7 @@
 
 import { EVALUATION_POSTURE } from '@mintro/engine';
 import { MARKER_PREFIX } from '../capture.js';
+import { CAPTURE_CLASS, deduplicateImages, pointImagesAtCaptures } from './images.js';
 
 /** What the assembler needs. Everything is already fetched; nothing here reaches for anything. */
 export interface CaptureInput {
@@ -61,10 +62,19 @@ export function assembleCapture(input: CaptureInput): string {
     quoted `on…=` attribute — so nothing observes this order and no test asserts it. It is a memory
     property, stated here because that is the only place it can be stated.
   */
+  /*
+    Each distinct capture becomes one rule, and every element that shows it points at that rule
+    (D-277). Eleven rules for the ninety-four images run `50a49af8` displays.
+
+    Computed first because the rules go in the head, and the head is written before the images are
+    pointed at them.
+  */
+  const captures = deduplicateImages(input.images);
+
   html = stripExecutable(html);
   html = stripResourceLinks(html);
-  html = injectHead(html, input);
-  html = substituteImages(html, input.images);
+  html = injectHead(html, input, captures.css);
+  html = pointImagesAtCaptures(html, input.images, captures.classOf);
 
   return html;
 }
@@ -93,33 +103,6 @@ export function assembleCapture(input: CaptureInput): string {
  * is built once. `#mintro-capture-` is this system's own prefix and the numbers are its own, which
  * is why the pattern can be a literal rather than an alternation of sixty escaped keys.
  */
-const MARKER_PATTERN = /"(#mintro-capture-\d+)"/g;
-
-/*
-  One definition of the prefix, checked rather than restated (D-181).
-
-  `MARKER_PATTERN` has to be a literal — a pattern built by escaping a string at every call is a
-  second thing to get wrong, and this one runs over a document that may be tens of megabytes. So the
-  literal is checked against the exported prefix at load. If `capture.ts` renames the scheme this
-  throws on import, which is the loud failure; without it the substitution would quietly match
-  nothing and the document would go out with markers where its evidence should be.
-*/
-if (!MARKER_PATTERN.source.includes(MARKER_PREFIX)) {
-  throw new Error(
-    `the capture marker prefix is now ${MARKER_PREFIX}; MARKER_PATTERN in capture/document.ts ` +
-      'still matches the old one and would substitute nothing',
-  );
-}
-
-function substituteImages(html: string, images: ReadonlyMap<string, string>): string {
-  MARKER_PATTERN.lastIndex = 0;
-
-  return html.replace(MARKER_PATTERN, (whole, marker: string) => {
-    const dataUri = images.get(marker);
-    return dataUri === undefined ? whole : `"${dataUri}"`;
-  });
-}
-
 /** Anything that executes, or that would show itself because nothing executes. */
 function stripExecutable(html: string): string {
   return (
@@ -160,8 +143,14 @@ function stripResourceLinks(html: string): string {
  * served from somewhere other than where it was written. The `X-Robots-Tag` header is set at the
  * serving layer where the serving layer can set one, as defence in depth.
  */
-function injectHead(html: string, input: CaptureInput): string {
-  const styles = [input.fontCss, ...input.css]
+function injectHead(html: string, input: CaptureInput, captureCss: string): string {
+  /*
+    The capture rules go **last**, so they win.
+
+    `.shot-img` sets `background:#fff` — the shorthand, which resets `background-image` to none.
+    Same specificity, so the later rule takes it; earlier and every screenshot would be a white box.
+  */
+  const styles = [input.fontCss, ...input.css, captureCss]
     .filter((sheet) => sheet.trim() !== '')
     .map((sheet) => `<style>${sheet}</style>`)
     .join('\n');
@@ -321,28 +310,68 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
     );
   }
 
+  /*
+    Every capture the page displayed is in the file, and every reference resolves (D-277).
+
+    Counted rather than sampled, and compared against what the *page* reported rather than against
+    what this function can see, so "some of the images inlined" cannot read as success. This is the
+    assertion that caught the marker defect: an image whose bytes could not be fetched keeps its
+    marker, the count comes up short, and the job fails instead of delivering a report with a hole
+    where a screenshot should be.
+
+    **What is counted changed with the deduplication.** The bytes used to be in each `src`, so
+    counting `src="data:image/` counted captures. They are in the stylesheet now and every `src` is
+    the same transparent pixel, so that count would be satisfied by ninety-four placeholders and
+    nothing behind them. It counts references and definitions instead, which is the same claim made
+    against the mechanism that now carries it:
+
+      - every `<img>` the page displayed carries a capture class, and
+      - every class an `<img>` carries is defined exactly once in the document.
+
+    The second half is what the old count could not have asked at all.
+  */
+  const referenced = [...html.matchAll(new RegExp(`class="[^"]*?(${CAPTURE_CLASS}\\d+)`, 'g'))].map(
+    (match) => match[1] as string,
+  );
+
+  if (referenced.length !== expected.images) {
+    throw new Error(
+      `the captured report shows ${referenced.length} capture(s) and the page displayed ` +
+        `${expected.images}. A report missing a capture is not a report to deliver.`,
+    );
+  }
+
+  for (const className of new Set(referenced)) {
+    const defined = html.split(`.${className}{background-image:url("data:image/`).length - 1;
+    if (defined !== 1) {
+      throw new Error(
+        `the captured report references ${className} and defines it ${defined} time(s). A capture ` +
+          'is written once and pointed at; a reference with no definition is a blank frame where a ' +
+          'screenshot should be.',
+      );
+    }
+  }
+
+  /*
+    And nothing is left pointing outside the file. A marker that survived is a capture that was not
+    written, and it would render as the page's own URL rather than as a screenshot.
+  */
+  if (html.includes(MARKER_PREFIX)) {
+    throw new Error(
+      'the captured report still contains a capture marker, so an image was not written into it',
+    );
+  }
+
+  /*
+    Taken before the external-reference sweep below, which would also refuse a leftover marker —
+    with a message about a URL rather than about a capture that was not written. The more specific
+    diagnosis is the one an operator should get.
+  */
   const external = externalReferences(html);
   if (external.length > 0) {
     throw new Error(
       `the captured report has ${external.length} reference(s) that are not inline: ` +
         `${external.slice(0, 5).join(', ')}${external.length > 5 ? ', …' : ''}`,
-    );
-  }
-
-  /*
-    Every capture the page displayed is in the file.
-
-    Counted rather than sampled, and compared against what the *page* reported rather than against
-    what this function can see, so "some of the images inlined" cannot read as success. This is the
-    assertion that catches a marker whose bytes could not be fetched: the substitution leaves the
-    marker in place, the count comes up short, and the job fails instead of delivering a report
-    with a hole where a screenshot should be.
-  */
-  const inlined = (html.match(/<img\b[^>]*\ssrc="data:image\//gi) ?? []).length;
-  if (inlined !== expected.images) {
-    throw new Error(
-      `the captured report inlines ${inlined} image(s) and the page displayed ${expected.images}. ` +
-        'A report missing a capture is not a report to deliver.',
     );
   }
 

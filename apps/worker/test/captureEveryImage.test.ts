@@ -1,5 +1,5 @@
 /**
- * Every image the page displayed reaches the file (D-277).
+ * Every image the page displayed reaches the file, and each capture is written once (D-277).
  *
  * ## What was refused
  *
@@ -7,27 +7,25 @@
  *
  *     the captured report inlines 1 image(s) and the page displayed 95.
  *
- * The one that survived was the masthead lockup. The other ninety-four were evidence screenshots,
- * and the guard did its job — the file was not delivered with holes in it.
+ * The marker step had created all ninety-five markers and they were thrown away with the elements
+ * carrying them: a marker is a fragment, a fragment resolves to the page itself, the page is HTML
+ * rather than an image, so setting it fired `error` on every image — and `EvidenceSlip`'s `Shot`
+ * answers `error` by rendering *capture not reachable* in the image's place. `capture.ts` replaces
+ * each image with a listener-free clone before marking it now, and `captureMarkers.test.ts` is the
+ * regression for that half.
  *
- * ## The cause was not the assembler
+ * ## And then the document was 182.7 MB
  *
- * The marker step created all ninety-five markers. What happened next is that a marker is a
- * fragment, a fragment resolves to the page itself, and the page is HTML rather than an image — so
- * setting the marker made the browser fire `error` on every one. `EvidenceSlip`'s `Shot` listens
- * for that and renders *capture not reachable* in the image's place, so React removed all
- * ninety-four `<img>` elements between the marker step and `page.content()` a few lines later.
- *
- * The markers were correct and were thrown away with the elements carrying them, and the serialized
- * document held one `<img>` and a hundred and four `shot-missing` divs.
- *
- * `capture.ts` now replaces each image with a listener-free clone before marking it. The assertions
- * about that live in `capture.ts`'s own reproduction, because it takes a browser; what this file
- * asserts is the document-level property the guard is about, at the count that failed.
+ * Ninety-four of those images are **eleven distinct screenshots**, one of them cited twenty-two
+ * times. Writing the bytes into each `src` turned 15.0 MB of PNG into a 182.7 MB document against a
+ * 40 MB ceiling. Each capture is written once now and pointed at by class: 20.0 MB, at full
+ * resolution, with the ceiling untouched.
  */
 
 import { describe, expect, it } from 'vitest';
-import { assembleCapture, CAPTURE_SIZE_CEILING_BYTES } from '../src/capture/document.js';
+import { EVALUATION_POSTURE } from '@mintro/engine';
+import { assembleCapture, assertCapturable, CAPTURE_SIZE_CEILING_BYTES } from '../src/capture/document.js';
+import { CAPTURE_CLASS, PLACEHOLDER_PIXEL, pngSize } from '../src/capture/images.js';
 import { MARKER_PREFIX } from '../src/capture.js';
 
 /** The run's own shape: ninety-four evidence images drawn from eleven distinct screenshots. */
@@ -35,30 +33,36 @@ const EVIDENCE_IMAGES = 94;
 const DISTINCT_CAPTURES = 11;
 
 /**
- * Deterministic base64, so a failure is reproducible (D-106).
+ * A real PNG of the given dimensions, so `pngSize` reads what the fixture claims.
  *
- * Each capture opens with its own index in base64 characters and is padded to the same length, so
- * no payload is a prefix of another — otherwise counting occurrences of one counts the others too.
+ * The header is built rather than the whole file: IHDR is the first twenty-four bytes and is all
+ * the assembler reads. The tail is deterministic filler of a fixed length, so no payload is a
+ * prefix of another and counting occurrences of one does not count the rest (D-106).
  */
-const payload = (id: number): string => {
-  const head = `Q${String.fromCharCode(65 + (id % 26))}${String(id).padStart(3, '0')}`;
-  return `data:image/jpeg;base64,${head}${'QUJDRA'.repeat(340)}`;
-};
+function png(width: number, height: number, id: number): string {
+  const head = Buffer.alloc(24);
+  Buffer.from('89504e470d0a1a0a', 'hex').copy(head, 0);
+  head.writeUInt32BE(13, 8);
+  head.write('IHDR', 12, 'ascii');
+  head.writeUInt32BE(width, 16);
+  head.writeUInt32BE(height, 20);
+
+  const tail = Buffer.alloc(1_200, id % 251);
+  return `data:image/png;base64,${Buffer.concat([head, tail]).toString('base64')}`;
+}
 
 /**
  * A document shaped like the evaluation's section 6: one `<img>` per citing finding, several
- * findings citing the same capture, plus the masthead lockup which is an app asset and not evidence.
+ * findings showing the same capture, plus the masthead lockup, which is an app asset.
  */
 function document(): { readonly html: string; readonly images: Map<string, string> } {
-  const captures = Array.from({ length: DISTINCT_CAPTURES }, (_, index) => payload(index));
+  const captures = Array.from({ length: DISTINCT_CAPTURES }, (_, index) =>
+    png(1280, 2000 + index * 100, index + 1),
+  );
   const images = new Map<string, string>();
 
-  /*
-    The masthead lockup is index 0, an app asset rather than evidence. Markers are numeric because
-    `capture.ts` numbers them by DOM position, and the pattern that finds them says so.
-  */
   const tags: string[] = [`<img src="${MARKER_PREFIX}0" alt="Mintro">`];
-  images.set(`${MARKER_PREFIX}0`, payload(900));
+  images.set(`${MARKER_PREFIX}0`, png(240, 60, 200));
 
   for (let index = 0; index < EVIDENCE_IMAGES; index += 1) {
     const marker = `${MARKER_PREFIX}${index + 1}`;
@@ -66,105 +70,213 @@ function document(): { readonly html: string; readonly images: Map<string, strin
     tags.push(`<img class="shot-img" src="${marker}" alt="Full-page screenshot">`);
   }
 
-  return {
-    html: `<html><head><title>r</title></head><body>${tags.join('')}</body></html>`,
-    images,
-  };
+  return { html: page(tags), images };
+}
+
+/**
+ * The wrapper every fixture needs to reach the assertions.
+ *
+ * `assertCapturable` refuses a document that does not carry the posture statement, the run id and
+ * the published version — so a fixture without them fails on the first of those rather than on the
+ * thing under test.
+ */
+function page(tags: readonly string[]): string {
+  return (
+    `<html><head><title>r</title></head><body>` +
+    `<p>${EVALUATION_POSTURE}</p><p>Version 1</p><p>50a49af8-ec24-46de-870a-cf3ff8401a79</p>` +
+    `${tags.join('')}</body></html>`
+  );
 }
 
 const assemble = (input: ReturnType<typeof document>): string =>
   assembleCapture({
     html: input.html,
-    css: [],
+    css: ['.shot-img{width:100%;height:auto;object-fit:cover;background:#fff}'],
     fontCss: '',
     images: input.images,
     merchantDomain: 'cheatcodespeptides.com',
     runId: '50a49af8-ec24-46de-870a-cf3ff8401a79',
   });
 
+const references = (html: string): string[] =>
+  [...html.matchAll(new RegExp(`class="[^"]*?(${CAPTURE_CLASS}\\d+)`, 'g'))].map((m) => m[1]!);
+
 describe('a document with ninety-five images', () => {
   const built = assemble(document());
 
-  it('inlines every one', () => {
-    const inlined = built.match(/<img\b[^>]*\ssrc="data:image\//gi) ?? [];
+  it('shows every one', () => {
+    expect(references(built)).toHaveLength(EVIDENCE_IMAGES + 1);
+  });
 
-    expect(inlined).toHaveLength(EVIDENCE_IMAGES + 1);
+  it('defines each distinct capture exactly once', () => {
+    const defined = built.match(
+      new RegExp(`\\.${CAPTURE_CLASS}\\d+\\{background-image:url\\("data:image/`, 'g'),
+    );
+
+    // Eleven screenshots and the lockup.
+    expect(defined).toHaveLength(DISTINCT_CAPTURES + 1);
+    expect(new Set(references(built)).size).toBe(DISTINCT_CAPTURES + 1);
   });
 
   /*
     The other half of the same claim, and the one that says the file is self-contained: not one
-    `src` still points at anything the reader's browser would have to fetch.
+    `src` still points at anything the reader's browser would have to fetch, and no marker survives.
   */
   it('leaves no external reference behind', () => {
     const srcs = [...built.matchAll(/<img\b[^>]*\ssrc="([^"]*)"/gi)].map((match) => match[1]!);
 
     expect(srcs).toHaveLength(EVIDENCE_IMAGES + 1);
-    for (const src of srcs) expect(src.startsWith('data:image/'), src).toBe(true);
+    for (const src of srcs) expect(src, src).toBe(PLACEHOLDER_PIXEL);
     expect(built).not.toContain(MARKER_PREFIX);
-    expect(built).not.toMatch(/src="https?:\/\//i);
+    expect(built).not.toMatch(/url\("https?:\/\//i);
     expect(built).not.toMatch(/src="\/[^/]/);
   });
 
   /*
-    Ninety-four images over eleven captures means the same bytes are written up to twenty-two times.
-    Asserted because it is the reason the thumbnailer exists: the document is not large because it
-    holds a lot of evidence, it is large because it holds the same evidence repeatedly.
+    The element stays an image. `.shot-img` sizes and crops off the intrinsic ratio — `height:auto`,
+    three different `max-height`s, `object-fit:cover` — so a capture with no dimensions on it would
+    lay out at zero height in the delivered file.
   */
-  it('writes a shared capture once per citing finding', () => {
-    const first = payload(0);
-    const occurrences = built.split(first).length - 1;
+  it('carries each capture’s own dimensions', () => {
+    const first = /<img\b[^>]*class="shot-img[^"]*"[^>]*>/i.exec(built)?.[0] ?? '';
 
-    expect(occurrences).toBeGreaterThan(1);
-    expect(occurrences).toBe(Math.ceil(EVIDENCE_IMAGES / DISTINCT_CAPTURES));
+    expect(first).toContain('width="1280"');
+    expect(first).toMatch(/height="\d{4}"/);
+    expect(first).toContain('alt="Full-page screenshot"');
+  });
+
+  /*
+    And the rules go after the app's stylesheet. `.shot-img` sets `background:#fff` — the shorthand,
+    which resets `background-image` to none — so at equal specificity the later rule has to be ours
+    or every screenshot is a white box.
+  */
+  it('puts the capture rules after the sheet that would blank them', () => {
+    expect(built.indexOf('background:#fff')).toBeLessThan(built.indexOf(`.${CAPTURE_CLASS}0{`));
+    expect(built).toContain('print-color-adjust:exact');
+  });
+});
+
+describe('one screenshot cited twenty-two times', () => {
+  /*
+    The worst case on the run, on its own: `CATG-003`'s capture backs twenty-two findings. Before
+    this, that was twenty-two copies of the same megabyte.
+  */
+  const CITATIONS = 22;
+  const capture = png(1280, 8400, 7);
+
+  const shared = (): { html: string; images: Map<string, string> } => {
+    const images = new Map<string, string>();
+    const tags: string[] = [];
+    for (let index = 0; index < CITATIONS; index += 1) {
+      const marker = `${MARKER_PREFIX}${index}`;
+      images.set(marker, capture);
+      tags.push(`<img class="shot-img" src="${marker}" alt="Full-page screenshot">`);
+    }
+    return { html: page(tags), images };
+  };
+
+  const built = assemble(shared());
+
+  it('produces one data URI', () => {
+    const uris = built.match(/url\("data:image\/png;base64,/g) ?? [];
+
+    expect(uris).toHaveLength(1);
+    expect(built.split(capture.slice(capture.indexOf(',') + 1))).toHaveLength(2);
+  });
+
+  it('still shows it twenty-two times', () => {
+    expect(references(built)).toHaveLength(CITATIONS);
+    expect(new Set(references(built)).size).toBe(1);
+  });
+
+  /*
+    The size, which is the whole point. Twenty-two copies of an 8400px capture is what pushed the
+    real document to 182.7 MB; one copy plus twenty-two class references is a rounding error above
+    the capture itself.
+  */
+  it('weighs one capture rather than twenty-two', () => {
+    const ifRepeated = capture.length * CITATIONS;
+
+    expect(built.length).toBeLessThan(ifRepeated / 2);
   });
 });
 
 describe('the refusal guard is kept', () => {
+  const expected = {
+    runId: '50a49af8-ec24-46de-870a-cf3ff8401a79',
+    images: EVIDENCE_IMAGES + 1,
+    published: { version: 1, publishedAt: '2026-09-10T20:46:30.299Z' },
+  };
+
   /*
-    A marker whose bytes could not be fetched leaves the marker in place, the count comes up short,
+    A marker whose bytes could not be fetched is left exactly as it is, so the count comes up short
     and the job fails rather than delivering a report with a hole where a screenshot should be. This
     is the guard that caught the defect above; it is not relaxed by fixing it.
   */
-  it('still leaves an unfetched marker in place rather than blanking it', () => {
+  it('refuses a document that is missing one capture', () => {
     const input = document();
     input.images.delete(`${MARKER_PREFIX}7`);
     const built = assemble(input);
 
     expect(built).toContain(`src="${MARKER_PREFIX}7"`);
     expect(built).not.toContain('src=""');
-    expect(built.match(/<img\b[^>]*\ssrc="data:image\//gi) ?? []).toHaveLength(EVIDENCE_IMAGES);
+    expect(references(built)).toHaveLength(EVIDENCE_IMAGES);
+    expect(() => assertCapturable(built, expected)).toThrow(/94 capture\(s\).*displayed 95/s);
+  });
+
+  /*
+    And the half the old count could not ask at all: a reference whose rule is not in the document.
+    Ninety-four placeholders over no definitions would have satisfied *"every src is a data URI"*.
+  */
+  it('refuses a reference with no definition behind it', () => {
+    const built = assemble(document()).replace(`.${CAPTURE_CLASS}1{background-image:url("data:image/`, '.unused{x:url("data:image/');
+
+    expect(() => assertCapturable(built, expected)).toThrow(/defines it 0 time\(s\)/);
+  });
+
+  it('refuses a document with a marker left in it', () => {
+    const built = `${assemble(document())}<!-- ${MARKER_PREFIX}404 -->`;
+
+    expect(() => assertCapturable(built, expected)).toThrow(/still contains a capture marker/);
   });
 });
 
-describe('the ceiling at this count', () => {
+describe('the ceiling', () => {
   /*
-    Measured against the real run rather than this fixture, because the fixture's payloads are
-    arbitrary and the ceiling question is about real screenshots. Run `50a49af8`: ninety-four
-    evidence images over eleven captures totalling 15.0 MB of PNG.
+    Measured against the real run, before and after.
 
-    | setting        | delivered document |
-    |----------------|--------------------|
-    | full size      | 182.7 MB           |
-    | 700px, q 0.72  |  42.9 MB           |
-    | 560px, q 0.65  |  27.5 MB           |
+    | | delivered document |
+    |---|---|
+    | before — bytes in every `src` | 182.7 MB |
+    | after — each capture written once | 20.0 MB |
 
-    So full-size inlining does **not** hold at this count — it exceeds the ceiling four and a half
-    times over — and the answer taken was thumbnails at capture time rather than a larger ceiling.
-    These assert the constants that arithmetic chose, so a later edit to them has to face it.
+    Ninety-four evidence images over eleven distinct screenshots, 15.0 MB of PNG. The ceiling is
+    unchanged and the captures are at full resolution; the downscaling that briefly shipped between
+    these two measurements is gone, because it was buying nothing.
   */
   it('is not raised', () => {
     expect(CAPTURE_SIZE_CEILING_BYTES).toBe(40 * 1024 * 1024);
   });
 
-  it('is cleared with headroom by the chosen thumbnail size, and not by a larger one', async () => {
-    const { THUMBNAIL_WIDTH, THUMBNAIL_QUALITY } = await import('../src/capture/thumbnail.js');
+  it('is cleared by the measured document, and would not have been before', () => {
+    expect(20.0 * 1048576).toBeLessThan(CAPTURE_SIZE_CEILING_BYTES);
+    expect(182.7 * 1048576).toBeGreaterThan(CAPTURE_SIZE_CEILING_BYTES);
+  });
+});
 
-    expect(THUMBNAIL_WIDTH).toBe(560);
-    expect(THUMBNAIL_QUALITY).toBe(0.65);
+describe('reading a capture’s dimensions', () => {
+  it('reads the PNG header', () => {
+    expect(pngSize(png(1280, 8400, 1))).toEqual({ width: 1280, height: 8400 });
+  });
 
-    // 27.5 MB measured at this setting, against a 40 MB ceiling.
-    expect(27.5 * 1024 * 1024).toBeLessThan(CAPTURE_SIZE_CEILING_BYTES);
-    // 42.9 MB measured at 700px, which is why 700 was not taken.
-    expect(42.9 * 1024 * 1024).toBeGreaterThan(CAPTURE_SIZE_CEILING_BYTES);
+  /*
+    Refused rather than guessed. An image whose ratio cannot be read is one this would lay out
+    wrongly in a document nobody can correct afterwards.
+  */
+  it('refuses anything that is not a PNG', () => {
+    expect(() => pngSize('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD')).toThrow(
+      /not a PNG/,
+    );
+    expect(() => pngSize('not-a-data-uri')).toThrow(/no payload/);
   });
 });

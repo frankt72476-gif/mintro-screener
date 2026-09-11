@@ -35,7 +35,6 @@ import {
 } from '@mintro/engine';
 import { startReportServer } from './reportServer.js';
 import { renderReportPage, type CaptureImageSource } from './capture.js';
-import { openThumbnailer } from './capture/thumbnail.js';
 import { assembleCapture, assertCapturable } from './capture/document.js';
 import { cssUrlReferences, hoistPrintRules, stripImports } from './capture/css.js';
 import { fontFaceCss } from './capture/fonts.js';
@@ -144,17 +143,8 @@ export async function captureRunReport(
       );
     }
 
-    /*
-      Downscaled once each, because the assembler writes each one as many times as a rule cites it
-      (D-277). The thumbnailer borrows the browser this capture is already running in.
-    */
-    const thumbnailer = await openThumbnailer(browser);
-    let images: Map<string, string>;
-    try {
-      images = await inlineImages(supabase, rendered.imageMarkers, (uri) => thumbnailer.shrink(uri));
-    } finally {
-      await thumbnailer.close();
-    }
+    // Full resolution: each distinct capture is written once, so there is nothing to shrink (D-277).
+    const images = await inlineImages(supabase, rendered.imageMarkers);
 
     const css: string[] = [];
     for (const sheet of rendered.stylesheets) {
@@ -269,16 +259,6 @@ export async function deliverCapture(
 export async function inlineImages(
   supabase: WorkerSupabase,
   markers: ReadonlyMap<string, CaptureImageSource>,
-  /**
-   * Downscales each evidence capture once, before it is written ninety-five times (D-277).
-   *
-   * Optional, and absent means full size. Only the evidence goes through it — an app asset is the
-   * masthead lockup, which is small, is drawn at its natural size, and appears once.
-   *
-   * Applied against the **cache**, so a screenshot cited by twenty-two findings is decoded and
-   * re-encoded once rather than twenty-two times.
-   */
-  thumbnail?: (dataUri: string) => Promise<string>,
 ): Promise<Map<string, string>> {
   const inlined = new Map<string, string>();
   // Deduplicated by source. One screenshot may back several findings and the lockup appears once
@@ -294,9 +274,6 @@ export async function inlineImages(
         source.kind === 'evidence'
           ? await evidenceDataUri(supabase, source.key)
           : await assetDataUri(source.url);
-      if (source.kind === 'evidence' && thumbnail !== undefined) {
-        dataUri = await thumbnail(dataUri);
-      }
       bytesBySource.set(cacheKey, dataUri);
     }
 

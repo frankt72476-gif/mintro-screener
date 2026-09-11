@@ -27,7 +27,6 @@ import { startReportServer } from './reportServer.js';
 import { renderReportPage } from './capture.js';
 import { assembleCapture } from './capture/document.js';
 import { inlineImages, inlineStylesheetUrls } from './captureJob.js';
-import { openThumbnailer } from './capture/thumbnail.js';
 import { hoistPrintRules, stripImports } from './capture/css.js';
 import { fontFaceCss } from './capture/fonts.js';
 import type { WorkerSupabase } from './store/supabase.js';
@@ -194,17 +193,8 @@ export async function renderPublishedEvaluation(
       and can lapse mid-render, and ten megabytes of base64 has no business crossing the CDP
       channel. The page renders from URLs; the file is assembled from keys.
     */
-    /*
-      Downscaled once each, because the assembler writes each one as many times as a rule cites it
-      (D-277). `openThumbnailer` borrows the browser this capture is already running in.
-    */
-    const thumbnailer = await openThumbnailer(browser);
-    let images: Map<string, string>;
-    try {
-      images = await inlineImages(supabase, rendered.imageMarkers, (uri) => thumbnailer.shrink(uri));
-    } finally {
-      await thumbnailer.close();
-    }
+    // Full resolution: each distinct capture is written once, so there is nothing to shrink (D-277).
+    const images = await inlineImages(supabase, rendered.imageMarkers);
 
     const css: string[] = [];
     for (const sheet of rendered.stylesheets) {

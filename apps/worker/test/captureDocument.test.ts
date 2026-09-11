@@ -53,7 +53,22 @@ const MASTHEAD =
   // The evaluation's own standing sentence, which `assertCapturable` requires in the delivered
   // bytes. The saved print-DOM fixture predates it and carries the checklist's (D-263).
   `<p class="eval-standing">${EVALUATION_POSTURE}</p>`;
-const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+/**
+ * A real PNG header, because the assembler reads each capture's dimensions out of one (D-277).
+ *
+ * The bytes after IHDR are filler. What matters is that the signature, the chunk length, the chunk
+ * type and the two dimensions are where a PNG puts them — an image whose ratio cannot be read is
+ * refused rather than laid out at a guess.
+ */
+const PNG = ((): string => {
+  const head = Buffer.alloc(24);
+  Buffer.from('89504e470d0a1a0a', 'hex').copy(head, 0);
+  head.writeUInt32BE(13, 8);
+  head.write('IHDR', 12, 'ascii');
+  head.writeUInt32BE(1280, 16);
+  head.writeUInt32BE(4096, 20);
+  return `data:image/png;base64,${Buffer.concat([head, Buffer.alloc(32, 7)]).toString('base64')}`;
+})();
 
 /** A rendered page, near enough to what `page.content()` gives. */
 function rendered(body: string, head = ''): string {
@@ -258,7 +273,14 @@ describe('what the file is refused for', () => {
       images: new Map([['#mintro-capture-0', PNG]]),
     });
 
-    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(/not inline/);
+    /*
+      The capture count answers first since D-277, and its message is the more useful one: a marker
+      left in the document is a capture that was not written, which the external-reference sweep
+      would have reported as a URL problem.
+    */
+    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(
+      /shows 1 capture\(s\) and the page displayed 2/,
+    );
   });
 
   it('refuses a report holding fewer captures than the page displayed', () => {
@@ -271,7 +293,9 @@ describe('what the file is refused for', () => {
       images: new Map([['#mintro-capture-0', PNG]]),
     });
 
-    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(/inlines 1 image/);
+    expect(() => assertCapturable(html, { images: 2, runId: RUN, published: PUBLISHED })).toThrow(
+      /shows 1 capture\(s\)/,
+    );
     expect(() => assertCapturable(html, { images: 1, runId: RUN, published: PUBLISHED })).not.toThrow();
   });
 
@@ -364,7 +388,11 @@ describe('the real print DOM', () => {
     const html = captureFixture(2);
 
     expect(html).toContain('/brand/mintro-lockup-full.png');
-    expect(() => assertCapturable(html, { images: 3, runId: RUN, published: PUBLISHED })).toThrow(/not inline/);
+    // Two captures written, three displayed: the lockup never got one. Reported as the missing
+    // capture it is rather than as a stray URL (D-277).
+    expect(() => assertCapturable(html, { images: 3, runId: RUN, published: PUBLISHED })).toThrow(
+      /shows 2 capture\(s\) and the page displayed 3/,
+    );
   });
 
   it('strips the bundle, the font link and the noscript out of the real shape', () => {
