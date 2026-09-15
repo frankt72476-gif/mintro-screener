@@ -34,7 +34,7 @@
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
-import { screenStorefront , type Escalation } from '../src/screen.js';
+import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
@@ -44,21 +44,12 @@ import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { recordSignIn } from '../src/auth/credentialState.js';
 import { establishSession, recordSignInSteps } from '../src/auth/login.js';
-import { DeadlineExceeded, withDeadlineOr } from '../src/deadline.js';
-
-/**
- * How long a cancelled crawl is given to stop before the browser is recycled under it (D-281).
- *
- * Closing its contexts makes the call in flight throw at once, and every loop checks the signal, so a
- * crawl that honours the abort settles in well under a second. The bound is for one that does not.
- */
-const CANCEL_SETTLE_MS = 15_000;
+import { DeadlineExceeded } from '../src/deadline.js';
 import {
   createHttpFetcher,
   describePhase,
   RUN_DEADLINE_MS,
   describeTruncation,
-  runTimeoutMessage,
   runTruncatedMessage,
 } from '@mintro/engine';
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
@@ -681,6 +672,8 @@ async function handle(
   const started = Date.now();
   // Aborted by the watchdog, and nothing else (D-281).
   const controller = new AbortController();
+  // The crawl's control, handed over before its first stage (D-282). A holder for the reason `held` is one.
+  const controls: { current: ScreenControl | null } = { current: null };
   // A holder rather than a `let`: the assignment happens inside the `escalate` callback, and
   // TypeScript's control-flow analysis cannot see through a closure — it would narrow the variable
   // to `null` and reject the close below.
@@ -708,6 +701,9 @@ async function handle(
     const screening = screenStorefront(browser, request.url, ruleset, {
       runId,
       signal: controller.signal,
+      onControl: (control) => {
+        controls.current = control;
+      },
 
       // Called only if the anonymous crawl is refused. The analyst chose nothing; this is the
       // escalation D-040 describes, and it happens on evidence or not at all.
@@ -751,63 +747,40 @@ async function handle(
 
     if (outcome.kind === 'timeout') {
       /*
-        Cancelled, not detached (D-281).
+        Cancelled, and kept without waiting for the crawl (D-281, D-282).
 
-        This was `void screening.catch(() => undefined)`: the crawl was left running and the browser
-        closed under it. Every remaining step then failed fast, was filed as an ordinary failure, and
-        the crawl walked the rest of the site logging into the next job's output. It is aborted now:
-        the signal is checked at every stage and in every loop, the contexts it owns close on abort,
-        and the signed-in context — ours — is closed here.
+        Aborted: the signal is checked at every stage and in every loop, the contexts the crawl owns
+        close on abort, and the signed-in context — ours — is closed here. What the crawl holds is then
+        taken from memory at once, through the control it handed over before its first stage.
 
-        Waited for, briefly. The handler attached by `.then` is also what keeps a rejection from an
-        unsettled crawl from reaching the process as an unhandled rejection.
+        **The crawl is not awaited.** Assembling the run needs its captures and findings, which are in
+        memory, not its promise. Whatever the crawl was blocked in — a sign-in, an HTTP fetch, a
+        crawl-delay sleep — runs to its own timeout against a closed context, and then against the
+        browser the loop recycles after this job has been written. The handler keeps that eventual
+        rejection from reaching the process. Recycling can never interrupt the write below: it happens
+        after `handle` returns, and persistence touches no browser.
       */
       controller.abort(new DeadlineExceeded('the screening run', RUN_DEADLINE_MS));
       await held.context?.close().catch(() => undefined);
+      void screening.catch(() => undefined);
+
+      console.error(
+        `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
+          `${Math.round(RUN_DEADLINE_MS / 60_000)} minutes expired; keeping what the crawl had as a truncated ` +
+          'run; the browser will be recycled once it is written',
+      );
     }
 
     /*
-      What the crawl kept (D-282).
-
-      A cancelled crawl returns a truncated result: what it had captured and evaluated, with every rule
-      it had not reached left to the report as `time_limit`. It is persisted below exactly as a
-      complete one is, and closed as `truncated`. Only a crawl that did not settle within the bound, or
-      that failed on the way out, leaves nothing — and that is the one case still recorded as the old
-      timeout.
+      What the crawl kept (D-282): a complete result, or a truncated one assembled from memory. It is
+      persisted below exactly as a complete one is, and closed as `truncated`.
     */
-    const screened =
-      outcome.kind === 'screened'
-        ? outcome.value
-        : await withDeadlineOr<Awaited<typeof screening> | null>(
-            screening.then(
-              (value) => value,
-              () => null,
-            ),
-            CANCEL_SETTLE_MS,
-            'the cancelled crawl settling',
-            null,
-          );
-
-    if (outcome.kind === 'timeout') {
-      const minutes = Math.round(RUN_DEADLINE_MS / 60_000);
-      console.error(
-        `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
-          `${minutes} minutes expired; ` +
-          (screened === null
-            ? `the crawl did not stop within ${CANCEL_SETTLE_MS / 1000}s, so nothing was kept; the browser will be recycled`
-            : 'the crawl stopped and what it had is kept as a truncated run; the browser will be recycled'),
-      );
-      if (screened === null) {
-        await settleThenFinish(progress, supabase, request.id, {
-          status: 'failed',
-          error: runTimeoutMessage(RUN_DEADLINE_MS),
-        });
-        return { recycleBrowser: true };
-      }
+    const control = controls.current;
+    if (outcome.kind === 'timeout' && control === null) {
+      // Unreachable: the control is handed over synchronously before the crawl's first await.
+      throw new Error('the crawl reached its deadline without having handed over its control, so nothing can be kept');
     }
-
-    if (screened === null) throw new Error('the crawl returned nothing');
-    const { report, artifacts } = screened;
+    const { report, artifacts } = outcome.kind === 'screened' ? outcome.value : control!.truncate();
 
     // The organization is required and never inferred. A queue row whose requester has no analyst
     // row cannot produce an attributable run, and failing here is better than writing one that no

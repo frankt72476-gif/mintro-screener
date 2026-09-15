@@ -19009,9 +19009,11 @@ Nothing in `screenStorefront`, `renderPage` or the layers could be told to stop.
   navigation. The signed-in context belongs to the worker, which closes it.
 - **`renderPage` rethrows an abort.** Every other failure is still a `PageContext` with `renderError`;
   a cancelled run is not a page that failed.
-- **The worker aborts instead of detaching**, waits up to `CANCEL_SETTLE_MS` (15 s) for the crawl to
-  settle, says in the `TERMINATED` line whether it stopped, and still recycles the browser. A progress
-  event after the abort is not logged or written.
+- **The worker aborts instead of detaching.** It closes the signed-in context, keeps what the crawl
+  holds without waiting for it (D-282), persists that, and recycles the browser once the job returns. A
+  progress event after the abort is not logged or written. The crawl is not awaited: whatever it was
+  blocked in — a sign-in, an HTTP fetch, a crawl-delay sleep — runs to its own timeout and ends against a
+  closed context or a recycled browser, with nobody listening.
 
 `cancellation.test.ts` aborts a crawl of a slow local storefront as its first product page lands, and
 asserts the thing that went wrong: once it settles, not one more request reaches the storefront and
@@ -19080,8 +19082,14 @@ The request records the same sentence behind `watchdog_timeout:`.
 - The schema's two `complete`-only gates widen to match the ruling: the eye-test trigger and
   `mark_run_ready_for_review`. So do `evaluationRun` and `bin/evaluate.ts`. Send and capture never
   read run status.
-- A crawl that does not settle within `CANCEL_SETTLE_MS` of the abort, or fails on the way out, still
-  leaves nothing and records the old timeout message — the one case where nothing can be kept.
+- **What is kept does not depend on the crawl settling.** `screenStorefront` hands its caller a
+  `ScreenControl` before the first stage; `truncate()` assembles from what is held at that moment,
+  synchronously, copying the captures so a crawl still running cannot change what was kept. The first
+  version assembled only in the crawl's own catch, so the worker awaited the crawl for up to 15 s and
+  kept nothing if it had not settled — which a sign-in in progress, an HTTP fetch or a crawl-delay sleep
+  could each cause, though none of them is needed to assemble the run. That path is gone. The browser is
+  recycled after the run is persisted, never during: persistence writes to the database and storage and
+  touches no browser.
 
 The web shows the new kind under its own heading, *"Not reached before the run's time limit"*, and
 counts it in the coverage sentence. `commentary.invitesComment` does not offer a merchant comment on

@@ -154,6 +154,22 @@ export interface ScreenOptions {
    * against a dead browser, logging as it went, into the next job's output.
    */
   readonly signal?: AbortSignal;
+  /**
+   * Receives the run's control once the crawl has started (D-282).
+   *
+   * `truncate()` assembles a truncated result from what the crawl holds at that moment, synchronously
+   * and from memory. The caller does not have to wait for the crawl to settle to keep what it has: a
+   * crawl stuck in an await the abort cannot reach — a sign-in, an HTTP fetch, a crawl-delay sleep —
+   * still yields its captures and findings. The crawl's own catch returns the same assembly when it
+   * does settle, for callers that await it.
+   */
+  readonly onControl?: (control: ScreenControl) => void;
+}
+
+/** What a caller can do with a crawl in progress (D-282). */
+export interface ScreenControl {
+  /** A truncated result from what the crawl holds now. Copies what it reads; the crawl may keep running. */
+  readonly truncate: () => ScreenResult;
 }
 
 export interface ScreenResult {
@@ -296,7 +312,9 @@ export async function screenStorefront(
       ...productFindings,
       ...(reached.layer3Findings ?? []),
     ];
-    const pages = reached.renderedPages ?? [];
+    // Copies, not views: a crawl that is still running after `truncate()` keeps pushing to these.
+    const pages = [...(reached.renderedPages ?? [])];
+    const kept = [...artifacts];
     const challengedPages = pages.filter((page) => page.challenged !== undefined).length;
 
     const report = assembleReport(
@@ -337,12 +355,15 @@ export async function screenStorefront(
 
     return {
       report,
-      artifacts,
+      artifacts: kept,
       ...(reached.homepage === undefined ? {} : { homepage: reached.homepage }),
       sampled,
       findings,
     };
   };
+
+  // Handed over before the first stage, so a caller can keep what the crawl has without awaiting it.
+  options.onControl?.({ truncate: truncatedResult });
 
   try {
 
