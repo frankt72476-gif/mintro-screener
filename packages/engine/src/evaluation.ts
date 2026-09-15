@@ -438,6 +438,18 @@ export const INFERENCE_OPEN = '[inference:';
  * a word and the digits must end one.
  */
 export const PROSE_HANDLE = /\b[FEYA]\d+\b/g;
+
+/**
+ * An internal angle label in prose: an angle handle (`A5`) or an angle number ("angle 6", "Angles 1").
+ *
+ * Refused in every paragraph a reader sees (D-283). Handles are issued per run and sorted, so `A1` is
+ * not "Angle 1"; the rubric's own numbers are a second vocabulary for the same seven angles; and the
+ * published evaluation does not carry the mapping that would decode either. The words for an angle are
+ * what it looks at.
+ *
+ * Uppercase `A` only, anchored like `PROSE_HANDLE`, so `AOD-9604`, `A-grade` and `a1c` are not matched.
+ */
+export const AXIS_LABEL = /\bA\d+\b|\b[Aa]ngles?\s+\d+\b/g;
 const INFERENCE_PATTERN = /\[inference:[^\]]*\]/g;
 
 /**
@@ -541,6 +553,8 @@ export interface DraftRejection {
     | 'legality_altered'
     | 'domestic_with_unmet_routing'
     | 'unresolved_prose_handle'
+    /** An angle handle or angle number written into prose a reader sees (D-283). */
+    | 'internal_axis_label'
     | 'not_observable_row_cites'
     | 'research_lean_over_heavy_failure'
     | 'citation_outside_angle_scope'
@@ -858,7 +872,26 @@ export function validateDraft(draft: EvaluationDraft, run: RunContext): DraftVal
   ];
 
   for (const [at, text] of proseSites) {
+    /*
+      No internal angle label in prose, resolved or not (D-283).
+
+      A merchant or an underwriter reads these paragraphs, and "A5 shows a catalogue built around
+      GLP-1…" tells them nothing. Checked at generation, where it sends the model back, and again at
+      publish, where it refuses a draft an operator has not yet rewritten.
+    */
+    for (const label of text.match(AXIS_LABEL) ?? []) {
+      reject(
+        'internal_axis_label',
+        at,
+        `writes '${label}', an internal angle label a reader cannot decode. Say what the angle looks ` +
+          'at in plain words instead — "the way the reader is addressed", "the order structure", ' +
+          '"no research-only statement anywhere".',
+      );
+    }
+
     for (const token of text.match(PROSE_HANDLE) ?? []) {
+      // Refused above as an axis label, whether or not the run issued it.
+      if (/^A\d+$/.test(token)) continue;
       if (run.knownHandles.has(token)) continue;
       reject(
         'unresolved_prose_handle',

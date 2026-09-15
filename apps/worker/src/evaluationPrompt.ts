@@ -86,7 +86,7 @@ export const ANSWER_SCHEMA = `{
   "placement": {
     "spectrum": "one of the spectrum ids",
     "recommended": "referred_out | international | domestic",
-    "paragraph": "one paragraph placing the business and naming the angles that drove it",
+    "paragraph": "one paragraph placing the business and saying, in plain words, what the angles that drove it observed",
     "citations": [{"kind": "angle", "ref": "A3"}]
   },
   "legality": { "clean": true, "items": [
@@ -235,8 +235,9 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
         '- `{"kind":"evidence","ref":"E7"}` — a stored capture, for an observation bound to ' +
         'no rule.\n' +
         '- `{"kind":"eye_test","ref":"Y3"}` — an eye-test verdict.\n' +
-        '- `{"kind":"angle","ref":"A5"}` — **placement only**. The placement names at ' +
-        'least two distinct angles that drove it.\n\n' +
+        '- `{"kind":"angle","ref":"A5"}` — **placement only**. The placement cites at ' +
+        'least two distinct angles that drove it, and its paragraph says in plain words what each ' +
+        'of them observed — never the handle itself.\n\n' +
         'Use only handles that appear in this document. There are no others.\n\n' +
         '**Cite a finding only where it is listed.** An angle cites the findings printed under ' +
         'that angle, and a routing row cites the findings that observe that condition — named ' +
@@ -485,7 +486,18 @@ export function buildPrompt(angles: AngleSet, inputs: PromptInputs): string {
         'evidence against the reading is what the lean answers to; lean neutral and say what the ' +
         'failure means. A `review` or a `not_evaluable` on a heavy rule does not bind the lean — ' +
         'neither is a failure. ' +
-        'Refer to angles by their handle (`A1`, `A2`, …), exactly as headed above. '+
+        /*
+          Plain words for an angle in prose, handles only in structure (D-283).
+
+          This told the model to refer to angles by handle, and it did: run 9011b2d7's placement read
+          "A5 shows a catalogue…; A2 shows promotional order structure…; A6 shows no research
+          qualification…". Those handles are issued per run, sorted, and mean nothing to a merchant
+          or an underwriter — and the published document drops the mapping that decodes them.
+        */
+        'In every paragraph, name an angle by what it looks at, in plain words — "the way the reader ' +
+        'is addressed", "the order structure", "no research-only statement anywhere" — and never by ' +
+        'its handle. An angle handle such as `A1` belongs in `angleId` and in a citation, and nowhere ' +
+        'in prose; a paragraph that writes one, or writes "angle 6", is refused. ' +
         'Return the legality block exactly as supplied, notes aside.',
     ),
   );

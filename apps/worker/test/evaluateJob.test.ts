@@ -247,6 +247,20 @@ describe('the prompt', () => {
     }
   });
 
+  /*
+    Handles head the angles the model reads, and never reach the prose it writes (D-283).
+
+    The prompt used to say "Refer to angles by their handle (A1, A2, …)", and run 9011b2d7's placement
+    came back as "A5 shows…; A2 shows…; A6 shows…". The instruction is now the opposite, and the
+    validator refuses what it forbids.
+  */
+  it('asks for angles in plain words in prose, and handles only in structure', () => {
+    expect(prompt).not.toContain('Refer to angles by their handle');
+    expect(prompt).toContain('name an angle by what it looks at, in plain words');
+    expect(prompt).toContain('"the way the reader is addressed"');
+    expect(prompt).toContain('belongs in `angleId` and in a citation, and nowhere in prose');
+  });
+
   it('carries every routing condition, with its label', () => {
     for (const condition of angles.routingConditions) {
       expect(prompt).toContain(condition.id);

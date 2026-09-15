@@ -330,7 +330,11 @@ describe('uncited_sentence', () => {
   it('accepts plain prose in the placement once angles are cited', () => {
     const draft = mutate((d) => ({
       ...d,
-      placement: { ...d.placement, paragraph: 'Angles 2 and 5 drove this. The product data is real.' },
+      // Plain words for the angles, as D-283 requires; "Angles 2 and 5 drove this" is now refused.
+      placement: {
+        ...d.placement,
+        paragraph: 'The order structure and the catalogue drove this. The product data is real.',
+      },
     }));
     expect(validateDraft(draft, RUN)).toEqual({ ok: true });
   });
@@ -1696,7 +1700,8 @@ describe('unresolved_prose_handle', () => {
     const draft = mutate((d) => ({
       ...d,
       angles: d.angles.map((a, i) =>
-        i === 0 ? { ...a, paragraph: 'Outcome-organised (F1, E1, Y1, A2).' } : a,
+        // No angle handle: those are refused in prose whether or not the run issued them (D-283).
+        i === 0 ? { ...a, paragraph: 'Outcome-organised (F1, E1, Y1).' } : a,
       ),
     }));
     expect(validateDraft(draft, RUN)).toEqual({ ok: true });
@@ -1719,7 +1724,7 @@ describe('unresolved_prose_handle', () => {
       ...d,
       legality: {
         ...d.legality,
-        items: d.legality.items.map((i, n) => (n === 0 ? { ...i, note: 'See A9.' } : i)),
+        items: d.legality.items.map((i, n) => (n === 0 ? { ...i, note: 'See Y9.' } : i)),
       },
     }));
     expect(rejectionRules(inNote)).toContain('unresolved_prose_handle');
@@ -1742,6 +1747,85 @@ describe('unresolved_prose_handle', () => {
       ),
     }));
     expect(rejectionRules(draft)).not.toContain('unresolved_prose_handle');
+  });
+});
+
+/*
+  Internal angle labels never reach a paragraph a reader sees (D-283).
+
+  Run 9011b2d7's placement read "A5 shows a catalogue built around GLP-1…; A2 shows promotional order
+  structure…; A6 shows no research qualification anywhere in sign-up; A1 sets those against the site's
+  own research-only statements." Those are per-run handles. The published document carries no mapping
+  for them, and a merchant or an underwriter could not decode them if it did.
+*/
+describe('internal angle labels in prose (D-283)', () => {
+  const withPlacement = (paragraph: string) =>
+    mutate((d) => ({ ...d, placement: { ...d.placement, paragraph } }));
+
+  it('refuses an angle handle the run issued, in the placement', () => {
+    const result = validateDraft(
+      withPlacement('A5 shows a catalogue built around GLP-1 compounds; A2 shows promotional order structure.'),
+      RUN,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const labels = result.rejections.filter((r) => r.rule === 'internal_axis_label');
+    expect(labels.map((r) => r.message.split("'")[1])).toEqual(['A5', 'A2']);
+    expect(labels[0]!.at).toBe('placement.paragraph');
+    // Refused as a label, not reported a second time as an unresolved handle.
+    expect(result.rejections.map((r) => r.rule)).not.toContain('unresolved_prose_handle');
+  });
+
+  it('refuses the rubric’s own angle numbers', () => {
+    expect(rejectionRules(withPlacement('Angle 6 in particular shows no research qualification.'))).toContain(
+      'internal_axis_label',
+    );
+    expect(rejectionRules(withPlacement('As angles 1 to 6 show, the posture is consumer.'))).toContain(
+      'internal_axis_label',
+    );
+  });
+
+  it('checks every paragraph a reader sees', () => {
+    const inAngle = mutate((d) => ({
+      ...d,
+      angles: d.angles.map((a, i) => (i === 0 ? { ...a, paragraph: 'Unlike A3, this reads outcome-first (F1).' } : a)),
+    }));
+    expect(rejectionRules(inAngle)).toContain('internal_axis_label');
+
+    const inShoreUp = mutate((d) => ({
+      ...d,
+      shoreUps: [{ text: 'State research use on sign-up, which A6 found missing.', citation: cite('f-001') }],
+    }));
+    expect(rejectionRules(inShoreUp)).toContain('internal_axis_label');
+
+    const inNote = mutate((d) => ({
+      ...d,
+      legality: {
+        ...d.legality,
+        items: d.legality.items.map((i, n) => (n === 0 ? { ...i, note: 'Also under A1.' } : i)),
+      },
+    }));
+    expect(rejectionRules(inNote)).toContain('internal_axis_label');
+  });
+
+  it('accepts the same placement said in plain words', () => {
+    const plain = withPlacement(
+      'The catalogue is built around GLP-1, cosmetic and recovery compounds, the order structure is ' +
+        'promotional, and there is no research-only statement anywhere in sign-up.',
+    );
+    expect(rejectionRules(plain)).not.toContain('internal_axis_label');
+  });
+
+  it('does not fire on compound names, grades or lowercase tokens', () => {
+    expect(
+      rejectionRules(withPlacement('AOD-9604, an A-grade supplier claim, and an a1c reference appear.')),
+    ).not.toContain('internal_axis_label');
+  });
+
+  it('refuses to publish a draft whose text still carries one', () => {
+    const refusal = publishRefusal(withPlacement('A5 drove the placement.'), 'ok', RUN);
+    expect(refusal).not.toBeNull();
+    expect(refusal).toContain("placement.paragraph: writes 'A5'");
   });
 });
 

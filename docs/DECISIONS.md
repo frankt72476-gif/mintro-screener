@@ -19087,3 +19087,56 @@ The web shows the new kind under its own heading, *"Not reached before the run's
 counts it in the coverage sentence. `commentary.invitesComment` does not offer a merchant comment on
 it: like `not_retrieved`, it is about this run.
 
+
+## D-283 — A published evaluation names an angle by what it looks at, never by an internal label
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Found on:** run `9011b2d7` (www.comopeptides.com), and the fixture `fixtures/evaluation/draft-9011b2d7.json`
+
+### What a reader was given
+
+The placement paragraph of run 9011b2d7:
+
+> …A5 shows a catalogue built around GLP-1, cosmetic and recovery compounds; A2 shows promotional order
+> structure, quantity tiers, a free-shipping threshold and weekly units-sold counters; A6 shows no
+> research qualification anywhere in sign-up; A1 sets those against the site's own research-only
+> statements.
+
+`A1`…`A7` are handles `evaluationHandles.ts` issues per run, sorted by angle id, so `A1` is not "Angle 1"
+and the same angle has a different handle on another run. The prompt told the model to use them in
+prose (*"Refer to angles by their handle (`A1`, `A2`, …)"*), and it did. The editor turns them into
+chips with the angle title, which is why the paragraph half-reads in the operator's view. The published
+document is what a merchant and an underwriter read, and publishing deletes the draft and its handle
+mapping (0082), so there the codes are not even decodable. The rubric adds a second vocabulary for the
+same seven angles — *"Angle 6 in particular"* — which the model also sees verbatim.
+
+### The rule
+
+**The text a merchant or an agent reads never contains an internal angle label.** An angle is named by
+what it looks at: *"the way the reader is addressed"*, *"the order structure"*, *"no research-only
+statement anywhere"*.
+
+- **The prompt** (`evaluationPrompt.ts`) tells the model to name angles in plain words in every
+  paragraph, and that a handle belongs in `angleId` and in citations only. The placement cites its
+  angles and says in words what each observed. The angle headings the model reads keep their handles:
+  that is the drafting context, and the structured fields still need them.
+- **The validator** (`validateDraft`, `packages/engine/src/evaluation.ts`) refuses `AXIS_LABEL` — an
+  angle handle `A<n>` or "angle(s) <n>" — in every prose site: the placement paragraph, each angle
+  paragraph, each shore-up, each legality note. The rule is `internal_axis_label`. At generation the
+  refusal goes back to the model as a retry, as every rejection does.
+- **At publish**, `publishRefusal` re-runs the validator, so a draft whose text still carries a label is
+  refused with the field and the label named. Frank ruled that such a draft is **refused until an
+  operator rewrites it**: nothing rewrites text shown under Mintro's name automatically.
+
+Finding, evidence and eye-test handles in prose (`F12`, `E7`, `Y3`) are unchanged: they render as links
+to the evidence in the report and are not angle labels. The pattern is uppercase and word-anchored, so
+`AOD-9604`, `A-grade` and `a1c` are not matched.
+
+### What this does not fix
+
+The delivered capture renders prose handles through a mapping it reads from the published content, and
+nothing writes one there — publishing deletes the draft's `handles`. So `F`, `E` and `Y` handles in a
+published evaluation's prose probably render as unresolved chips in the capture today. That is a
+separate defect, found while tracing this one, and not changed here.
+
