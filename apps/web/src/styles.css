@@ -1294,6 +1294,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 /* `not_retrieved` — this run's limitation, not the merchant's and not Mintro's (D-058). */
 .cov-col.run { border-left-color: #9C94BD; }
 .sect[data-bucket='not_retrieved']::before { content: 'This run could not fetch these'; }
+.sect[data-bucket='time_limit']::before { content: 'Not reached on this run'; }
 
 /* -- The merchant's response (D-063) --------------------------------------------------------
    Attribution carried by four signals, not one: a separate container, a named source, a visible

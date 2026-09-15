@@ -126,6 +126,7 @@ export {
   PHASE_LABEL,
   hasCount,
   describePhase,
+  phaseActivity,
   type ScanPhase,
   type ProgressEvent,
 } from './progress.js';
@@ -137,6 +138,7 @@ export {
   RUN_DEADLINE_MS,
   RUN_TIMEOUT_CODE,
   runTimeoutMessage,
+  runTruncatedMessage,
 } from './runDeadline.js';
 
 export { scopeTerms, termsAt, type ClaimScope, type ScopedHit } from './claimScope.js';
@@ -343,6 +345,8 @@ export {
   type BlockingFailure,
   type ScanMode,
   type ScreeningReport,
+  describeTruncation,
+  type RunTruncation,
 } from './report.js';
 export {
   scoreProductUrls,

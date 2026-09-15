@@ -57,7 +57,9 @@ import {
   createHttpFetcher,
   describePhase,
   RUN_DEADLINE_MS,
+  describeTruncation,
   runTimeoutMessage,
+  runTruncatedMessage,
 } from '@mintro/engine';
 import { createProgressWriter, type ProgressWriter } from '../src/progressWriter.js';
 import { captureRunReport } from '../src/captureJob.js';
@@ -762,31 +764,50 @@ async function handle(
       */
       controller.abort(new DeadlineExceeded('the screening run', RUN_DEADLINE_MS));
       await held.context?.close().catch(() => undefined);
-      const stopped = await withDeadlineOr(
-        screening.then(
-          () => true,
-          () => true,
-        ),
-        CANCEL_SETTLE_MS,
-        'the cancelled crawl settling',
-        false,
-      );
+    }
 
+    /*
+      What the crawl kept (D-282).
+
+      A cancelled crawl returns a truncated result: what it had captured and evaluated, with every rule
+      it had not reached left to the report as `time_limit`. It is persisted below exactly as a
+      complete one is, and closed as `truncated`. Only a crawl that did not settle within the bound, or
+      that failed on the way out, leaves nothing — and that is the one case still recorded as the old
+      timeout.
+    */
+    const screened =
+      outcome.kind === 'screened'
+        ? outcome.value
+        : await withDeadlineOr<Awaited<typeof screening> | null>(
+            screening.then(
+              (value) => value,
+              () => null,
+            ),
+            CANCEL_SETTLE_MS,
+            'the cancelled crawl settling',
+            null,
+          );
+
+    if (outcome.kind === 'timeout') {
       const minutes = Math.round(RUN_DEADLINE_MS / 60_000);
-      const message = runTimeoutMessage(RUN_DEADLINE_MS);
-
       console.error(
         `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
           `${minutes} minutes expired; ` +
-          (stopped
-            ? 'the crawl stopped; the browser will be recycled before the next job'
-            : `the crawl did not stop within ${CANCEL_SETTLE_MS / 1000}s; the browser will be recycled under it`),
+          (screened === null
+            ? `the crawl did not stop within ${CANCEL_SETTLE_MS / 1000}s, so nothing was kept; the browser will be recycled`
+            : 'the crawl stopped and what it had is kept as a truncated run; the browser will be recycled'),
       );
-      await settleThenFinish(progress, supabase, request.id, { status: 'failed', error: message });
-      return { recycleBrowser: true };
+      if (screened === null) {
+        await settleThenFinish(progress, supabase, request.id, {
+          status: 'failed',
+          error: runTimeoutMessage(RUN_DEADLINE_MS),
+        });
+        return { recycleBrowser: true };
+      }
     }
 
-    const { report, artifacts } = outcome.value;
+    if (screened === null) throw new Error('the crawl returned nothing');
+    const { report, artifacts } = screened;
 
     // The organization is required and never inferred. A queue row whose requester has no analyst
     // row cannot produce an attributable run, and failing here is better than writing one that no
@@ -835,6 +856,17 @@ async function handle(
       which is a true statement about the document: there is nothing to send yet.
 
     */
+    if (report.truncated !== undefined) {
+      // Closed as truncated, naming the run and why it stopped (D-282, 0087).
+      await settleThenFinish(progress, supabase, request.id, {
+        status: 'truncated',
+        runId,
+        error: runTruncatedMessage(describeTruncation(report.truncated)),
+      });
+      console.log(`  kept as truncated in ${Math.round((Date.now() - started) / 1000)}s`);
+      return { recycleBrowser: true };
+    }
+
     await settleThenFinish(progress, supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
     return { recycleBrowser: false };
@@ -988,7 +1020,10 @@ async function settleThenFinish(
 async function finish(
   supabase: WorkerSupabase,
   requestId: string,
-  outcome: { status: 'done'; runId: string } | { status: 'failed'; error: string },
+  outcome:
+    | { status: 'done'; runId: string }
+    | { status: 'truncated'; runId: string; error: string }
+    | { status: 'failed'; error: string },
 ): Promise<void> {
   const { error } = await supabase.client
     .from('scan_requests')
@@ -997,7 +1032,10 @@ async function finish(
       finished_at: new Date().toISOString(),
       ...(outcome.status === 'done'
         ? { run_id: outcome.runId, progress: 'complete' }
-        : { error: outcome.error.slice(0, 2000), progress: null }),
+        : outcome.status === 'truncated'
+          ? // The run it kept, and why it stopped: 0087 refuses a truncated row without both.
+            { run_id: outcome.runId, error: outcome.error.slice(0, 2000), progress: null }
+          : { error: outcome.error.slice(0, 2000), progress: null }),
     })
     .eq('id', requestId);
 

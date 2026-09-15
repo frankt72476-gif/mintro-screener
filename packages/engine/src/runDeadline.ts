@@ -39,8 +39,12 @@
  *
  * Nothing derived from it may reach a report as a property of the storefront. It says this crawl
  * did not come back in time; it says nothing whatever about what the site does, contains, or
- * permits. A terminated run produces no findings at all — it is written once, after the crawl
- * returns, and this one did not return — so there is no observation to misattribute.
+ * permits.
+ *
+ * **What a termination keeps changed at D-282.** It used to keep nothing: a terminated run produced
+ * no findings at all. It is now cancelled (D-281) and persisted as a `truncated` run holding what the
+ * crawl had captured and evaluated, with every rule it had not reached reported `not_evaluable` of
+ * kind `time_limit` — a statement about this run, which is what a termination is.
  */
 export const RUN_DEADLINE_MS = 30 * 60 * 1000;
 
@@ -83,7 +87,17 @@ export const HEARTBEAT_QUIET_MS = 2 * HEARTBEAT_MS;
  */
 export const RUN_TIMEOUT_CODE = 'watchdog_timeout';
 
-/** The message a terminated request carries, naming the deadline it passed. */
+/**
+ * The message a request carries when its run was kept as truncated (D-282).
+ *
+ * Takes the sentence rather than building it: `describeTruncation` in the report module is the one
+ * place that sentence is written, so the queue row and the report cannot word it two ways.
+ */
+export function runTruncatedMessage(description: string): string {
+  return `${RUN_TIMEOUT_CODE}: ${description}`;
+}
+
+/** The message a terminated request carries when nothing could be kept, naming the deadline it passed. */
 export function runTimeoutMessage(deadlineMs: number = RUN_DEADLINE_MS): string {
   const minutes = Math.round(deadlineMs / 60_000);
   return (

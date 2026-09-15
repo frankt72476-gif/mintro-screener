@@ -52,7 +52,8 @@ async function loadReport(supabase: WorkerSupabase, runId: string): Promise<Scre
   if (data === null) throw new Error(`run ${runId} does not exist`);
 
   const row = data as { report: unknown; status: string };
-  if (row.status !== 'complete') {
+  // Complete or truncated: a truncated run is finished, and is evaluated like any other (D-282).
+  if (row.status !== 'complete' && row.status !== 'truncated') {
     throw new Error(
       `run ${runId} is '${row.status}'. An evaluation reads a finished run — a draft over a ` +
         'half-written one would cite findings the run had not made yet.',

@@ -46,7 +46,7 @@ import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
 import { NumberingContext, createNumbering, eyeLineOrdinal, useFindingNumber } from '../lib/numbering.js';
 import { MerchantResponse } from './MerchantResponse.js';
-import { leadSentence, notObservedSentence } from '@mintro/engine';
+import { describeTruncation, leadSentence, notObservedSentence } from '@mintro/engine';
 import { formatStamp } from '../lib/format.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
@@ -385,6 +385,12 @@ export function ReportView({
                   : 'Coverage limited by a login wall.'}
               </strong>{' '}
               {report.access.note}
+            </p>
+          )}
+          {/* A run cut short at its time limit (D-282). */}
+          {report.truncated !== undefined && (
+            <p className="access-note limited">
+              <strong>Cut short at the time limit.</strong> {describeTruncation(report.truncated)}
             </p>
           )}
         </div>

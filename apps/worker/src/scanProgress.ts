@@ -54,6 +54,8 @@ export interface ScanProgress {
   readonly notRenderedIs: (recognised: number, overCap: number) => void;
   /** What D-162 stores, from the same facts the run page was shown. */
   readonly sampleBasis: () => SampleBasis;
+  /** The phase the run is in now, for saying where a truncated run stopped (D-282). */
+  readonly phase: () => ScanPhase;
 }
 
 export function createScanProgress(emit: (event: ProgressEvent) => void): ScanProgress {
@@ -95,6 +97,9 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
     },
     notRenderedIs(recognised, overCap) {
       notRendered = { recognised, overCap };
+    },
+    phase() {
+      return phase;
     },
     sampleBasis() {
       return {

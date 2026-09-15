@@ -200,7 +200,9 @@ export async function assessRun(
 
   const problems: string[] = [];
 
-  if (row.status !== 'complete') problems.push(`status is '${row.status}', not 'complete'`);
+  // A truncated report is closed as `truncated`, and that is its complete state (D-282).
+  const closedAs = (report as { readonly truncated?: unknown } | null)?.truncated === undefined ? 'complete' : 'truncated';
+  if (row.status !== closedAs) problems.push(`status is '${row.status}', not '${closedAs}'`);
   if (row.finished_at === null) problems.push('finished_at is not set');
   if (report === null) problems.push('no assembled report is stored');
   problems.push(...contents.problems);

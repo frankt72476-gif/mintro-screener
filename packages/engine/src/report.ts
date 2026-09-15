@@ -18,6 +18,7 @@ import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findin
 import { STATE_LABEL_LOWER } from './stateLabel.js';
 import type { EyeTestCaptureRequest } from './eyetest.js';
 import { notEvaluable, tally, unbuiltCheckReason } from './findings.js';
+import { phaseActivity, type ScanPhase } from './progress.js';
 
 /** How the run reached the merchant's site. Shown in the report header. */
 export type ScanMode = 'public' | 'screening_account' | 'assisted';
@@ -133,6 +134,13 @@ export interface ReportCoverage {
    */
   readonly gated: number;
   /**
+   * Rules a truncated run had not reached when its time limit fell (D-282).
+   *
+   * About this run, like `notRetrieved`, and outstanding like it: nothing was established, and a re-run
+   * may reach them. Zero on every complete run.
+   */
+  readonly timeLimit: number;
+  /**
    * `not_evaluable` findings from runs recorded before D-044, which carry no kind.
    *
    * Counted separately and never folded into another bucket. Those runs are immutable (D-002),
@@ -202,6 +210,36 @@ export interface BlockingSummary {
   readonly passed: readonly string[];
 }
 
+/**
+ * A run the watchdog cut short, kept with what it had (D-282).
+ */
+export interface RunTruncation {
+  /** The phase the run was in when its time limit fell. */
+  readonly phase: ScanPhase;
+  /** The limit it reached, in minutes. */
+  readonly limitMinutes: number;
+  /** Product pages rendered in the sample pass in progress or last finished, of those selected. */
+  readonly productPages: { readonly captured: number; readonly selected: number };
+}
+
+/**
+ * The sentence saying where a truncated run stopped (D-282).
+ *
+ * The one place it is written: the report's `truncations`, the request's error and the masthead all
+ * read it from here, so a reader is never told two different accounts of the same stop.
+ */
+export function describeTruncation(truncated: RunTruncation): string {
+  const { captured, selected } = truncated.productPages;
+  const pages =
+    selected === 0
+      ? 'before any product page was sampled'
+      : `with ${captured} of ${selected} product pages captured`;
+  return (
+    `The run reached its ${truncated.limitMinutes}-minute time limit while ${phaseActivity(truncated.phase)}, ` +
+    `${pages}. It was kept as it stood; rules it had not reached are reported as not evaluated for that reason.`
+  );
+}
+
 export interface ScreeningReport {
   readonly runId: string;
   readonly merchantDomain: string;
@@ -255,6 +293,13 @@ export interface ScreeningReport {
   readonly strip: readonly { readonly ruleId: string; readonly title: string; readonly state: State }[];
   /** Coverage limits the run hit, in words. Empty when nothing was truncated. */
   readonly truncations: readonly string[];
+  /**
+   * Present when the run was cut short at its time limit and kept as it stood (D-282).
+   *
+   * Absent on every complete run, and on every run recorded before D-282 — which were never truncated,
+   * because a terminated run used to keep nothing.
+   */
+  readonly truncated?: RunTruncation;
   /** What the run did about `Crawl-delay` (D-013). */
   readonly politeness: string;
   /**
@@ -461,6 +506,8 @@ export interface AssembleInput {
   readonly finishedAt: string;
   readonly findings: readonly Finding[];
   readonly truncations?: readonly string[];
+  /** The run was cut short at its time limit (D-282). Unreached rules become `time_limit`. */
+  readonly truncated?: RunTruncation;
   readonly politeness: string;
   /**
    * Every navigation the run made looking for a surface, and what it returned.
@@ -527,7 +574,12 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
   for (const rule of ruleset.rules) {
     if (covered.has(rule.id)) continue;
     enriched.push({
-      ...notEvaluable(rule, reasonForUnrun(rule), 'document', kindForUnrun(rule)),
+      ...notEvaluable(
+        rule,
+        reasonForUnrun(rule, input.truncated),
+        'document',
+        kindForUnrun(rule, input.truncated),
+      ),
       title: rule.title,
       clause: rule.clause,
       subject: rule.subject,
@@ -579,6 +631,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
     ),
     ...(obstruction === null ? {} : { obstruction }),
     truncations: input.truncations ?? [],
+    ...(input.truncated === undefined ? {} : { truncated: input.truncated }),
     politeness: input.politeness,
     notChecked: ruleset.not_checked,
     attestationQuestions: ruleset.attestations,
@@ -645,8 +698,20 @@ function describeObstruction(
  * wrote why the thing cannot be seen from a website. Anything else is a gap in what has been
  * built, and says so rather than borrowing a reason that makes it sound intentional.
  */
-function reasonForUnrun(rule: Rule): string {
+function reasonForUnrun(rule: Rule, truncated?: RunTruncation): string {
   if (rule.type === 'manual') return rule.params.reason;
+  /*
+    On a truncated run the honest reason is the stop, not the build (D-282). "Mintro has not built this
+    check" would be false of most of these; a rule whose check is genuinely unbuilt, in a stage the run
+    never reached, reads as the time limit too, and the next complete run says which it is.
+  */
+  if (truncated !== undefined) {
+    return (
+      `The run reached its ${truncated.limitMinutes}-minute time limit while ${phaseActivity(truncated.phase)}, ` +
+      'before this rule was evaluated. Nothing was established either way, and in particular nothing about ' +
+      'the merchant.'
+    );
+  }
   return unbuiltCheckReason(rule);
 }
 
@@ -658,8 +723,9 @@ function reasonForUnrun(rule: Rule): string {
  * used to present the two identically, which read as a limitation of the merchant when it was a
  * limitation of the tool.
  */
-function kindForUnrun(rule: Rule): NotEvaluableKind {
-  return rule.type === 'manual' ? 'not_reachable' : 'no_check_built';
+function kindForUnrun(rule: Rule, truncated?: RunTruncation): NotEvaluableKind {
+  if (rule.type === 'manual') return 'not_reachable';
+  return truncated === undefined ? 'no_check_built' : 'time_limit';
 }
 
 
@@ -872,6 +938,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
   const notRetrieved = of('not_retrieved');
   const challenged = of('challenged');
   const gated = of('gated');
+  const timeLimit = of('time_limit');
   const kindNotRecorded = unevaluated.filter((finding) => finding.notEvaluableKind === undefined).length;
 
   return {
@@ -884,6 +951,7 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
     notRetrieved,
     challenged,
     gated,
+    timeLimit,
     kindNotRecorded,
     // Resolved and outstanding are derived here rather than in the renderer, for the same reason
     // coverage itself is: a renderer that computed them could get the split wrong quietly, and
@@ -904,6 +972,8 @@ export function computeCoverage(findings: readonly ReportFinding[]): ReportCover
       notRetrieved +
       challenged +
       gated +
+      // Outstanding: the run stopped before it looked (D-282).
+      timeLimit +
       kindNotRecorded,
   };
 }

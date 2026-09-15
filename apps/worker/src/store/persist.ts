@@ -404,7 +404,8 @@ async function finishRun(
     .from('runs')
     .update({
       finished_at: report.finishedAt,
-      status: 'complete',
+      // A run the watchdog cut short is finished too, and frozen the same way (D-282, D-002).
+      status: report.truncated === undefined ? 'complete' : 'truncated',
       report,
     })
     .eq('id', runId);

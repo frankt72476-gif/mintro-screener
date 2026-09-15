@@ -275,7 +275,14 @@ export type NotEvaluableKind =
   | 'not_applicable'
   | 'not_retrieved'
   | 'challenged'
-  | 'gated';
+  | 'gated'
+  /**
+   * The run reached its time limit before it evaluated this rule (D-282).
+   *
+   * About this run and nothing else: not Mintro's missing check (`no_check_built`), not the merchant.
+   * Only a truncated run produces it, and a re-run may resolve it.
+   */
+  | 'time_limit';
 
 /**
  * A rule that could not be observed.

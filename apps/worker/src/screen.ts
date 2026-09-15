@@ -49,6 +49,9 @@ import {
   tally,
   assessWall,
   wasServed,
+  describeTruncation,
+  RUN_DEADLINE_MS,
+  type RunTruncation,
   type EvidenceArtifact,
   type Finding,
   type Layer0Result,
@@ -156,8 +159,10 @@ export interface ScreenOptions {
 export interface ScreenResult {
   readonly report: ScreeningReport;
   readonly artifacts: readonly EvidenceArtifact[];
-  readonly layer0: Layer0Result;
-  readonly homepage: PageContext;
+  /** Absent on a truncated result, which keeps the findings Layer 0 produced but not its working state (D-282). */
+  readonly layer0?: Layer0Result;
+  /** Absent only on a truncated result whose crawl stopped before the homepage was read (D-282). */
+  readonly homepage?: PageContext;
   readonly sampled: readonly SampledPage[];
   readonly findings: readonly Finding[];
 }
@@ -206,6 +211,35 @@ export async function screenStorefront(
   const releaseCrawl = closeOnAbort(crawl);
   const withSignal = signal === undefined ? {} : { signal };
 
+  /*
+    What the crawl has in hand, recorded as it gets it (D-282).
+
+    The stages below hold their results in block-scoped constants, which a cancellation cannot reach.
+    Each is copied here the moment it exists, so that when the watchdog cancels the run what was
+    captured and evaluated can be kept as a truncated run rather than thrown away.
+  */
+  const reached: {
+    origin?: string;
+    delay?: ReturnType<typeof resolveCrawlDelay>;
+    homepage?: PageContext;
+    renderedPages?: PageContext[];
+    layer0Findings?: readonly Finding[];
+    layer1Findings?: readonly Finding[];
+    selected?: number;
+    /** Product pages rendered in the sample pass in progress, or the last one to finish. */
+    captured: number;
+    sampled?: readonly SampledPage[];
+    /** True once the sample — including any signed-in re-render — has finished. */
+    sampleSettled: boolean;
+    wall?: WallAssessment;
+    escalation?: Escalation;
+    usedCredential: boolean;
+    mode: ScanMode;
+    coa?: Awaited<ReturnType<typeof fetchCertificate>>;
+    layer2Findings?: readonly Finding[];
+    layer3Findings?: readonly Finding[];
+  } = { captured: 0, sampleSettled: false, usedCredential: false, mode: 'public' };
+
   /** Set once the crawl has been through a consent gate on this context (D-267). */
   let enteredGate: string | undefined;
   const gateOptions = (): {
@@ -219,6 +253,97 @@ export async function screenStorefront(
     },
   });
 
+  /*
+    A truncated result, from what the crawl had when it was cancelled (D-282).
+
+    Only what was actually established is kept:
+
+    - Layer 0 and Layer 1 findings, once the homepage was read.
+    - Layer 2 on the product sample, **only once the sample had finished** — including a signed-in
+      re-render, because a sample half re-rendered with the account describes neither pass. Without
+      the certificate fetch, `doc_parse` findings are dropped (an unfetched certificate is not an
+      absent one), and so are the `all_sampled` rules, which also read the about and editorial pages
+      that discovery had not yet reached (D-271). Where Layer 2 had already run, its findings are
+      used as they stood.
+    - Layer 3 findings, where discovery had finished.
+
+    Every other rule is filled by `assembleReport` as `not_evaluable` of kind `time_limit`.
+  */
+  const truncatedResult = (): ScreenResult => {
+    const truncated: RunTruncation = {
+      phase: progress.phase(),
+      limitMinutes: Math.round(RUN_DEADLINE_MS / 60_000),
+      productPages: { captured: reached.captured, selected: reached.selected ?? 0 },
+    };
+    const rulesById = new Map(ruleset.rules.map((rule) => [rule.id, rule]));
+    const readableWithoutDiscovery = (finding: Finding): boolean => {
+      const rule = rulesById.get(finding.ruleId);
+      if (rule === undefined) return false;
+      if (rule.type === 'doc_parse' && reached.coa === undefined) return false;
+      return !('surface' in rule.params && rule.params.surface === 'all_sampled');
+    };
+
+    const sampled = reached.sampleSettled ? (reached.sampled ?? []) : [];
+    const productFindings =
+      reached.layer2Findings ??
+      (reached.sampleSettled && sampled.length > 0
+        ? runLayer2(sampled, ruleset, reached.coa?.outcome, []).findings.filter(readableWithoutDiscovery)
+        : []);
+
+    const findings: Finding[] = [
+      ...(reached.layer1Findings ?? []),
+      ...(reached.layer0Findings ?? []),
+      ...productFindings,
+      ...(reached.layer3Findings ?? []),
+    ];
+    const pages = reached.renderedPages ?? [];
+    const challengedPages = pages.filter((page) => page.challenged !== undefined).length;
+
+    const report = assembleReport(
+      {
+        runId,
+        ...(reached.sampleSettled && reached.wall !== undefined
+          ? { access: describeAccess(reached.wall, reached.mode, reached.usedCredential, reached.escalation) }
+          : {}),
+        merchantDomain: new URL(reached.origin ?? target).host,
+        ...(reached.homepage === undefined || reached.homepage.title === ''
+          ? {}
+          : { merchantName: reached.homepage.title }),
+        ...(reached.homepage?.shop.platform === undefined ? {} : { platform: reached.homepage.shop.platform }),
+        mode: reached.mode,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        findings,
+        truncations: [describeTruncation(truncated)],
+        politeness:
+          reached.delay === undefined
+            ? 'the run stopped before robots.txt had been read'
+            : describeCrawlDelay(reached.delay),
+        sample: progress.sampleBasis(),
+        ...(challengedPages === 0 ? {} : { challenge: { challenged: challengedPages, pages: pages.length } }),
+        ...(reached.homepage === undefined
+          ? {}
+          : {
+              eyeTestCaptures: eyeTestManifest({
+                homepage: reached.homepage,
+                products: sampled.map((entry) => entry.page),
+                editorial: [],
+              }),
+            }),
+        truncated,
+      },
+      ruleset,
+    );
+
+    return {
+      report,
+      artifacts,
+      ...(reached.homepage === undefined ? {} : { homepage: reached.homepage }),
+      sampled,
+      findings,
+    };
+  };
+
   try {
 
   // ---- Layer 0, which also tells us how politely to behave from here on ----------------
@@ -230,6 +355,8 @@ export async function screenStorefront(
   const pacer = createPacer(delay);
 
   progress.enter('discovery', `${layer0.origin} · politeness ${describeCrawlDelay(delay)}`);
+  reached.origin = layer0.origin;
+  reached.delay = delay;
 
   // ---- Layer 1 -------------------------------------------------------------------------
   const homepage = `${layer0.origin}/`;
@@ -265,12 +392,16 @@ export async function screenStorefront(
   const renderedPages: PageContext[] = [rendered.page];
 
   const layer1 = runLayer1(rendered.page, ruleset);
+  reached.homepage = rendered.page;
+  reached.renderedPages = renderedPages;
+  reached.layer1Findings = layer1.findings;
 
   // ---- feed what Layer 1 learned back into the Layer 0 classifier -----------------------
   const overrides = toScopeOverrides(rendered.page);
   const improved = reclassify(layer0, overrides);
   const before = layer0Rules(ruleset).map((rule) => checkUrlPattern(rule, layer0));
   const after = layer0Rules(ruleset).map((rule) => checkUrlPattern(rule, improved));
+  reached.layer0Findings = after;
 
   const gained = before.filter(
     (finding, i) => finding.state === 'not_evaluable' && after[i]?.state !== 'not_evaluable',
@@ -298,6 +429,7 @@ export async function screenStorefront(
   const worthRendering = scored.filter((entry) => entry.slugClass !== 'benign').length;
   const sampleSize = Math.min(RENDER_CAP, Math.max(SAMPLE_SIZE, worthRendering));
   const selected = selectSample(scored, sampleSize);
+  reached.selected = selected.length;
   const unrendered = scored.slice(selected.length);
 
   /*
@@ -341,6 +473,7 @@ export async function screenStorefront(
       artifacts.push(...result.artifacts);
       renderedPages.push(result.page);
       pages.push({ selection: pick, page: result.page });
+      reached.captured = pages.length;
       /*
         A real denominator: the sample was chosen before the loop and its size cannot change here.
 
@@ -364,6 +497,8 @@ export async function screenStorefront(
   /** What escalation found, when it ran. `undefined` means the crawl was never refused. */
   let escalation: Escalation | undefined;
   let mode: ScanMode = 'public';
+  reached.sampled = sampled;
+  reached.wall = wall;
 
   progress.sampleIs(sampled.filter((entry) => wasServed(entry.page)).length);
   say(wall.reason);
@@ -424,6 +559,7 @@ export async function screenStorefront(
   if (wall.walled && options.escalate !== undefined) {
     checkpoint();
     escalation = await options.escalate();
+    reached.escalation = escalation;
     checkpoint();
     progress.enter('escalate', escalationLine(escalation));
 
@@ -452,6 +588,11 @@ export async function screenStorefront(
       }
     }
   }
+  reached.sampled = sampled;
+  reached.wall = wall;
+  reached.usedCredential = usedCredential;
+  reached.mode = mode;
+  reached.sampleSettled = true;
 
   /*
     The certificate of analysis, for the COA rules (D-057).
@@ -480,6 +621,7 @@ export async function screenStorefront(
   }
   checkpoint();
   artifacts.push(...coa.artifacts);
+  reached.coa = coa;
 
   // ---- Layer 3: the surfaces reached by doing something ----------------------------------
   //
@@ -598,6 +740,9 @@ export async function screenStorefront(
     },
     ruleset,
   );
+
+  reached.layer2Findings = layer2.findings;
+  reached.layer3Findings = layer3.findings;
 
   say(
     `layer 3: ${layer3.counts.fail} fail · ${layer3.counts.review} review · ${layer3.counts.pass} pass ` +
@@ -772,6 +917,10 @@ export async function screenStorefront(
   );
 
   return { report, artifacts, layer0: improved, homepage: rendered.page, sampled, findings };
+  } catch (error) {
+    // Cancelled: keep what the crawl had, as a truncated run (D-282). Anything else is still a failure.
+    if (signal?.aborted !== true) throw error;
+    return truncatedResult();
   } finally {
     releaseCrawl();
     // Ours, so ours to close. A merchant-session context belongs to `escalate` and is not touched.

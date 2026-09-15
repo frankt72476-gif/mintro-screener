@@ -17,7 +17,7 @@
  */
 
 import type { JSX } from 'react';
-import type { ScreeningReport } from '@mintro/engine';
+import { describeTruncation, type ScreeningReport } from '@mintro/engine';
 import { formatReportDate } from '../lib/format.js';
 import type { ReportActions } from './ReportView.js';
 
@@ -52,6 +52,15 @@ export function RunActions({
                 : 'Coverage limited by a login wall.'}
             </strong>{' '}
             {report.access.note}
+          </p>
+        )}
+        {/*
+          A run cut short at its time limit, said where the reader decides what the coverage means
+          (D-282). The same sentence the report's truncations and the request row carry.
+        */}
+        {report.truncated !== undefined && (
+          <p className="access-note limited">
+            <strong>Cut short at the time limit.</strong> {describeTruncation(report.truncated)}
           </p>
         )}
       </div>

@@ -59,6 +59,17 @@ export const PHASE_LABEL: Readonly<Record<ScanPhase, string>> = {
 };
 
 /**
+ * The phase as an activity inside a sentence — "reading policy pages" (D-282).
+ *
+ * From `PHASE_LABEL`, so the sentence saying where a truncated run stopped uses the words the run page
+ * showed while it was running.
+ */
+export function phaseActivity(phase: ScanPhase): string {
+  const label = PHASE_LABEL[phase];
+  return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+}
+
+/**
  * One progress event.
  *
  * `line` is the free-text current-state sentence the worker has always written, kept verbatim.

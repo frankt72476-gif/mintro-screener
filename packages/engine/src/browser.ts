@@ -73,6 +73,7 @@ export {
   PHASE_LABEL,
   hasCount,
   describePhase,
+  phaseActivity,
   type ScanPhase,
   type ProgressEvent,
 } from './progress.js';
@@ -83,6 +84,7 @@ export {
   RUN_DEADLINE_MS,
   RUN_TIMEOUT_CODE,
   runTimeoutMessage,
+  runTruncatedMessage,
 } from './runDeadline.js';
 
 export type {
@@ -96,7 +98,11 @@ export type {
   SameObservationPair,
   ScanMode,
   ScreeningReport,
+  RunTruncation,
 } from './report.js';
+
+/** Where a truncated run stopped, in the one sentence the worker also writes (D-282). */
+export { describeTruncation } from './report.js';
 
 /*
   Counting rules rather than findings, shared with the report view (D-170).

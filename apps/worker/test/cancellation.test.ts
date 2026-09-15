@@ -90,7 +90,7 @@ describe('a cancelled render', () => {
 });
 
 describe('a cancelled crawl (D-281)', () => {
-  it('stops: it settles promptly, then makes no request and emits no progress', async () => {
+  it('stops: it settles promptly, keeps what it had, then makes no request and emits no progress', async () => {
     const controller = new AbortController();
     const events: { readonly at: number; readonly line: string }[] = [];
     let abortedAt = 0;
@@ -105,17 +105,30 @@ describe('a cancelled crawl (D-281)', () => {
           controller.abort(new Error('deadline'));
         }
       },
-    }).then(
-      () => 'resolved' as const,
-      (error: unknown) => error,
-    );
+    });
     const settledAt = Date.now();
 
     expect(abortedAt).toBeGreaterThan(0);
-    expect(outcome).toBeInstanceOf(Error);
-    expect((outcome as Error).message).toBe('deadline');
     // One product page was mid-flight (1.5 s). Closing the context ends it; nothing waits it out.
     expect(settledAt - abortedAt).toBeLessThan(5_000);
+
+    /*
+      And what it had is kept, as a truncated result (D-282).
+
+      Cancelled after the first product page: the homepage's findings are kept, the half-rendered sample
+      supports no Layer 2 verdict, and every rule it had not reached is `time_limit` — never
+      `no_check_built`, which would say Mintro has no check.
+    */
+    const { report } = outcome;
+    expect(report.truncated).toMatchObject({ phase: 'sample', limitMinutes: 30, productPages: { captured: 1 } });
+    expect(report.truncations[0]).toContain('while reading product pages, with 1 of');
+    expect(report.coverage.timeLimit).toBeGreaterThan(0);
+    const unevaluated = report.categories.flatMap((category) => category.findings).filter(
+      (finding) => finding.state === 'not_evaluable',
+    );
+    expect(unevaluated.some((finding) => finding.notEvaluableKind === 'time_limit')).toBe(true);
+    expect(report.categories.flatMap((category) => category.findings).some((finding) => finding.layer === 1)).toBe(true);
+    expect(outcome.sampled).toEqual([]);
 
     const requestsAtSettle = seen.length;
     const eventsAtSettle = events.length;

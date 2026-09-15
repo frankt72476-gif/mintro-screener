@@ -22,6 +22,8 @@ export interface RunSummary {
   readonly runId: string;
   readonly domain: string;
   readonly finishedAt: string | null;
+  /** The run was cut short at its time limit and kept as it stood (D-282). Absent when it was not. */
+  readonly truncated?: boolean;
   /**
    * Why this run's evidence is known to be incomplete, or null for an ordinary run.
    *
@@ -167,7 +169,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
         .select(
           // `created_by` for the Run by column. The name is resolved separately by
           // `internalIdentity`, which is gated by `analysts_select` (D-233).
-          'id, finished_at, report, created_by, merchants ( domain ), run_quarantine ( reason ), ' +
+          'id, status, finished_at, report, created_by, merchants ( domain ), run_quarantine ( reason ), ' +
             /*
               Named relationship, not a bare table name (D-213).
 
@@ -202,7 +204,8 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             'spectrum:content->placement->>spectrum, placement:content->placement->>recommended )' +
             ', evaluation_drafts!evaluation_drafts_run_id_fkey ( run_id )',
         )
-        .eq('status', 'complete')
+        // A truncated run is a run like any other, flagged (D-282).
+        .in('status', ['complete', 'truncated'])
         .order('started_at', { ascending: false })
         .limit(100);
 
@@ -242,6 +245,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             runId: row.id,
             domain: report.merchantDomain,
             finishedAt: row.finished_at,
+            ...(row.status === 'truncated' ? { truncated: true } : {}),
             quarantine: quarantineReason(row.run_quarantine),
             responded: commentCount(row.merchant_comments) > 0,
             awaitingReview: embedCount(row.run_review_requests) > 0 && embedCount(row.sends) === 0,
@@ -344,6 +348,8 @@ interface RunRow {
   readonly evaluations?: unknown;
   readonly evaluation_drafts?: unknown;
   id: string;
+  /** `complete` or `truncated` — the two the list reads (D-282). Optional for local-file runs. */
+  status?: string;
   finished_at: string | null;
   /** Not null since 0057. Optional here only because a local-file run carries none. */
   created_by?: string | null;

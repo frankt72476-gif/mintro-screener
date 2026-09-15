@@ -9003,6 +9003,9 @@ would have left a pressable button whose handler returns immediately. Both carry
 
 **2026-08-28 · engineering · prompted by the comopeptides hang**
 
+> **What a termination keeps was reversed at D-282.** The deadline stands. A terminated run is no
+> longer discarded with "nothing persisted": it is cancelled (D-281) and kept as a `truncated` run.
+
 Full trace in `docs/stuck-run-investigation.md`. In short: request `5ccd3051` claimed at 13:37:55
 ET, produced its last output at 13:39:47, and then sat silent. The worker was alive and healthy —
 no OOM, no restart, `oom_killed=false` — and blocked inside `runCheckoutFlow`. It stayed blocked
@@ -9223,6 +9226,9 @@ to add a lane.
 ## D-155 — Layer 3 probe cost, and the watchdog as a policy cap
 
 **2026-08-28 · engineering · prompted by run 5506488a**
+
+> **"A terminated run produces no findings at all" was reversed at D-282.** The cap and its sizing
+> stand; a run that reaches it is kept as a `truncated` run with what it had established.
 
 sportstechnologylabs completed normally in **626s**. Of that, **349s — 56% of the whole run — was
 the payment/refund probe**, which found nothing. The same step took 25s on comopeptides. Both
@@ -19012,4 +19018,72 @@ asserts the thing that went wrong: once it settles, not one more request reaches
 not one more progress line is emitted.
 
 What the watchdog then records is D-282.
+
+
+## D-282 — A run cut short at its deadline is kept, as a truncated run
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Reverses:** D-152 and D-155 on what a termination keeps
+**Found on:** runs `905b4e0e`, `c12b8f8a` and `6cc959ea` (legendarypeptides.com)
+
+### What was lost
+
+Each of the three had captured the homepage, both passes of an eighteen-page product sample — the
+second through the merchant's screening account — and the certificate of analysis, and was reading
+the policy pages when the 30-minute deadline fell. Each recorded `watchdog_timeout: ... Nothing was
+persisted`, and each left no run: D-152 and D-155 held that *"a terminated run produces no findings
+at all — it is written once, after the crawl returns, and this one did not return"*. An analyst
+pressing Re-screen saw nothing appear, three times.
+
+### The ruling
+
+A run the watchdog cuts short is **kept**, under a status of its own. Frank ruled on 2026-09-15 that a
+truncated run is a full run, flagged: listed, openable, evaluable, eye-tested, reviewable and sendable
+like a complete one (D-001: Send is never blocked), with its coverage stating what it did not reach
+and why.
+
+### What is kept, and what is not
+
+On cancellation (D-281) `screenStorefront` assembles from what it had established:
+
+- **Layer 0 and Layer 1** findings, once the homepage was read.
+- **Layer 2 on the product sample, only once the sample had finished**, including a signed-in
+  re-render: a sample half re-rendered with the account describes neither pass. Two groups are left
+  out even then. `doc_parse` findings are dropped where the certificate had not been fetched, because
+  an unfetched certificate is not an absent one. And the `all_sampled` rules are dropped, because they
+  also read the about and editorial pages (D-271) that discovery had not reached, and a verdict over
+  the sample alone would be over less than the rule reads.
+- **Layer 3** findings, where discovery had finished; Layer 2 as it stood, where it had run.
+- **Every capture** taken, and the coverage from `sampleBasis`.
+
+Every other rule is filled by `assembleReport` as `not_evaluable` of a new kind, **`time_limit`**:
+*"The run reached its 30-minute time limit while reading policy pages, before this rule was
+evaluated. Nothing was established either way, and in particular nothing about the merchant."* Not
+`no_check_built` — that says Mintro has no check, which is false. A check Mintro has not built, in a
+stage the run did not reach, reads as `time_limit` too; the next complete run says which it is.
+
+The report carries `truncated: { phase, limitMinutes, productPages: { captured, selected } }` and a
+line in `truncations` from `describeTruncation`, the one place that sentence is written: *"The run
+reached its 30-minute time limit while reading policy pages, with 18 of 18 product pages captured.
+It was kept as it stood; rules it had not reached are reported as not evaluated for that reason."*
+The request records the same sentence behind `watchdog_timeout:`.
+
+### Status, and immutability
+
+- `runs.status` and `scan_requests.status` gain `truncated` (0087). A truncated request must name its
+  run and say why.
+- **A truncated run is an immutable snapshot exactly as a complete one is (D-002).**
+  `runs_are_immutable_once_finished` (0004) reads `finished_at`, not status: `finishRun` sets it and
+  `truncated` in one update, and from then no update or delete is accepted. Findings and evidence are
+  append-only by their own triggers. `truncatedRuns.test.ts` asserts the refusal on a truncated run.
+- The schema's two `complete`-only gates widen to match the ruling: the eye-test trigger and
+  `mark_run_ready_for_review`. So do `evaluationRun` and `bin/evaluate.ts`. Send and capture never
+  read run status.
+- A crawl that does not settle within `CANCEL_SETTLE_MS` of the abort, or fails on the way out, still
+  leaves nothing and records the old timeout message — the one case where nothing can be kept.
+
+The web shows the new kind under its own heading, *"Not reached before the run's time limit"*, and
+counts it in the coverage sentence. `commentary.invitesComment` does not offer a merchant comment on
+it: like `not_retrieved`, it is about this run.
 

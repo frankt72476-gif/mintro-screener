@@ -180,6 +180,11 @@ const NOT_EVALUABLE_ORDER: readonly { bucket: Bucket; heading: string; lede: str
     lede: "The merchant serves a consent gate in place of these pages, and Mintro does not attest through it on a visitor's behalf. The gate itself was observed and is reported under the gate rules; what is behind it was not read. Nothing in this section is a shortfall of the merchant's.",
   },
   {
+    bucket: 'time_limit',
+    heading: 'Not reached before the run’s time limit',
+    lede: "The run was stopped at its time limit before it evaluated these. Nothing was established either way, and in particular nothing about the merchant. A re-run may reach them.",
+  },
+  {
     bucket: 'unrecorded',
     heading: 'Reason not recorded',
     lede: 'This run was screened before Mintro separated these reasons, so which one applies was never written down. A completed run is never edited, so it stays as recorded.',
@@ -807,6 +812,7 @@ const EMPTY_BUCKETS: Record<Bucket, number> = {
   not_retrieved: 0,
   challenged: 0,
   gated: 0,
+  time_limit: 0,
   unrecorded: 0,
 };
 
@@ -1698,6 +1704,11 @@ export function coverageSentence(report: ScreeningReport): string {
   push(c.notExposed, 'was looked for and not found on the site', 'were looked for and not found on the site');
   push(c.noCheckBuilt, 'is a check Mintro has not built yet', 'are checks Mintro has not built yet');
   push(c.notRetrieved ?? 0, 'could not be fetched on this run', 'could not be fetched on this run');
+  push(
+    c.timeLimit ?? 0,
+    'was not reached before the run’s time limit',
+    'were not reached before the run’s time limit',
+  );
   push(c.kindNotRecorded, 'was recorded before this distinction existed', 'were recorded before this distinction existed');
 
   const resolved = `Of ${c.total} findings, ${c.resolved} were resolved from the crawled surface.`;

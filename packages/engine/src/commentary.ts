@@ -199,7 +199,8 @@ export interface FindingCommentary {
 export function invitesComment(state: State, kind?: NotEvaluableKind): boolean {
   if (state === 'pass') return false;
   if (state !== 'not_evaluable') return true;
-  return kind !== 'no_check_built' && kind !== 'not_retrieved';
+  // `time_limit` is ours as `not_retrieved` is: the run stopped before it looked (D-282).
+  return kind !== 'no_check_built' && kind !== 'not_retrieved' && kind !== 'time_limit';
 }
 
 /**

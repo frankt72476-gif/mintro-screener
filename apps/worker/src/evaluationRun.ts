@@ -57,7 +57,8 @@ export async function runEvaluationRequest(
       yet — the same refusal `bin/evaluate.ts` makes, and it belongs on both paths because the
       button is reachable while a rescan is in flight.
     */
-    if (row.status !== 'complete') {
+    // Complete or truncated: a truncated run is finished, and is evaluated like any other (D-282).
+    if (row.status !== 'complete' && row.status !== 'truncated') {
       return `run ${runId} is '${row.status}'; an evaluation reads a finished run`;
     }
     if (row.report === null) return `run ${runId} carries no report`;
