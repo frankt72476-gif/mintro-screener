@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import type { Browser, BrowserContext, Page } from 'playwright';
+import type { Browser, BrowserContext, BrowserContextOptions, Page } from 'playwright';
 import {
   classifyChallenge,
   classifyConsentGate,
@@ -160,6 +160,27 @@ export const DEFAULT_IDLE_MS = 8_000;
 export const PROBE_IDLE_MS = 3_000;
 
 /**
+ * What a caller of `createCrawlContext` may vary (D-278).
+ *
+ * Identity is not on the list. User agent, locale, timezone and headers are the context's, and a
+ * call site that needs a different one is a call site declaring a second identity.
+ */
+export interface CrawlContextOverrides {
+  readonly viewport?: { width: number; height: number };
+  /** A stored merchant session, for reuse (`auth/login.ts`). */
+  readonly storageState?: BrowserContextOptions['storageState'];
+}
+
+/**
+ * Playwright's own default viewport.
+ *
+ * The contexts that render our report route, and the loader that re-reads stored captures, were
+ * bare `newContext()` calls until D-278 and so laid pages out at this size. Moving them onto the one
+ * identity is not a reason to move their layout too.
+ */
+export const PLAYWRIGHT_DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
+
+/**
  * The anonymous context every crawl render uses (D-017, D-267).
  *
  * Extracted so a caller can build **one for the whole run** and hand it to every render. That is
@@ -169,13 +190,19 @@ export const PROBE_IDLE_MS = 3_000;
  * D-017 unchanged: polite mitigations, not stealth. A standard desktop viewport, a real
  * accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who inspects
  * their logs still sees who we are and can reach us.
+ *
+ * **The only browser context the worker creates (D-278).** Run `2f9cc2ee` signed in through a bare
+ * `browser.newContext()`, which declares itself `HeadlessChrome`; the edge answered the login page
+ * with a 403 while answering this identity with the form. Five call sites had their own bare context
+ * and each was a second identity nobody had chosen. `singleBrowserIdentity.test.ts` holds the line.
  */
 export async function createCrawlContext(
   browser: Browser,
-  viewport?: { width: number; height: number },
+  overrides: CrawlContextOverrides = {},
 ): Promise<BrowserContext> {
   return browser.newContext({
-    viewport: viewport ?? { width: 1440, height: 900 },
+    viewport: overrides.viewport ?? { width: 1440, height: 900 },
+    ...(overrides.storageState === undefined ? {} : { storageState: overrides.storageState }),
     userAgent: USER_AGENT,
     locale: 'en-US',
     timezoneId: 'America/New_York',
@@ -233,7 +260,9 @@ export async function renderPage(
     // D-017: polite mitigations, not stealth. A standard desktop viewport, a real
     // accept-language, and the same declared identity the Layer 0 fetcher uses. A merchant who
     // inspects their logs still sees who we are and can reach us.
-    context = options.context ?? (await createCrawlContext(browser, options.viewport));
+    context =
+      options.context ??
+      (await createCrawlContext(browser, options.viewport === undefined ? {} : { viewport: options.viewport }));
 
     const page = await context.newPage();
     // Handed to the `finally` immediately, so a throw anywhere below still closes it. The body

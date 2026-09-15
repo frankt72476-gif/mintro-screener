@@ -27,6 +27,7 @@
 
 import type { Browser } from 'playwright';
 import type { EyeTestRecord, RunAttestations, RunCommentary, ScreeningReport } from '@mintro/engine';
+import { createCrawlContext, PLAYWRIGHT_DEFAULT_VIEWPORT } from './render.js';
 
 export interface CaptureOptions {
   /** Origin serving the report route. */
@@ -94,7 +95,7 @@ export async function renderReportPage(
   const timeout = options.timeoutMs ?? 60_000;
   const url = `${options.origin}/?report=${encodeURIComponent(options.slug ?? options.domain)}&print=1`;
 
-  const context = await browser.newContext();
+  const context = await createCrawlContext(browser, { viewport: PLAYWRIGHT_DEFAULT_VIEWPORT });
   const page = await context.newPage();
 
   try {

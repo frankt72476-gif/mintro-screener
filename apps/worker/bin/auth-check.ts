@@ -15,6 +15,7 @@ import { chromium } from 'playwright';
 import { createVault, createMemoryBackend, encrypt, keyFromToken } from '../src/auth/vault.js';
 import { establishSession } from '../src/auth/login.js';
 import { probePaths } from '../src/probe.js';
+import { createCrawlContext } from '../src/render.js';
 import { runCheckoutFlow } from '../src/flow.js';
 import { checkFlowProbe, checkHttpProbe, loadRulesetFromDisk } from '../src/rules.js';
 
@@ -85,7 +86,7 @@ async function main(): Promise<number> {
     if (gate003 !== undefined && gate003.type === 'flow_probe') {
       const productUrl = `${ORIGIN}/products/bpc-157-5mg`;
 
-      const anonContext = await browser.newContext();
+      const anonContext = await createCrawlContext(browser);
       const anonFlow = await runCheckoutFlow(anonContext, { productUrl, origin: ORIGIN });
       await anonContext.close();
 

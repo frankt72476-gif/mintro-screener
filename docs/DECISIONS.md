@@ -18696,3 +18696,82 @@ operator gets *a capture was not written* rather than *there is a stray URL*.
 | the marker-left-behind check | a marker reaches the file |
 | the PNG header check | a non-PNG is laid out at a guess |
 
+
+## D-278 — The worker has one browser identity
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Found on:** run `2f9cc2ee` (legendarypeptides.com)
+
+**All browser contexts are created by `createCrawlContext` and carry one identity. Bare
+`newContext()` is forbidden in the worker; guarded by test.**
+
+### What happened
+
+The run met a login wall on every sampled product page, escalated to the stored screening account,
+and reported *"A screening account is stored for this merchant and it did not sign in on this run."*
+The account was valid: a person signing in at `/my-account/` with it lands on the dashboard.
+
+The worker never submitted it. Its log said *"no login form matching the woocommerce selectors was
+found at https://legendarypeptides.com/my-account/"*, and that page carries `#username`, `#password`
+and `button[name="login"]`. The crawl had rendered it through `createCrawlContext`; the sign-in
+opened a bare `browser.newContext()`. The bare context declares itself `HeadlessChrome`, and the
+merchant's edge answered it with a 403 titled *"Attention Required! | Cloudflare"* while answering
+the crawl identity with the form. Reproduced locally, same page, same selectors:
+
+| context | status | title | selectors found |
+|---|---|---|---|
+| bare `newContext()` | 403 | Attention Required! \| Cloudflare | 0 / 0 / 0 |
+| `createCrawlContext` | 200 | My account – Legendary Peptides | 1 / 1 / 1 |
+
+The 403 is measured from a workstation, not from the Fly egress; on the worker the page load and
+selector count took 226 ms, which is a refusal and not a 350 KB page.
+
+### Five identities nobody chose
+
+The login context was one of five bare `newContext()` calls in `apps/worker/src`, plus one in
+`bin/auth-check.ts`: session reuse and scripted login (`auth/login.ts`), the certificate fetch and
+the checkout flow (`screen.ts`), and the gate probes (`probe.ts`). The last three decide GATE-002,
+GATE-003 and the COA rules. Each was a second declaration of what the crawler is — D-017's
+*"the same declared identity the Layer 0 fetcher uses"* — made by omission.
+
+The report-route renderers (`capture.ts`, `pdf.ts`, `documentsPdf.ts`) and the stored-capture loader
+(`evaluationPages.ts`) were bare too. They go through the factory for the same reason, and keep the
+1280×720 viewport they had been laying pages out at (`PLAYWRIGHT_DEFAULT_VIEWPORT`). The report route
+pins every displayed time to America/New_York itself, so the context's timezone does not reach it.
+
+### The rule
+
+- `createCrawlContext` (`render.ts`) is the only place a context is created.
+- A call site may vary `viewport` and `storageState` (`CrawlContextOverrides`). It may not vary user
+  agent, locale, timezone or headers: a call site that needs a different identity is declaring a
+  second one, and that is a decision, not an option.
+- `singleBrowserIdentity.test.ts` fails on `newContext(` anywhere in `apps/worker/src` outside
+  `render.ts`, and asserts the one call is inside `createCrawlContext`.
+
+Nothing here changes what the crawler declares itself to be. D-017 stands: this makes every context
+declare it, rather than one.
+
+### A refused login page is named as refused
+
+`openLoginForm` (`auth/login.ts`) reads the status and title of the login page before locating the
+form. A page `classifyChallenge` identifies, or any other status of 400 or above, returns *"login
+page blocked (HTTP <status>, '<title>')"*. A 404 without a challenge returns *"login page not found
+(HTTP 404)"*: a missing page is not a refusal, and naming it a block would be a claim about the
+merchant's edge drawn from a status code. *"No login form … was found"* is kept for a page that was
+served and did not carry the form: it is a statement about the merchant's page, and only true of
+one somebody was shown.
+
+The reason travels the existing `sign_in_failed` path into the coverage note, in parentheses after
+*"did not sign in on this run"*. No new sentence; the reason is what changed.
+
+Two reasons are reworded on the way, because they now reach report copy:
+
+- *"no scripted login exists for platform '<x>'; assisted sign-in is required"* becomes *"…; sign-in
+  was not attempted"*. The first told the reader what to do (D-001).
+- *"login attempt failed: <Playwright error>"* reaches the note as *"the login attempt failed"* and
+  nothing more. The error text, call log included, is Playwright's, and goes to the worker log for
+  the run in full. The progress row (`scan_requests.progress`) and the run's escalate line carry its
+  first line only, as they did before. The blocked, not-found and no-form reasons are authored, and
+  pass through.
+

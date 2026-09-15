@@ -43,7 +43,7 @@ import { createSealedVault, vaultRefFor, type SealedVaultKeys } from '../src/aut
 import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { recordSignIn } from '../src/auth/credentialState.js';
-import { establishSession } from '../src/auth/login.js';
+import { establishSession, recordSignInSteps } from '../src/auth/login.js';
 import {
   createHttpFetcher,
   describePhase,
@@ -696,11 +696,12 @@ async function handle(
       // escalation D-040 describes, and it happens on evidence or not at all.
       escalate: async () => {
         const established = await signIn(supabase, browser, request, keys);
-        for (const step of established.steps) {
-          console.log(`  ${step}`);
+        recordSignInSteps(
+          established.steps,
+          (step) => console.log(`  ${step}`),
           // Sign-in is `escalate`, which has no denominator and never carries one (D-173).
-          progress.write({ phase: 'escalate', line: step });
-        }
+          (line) => progress.write({ phase: 'escalate', line }),
+        );
         held.context = established.outcome.kind === 'signed_in' ? established.outcome.context : null;
         return established.outcome;
       },

@@ -32,6 +32,31 @@ describe('a walled crawl says which of three things happened', () => {
     expect(text).not.toContain('No screening account is stored');
   });
 
+  it('says why the stored account did not sign in (D-278)', () => {
+    // Run 2f9cc2ee's note could not tell a refused login page from a formless one. The reason can.
+    const reason =
+      "scripted woocommerce login failed: login page blocked (HTTP 403, 'Attention Required! | Cloudflare')";
+    const text = note({ kind: 'sign_in_failed', reason });
+
+    expect(text).toContain(`did not sign in on this run (${reason}), so it was not used`);
+  });
+
+  it('never quotes an exception into the note (D-278)', () => {
+    // The shape `scriptedLogin` records when Playwright throws: its message, call log and all.
+    const reason =
+      'scripted woocommerce login failed: login attempt failed: locator.fill: Timeout 30000ms exceeded.\n' +
+      'Call log:\n' +
+      "  - waiting for locator('#username, input[name=\"username\"]').first()\n" +
+      '    - locator resolved to <input id="username" name="username" type="text"/>\n' +
+      '    - elementHandle.fill("…")';
+    const text = note({ kind: 'sign_in_failed', reason });
+
+    expect(text).toContain('did not sign in on this run (the login attempt failed), so it was not used');
+    expect(text).not.toContain('Call log');
+    expect(text).not.toContain('locator');
+    expect(text).not.toContain('Timeout');
+  });
+
   it('a credential signed in and the pages were still not served', () => {
     const text = note({ kind: 'signed_in', context: null as never });
 

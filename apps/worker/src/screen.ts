@@ -66,6 +66,7 @@ import { discoverLayer3 } from './signup.js';
 import { coaLinkVocabulary, fetchCertificate } from './coa.js';
 import { probePaths } from './probe.js';
 import { runCheckoutFlow } from './flow.js';
+import { firstLine, LOGIN_ATTEMPT_FAILED } from './auth/login.js';
 
 /**
  * The floor: a catalogue with nothing to look at still gets looked at.
@@ -388,24 +389,10 @@ export async function screenStorefront(
   // limited and why. Nobody is asked to predict which it will be (D-040).
   if (wall.walled && options.escalate !== undefined) {
     escalation = await options.escalate();
+    progress.enter('escalate', escalationLine(escalation));
 
-    if (escalation.kind === 'no_credential') {
-      progress.enter(
-        'escalate',
-        'a login wall was met and no screening account is stored for this merchant',
-      );
-    } else if (escalation.kind === 'sign_in_failed') {
-      // Distinct from the line above, and the distinction reaches the report (D-185).
-      progress.enter(
-        'escalate',
-        `a login wall was met and the stored screening account did not sign in: ${escalation.reason}`,
-      );
-    } else {
+    if (escalation.kind === 'signed_in') {
       const context = escalation.context;
-      progress.enter(
-        'escalate',
-        'a login wall was met; re-rendering the sample with the stored screening account',
-      );
       const retried = await renderSample(context);
       const afterWall = assessWall(retried.map((entry) => entry.page));
 
@@ -433,7 +420,7 @@ export async function screenStorefront(
     rather than by the server's content type, and stored in full. Skipped when nothing linked to
     one — the COA rules then report that, and never read `pass` from an absent certificate.
   */
-  const coaContext = await browser.newContext();
+  const coaContext = await createCrawlContext(browser);
   let coa;
   try {
     const coaPage = await coaContext.newPage();
@@ -581,7 +568,7 @@ export async function screenStorefront(
       probePaths(browser, layer0.origin, paths, { authenticated: null, timeoutMs: 20_000 }),
 
     async flow(productUrl) {
-      const context = await browser.newContext();
+      const context = await createCrawlContext(browser);
       try {
         return await runCheckoutFlow(context, { productUrl, origin: layer0.origin, timeoutMs: 20_000 });
       } finally {
@@ -788,6 +775,35 @@ function commonSegment(urls: readonly string[]): string | null {
 }
 
 /**
+ * The progress line for what escalation found.
+ *
+ * One line always. A sign-in reason can end in a Playwright call log, which the worker log already
+ * holds in full; the run page and the queue row carry its first line (D-278).
+ */
+export function escalationLine(escalation: Escalation): string {
+  switch (escalation.kind) {
+    case 'no_credential':
+      return 'a login wall was met and no screening account is stored for this merchant';
+    case 'sign_in_failed':
+      // Distinct from the line above, and the distinction reaches the report (D-185).
+      return `a login wall was met and the stored screening account did not sign in: ${firstLine(escalation.reason)}`;
+    case 'signed_in':
+      return 'a login wall was met; re-rendering the sample with the stored screening account';
+  }
+}
+
+/**
+ * A sign-in reason as the coverage note may quote it (D-278).
+ *
+ * Authored reasons — blocked, not found, no form — pass through. An exception's text does not: a
+ * Playwright message is a call log, written for whoever debugs the worker, and the full text is
+ * already in the worker log for the run.
+ */
+function noteReason(reason: string): string {
+  return reason.includes(`${LOGIN_ATTEMPT_FAILED}:`) ? 'the login attempt failed' : reason;
+}
+
+/**
  * What the report says about its own reach.
  *
  * Descriptive throughout. It states what was served and what was not; it never says a credential
@@ -827,7 +843,7 @@ export function describeAccess(
     */
     const why =
       escalation?.kind === 'sign_in_failed'
-        ? 'A screening account is stored for this merchant and it did not sign in on this run, so it was not used'
+        ? `A screening account is stored for this merchant and it did not sign in on this run (${noteReason(escalation.reason)}), so it was not used`
         : escalation?.kind === 'signed_in'
           ? 'A stored screening account signed in but the product pages were still not served'
           : escalation === undefined

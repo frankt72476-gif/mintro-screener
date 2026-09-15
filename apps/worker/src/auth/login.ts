@@ -14,8 +14,10 @@
  * because a screen that stops entirely is worth less than one that reports what it could see.
  */
 
-import type { Browser, BrowserContext } from 'playwright';
-import { NO_SESSION, type SessionDescriptor } from '@mintro/engine';
+import type { Browser, BrowserContext, Locator, Page } from 'playwright';
+import { classifyChallenge, headerLookup, NO_SESSION, type SessionDescriptor } from '@mintro/engine';
+import { withDeadline } from '../deadline.js';
+import { createCrawlContext } from '../render.js';
 import type { CredentialVault } from './vault.js';
 import { detectPlatform, loginFor, type PlatformLogin } from './platform.js';
 
@@ -58,7 +60,7 @@ export async function establishSession(input: EstablishInput): Promise<Establish
       context: null,
       session: NO_SESSION,
       steps,
-      needsHuman: `no scripted login exists for platform '${platform}'; assisted sign-in is required`,
+      needsHuman: `no scripted login exists for platform '${platform}'; sign-in was not attempted`,
     };
   }
 
@@ -76,7 +78,7 @@ export async function establishSession(input: EstablishInput): Promise<Establish
   const stored = await input.vault.readSession(input.vaultRef, `session reuse for ${input.origin}`);
   if (stored !== null) {
     steps.push(`stored session found, established ${stored.establishedAt}`);
-    const context = await input.browser.newContext({ storageState: stored.state as never });
+    const context = await createCrawlContext(input.browser, { storageState: stored.state as never });
 
     if (await stillValid(context, input.origin, login, timeout)) {
       steps.push('stored session revalidated');
@@ -99,7 +101,7 @@ export async function establishSession(input: EstablishInput): Promise<Establish
   }
 
   // ---- 2. scripted login ---------------------------------------------------------------
-  const context = await input.browser.newContext();
+  const context = await createCrawlContext(input.browser);
   const outcome = await scriptedLogin(context, input.origin, login, credentials, timeout);
   steps.push(outcome.detail);
 
@@ -182,6 +184,101 @@ interface LoginOutcome {
 }
 
 /**
+ * The prefix of a reason that carries an exception's text (D-278).
+ *
+ * Exported so the coverage note recognises it by the same spelling this module writes it with. The
+ * text after it is Playwright's, goes to the worker log, and never reaches a report.
+ */
+export const LOGIN_ATTEMPT_FAILED = 'login attempt failed';
+
+/**
+ * The first line of a reason, for a progress line (D-278).
+ *
+ * A Playwright message is a headline and then a call log. The headline is what the run page shows;
+ * the call log is for whoever debugs the worker, and it goes to the worker log only.
+ */
+export function firstLine(text: string): string {
+  return (text.split(/\r?\n/)[0] ?? '').trimEnd();
+}
+
+/**
+ * Records sign-in steps: in full to the worker log, one line each to the progress row (D-278).
+ */
+export function recordSignInSteps(
+  steps: readonly string[],
+  log: (line: string) => void,
+  write: (line: string) => void,
+): void {
+  for (const step of steps) {
+    log(step);
+    write(firstLine(step));
+  }
+}
+
+/** The login form on a page that was actually served, or why there is none to fill. */
+export type LoginFormOutcome =
+  | {
+      readonly ok: true;
+      readonly username: Locator;
+      readonly password: Locator;
+      readonly submit: Locator;
+    }
+  | { readonly ok: false; readonly detail: string };
+
+/**
+ * Loads the login page and locates the form on it. Fills nothing.
+ *
+ * **A refused page is named as refused (D-278).** Run `2f9cc2ee` reported *"no login form matching
+ * the woocommerce selectors was found"* about a page the edge had answered with a 403 titled
+ * *"Attention Required! | Cloudflare"*. The form existed; nobody had been shown it. "No form" is a
+ * statement about the merchant's page and is only true of a page that was served.
+ *
+ * The title quoted is the blocking page's, read before anything is filled, so it cannot carry the
+ * username the way a failed-login page can.
+ */
+export async function openLoginForm(
+  page: Page,
+  url: string,
+  login: PlatformLogin,
+  timeout: number,
+): Promise<LoginFormOutcome> {
+  const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
+  const status = response?.status() ?? 0;
+  const title = await page.title().catch(() => '');
+
+  // `page.content()` ignores page timeouts and can hang on a wedged page (D-153).
+  const body = await withDeadline(page.content(), timeout, `page.content() for ${url}`).catch(() => '');
+  const challenged = classifyChallenge({
+    status,
+    header: headerLookup(response?.headers() ?? {}),
+    title,
+    body,
+  });
+
+  // A challenge is a block whatever status carried it. A 404 without one is a missing page, not a
+  // refusal: calling it a block would be a claim about the merchant's edge drawn from a status code.
+  if (challenged === null && status === 404) {
+    return { ok: false, detail: 'login page not found (HTTP 404)' };
+  }
+
+  if (status >= 400 || challenged !== null) {
+    return { ok: false, detail: `login page blocked (HTTP ${status}, '${title}')` };
+  }
+
+  const username = page.locator(login.usernameSelector).first();
+  const password = page.locator(login.passwordSelector).first();
+
+  if ((await username.count()) === 0 || (await password.count()) === 0) {
+    return {
+      ok: false,
+      detail: `no login form matching the ${login.platform} selectors was found at ${url}`,
+    };
+  }
+
+  return { ok: true, username, password, submit: page.locator(login.submitSelector).first() };
+}
+
+/**
  * Fills and submits the platform's customer login form.
  *
  * Success is decided by `signedInSelector`, never by the form having submitted without an error.
@@ -199,24 +296,15 @@ async function scriptedLogin(
   const url = credentials.loginUrl ?? new URL(login.loginPath, origin).toString();
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
+    const form = await openLoginForm(page, url, login, timeout);
+    if (!form.ok) return { ok: false, detail: form.detail };
 
-    const username = page.locator(login.usernameSelector).first();
-    const password = page.locator(login.passwordSelector).first();
-
-    if ((await username.count()) === 0 || (await password.count()) === 0) {
-      return {
-        ok: false,
-        detail: `no login form matching the ${login.platform} selectors was found at ${url}`,
-      };
-    }
-
-    await username.fill(credentials.username);
-    await password.fill(credentials.password);
+    await form.username.fill(credentials.username);
+    await form.password.fill(credentials.password);
 
     await Promise.all([
       page.waitForLoadState('domcontentloaded', { timeout }).catch(() => undefined),
-      page.locator(login.submitSelector).first().click({ timeout }),
+      form.submit.click({ timeout }),
     ]);
     await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
 
@@ -229,8 +317,10 @@ async function scriptedLogin(
 
     return { ok: true, detail: `signed in via scripted ${login.platform} login` };
   } catch (error) {
-    const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
-    return { ok: false, detail: `login attempt failed: ${message}` };
+    // In full, call log included: this reaches the worker log through `steps`, and the coverage note
+    // shortens it (D-278).
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, detail: `${LOGIN_ATTEMPT_FAILED}: ${message}` };
   } finally {
     await page.close().catch(() => undefined);
   }

@@ -53,6 +53,7 @@ import type { Browser } from 'playwright';
 import type { Ruleset } from '@mintro/ruleset';
 import { containsTokenSequence, tokenizePath, type ScreeningReport } from '@mintro/engine';
 import { extractPage } from './extract.js';
+import { createCrawlContext, PLAYWRIGHT_DEFAULT_VIEWPORT } from './render.js';
 import { storagePathForKey, type WorkerSupabase } from './store/supabase.js';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
@@ -621,7 +622,7 @@ export async function createLoader(
   browser: Browser,
   selectors: readonly string[],
 ): Promise<Loader & { close(): Promise<void> }> {
-  const context = await browser.newContext();
+  const context = await createCrawlContext(browser, { viewport: PLAYWRIGHT_DEFAULT_VIEWPORT });
   const page = await context.newPage();
 
   return {

@@ -21,6 +21,7 @@ import {
 } from '@mintro/engine';
 import { extractConsentGate } from './extract.js';
 import { withDeadline } from './deadline.js';
+import { createCrawlContext } from './render.js';
 
 export interface ProbeOptions {
   /** A context carrying a session, or null to probe as an anonymous visitor. */
@@ -39,7 +40,7 @@ export async function probePaths(
 
   // A fresh anonymous context per probe run: reusing one would let a cookie set by an earlier
   // path leak into the next, which is exactly the confusion this check is trying to resolve.
-  const context = options.authenticated ?? (await browser.newContext());
+  const context = options.authenticated ?? (await createCrawlContext(browser));
   const owned = options.authenticated === null;
   const results: ProbeResult[] = [];
 

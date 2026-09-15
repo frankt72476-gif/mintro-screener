@@ -14,6 +14,7 @@
 
 import type { Browser } from 'playwright';
 import type { DocumentsReportViewProps } from './documentsPdfTypes.js';
+import { createCrawlContext, PLAYWRIGHT_DEFAULT_VIEWPORT } from './render.js';
 
 export interface DocumentsPdfOptions {
   /** Origin serving the report route. */
@@ -40,7 +41,7 @@ export async function renderDocumentsReportPdf(
   options: DocumentsPdfOptions,
 ): Promise<DocumentsPdfResult> {
   const timeout = options.timeoutMs ?? 60_000;
-  const context = await browser.newContext();
+  const context = await createCrawlContext(browser, { viewport: PLAYWRIGHT_DEFAULT_VIEWPORT });
   const page = await context.newPage();
 
   try {
