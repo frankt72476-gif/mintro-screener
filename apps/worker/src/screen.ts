@@ -302,6 +302,9 @@ export async function screenStorefront(
         // The merchant session where one was established, the run's own anonymous context
         // otherwise. Either way it is shared across the sample, so a gate is passed once.
         context: context ?? crawl,
+        // A signed-in page never goes network-idle; wait for the product instead (D-280). The
+        // anonymous sample keeps the idle wait it has always had.
+        ...(context === undefined ? {} : { settle: 'content' as const }),
         ...gateOptions(),
       });
       artifacts.push(...result.artifacts);

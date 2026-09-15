@@ -18929,3 +18929,46 @@ all-decline presses nothing and leaves the overlay in place.
 
 `accessNote.test.ts`: all three new reasons pass through to the note.
 
+
+## D-280 — A signed-in page is read when its product is there, and no page read can take 30 s
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Found on:** runs `c12b8f8a` and `6cc959ea` (legendarypeptides.com), and the Fly probe of 2026-09-15 17:57 UTC
+
+### What was measured
+
+Both runs re-rendered the eighteen-page sample with the merchant's screening account and ran out
+the 30-minute watchdog: 52–65 s a page on a 1 GB machine, 59–72 s on 2 GB. Memory was not it.
+
+The per-step probe on the worker machine, through the stored session, found where the minute went:
+
+| step (limit) | signed-in page A | signed-in page B |
+|---|---|---|
+| DOM-ready (30 s) | 2185 ms | 1957 ms |
+| network idle (8 s) | 3885 ms | **8002 ms, expired** |
+| page read, `extractPage` (30 s) | 56 ms | **30007 ms, expired** |
+
+A logged-in storefront page does not go network-idle: its cart and session widgets poll for as long
+as the page is open. And a page whose main thread is busy holds `page.evaluate` for the whole
+render timeout. Together, 40 s for one page.
+
+### The change
+
+- **`settle: 'content'`** (`render.ts`). Instead of network quiet, a render waits for the product
+  structure the extractor reads (`PRODUCT_CONTENT_SELECTORS`, the same selectors
+  `extractConsentGate` uses for "this is a storefront page") and for `load`, so the screenshot has
+  its images. Each is capped at `CONTENT_WAIT_MS`, 4 s. The waits bound time; they never decide a
+  finding, and a page with none of those selectors simply waits out the cap.
+- **Used for the signed-in sample re-render only** (`screen.ts`). Frank ruled that the anonymous
+  renders keep the network-idle wait unchanged.
+- **The page read has its own ceiling on every render**: `READ_DEADLINE_MS`, 5 s, instead of the
+  render's 30 s. Frank ruled this applies everywhere, so no page in any render can hold the read for
+  30 s. The read took 12–350 ms on every page measured; five seconds bounds a stuck page, not a slow
+  one. A page that hits it is a render failure and is reported as not served, as any render failure
+  is.
+
+`renderSettle.test.ts` holds the shape: a page that polls for ever is read in under the cap, a
+wedged page fails at the read ceiling, an anonymous render still waits for network quiet, and the
+selector list and the extractor cannot drift apart.
+

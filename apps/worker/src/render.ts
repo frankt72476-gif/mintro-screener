@@ -83,6 +83,15 @@ export interface RenderOptions {
    */
   readonly idleMs?: number;
   /**
+   * What a render waits for after DOM-ready (D-280).
+   *
+   * `network` (the default, and every anonymous render) waits for network quiet, bounded by
+   * `idleMs`. `content` waits for the product structure and for `load`, each bounded by
+   * `CONTENT_WAIT_MS`: it is for pages that never go quiet, which is every signed-in page of a
+   * storefront whose cart polls.
+   */
+  readonly settle?: 'network' | 'content';
+  /**
    * Whether this render's capture is worth keeping, decided **after** the page is read (D-155).
    *
    * Called with the page as it stands — everything except the artifact keys, which is all any
@@ -158,6 +167,48 @@ export const DEFAULT_IDLE_MS = 8_000;
  * finding is a regression, not an optimisation.
  */
 export const PROBE_IDLE_MS = 3_000;
+
+/**
+ * How long a content-settled render waits for the product structure, and for `load` (D-280).
+ *
+ * Short on purpose. A signed-in storefront page never goes network-idle — the cart and session
+ * widgets poll for as long as the page is open — so the 8 s idle wait expired on every one, and
+ * that is most of what made a signed-in re-render cost a minute a page.
+ */
+export const CONTENT_WAIT_MS = 4_000;
+
+/**
+ * The ceiling on the page read, `page.evaluate(extractPage)`, on every render (D-280).
+ *
+ * It was the render's 30 s timeout. On the Fly probe of 2026-09-15 a signed-in product page wedged
+ * the read for the full 30 s after its idle wait had already expired, and one page cost 40 s. The
+ * read itself takes 12–350 ms on every page measured, so five seconds is a bound on a stuck page,
+ * not on a slow one.
+ */
+export const READ_DEADLINE_MS = 5_000;
+
+/**
+ * The product structure `extractConsentGate` reads as "this document is a storefront page", as
+ * selectors to wait for (D-280).
+ *
+ * The same selectors, listed once more because that function runs in the page and can import
+ * nothing. `renderSettle.test.ts` fails if the two lists part company. Waiting for them bounds a
+ * wait; it never decides a finding, and a page without any of them simply waits out the cap.
+ */
+export const PRODUCT_CONTENT_SELECTORS: readonly string[] = [
+  '[itemtype*="schema.org/Product" i]',
+  '.price',
+  '.woocommerce-Price-amount',
+  '[itemprop=price]',
+  '[class*="product-price" i]',
+  '[data-price]',
+  '[name=add-to-cart]',
+  '.add_to_cart_button',
+  '.single_add_to_cart_button',
+  'form.cart',
+  'button[name=add]',
+  '[data-add-to-cart]',
+];
 
 /**
  * What a caller of `createCrawlContext` may vary (D-278).
@@ -270,14 +321,33 @@ export async function renderPage(
     opened = page;
     page.setDefaultTimeout(timeout);
 
+    /*
+      Give the page a chance to paint before it is read.
+
+      `network`: wait for quiet, with a bounded fallback rather than hanging. Shortened for Layer 3
+      probe renders, which spend most of their time here on pages that are about to be discarded
+      (D-155).
+
+      `content` (D-280): wait for what the extractor reads, and for `load` so the screenshot has its
+      images, each capped short. Used for signed-in renders, where quiet never comes.
+    */
+    const settle = async (): Promise<void> => {
+      if (options.settle === 'content') {
+        await Promise.all([
+          page
+            .waitForSelector(PRODUCT_CONTENT_SELECTORS.join(', '), { state: 'attached', timeout: CONTENT_WAIT_MS })
+            .catch(() => undefined),
+          page.waitForLoadState('load', { timeout: CONTENT_WAIT_MS }).catch(() => undefined),
+        ]);
+        return;
+      }
+      await page
+        .waitForLoadState('networkidle', { timeout: options.idleMs ?? DEFAULT_IDLE_MS })
+        .catch(() => undefined);
+    };
+
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
-    // Give client-rendered storefronts a chance to paint. `networkidle` is unreliable on sites
-    // with polling widgets, so this waits for quiet with a bounded fallback rather than hanging.
-    // Shortened for Layer 3 probe renders, which spend most of their time here on pages that are
-    // about to be discarded (D-155).
-    await page
-      .waitForLoadState('networkidle', { timeout: options.idleMs ?? DEFAULT_IDLE_MS })
-      .catch(() => undefined);
+    await settle();
 
     const status = response?.status() ?? 0;
     const finalUrl = page.url();
@@ -318,7 +388,8 @@ export async function renderPage(
           paymentTerms: [...PAYMENT_TERMS],
           selectors: [...(options.selectors ?? [])],
         }),
-        timeout,
+        // Its own, lower ceiling (D-280): a wedged read used to hold the render for 30 s.
+        Math.min(timeout, READ_DEADLINE_MS),
         `page.evaluate() extracting ${url}`,
       )) as RawExtraction;
       const body = await withDeadline(page.content(), timeout, `page.content() for ${url}`);
@@ -437,9 +508,7 @@ export async function renderPage(
         if (page.url() !== url) {
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout }).catch(() => undefined);
         }
-        await page
-          .waitForLoadState('networkidle', { timeout: options.idleMs ?? DEFAULT_IDLE_MS })
-          .catch(() => undefined);
+        await settle();
 
         ({ extraction, html, htmlSha256 } = await read());
         finalUrlNow = page.url();
