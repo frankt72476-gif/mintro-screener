@@ -20,7 +20,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { SCAN_PHASES, type ScanPhase } from '@mintro/engine';
 import { RUN_DEADLINE_MS as DEADLINE } from '@mintro/engine';
 
-export type ScanStatus = 'queued' | 'running' | 'done' | 'failed';
+/** `truncated`: the run was cut short at its time limit and kept as it stood (D-282, 0087). */
+export type ScanStatus = 'queued' | 'running' | 'done' | 'truncated' | 'failed';
 
 /**
  * How a scan actually ran — an outcome, not a request (D-040).
@@ -50,6 +51,13 @@ export interface ScanRequestSummary {
    * is touching the row — which is a different thing to show an analyst than "in progress".
    */
   readonly claimedAt: string | null;
+  /**
+   * When the worker recorded the outcome, or null while it has not (D-282).
+   *
+   * Read so the form can tell a request that stopped a minute ago — which an analyst may still be
+   * waiting on — from one that stopped yesterday, and not say *"Nothing running"* over the first.
+   */
+  readonly finishedAt: string | null;
   readonly mode: ScanMode;
   /**
    * Which stage of the crawl is running, and how far through it, where that is knowable (D-173).
@@ -213,7 +221,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
 /* One string literal, not a concatenation: supabase-js infers the row type from the literal, and
    splitting it across lines turns the result into `GenericStringError[]`. */
 // prettier-ignore
-const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, claimed_at, mode, phase, phase_started_at, phase_done, phase_total';
+const REQUEST_COLUMNS = 'id, url, status, progress, error, run_id, created_at, claimed_at, finished_at, mode, phase, phase_started_at, phase_done, phase_total';
 
 function toSummary(row: RequestRow): ScanRequestSummary {
   return {
@@ -225,6 +233,7 @@ function toSummary(row: RequestRow): ScanRequestSummary {
     runId: row.run_id,
     createdAt: row.created_at,
     claimedAt: row.claimed_at,
+    finishedAt: row.finished_at,
     mode: row.mode as ScanMode,
     // A phase the frontend has no label for is treated as absent rather than rendered raw. The
     // database constrains the vocabulary; this is what happens if the two ever disagree.
@@ -247,6 +256,7 @@ interface RequestRow {
   run_id: string | null;
   created_at: string;
   claimed_at: string | null;
+  finished_at: string | null;
   mode: string;
   phase: string | null;
   phase_started_at: string | null;

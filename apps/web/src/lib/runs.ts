@@ -13,7 +13,7 @@
  * change silently alter an old run's conclusions.
  */
 
-import type { ScreeningReport } from '@mintro/engine';
+import { describeTruncation, type ScreeningReport } from '@mintro/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runCreators } from './internalIdentity.js';
 import { PLACEMENT_LABEL, SPECTRUM_LABEL } from './evaluationView.js';
@@ -22,8 +22,13 @@ export interface RunSummary {
   readonly runId: string;
   readonly domain: string;
   readonly finishedAt: string | null;
-  /** The run was cut short at its time limit and kept as it stood (D-282). Absent when it was not. */
-  readonly truncated?: boolean;
+  /**
+   * Where a run cut short at its time limit stopped, in `describeTruncation`'s sentence (D-282).
+   *
+   * Absent when the run was not truncated. The sentence rather than a flag, because the row has to say
+   * where it stopped, and a second wording of that built here would drift from the report's.
+   */
+  readonly truncation?: string;
   /**
    * Why this run's evidence is known to be incomplete, or null for an ordinary run.
    *
@@ -245,7 +250,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
             runId: row.id,
             domain: report.merchantDomain,
             finishedAt: row.finished_at,
-            ...(row.status === 'truncated' ? { truncated: true } : {}),
+            ...(report.truncated === undefined ? {} : { truncation: describeTruncation(report.truncated) }),
             quarantine: quarantineReason(row.run_quarantine),
             responded: commentCount(row.merchant_comments) > 0,
             awaitingReview: embedCount(row.run_review_requests) > 0 && embedCount(row.sends) === 0,

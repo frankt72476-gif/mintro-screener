@@ -709,6 +709,9 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 .queue-state.running  { color: var(--violet); }
 .queue-state.done     { color: var(--jade); }
 .queue-state.failed   { color: var(--rose); }
+/* D-282: kept, but cut short — and the queue's `done` as a reader says it. */
+.queue-state.truncated { color: var(--amber); }
+.queue-state.complete  { color: var(--jade); }
 
 /*
   A request no worker is attached to (D-152).
@@ -3159,6 +3162,8 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 .drun-eval-published { color: var(--ink); font-weight: 600; }
 .drun-eval-none, .drun-eval-unreadable { color: var(--ink-mid); }
 .drun-flag { color: #A5620E; font-size: 11px; }
+/* Where a stopped request or a truncated run ended, and why (D-282). */
+.drun-outcome { color: var(--ink-mid); flex: 1 1 auto; font-size: 12px; }
 .drun-open { flex: none; }
 .drun-none { color: var(--slate); }
 

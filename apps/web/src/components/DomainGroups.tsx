@@ -132,7 +132,15 @@ function DomainRow({
               <span className={`queue-state ${scan.stalled ? 'stalled' : scan.status}`}>
                 {scan.stalled ? 'no worker' : scan.status}
               </span>
-              <span className="drun-when">{scan.progress ?? 'queued'}</span>
+              {/*
+                A request that stopped short says where and why, in the row it appeared in (D-282). It
+                used to leave the list the moment it failed.
+              */}
+              {scan.outcome !== null && scan.outcome !== undefined ? (
+                <span className="drun-outcome">{scan.outcome}</span>
+              ) : (
+                <span className="drun-when">{scan.progress ?? 'queued'}</span>
+              )}
             </li>
           ))}
 
@@ -153,6 +161,13 @@ function DomainRow({
               <span className={`drun-eval drun-eval-${run.evaluation.kind}`}>
                 {evaluationLine(run.evaluation)}
               </span>
+              {/* A run cut short at its time limit, and where (D-282). */}
+              {run.truncation !== undefined && (
+                <>
+                  <span className="queue-state truncated">truncated</span>
+                  <span className="drun-outcome">{run.truncation}</span>
+                </>
+              )}
               {/*
                 Run by (D-228, D-229, D-233).
 

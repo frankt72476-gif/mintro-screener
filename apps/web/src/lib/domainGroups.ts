@@ -28,13 +28,19 @@ import type { RunSummary } from './runs.js';
 export interface InFlightRun {
   readonly requestId: string;
   readonly url: string;
-  /** `queued`, `running`, `failed` — whatever the queue says, said as the queue says it. */
+  /** `queued`, `running`, `failed`, `truncated`, `complete` — the queue's status as a reader says it. */
   readonly status: string;
   /** The worker's own line, where it has written one. */
   readonly progress: string | null;
   readonly createdAt: string;
   /** True where the claim is older than the worker's watchdog deadline (D-152). */
   readonly stalled: boolean;
+  /**
+   * How a failed or truncated request ended — where it stopped and why — or null (D-282).
+   *
+   * From `describeOutcome`. Null for every request that has not stopped short.
+   */
+  readonly outcome: string | null;
 }
 
 export interface DomainGroup {

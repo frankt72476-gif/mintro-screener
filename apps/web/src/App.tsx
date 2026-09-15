@@ -98,6 +98,7 @@ import type { InFlightRun } from './lib/domainGroups.js';
 import type { RunList } from './lib/runs.js';
 import type { RequestList } from './lib/scanQueue.js';
 import { groupByDomain } from './lib/domainGroups.js';
+import { describeOutcome, isRecentlyEnded, RECENTLY_ENDED_MS, requestRows } from './lib/requestRows.js';
 import { DomainGroups } from './components/DomainGroups.js';
 
 import type { Pane } from './components/Rail.js';
@@ -549,8 +550,9 @@ function Screener({
     not be read is a false statement about the worker, and the surface has to be able to tell the
     two apart.
   */
-  const [queueList, setQueueList] = useState<RequestList>({ ok: true, requests: [] });
-  const queued = queueList.ok ? queueList.requests : [];
+  // Null until the first read comes back: not read is not empty, and "Nothing running" over it is false (D-282).
+  const [queueList, setQueueList] = useState<RequestList | null>(null);
+  const queued = queueList !== null && queueList.ok ? queueList.requests : [];
   /**
    * The request this browser asked for and is following, by id (D-045).
    *
@@ -767,16 +769,8 @@ function Screener({
     somewhere else on the page. The agent presses Re-screen and watches it appear where she is
     already looking.
   */
-  const inFlight: InFlightRun[] = queued
-    .filter((request) => isPending(request.status))
-    .map((request) => ({
-      requestId: request.id,
-      url: request.url,
-      status: request.status,
-      progress: request.progress,
-      createdAt: request.createdAt,
-      stalled: isStalled(request),
-    }));
+  // Every request until its run takes its place, failed ones included (D-282).
+  const inFlight: InFlightRun[] = requestRows(queued, available);
 
   /**
    * Re-screening a domain, from wherever the agent decided to.
@@ -1079,7 +1073,8 @@ function Screener({
       void runs.list().then(setListing).catch(() => undefined);
 
       if (request.status === 'failed') {
-        setError(`The scan of ${request.url} failed: ${request.error ?? 'no reason was recorded'}`);
+        // Where it stopped as well as why (D-282). A truncated request has a run, and opens it below.
+        setError(`The scan of ${request.url} failed. ${describeOutcome(request) ?? 'No reason was recorded.'}`);
         setStage('input');
         return;
       }
@@ -1247,7 +1242,8 @@ function Screener({
               onRun={load}
               source={runs.description}
               queued={queued}
-              queueUnreadable={queueList.ok ? null : queueList.error}
+              queueUnreadable={queueList === null || queueList.ok ? null : queueList.error}
+              queueRead={queueList !== null}
               credentialsAvailable={credentials.available}
               onCredential={(domain) => setCredentialFor(domain)}
               client={client}
@@ -1512,6 +1508,7 @@ export function ScanInput({
   credentialEpoch,
   depositedAt,
   showsRunBy,
+  queueRead,
 }: {
   readonly available: readonly RunSummary[];
   readonly error: string | null;
@@ -1525,6 +1522,13 @@ export function ScanInput({
    * operator would act on — they would queue the scan again.
    */
   readonly queueUnreadable: string | null;
+  /**
+   * Whether the queue has been read at all yet (D-282).
+   *
+   * Required, not defaulted: before the first read the queue is unknown, and *"Nothing running"* over
+   * an unknown queue is the false statement this form exists not to make.
+   */
+  readonly queueRead: boolean;
   readonly credentialsAvailable: boolean;
   readonly onCredential: (domain: string) => void;
   readonly client: SupabaseClient;
@@ -1613,6 +1617,8 @@ export function ScanInput({
   const pending = queued.filter((request) => isPending(request.status));
   const stalled = pending.filter((request) => isStalled(request));
   const working = pending.filter((request) => !isStalled(request));
+  // Stopped short within a run's length of now: an analyst may still be waiting on these (D-282).
+  const recentlyEnded = queued.filter((request) => isRecentlyEnded(request));
   /*
     Five quick links, not the whole queue (D-047).
 
@@ -1626,17 +1632,7 @@ export function ScanInput({
     Grouped from the same rows the reports pane groups, then cut to five — cutting first would drop
     a merchant whose runs happen to sit below the fold of a flat list, which is the defect.
   */
-  const recentGroups = groupByDomain(
-    available,
-    queued.filter((request) => isPending(request.status)).map((request) => ({
-      requestId: request.id,
-      url: request.url,
-      status: request.status,
-      progress: request.progress,
-      createdAt: request.createdAt,
-      stalled: isStalled(request),
-    })),
-  ).slice(0, 5);
+  const recentGroups = groupByDomain(available, requestRows(queued, available)).slice(0, 5);
 
   /*
     Scans still running, shaped for the group list (D-211).
@@ -1750,10 +1746,22 @@ export function ScanInput({
                 <strong className="queue-unreadable">
                   The request queue could not be read, so what is running is not known.
                 </strong>
+              ) : !queueRead ? (
+                /*
+                  "Nothing running" is said only when the queue says so, and never over a request that
+                  is running, stalled, or stopped in the last half hour (D-282).
+                */
+                'Reading the queue…'
+              ) : working.length > 0 ? (
+                `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
+              ) : stalled.length > 0 ? null : recentlyEnded.length > 0 ? (
+                `No scan is in progress. ${
+                  recentlyEnded.length === 1 ? '1 scan' : `${recentlyEnded.length} scans`
+                } stopped in the last ${Math.round(RECENTLY_ENDED_MS / 60_000)} minutes and ${
+                  recentlyEnded.length === 1 ? 'is' : 'are'
+                } listed below with where ${recentlyEnded.length === 1 ? 'it' : 'they'} stopped.`
               ) : (
-                working.length > 0
-                  ? `${working.length} in progress. A full scan renders the homepage and samples five product pages.`
-                  : 'Nothing running.'
+                'Nothing running.'
               )}
               {stalled.length > 0 && (
                 <>
