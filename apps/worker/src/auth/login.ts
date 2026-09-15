@@ -15,8 +15,17 @@
  */
 
 import type { Browser, BrowserContext, Locator, Page } from 'playwright';
-import { classifyChallenge, headerLookup, NO_SESSION, type SessionDescriptor } from '@mintro/engine';
+import {
+  classifyChallenge,
+  classifyConsentGate,
+  headerLookup,
+  NO_SESSION,
+  type SessionDescriptor,
+} from '@mintro/engine';
+import { passConsentGate } from '../consentGatePass.js';
 import { withDeadline } from '../deadline.js';
+import { clearInterstitial, OVERLAY_NO_WAY_THROUGH, type InterstitialOutcome } from '../driveAdd.js';
+import { extractConsentGate } from '../extract.js';
 import { createCrawlContext } from '../render.js';
 import type { CredentialVault } from './vault.js';
 import { detectPlatform, loginFor, type PlatformLogin } from './platform.js';
@@ -103,7 +112,7 @@ export async function establishSession(input: EstablishInput): Promise<Establish
   // ---- 2. scripted login ---------------------------------------------------------------
   const context = await createCrawlContext(input.browser);
   const outcome = await scriptedLogin(context, input.origin, login, credentials, timeout);
-  steps.push(outcome.detail);
+  steps.push(...outcome.steps, outcome.detail);
 
   if (!outcome.ok) {
     await context.close();
@@ -181,7 +190,21 @@ async function stillValid(
 interface LoginOutcome {
   readonly ok: boolean;
   readonly detail: string;
+  /** What happened on the way, on success as on failure, for the worker log (D-279). */
+  readonly steps: readonly string[];
 }
+
+/** A consent gate on the login page was classified and did not take (D-279). Authored. */
+export const LOGIN_GATE_NOT_PASSED = 'consent gate on the login page was not passed';
+
+/** Something still covered the login button after the overlay handler ran (D-279). Authored. */
+export const LOGIN_BUTTON_COVERED = 'the login button was covered by an overlay';
+
+/** How long the login page is given to go quiet before anything in the way is looked for (D-227). */
+const SETTLE_MS = 8_000;
+
+/** How long a sweep waits to see whether its own dismissal navigated the page (D-279). */
+const NAVIGATION_GRACE_MS = 2_000;
 
 /**
  * The prefix of a reason that carries an exception's text (D-278).
@@ -242,6 +265,17 @@ export async function openLoginForm(
   login: PlatformLogin,
   timeout: number,
 ): Promise<LoginFormOutcome> {
+  const loaded = await loadLoginPage(page, url, timeout);
+  return loaded.ok ? locateLoginForm(page, url, login) : loaded;
+}
+
+/** A login page that was served, with what it answered; or why it was not. */
+export type LoginPageOutcome =
+  | { readonly ok: true; readonly status: number; readonly title: string; readonly url: string }
+  | { readonly ok: false; readonly detail: string };
+
+/** Loads the login page and says whether it was served (D-278). Fills and locates nothing. */
+export async function loadLoginPage(page: Page, url: string, timeout: number): Promise<LoginPageOutcome> {
   const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
   const status = response?.status() ?? 0;
   const title = await page.title().catch(() => '');
@@ -265,6 +299,11 @@ export async function openLoginForm(
     return { ok: false, detail: `login page blocked (HTTP ${status}, '${title}')` };
   }
 
+  return { ok: true, status, title, url: page.url() };
+}
+
+/** Locates the platform's login form on the page as it now stands. Fills nothing. */
+export async function locateLoginForm(page: Page, url: string, login: PlatformLogin): Promise<LoginFormOutcome> {
   const username = page.locator(login.usernameSelector).first();
   const password = page.locator(login.passwordSelector).first();
 
@@ -294,34 +333,174 @@ async function scriptedLogin(
 ): Promise<LoginOutcome> {
   const page = await context.newPage();
   const url = credentials.loginUrl ?? new URL(login.loginPath, origin).toString();
+  const steps: string[] = [];
 
   try {
-    const form = await openLoginForm(page, url, login, timeout);
-    if (!form.ok) return { ok: false, detail: form.detail };
+    const loaded = await loadLoginPage(page, url, timeout);
+    if (!loaded.ok) return { ok: false, detail: loaded.detail, steps };
+
+    // Recorded on success as well (D-279). Run 905b4e0e's status, title and URL had to be inferred.
+    steps.push(`login page: HTTP ${loaded.status}, '${loaded.title}', ${loaded.url}`);
+
+    // Let the page finish arriving before looking for what is in the way (D-227). An age overlay is
+    // put up by script, after `domcontentloaded`.
+    await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
+
+    const gate = await enterLoginGate(page, url, loaded.status, timeout);
+    steps.push(...gate.steps);
+    if (!gate.ok) return { ok: false, detail: LOGIN_GATE_NOT_PASSED, steps };
+
+    // Located before anything on the page is pressed, so a page without the form says so first.
+    const served = await locateLoginForm(page, url, login);
+    if (!served.ok) return { ok: false, detail: served.detail, steps };
+
+    // The checkout flow's overlay handler (D-227, D-279), aimed at the login button, and run before
+    // anything is typed: a dismissal that reloads the page would clear filled fields. Twice, for an
+    // overlay that arrives late. Run 905b4e0e's age overlay intercepted every click for thirty seconds.
+    for (const dismissedStep of [
+      'dismissed an element covering the login button',
+      'dismissed a late element covering the login button',
+    ]) {
+      const cleared = await sweepLoginOverlay(page, login.submitSelector, timeout);
+      if (cleared === 'no_way_through') return { ok: false, detail: OVERLAY_NO_WAY_THROUGH, steps };
+      if (cleared === 'dismissed') steps.push(dismissedStep);
+    }
+
+    // Re-located after the sweeps. If one reloaded or navigated the page, these are the fields on the
+    // document that will actually be submitted.
+    const form = await locateLoginForm(page, url, login);
+    if (!form.ok) return { ok: false, detail: form.detail, steps };
 
     await form.username.fill(credentials.username);
     await form.password.fill(credentials.password);
+
+    if (await buttonCovered(form.submit, timeout)) {
+      return { ok: false, detail: LOGIN_BUTTON_COVERED, steps };
+    }
 
     await Promise.all([
       page.waitForLoadState('domcontentloaded', { timeout }).catch(() => undefined),
       form.submit.click({ timeout }),
     ]);
-    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
+    await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
+
+    // A WooCommerce login re-renders the dashboard at the URL it posted to, so this is often the
+    // login URL again. Recorded rather than inferred (D-279); success is still the marker below.
+    steps.push(`after submit: ${page.url()}`);
 
     const signedIn = await page.locator(login.signedInSelector).first().count();
     if (signedIn === 0) {
       // Deliberately does not quote the page. A failed-login page can echo the username, and an
       // error string that travels into a log is a credential fragment in a log.
-      return { ok: false, detail: 'the form submitted but no signed-in marker appeared' };
+      return { ok: false, detail: 'the form submitted but no signed-in marker appeared', steps };
     }
 
-    return { ok: true, detail: `signed in via scripted ${login.platform} login` };
+    return { ok: true, detail: `signed in via scripted ${login.platform} login`, steps };
   } catch (error) {
     // In full, call log included: this reaches the worker log through `steps`, and the coverage note
     // shortens it (D-278).
     const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, detail: `${LOGIN_ATTEMPT_FAILED}: ${message}` };
+    return { ok: false, detail: `${LOGIN_ATTEMPT_FAILED}: ${message}`, steps };
   } finally {
     await page.close().catch(() => undefined);
   }
+}
+
+/**
+ * Passes a consent gate standing on the login page, with the crawl's own handler (D-279, D-267).
+ *
+ * Classified as `renderPage` classifies one — `extractConsentGate`, then `classifyConsentGate` — and
+ * passed by `passConsentGate`, once. There is no login-specific handler: a second would be a second
+ * answer to *what may the crawler affirm*, and D-267 settled that for the crawl.
+ *
+ * `ok` with no steps means there was no gate, which is the ordinary case.
+ */
+async function enterLoginGate(
+  page: Page,
+  url: string,
+  status: number,
+  timeout: number,
+): Promise<{ readonly ok: boolean; readonly steps: readonly string[] }> {
+  const readGate = async (statusNow: number): Promise<ReturnType<typeof classifyConsentGate>> =>
+    classifyConsentGate({
+      status: statusNow,
+      ...((await withDeadline(
+        page.evaluate(extractConsentGate),
+        timeout,
+        `page.evaluate() reading the consent gate at ${url}`,
+      )) as Awaited<ReturnType<typeof extractConsentGate>>),
+    });
+
+  if ((await readGate(status)) === null) return { ok: true, steps: [] };
+
+  const outcome = await passConsentGate(page, timeout);
+  if (!outcome.submitted) {
+    return {
+      ok: false,
+      steps: [`the login page's consent gate was not submitted: ${outcome.refusal ?? 'no reason was given'}`],
+    };
+  }
+
+  // Back to the login page, not wherever the gate sent us, as `renderPage` does (D-267).
+  let statusNow = status;
+  if (page.url() !== url) {
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout }).catch(() => null);
+    statusNow = response?.status() ?? statusNow;
+  }
+  await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
+
+  // Still a gate? Then it did not take, and nothing is submitted a second time (D-267).
+  if ((await readGate(statusNow)) !== null) {
+    return { ok: false, steps: ['the login page presented its consent gate again after it was submitted once'] };
+  }
+
+  return { ok: true, steps: [`passed the login page's consent gate (${outcome.acknowledged} acknowledgement(s))`] };
+}
+
+/**
+ * One sweep of the overlay handler at the login button, with the page allowed to settle after it (D-279).
+ *
+ * An overlay that reloads the page when it is accepted leaves a new document behind it, and waiting for
+ * that document here is what lets the fields be re-located on the page that will be submitted. `unread`
+ * waits too: a reload that began inside the sweep is one way the page stops answering it.
+ */
+async function sweepLoginOverlay(page: Page, control: string, timeout: number): Promise<InterstitialOutcome> {
+  const navigated = page
+    .waitForEvent('framenavigated', {
+      predicate: (frame) => frame === page.mainFrame(),
+      timeout: NAVIGATION_GRACE_MS,
+    })
+    .then(
+      () => true,
+      () => false,
+    );
+
+  const outcome = await clearInterstitial(page, timeout, control);
+
+  if ((outcome === 'dismissed' || outcome === 'unread') && (await navigated)) {
+    await page.waitForLoadState('domcontentloaded', { timeout }).catch(() => undefined);
+    await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
+  }
+  return outcome;
+}
+
+/**
+ * Whether something other than the button would receive a click at its centre (D-279).
+ *
+ * Asked of the document, as `addBlockers` asks it: whatever `elementFromPoint` returns there is what
+ * a click reaches. Run 905b4e0e left `locator.click` to find that out by retrying for thirty seconds.
+ * A button with no box answers `false`, and the click reports whatever it meets.
+ */
+async function buttonCovered(submit: Locator, timeout: number): Promise<boolean> {
+  return submit.evaluate(
+    (control) => {
+      control.scrollIntoView({ block: 'center' });
+      const box = control.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return false;
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return top !== null && top !== control && !control.contains(top) && !top.contains(control);
+    },
+    undefined,
+    { timeout },
+  );
 }

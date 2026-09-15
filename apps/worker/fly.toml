@@ -2,7 +2,7 @@
 #
 # Deploy from the REPOSITORY ROOT, not from this directory:
 #
-#     fly deploy --config apps/worker/fly.toml
+#     fly deploy --config apps/worker/fly.toml --build-arg GIT_SHA=$(git rev-parse --short HEAD)
 #
 # The build context has to be the whole repo, because the worker compiles the shared packages in
 # packages/. `.dockerignore` keeps node_modules and stored evidence out of the upload.

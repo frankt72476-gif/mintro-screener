@@ -393,7 +393,14 @@ To check what is set — this shows names and digests, never values:
 
 ### 3.5 Deploy
 
-    fly deploy --config apps/worker/fly.toml
+    fly deploy --config apps/worker/fly.toml --build-arg GIT_SHA=$(git rev-parse --short HEAD)
+
+The build argument puts the commit into the worker's startup line
+(`mintro worker · commit b048483 · rule set …`), which `fly logs` shows after every deploy. It is the
+only place a running machine says what it is running: Fly's release view names an image, not a
+commit, and `.git` is not in the build context. Deploy from a clean tree, or the hash names a commit
+the image does not match. A deploy without the argument starts normally and prints
+`commit unrecorded` (D-279).
 
 From the repository root, because the worker compiles the shared packages in `packages/` — the
 build context is the directory you run this from. The build itself runs on Fly's builders, so you

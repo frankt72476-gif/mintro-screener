@@ -91,6 +91,16 @@ ENV HOME=/tmp
 # build requires. At runtime it is what we want.
 ENV NODE_ENV=production
 
+# The commit this image was built from, printed in the worker's startup line (D-279). Passed at
+# deploy time, because `.git` is excluded from the build context and the image cannot work it out:
+#
+#     fly deploy --config apps/worker/fly.toml --build-arg GIT_SHA=$(git rev-parse --short HEAD)
+#
+# Declared this late so a new commit invalidates one layer, not the install. A deploy that passes
+# no value prints `commit unrecorded` rather than nothing.
+ARG GIT_SHA=unrecorded
+ENV GIT_SHA=$GIT_SHA
+
 # Evidence goes straight to Supabase storage, never to the container filesystem: Fly machines are
 # ephemeral and anything written locally disappears on redeploy (docs/DEPLOY.md, hard constraint
 # 5). The worker is given no evidence directory and no report directory, so there is nothing to

@@ -14,7 +14,14 @@ import { createHash } from 'node:crypto';
 import type { BrowserContext } from 'playwright';
 import { cartHoldsProduct } from './cart.js';
 import { attributedToUsAfterDriving, inspectAddOutcome } from './addBlockers.js';
-import { addControlUsable, dismissInterstitial, driveToAddable, NOTHING_DRIVEN, type Driven } from './driveAdd.js';
+import {
+  addControlUsable,
+  clearInterstitial,
+  driveToAddable,
+  NOTHING_DRIVEN,
+  OVERLAY_NO_WAY_THROUGH,
+  type Driven,
+} from './driveAdd.js';
 import { establishCheckout } from './locate.js';
 import { withDeadline, withDeadlineOr } from './deadline.js';
 import type { FlowObservation, FlowStage } from '@mintro/engine';
@@ -168,9 +175,14 @@ export async function runCheckoutFlow(
       first sweep. This is the cheap half of not depending on timing: one DOM read against a page
       already in hand.
     */
-    if (await dismissInterstitial(page, timeout)) {
+    const late = await clearInterstitial(page, timeout);
+    if (late === 'dismissed') {
       steps.push('dismissed a late element covering the add-to-cart control');
       driven = { ...driven, interstitialDismissed: true };
+    } else if (late === 'no_way_through') {
+      // Nothing pressed, overlay left in place (D-279). The click below meets it, and D-222 already
+      // attributes that to us rather than to the merchant.
+      steps.push(OVERLAY_NO_WAY_THROUGH);
     }
 
     const add = await clickFirst(page, ADD_TO_CART, timeout);

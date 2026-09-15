@@ -14,9 +14,10 @@
  *
  * A variation form is `form.variations_form` and `[data-product_variations]`; an interstitial is
  * whatever `elementFromPoint` says is actually on top of the control; a disabled control is the
- * class the platform sets. None of it reads merchant copy. A driver that looked for *"Choose an
- * option"* or *"I am 21"* would work on the merchants whose wording we guessed and fail on the
- * rest — which is the set it exists to reach.
+ * class the platform sets. None of it is *located* by merchant copy. A driver that looked for
+ * *"Choose an option"* or *"I am 21"* would work on the merchants whose wording we guessed and fail on
+ * the rest — which is the set it exists to reach. Labels are read in one place only, and only as a
+ * preference: which of an already-located overlay's own controls is pressed (D-279).
  *
  * ## Unauthenticated, and nothing is submitted (D-039)
  *
@@ -83,8 +84,10 @@ export const NOTHING_DRIVEN: Driven = {
 export async function driveToAddable(page: Page, timeoutMs = STEP_MS): Promise<Driven> {
   const steps: string[] = [];
 
-  const dismissed = await dismissInterstitial(page, timeoutMs);
+  const cleared = await clearInterstitial(page, timeoutMs);
+  const dismissed = cleared === 'dismissed';
   if (dismissed) steps.push('dismissed an element covering the add-to-cart control');
+  if (cleared === 'no_way_through') steps.push(OVERLAY_NO_WAY_THROUGH);
 
   const variations = await completeVariations(page, timeoutMs);
   if (variations.chosen > 0) {
@@ -102,43 +105,94 @@ export async function driveToAddable(page: Page, timeoutMs = STEP_MS): Promise<D
   };
 }
 
+/** What one sweep found (D-279). `unread` is "the page could not be asked", never "nothing was there". */
+export type InterstitialOutcome = 'none' | 'dismissed' | 'no_way_through' | 'unread';
+
+/** An overlay whose every control declines: nothing was pressed and it was left in place (D-279). */
+export const OVERLAY_NO_WAY_THROUGH = 'the overlay offered no recognised way through';
+
 /**
- * Dismisses whatever is covering the add control, if anything is.
+ * Labels that affirm, pressed in preference to anything else inside an overlay (D-279).
+ *
+ * Whole words, case-insensitive, read from a control's text and `aria-label`. A preference and never a
+ * locator: the overlay is still found by `elementFromPoint` (constraint 9), and these only choose which
+ * of its own controls is pressed.
+ */
+export const AFFIRM_LABELS: readonly string[] = [
+  'enter',
+  'yes',
+  'agree',
+  'accept',
+  'continue',
+  'confirm',
+  'proceed',
+  'i am 21',
+  '21 or older',
+  'over 21',
+  'i am 18',
+  '18 or older',
+  'over 18',
+  'of legal age',
+];
+
+/** Labels that decline. Never pressed, by the preference or by the fallback; declining wins (D-279). */
+export const DECLINE_LABELS: readonly string[] = [
+  'no',
+  'decline',
+  'leave',
+  'exit',
+  'cancel',
+  'not now',
+  'i am not',
+  'under 21',
+  'under 18',
+  'not 21',
+  'not 18',
+];
+
+/**
+ * Clears whatever is covering a control, if anything is.
  *
  * **This removes a race, which is worth doing on its own.** The probe was getting past
  * comopeptides' age gate by clicking at ~1.7s, before an Elementor lightbox rendered — measured,
  * not theorised. That is a coincidence, not a guard: it inverts the first time the page is slower
  * or the probe is faster, and when it inverts the failure is silent.
  *
- * The dismissal is structural in both halves. What is in the way is whatever `elementFromPoint`
- * returns over the control — not an element matching a class we guessed. What closes it is a
- * control **inside that element**, chosen by role and position rather than by its words: the
- * overlay's own buttons and links, in DOM order. An age gate's accept is the first actionable
- * thing in it on every storefront seen; a driver that read the label would need the label.
+ * What is in the way is found structurally: whatever `elementFromPoint` returns over the control —
+ * not an element matching a class we guessed. What closes it is a control **inside that element**,
+ * and which one is a preference by label (D-279): an affirming one first, then the first that does
+ * not decline, and never one that declines. Position alone pressed legendarypeptides.com's *Terms of
+ * Service* link, which comes before its *Accept*.
  *
  * Falls back to removing the element from the layout when it carries nothing clickable — a
  * cookie bar with no button still intercepts, and hiding it is what a reader's own ad-blocker
  * would do. Nothing is submitted either way.
+ *
+ * Aimed at the add-to-cart control unless the caller names another. The sign-in path aims it at the
+ * login button (D-279): one handler for what stands in front of a control, not one per control.
  */
-export async function dismissInterstitial(page: Page, timeoutMs = STEP_MS): Promise<boolean> {
-  return (
-    (await withDeadlineOr<boolean | null>(
+export async function clearInterstitial(
+  page: Page,
+  timeoutMs = STEP_MS,
+  control: string = ADD_CONTROL,
+): Promise<InterstitialOutcome> {
+  return withDeadlineOr<InterstitialOutcome>(
       page.evaluate(
-        ([selector]) => {
+        ([selector, affirm, decline]) => {
           const control = document.querySelector(selector);
-          if (control === null) return false;
+          if (control === null) return 'none' as const;
 
           control.scrollIntoView({ block: 'center' });
           const box = control.getBoundingClientRect();
-          if (box.width === 0 || box.height === 0) return false;
+          if (box.width === 0 || box.height === 0) return 'none' as const;
 
           const cx = box.left + box.width / 2;
           const cy = box.top + box.height / 2;
-          if (cy < 0 || cy > window.innerHeight || cx < 0 || cx > window.innerWidth) return false;
+          if (cy < 0 || cy > window.innerHeight || cx < 0 || cx > window.innerWidth) return 'none' as const;
 
           const top = document.elementFromPoint(cx, cy);
           if (top === null || top === control || control.contains(top) || top.contains(control)) {
-            return false;
+            return 'none' as const;
           }
 
           /*
@@ -157,31 +211,57 @@ export async function dismissInterstitial(page: Page, timeoutMs = STEP_MS): Prom
           }
 
           /*
-            By role and position, never by label: the first actionable thing inside it.
+            Which of its own controls to press, then out of the layout (D-279).
+
+            An affirming label first, then the first control that does not decline, in DOM order. A
+            control that declines is never pressed. An overlay whose every control declines is left
+            exactly as it is and says so: pressing *Leave* sends the visitor away, and hiding the
+            overlay instead would be walking round a question the page asked.
 
             Clicked in the page rather than through the driver, because Playwright refuses to click
             an element it considers obscured — and the thing being clicked is the obscuring element
-            itself. Where nothing is pressable the overlay is taken out of the layout instead: a
+            itself. Where nothing is pressable at all the overlay is taken out of the layout: a
             cookie bar with no button still intercepts, and hiding it is what a reader's own
             extension would do. Nothing is submitted either way.
           */
-          const closer = overlay.querySelector('button, a[href], [role="button"]');
-          if (closer instanceof HTMLElement) {
-            closer.click();
-          }
+          const words = (text: string): string => ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+          const says = (label: string, terms: readonly string[]): boolean =>
+            terms.some((term) => label.includes(` ${term} `));
+          const label = (element: HTMLElement): string =>
+            words(`${element.textContent ?? ''} ${element.getAttribute('aria-label') ?? ''}`);
+          const declines = (element: HTMLElement): boolean => says(label(element), decline);
+
+          const pressable = Array.from(overlay.querySelectorAll('button, a[href], [role="button"]')).filter(
+            (element): element is HTMLElement => element instanceof HTMLElement,
+          );
+          const choice =
+            pressable.find((element) => !declines(element) && says(label(element), affirm)) ??
+            pressable.find((element) => !declines(element));
+
+          if (choice === undefined && pressable.length > 0) return 'no_way_through' as const;
+
+          choice?.click();
           if (overlay instanceof HTMLElement) {
             overlay.style.display = 'none';
           }
 
-          return true;
+          return 'dismissed' as const;
         },
-        [ADD_CONTROL] as const,
+        [control, AFFIRM_LABELS, DECLINE_LABELS] as const,
       ),
       timeoutMs,
-      `page.evaluate() dismissing an interstitial at ${page.url()}`,
-      null,
-    )) === true
+      `page.evaluate() clearing an interstitial at ${page.url()}`,
+      'unread',
   );
+}
+
+/** `clearInterstitial` as a yes or no: something was in the way and has been taken out of it. */
+export async function dismissInterstitial(
+  page: Page,
+  timeoutMs = STEP_MS,
+  control: string = ADD_CONTROL,
+): Promise<boolean> {
+  return (await clearInterstitial(page, timeoutMs, control)) === 'dismissed';
 }
 
 /**

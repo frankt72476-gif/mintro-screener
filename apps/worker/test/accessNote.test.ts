@@ -12,6 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import { describeAccess } from '../src/screen.js';
 import type { Escalation } from '../src/screen.js';
+import { LOGIN_BUTTON_COVERED, LOGIN_GATE_NOT_PASSED } from '../src/auth/login.js';
+import { OVERLAY_NO_WAY_THROUGH } from '../src/driveAdd.js';
 
 const walled = { walled: true as const, served: 0, attempted: 5, reason: 'none of the 5 sampled product pages was served to an anonymous request' };
 const open = { walled: false as const, served: 5, attempted: 5, reason: 'all 5 sampled product pages were served anonymously' };
@@ -39,6 +41,15 @@ describe('a walled crawl says which of three things happened', () => {
     const text = note({ kind: 'sign_in_failed', reason });
 
     expect(text).toContain(`did not sign in on this run (${reason}), so it was not used`);
+  });
+
+  it('passes the authored gate and overlay reasons through (D-279)', () => {
+    for (const authored of [LOGIN_GATE_NOT_PASSED, LOGIN_BUTTON_COVERED, OVERLAY_NO_WAY_THROUGH]) {
+      const reason = `scripted woocommerce login failed: ${authored}`;
+      const text = note({ kind: 'sign_in_failed', reason });
+
+      expect(text).toContain(`did not sign in on this run (${reason}), so it was not used`);
+    }
   });
 
   it('never quotes an exception into the note (D-278)', () => {

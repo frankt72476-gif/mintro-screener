@@ -15221,6 +15221,9 @@ was distinguished by its own stated reason pointing at a section that already ex
 ## D-227 — The probe does what a shopper does, and GATE-003 answers
 **2026-09-01 · engineering · `apps/worker/src/driveAdd.ts`, `flow.ts`, `addBlockers.ts`**
 
+> **Which overlay control is pressed changed in D-279.** The overlay is still located as below. The
+> control pressed inside it now prefers an affirming label, and a declining one is never pressed.
+
 D-222 made an empty cart honest about whose failure it was. It stayed blind. `GATE-003` is a
 stopping condition, and on every WooCommerce variable-product merchant it returned `not_evaluable`
 — the right answer to the wrong question, because nobody had asked the store to add anything.
@@ -18774,4 +18777,155 @@ Two reasons are reworded on the way, because they now reach report copy:
   the run in full. The progress row (`scan_requests.progress`) and the run's escalate line carry its
   first line only, as they did before. The blocked, not-found and no-form reasons are authored, and
   pass through.
+
+
+## D-279 — The sign-in path passes consent gates with the crawl's handler and never with its own
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Found on:** run `905b4e0e` (legendarypeptides.com)
+
+**The sign-in path passes consent gates with the crawl's handler and never with its own.**
+
+### What happened
+
+The first run after D-278 reached the login form through the crawl identity, filled both fields, and
+did not sign in. The worker log:
+
+```
+login attempt failed: locator.click: Timeout 30000ms exceeded.
+  - locator resolved to <button name="login" type="submit" … class="woocommerce-button button woocommerce-form-login__submit">Log in</button>
+      - element is visible, enabled and stable
+      - <div class="lpu-age-overlay" id="lpu-age-verification-overlay">…</div> from <div class="avada-footer-scripts">…</div> subtree intercepts pointer events
+    - retrying click action
+```
+
+Sixty attempts in thirty seconds, every one intercepted by the storefront's age overlay. Nothing was
+submitted and the signed-in marker was never counted. The login page's status, title and URL were
+not recorded anywhere, because they were only ever written on failure.
+
+### Two handlers, and the overlay was neither's to begin with
+
+The worker already had two ways past something standing in front of a page:
+
+| handler | ruled by | passes | on legendarypeptides.com |
+|---|---|---|---|
+| `passConsentGate` (`consentGatePass.ts`) | D-267 | a **document** gate: a `POST` form of required checkboxes with a hidden return path, served in place of the page | not recognised: the overlay has no form and no checkbox |
+| `dismissInterstitial` (`driveAdd.ts`) | D-227 | an **overlay** covering a control: the outermost positioned element over it, closed by its first button or link in DOM order | would press the *Terms of Service* link in the overlay's text — its first actionable element, ahead of *Accept* — and then hide the overlay |
+
+The crawl never passed this overlay. It read the product sample and the sign-up form out of the DOM
+underneath it, which needs no click. Only the sign-in has to press something, so only the sign-in
+met it.
+
+Asked which to use, Frank ruled **both**: the D-267 handler for a document gate on the login page,
+and the D-227 handler for an overlay on the login button. Neither is copied and neither is
+specialised. `clearInterstitial` takes the control it clears as an argument, defaulting to the
+add-to-cart control. Which of an overlay's controls it presses changed for both callers — see
+*Which control is pressed*.
+
+### The sign-in, in order
+
+`scriptedLogin` (`auth/login.ts`):
+
+1. **Load** — `loadLoginPage`. Blocked, not-found and no-form are D-278's and unchanged. The status,
+   title and URL are now logged on success: `login page: HTTP 200, '<title>', <url>`.
+2. **Settle** — `networkidle`, bounded at 8 s. An age overlay is put up by script after
+   `domcontentloaded`, and D-227 is the record of what dismissing before it arrives does.
+3. **Gate** — `extractConsentGate` then `classifyConsentGate`, exactly as `renderPage` reads one, and
+   `passConsentGate` once. Back to the login URL if the gate sent the page elsewhere; re-read; still a
+   gate means it did not take, and nothing is submitted a second time (D-267). Reason:
+   *"consent gate on the login page was not passed"*. The handler's own refusal goes to the log.
+4. **Locate** the fields — `locateLoginForm` — so a page without the form says so before anything on
+   it is pressed.
+5. **Overlay sweeps, twice, before anything is typed** — `clearInterstitial` aimed at the login button.
+   A dismissal that reloads the page would clear filled fields, so nothing is filled until both sweeps
+   are over. After a dismissal the sweep waits up to 2 s to see whether the page navigated, and if it
+   did, for the new document to load and settle. An overlay whose every control declines stops here:
+   *"the overlay offered no recognised way through"*.
+6. **Re-locate** the fields. If a sweep reloaded or navigated the page, these are the fields on the
+   document that will be submitted.
+7. **Fill** username and password.
+8. **Covered?** — `elementFromPoint` at the button's centre, as `addBlockers` asks it. Anything other
+   than the button returns *"the login button was covered by an overlay"* at once, instead of a
+   thirty-second retry that ends in a Playwright message the note cannot quote.
+9. **Submit**, then `after submit: <url>` is logged. On WooCommerce that is usually the login URL
+   again — the dashboard re-renders where the form posted — and success is still decided by
+   `signedInSelector`, never by the URL.
+
+`openLoginForm` stays load-then-locate and still fills nothing; it is what the D-278 tests and the
+live probe drive.
+
+The three new reasons are authored strings and reach the coverage note through `sign_in_failed` as
+the D-278 reasons do.
+
+### What this does not change
+
+- **What the crawler affirms.** D-267 decided that, for a checkbox gate. Pressing an overlay's
+  affirming control is D-227's reading of *what a browsing visitor does*, and this applies it on one
+  more page. Neither handler types, and neither submits anything but a gate form.
+- **D-039.** The gate rules still run with no session. The login context is the one that will carry
+  the session; the handlers run in it before there is one.
+- **D-017.** The same declared identity throughout (D-278).
+
+### Which control is pressed
+
+D-227 pressed an overlay's **first** actionable element, by position and never by label, on the
+reasoning that an age gate's accept came first on every storefront seen. legendarypeptides.com is the
+counterexample: the first actionable element in its overlay is a *Terms of Service* link in the body
+text, ahead of *Accept* and *Decline*. And an overlay with *Decline* first would have been declined on
+the checkout flow as well as on the sign-in.
+
+`clearInterstitial` (`driveAdd.ts`) now chooses among the overlay's own buttons and links, **for both
+callers**:
+
+1. the first whose label **affirms** — `AFFIRM_LABELS`: *enter, yes, agree, accept, continue, confirm,
+   proceed, I am 21, 21 or older, over 21, I am 18, 18 or older, over 18, of legal age*;
+2. otherwise the first that does not **decline** — `DECLINE_LABELS`: *no, decline, leave, exit,
+   cancel, not now, I am not, under 21, under 18, not 21, not 18*;
+3. otherwise, when every control declines, **nothing is pressed and the overlay is left in place**.
+   The sign-in fails with *"the overlay offered no recognised way through"*. The checkout flow records
+   the same sentence as a step, and its click then meets the overlay, which D-222 already attributes
+   to us rather than to the merchant;
+4. an overlay with no control at all is still taken out of the layout, as D-227 did for a cookie bar.
+
+Labels are read from a control's text and `aria-label`, lowercased, as whole words, and declining
+wins: *"No, I am under 21"* is never pressed. Frank ruled the decline filter, the 18-and-over wordings
+and the no-way-through reason.
+
+**A preference, never a locator.** The overlay is still found by `elementFromPoint`, structurally
+(constraint 9, D-014). The words only choose which of its own controls is pressed, and a control that
+matches neither list is still pressable by the fallback. So the case this still gets wrong is an
+affirm wording neither list anticipates behind a decline wording neither list anticipates — *"Take me
+back"* first, *"Come in"* second — where the first is pressed.
+
+A dismissal that navigates the page more than 2 s after it was pressed is not waited for. The fields
+are then located on a document about to be replaced, and the login fails as *"no signed-in marker
+appeared"*, which is true.
+
+### Knowing what is running
+
+The worker's startup line now names the commit: `mintro worker · commit <hash> · rule set …`.
+`GIT_SHA` is a Docker build argument, passed by the deploy command in `docs/DEPLOY.md`. Fly's release
+view names an image and `.git` is not in the build context, so neither can say it. The run that
+prompted this was attributed to a commit by the shape of its log lines, which is inference. A deploy
+that passes no hash prints `commit unrecorded`.
+
+### Tests
+
+`loginPage.test.ts`, against a local WooCommerce-shaped login whose POST re-renders the dashboard at
+the same URL:
+
+| case | asserts |
+|---|---|
+| checkbox gate in front of the login | one gate POST, signed in, status/title/URL and after-submit URL logged |
+| gate that does not take | *not passed*, and the gate submitted exactly once |
+| age overlay put up by script, *Accept* first | dismissed, signed in |
+| overlay the handler cannot clear | *covered by an overlay*, nothing posted, well inside the 30 s click limit |
+| overlay laid out as legendarypeptides.com's — a link, *Leave*, then *Enter*, which reloads the page | *Enter* pressed, neither the link nor *Leave* followed, page reloaded before filling, signed in |
+| overlay whose every control declines | *no recognised way through*, nothing pressed, nothing posted |
+
+`driveAdd.test.ts`: the label preference directly — affirm over position, decline never pressed,
+all-decline presses nothing and leaves the overlay in place.
+
+`accessNote.test.ts`: all three new reasons pass through to the note.
 

@@ -168,7 +168,10 @@ async function main(argv: readonly string[]): Promise<number> {
   const ruleset = loadRulesetFile('rules/ruleset.json');
   const supabase = createWorkerSupabase();
 
-  console.log(`mintro worker · rule set ${ruleset.version} (effective ${ruleset.effective})`);
+  // The commit the image was built from (D-279). `GIT_SHA` is a build argument, because Fly's release
+  // view names an image and not a commit; a deploy that passed none says so.
+  const commit = process.env['GIT_SHA'] || 'unrecorded';
+  console.log(`mintro worker · commit ${commit} · rule set ${ruleset.version} (effective ${ruleset.effective})`);
 
   const checks = await preflight(supabase);
   for (const check of checks.checks) {

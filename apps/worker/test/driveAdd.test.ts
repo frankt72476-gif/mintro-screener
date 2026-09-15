@@ -28,6 +28,7 @@ import { resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import {
   addControlUsable,
+  clearInterstitial,
   completeVariations,
   dismissInterstitial,
   driveToAddable,
@@ -140,6 +141,99 @@ describe('an interstitial is dismissed, not raced', () => {
       // Now it is there, and dismissing it does not depend on having been quicker.
       expect(await dismissInterstitial(page)).toBe(true);
       expect(await dismissInterstitial(page)).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+describe("which of an overlay's controls is pressed (D-279)", () => {
+  /**
+   * An add control under a full-viewport overlay whose controls record what was pressed.
+   *
+   * The same function for both callers, so this is the checkout flow's rule and the sign-in's at once.
+   * Links are prevented from navigating so a press is observable rather than a page change.
+   */
+  async function covered(controls: string): Promise<Page> {
+    const page = await context.newPage();
+    await page.setContent(`
+      <body style="margin:0">
+        <button type="submit" class="single_add_to_cart_button" style="margin:200px">Add to cart</button>
+        <div id="overlay" style="position:fixed;inset:0;z-index:9999;background:#000">${controls}</div>
+        <script>
+          window.pressed = [];
+          document.getElementById('overlay').addEventListener('click', function (event) {
+            var target = event.target.closest('button, a, [role="button"]');
+            if (target) { event.preventDefault(); window.pressed.push(target.textContent.trim()); }
+          });
+        </script>
+      </body>`);
+    return page;
+  }
+
+  const pressed = (page: Page): Promise<string[]> =>
+    page.evaluate(() => (window as unknown as { pressed: string[] }).pressed);
+  const overlayShown = (page: Page): Promise<boolean> =>
+    page.evaluate(() => getComputedStyle(document.getElementById('overlay') as HTMLElement).display !== 'none');
+
+  it("presses the affirming control over an earlier link and an earlier decline — legendarypeptides.com's layout", async () => {
+    const page = await covered(
+      '<p>Adults only. See our <a href="/terms/">Terms of Service</a>.</p><button>Leave</button><button>Enter</button>',
+    );
+    try {
+      expect(await clearInterstitial(page)).toBe('dismissed');
+      expect(await pressed(page)).toEqual(['Enter']);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('reads an 18-and-over wording as affirming', async () => {
+    const page = await covered('<button>Take me back</button><button>I am over 18</button>');
+    try {
+      expect(await clearInterstitial(page)).toBe('dismissed');
+      expect(await pressed(page)).toEqual(['I am over 18']);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('never presses a declining control, even one that also carries an affirming word', async () => {
+    const page = await covered('<button>No, I am under 21</button><button>Continue</button>');
+    try {
+      expect(await clearInterstitial(page)).toBe('dismissed');
+      expect(await pressed(page)).toEqual(['Continue']);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('falls back to the first control that does not decline when nothing affirms', async () => {
+    const page = await covered('<button>No</button><button>OK</button>');
+    try {
+      expect(await clearInterstitial(page)).toBe('dismissed');
+      expect(await pressed(page)).toEqual(['OK']);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('presses nothing and leaves the overlay in place when every control declines', async () => {
+    const page = await covered('<button>No</button><button>Leave site</button>');
+    try {
+      expect(await clearInterstitial(page)).toBe('no_way_through');
+      expect(await pressed(page)).toEqual([]);
+      expect(await overlayShown(page)).toBe(true);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('still takes an overlay with no control at all out of the layout, as D-227 did', async () => {
+    const page = await covered('<p>This site uses cookies.</p>');
+    try {
+      expect(await clearInterstitial(page)).toBe('dismissed');
+      expect(await overlayShown(page)).toBe(false);
     } finally {
       await page.close();
     }
