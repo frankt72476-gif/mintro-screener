@@ -394,7 +394,11 @@ export async function screenStorefront(
     if (escalation.kind === 'signed_in') {
       const context = escalation.context;
       const retried = await renderSample(context);
-      const afterWall = assessWall(retried.map((entry) => entry.page));
+      // Assessed as what it was: pages requested with the screening account, not anonymously.
+      const afterWall = assessWall(
+        retried.map((entry) => entry.page),
+        'screening_account',
+      );
 
       // Kept only if it actually got further. A credential that failed to change what was served
       // has widened nothing, and reporting `screening_account` on that basis would overstate what

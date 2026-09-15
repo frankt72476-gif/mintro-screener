@@ -95,7 +95,18 @@ export function wasServed(page: PageContext): boolean {
  * catalogue is not a wall: some merchants gate a subset, and escalating to a credential on that
  * basis would be using an account to read pages the merchant chose to gate for everyone.
  */
-export function assessWall(pages: readonly PageContext[]): WallAssessment {
+export function assessWall(
+  pages: readonly PageContext[],
+  /**
+   * How the pages were requested. The sentence says so, because it is read beside the pages.
+   *
+   * A signed-in re-render used to log *"every sampled product page was served to an anonymous
+   * request"* — true of nothing on that screen. Defaulted to `anonymous`, which is every caller but
+   * the re-render.
+   */
+  access: 'anonymous' | 'screening_account' = 'anonymous',
+): WallAssessment {
+  const servedTo = access === 'anonymous' ? 'to an anonymous request' : 'with the stored screening account';
   const attempted = pages.length;
   const servedPages = pages.filter(wasServed);
   const challenged = pages.filter((page) => page.challenged !== undefined).length;
@@ -127,8 +138,10 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
       consentGated,
       reason:
         (servedPages.length === attempted
-          ? 'every sampled product page was served to an anonymous request'
-          : `${servedPages.length} of ${attempted} sampled product pages were served anonymously`) +
+          ? `every sampled product page was served ${servedTo}`
+          : `${servedPages.length} of ${attempted} sampled product pages were served ${
+              access === 'anonymous' ? 'anonymously' : servedTo
+            }`) +
         describeChallenged(challenged, attempted) +
         describeGated(consentGated, attempted),
       refusals,
@@ -187,7 +200,7 @@ export function assessWall(pages: readonly PageContext[]): WallAssessment {
     challenged,
     consentGated,
     reason:
-      `none of the ${attempted} sampled product page(s) were served to an anonymous request` +
+      `none of the ${attempted} sampled product page(s) were served ${servedTo}` +
       describeChallenged(challenged, attempted) +
       describeGated(consentGated, attempted),
     refusals,

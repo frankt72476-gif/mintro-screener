@@ -145,4 +145,29 @@ describe('assessWall', () => {
     expect(assessment.refusals[0]).toContain('HTTP 403');
     expect(assessment.refusals[1]).toContain('timeout');
   });
+
+  /**
+   * A signed-in re-render is not an anonymous request, and the sentence read beside it must not say
+   * it was. Runs c12b8f8a and 6cc959ea both logged *"signed in: every sampled product page was served
+   * to an anonymous request"* about pages read with the merchant's screening account.
+   */
+  it('names the screening account when the sample was requested with it', () => {
+    const signedIn = assessWall([served, served], 'screening_account');
+    expect(signedIn.reason).toBe('every sampled product page was served with the stored screening account');
+    expect(signedIn.reason).not.toContain('anonymous');
+
+    const partly = assessWall([served, refused], 'screening_account');
+    expect(partly.reason).toContain('1 of 2 sampled product pages were served with the stored screening account');
+    expect(partly.reason).not.toContain('anonymous');
+
+    const none = assessWall([refused, refused], 'screening_account');
+    expect(none.reason).toContain('none of the 2 sampled product page(s) were served with the stored screening account');
+    expect(none.reason).not.toContain('anonymous');
+  });
+
+  it('leaves the anonymous sentences exactly as they were', () => {
+    expect(assessWall([served]).reason).toBe('every sampled product page was served to an anonymous request');
+    expect(assessWall([served, refused]).reason).toContain('1 of 2 sampled product pages were served anonymously');
+    expect(assessWall([refused]).reason).toContain('none of the 1 sampled product page(s) were served to an anonymous request');
+  });
 });
