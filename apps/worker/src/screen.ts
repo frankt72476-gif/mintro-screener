@@ -142,6 +142,15 @@ export interface ScreenOptions {
    * always the person who would look at the credential card.
    */
   readonly escalate?: () => Promise<Escalation>;
+  /**
+   * The run's cancellation (D-281).
+   *
+   * Checked at every stage boundary and in every per-item loop below and in the layers, and on abort
+   * the contexts this function owns are closed so the call in flight throws at once. The watchdog
+   * used to detach the crawl and close the browser under it; the crawl then ran every remaining step
+   * against a dead browser, logging as it went, into the next job's output.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface ScreenResult {
@@ -179,6 +188,24 @@ export async function screenStorefront(
     build their own with no session at all (D-039). Neither is touched by this.
   */
   const crawl = await createCrawlContext(browser);
+
+  /*
+    Cancellation (D-281).
+
+    `checkpoint` stops the crawl between steps; closing the contexts on abort stops the step in
+    flight, which may otherwise wait out a 30 s navigation. The contexts opened for the certificate and
+    the checkout flow register their own close below, for the same reason.
+  */
+  const { signal } = options;
+  const checkpoint = (): void => signal?.throwIfAborted();
+  const closeOnAbort = (context: BrowserContext): (() => void) => {
+    const close = (): void => void context.close().catch(() => undefined);
+    signal?.addEventListener('abort', close, { once: true });
+    return () => signal?.removeEventListener('abort', close);
+  };
+  const releaseCrawl = closeOnAbort(crawl);
+  const withSignal = signal === undefined ? {} : { signal };
+
   /** Set once the crawl has been through a consent gate on this context (D-267). */
   let enteredGate: string | undefined;
   const gateOptions = (): {
@@ -206,6 +233,7 @@ export async function screenStorefront(
 
   // ---- Layer 1 -------------------------------------------------------------------------
   const homepage = `${layer0.origin}/`;
+  checkpoint();
   // Anonymous, always. The homepage is where the footer disclosure rules are read, and those
   // describe what a customer sees — reading them while signed in would answer a different
   // question. Escalation, if it happens at all, reaches the product sample and nothing else.
@@ -215,6 +243,7 @@ export async function screenStorefront(
     timeoutMs: 30_000,
     context: crawl,
     ...gateOptions(),
+    ...withSignal,
   });
   artifacts.push(...rendered.artifacts);
 
@@ -294,7 +323,9 @@ export async function screenStorefront(
   const renderSample = async (context?: BrowserContext): Promise<SampledPage[]> => {
     const pages: SampledPage[] = [];
     for (const pick of selected) {
+      checkpoint();
       const result = await renderPage(browser, pick.url.url, {
+        ...withSignal,
         runId,
         pacer,
         selectors,
@@ -391,7 +422,9 @@ export async function screenStorefront(
   // the anonymous crawl was refused and one exists; otherwise the report says coverage was
   // limited and why. Nobody is asked to predict which it will be (D-040).
   if (wall.walled && options.escalate !== undefined) {
+    checkpoint();
     escalation = await options.escalate();
+    checkpoint();
     progress.enter('escalate', escalationLine(escalation));
 
     if (escalation.kind === 'signed_in') {
@@ -427,7 +460,9 @@ export async function screenStorefront(
     rather than by the server's content type, and stored in full. Skipped when nothing linked to
     one — the COA rules then report that, and never read `pass` from an absent certificate.
   */
+  checkpoint();
   const coaContext = await createCrawlContext(browser);
+  const releaseCoa = closeOnAbort(coaContext);
   let coa;
   try {
     const coaPage = await coaContext.newPage();
@@ -437,10 +472,13 @@ export async function screenStorefront(
       // One vocabulary, read from the rule set, shared with COA-001 (D-059).
       vocabulary: coaLinkVocabulary(ruleset),
       onProgress: say,
+      ...withSignal,
     });
   } finally {
+    releaseCoa();
     await coaContext.close().catch(() => undefined);
   }
+  checkpoint();
   artifacts.push(...coa.artifacts);
 
   // ---- Layer 3: the surfaces reached by doing something ----------------------------------
@@ -455,6 +493,7 @@ export async function screenStorefront(
   const discovered = await discoverLayer3(browser, layer0.origin, {
     runId,
     pacer,
+    ...withSignal,
     context: crawl,
     ...gateOptions(),
     /*
@@ -570,15 +609,23 @@ export async function screenStorefront(
   // Built here, from `browser`, and deliberately not from `options.authenticated`. `probePaths`
   // with `authenticated: null` creates its own anonymous context; `runGateRules` could not accept
   // a session even if one were offered.
+  checkpoint();
   const anonymous: AnonymousAccess = {
     probe: (paths) =>
-      probePaths(browser, layer0.origin, paths, { authenticated: null, timeoutMs: 20_000 }),
+      probePaths(browser, layer0.origin, paths, { authenticated: null, timeoutMs: 20_000, ...withSignal }),
 
     async flow(productUrl) {
       const context = await createCrawlContext(browser);
+      const releaseFlow = closeOnAbort(context);
       try {
-        return await runCheckoutFlow(context, { productUrl, origin: layer0.origin, timeoutMs: 20_000 });
+        return await runCheckoutFlow(context, {
+          productUrl,
+          origin: layer0.origin,
+          timeoutMs: 20_000,
+          ...withSignal,
+        });
       } finally {
+        releaseFlow();
         await context.close().catch(() => undefined);
       }
     },
@@ -589,7 +636,9 @@ export async function screenStorefront(
     ruleset,
     access: anonymous,
     ...(firstProduct === undefined ? {} : { productUrl: firstProduct }),
+    ...withSignal,
   });
+  checkpoint();
 
   progress.enter('gate', 'evaluating the gate rules without a session');
   say(`gate rules evaluated without a session: ${gate.map((f) => `${f.ruleId} ${f.state}`).join(', ')}`);
@@ -724,6 +773,7 @@ export async function screenStorefront(
 
   return { report, artifacts, layer0: improved, homepage: rendered.page, sampled, findings };
   } finally {
+    releaseCrawl();
     // Ours, so ours to close. A merchant-session context belongs to `escalate` and is not touched.
     await crawl.close().catch(() => undefined);
   }

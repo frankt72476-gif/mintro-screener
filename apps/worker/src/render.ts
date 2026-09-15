@@ -92,6 +92,14 @@ export interface RenderOptions {
    */
   readonly settle?: 'network' | 'content';
   /**
+   * The run's cancellation (D-281).
+   *
+   * Checked before the request leaves, and honoured in the catch: every other failure in a render
+   * becomes a `PageContext` carrying `renderError`, but a cancelled run is not a page that failed to
+   * render, and turning it into one is how an abandoned crawl kept rendering the rest of the site.
+   */
+  readonly signal?: AbortSignal;
+  /**
    * Whether this render's capture is worth keeping, decided **after** the page is read (D-155).
    *
    * Called with the page as it stands — everything except the artifact keys, which is all any
@@ -305,6 +313,7 @@ export async function renderPage(
   const borrowed = options.context !== undefined;
 
   try {
+    options.signal?.throwIfAborted();
     // Crawl-delay is observed before the request leaves, not after (D-013).
     await options.pacer?.before();
 
@@ -652,6 +661,9 @@ export async function renderPage(
       ...(signupForm === undefined ? {} : { signupForm }),
     };
   } catch (error) {
+    // A cancelled run is not a failed render (D-281). Closing the context on abort is what makes the
+    // call in flight throw; this is what stops that throw being filed as a page and the crawl moving on.
+    if (options.signal?.aborted === true) throw options.signal.reason;
     return {
       page: failedPage(url, capturedAt, describeError(error)),
       artifacts: [],

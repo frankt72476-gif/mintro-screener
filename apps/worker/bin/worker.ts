@@ -44,6 +44,15 @@ import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { recordSignIn } from '../src/auth/credentialState.js';
 import { establishSession, recordSignInSteps } from '../src/auth/login.js';
+import { DeadlineExceeded, withDeadlineOr } from '../src/deadline.js';
+
+/**
+ * How long a cancelled crawl is given to stop before the browser is recycled under it (D-281).
+ *
+ * Closing its contexts makes the call in flight throw at once, and every loop checks the signal, so a
+ * crawl that honours the abort settles in well under a second. The bound is for one that does not.
+ */
+const CANCEL_SETTLE_MS = 15_000;
 import {
   createHttpFetcher,
   describePhase,
@@ -668,6 +677,8 @@ async function handle(
 ): Promise<HandleOutcome> {
   const runId = randomUUID();
   const started = Date.now();
+  // Aborted by the watchdog, and nothing else (D-281).
+  const controller = new AbortController();
   // A holder rather than a `let`: the assignment happens inside the `escalate` callback, and
   // TypeScript's control-flow analysis cannot see through a closure — it would narrow the variable
   // to `null` and reject the close below.
@@ -694,6 +705,7 @@ async function handle(
   try {
     const screening = screenStorefront(browser, request.url, ruleset, {
       runId,
+      signal: controller.signal,
 
       // Called only if the anonymous crawl is refused. The analyst chose nothing; this is the
       // escalation D-040 describes, and it happens on evidence or not at all.
@@ -710,6 +722,8 @@ async function handle(
       },
 
       onProgress: (event) => {
+        // A cancelled crawl says nothing more (D-281). Its lines used to run on into the next job's.
+        if (controller.signal.aborted) return;
         console.log(`  ${describePhase(event)} — ${event.line}`);
         progress.write(event);
       },
@@ -735,18 +749,38 @@ async function handle(
 
     if (outcome.kind === 'timeout') {
       /*
-        The crawl is still live inside the browser the loop is about to close. Attaching a handler
-        first is not tidiness: closing the browser rejects every pending Playwright call, and an
-        orphaned promise with no handler takes the process down with an unhandled rejection.
+        Cancelled, not detached (D-281).
+
+        This was `void screening.catch(() => undefined)`: the crawl was left running and the browser
+        closed under it. Every remaining step then failed fast, was filed as an ordinary failure, and
+        the crawl walked the rest of the site logging into the next job's output. It is aborted now:
+        the signal is checked at every stage and in every loop, the contexts it owns close on abort,
+        and the signed-in context — ours — is closed here.
+
+        Waited for, briefly. The handler attached by `.then` is also what keeps a rejection from an
+        unsettled crawl from reaching the process as an unhandled rejection.
       */
-      void screening.catch(() => undefined);
+      controller.abort(new DeadlineExceeded('the screening run', RUN_DEADLINE_MS));
+      await held.context?.close().catch(() => undefined);
+      const stopped = await withDeadlineOr(
+        screening.then(
+          () => true,
+          () => true,
+        ),
+        CANCEL_SETTLE_MS,
+        'the cancelled crawl settling',
+        false,
+      );
 
       const minutes = Math.round(RUN_DEADLINE_MS / 60_000);
       const message = runTimeoutMessage(RUN_DEADLINE_MS);
 
       console.error(
         `  TERMINATED after ${Math.round((Date.now() - started) / 1000)}s — watchdog deadline of ` +
-          `${minutes} minutes expired; the browser will be recycled before the next job`,
+          `${minutes} minutes expired; ` +
+          (stopped
+            ? 'the crawl stopped; the browser will be recycled before the next job'
+            : `the crawl did not stop within ${CANCEL_SETTLE_MS / 1000}s; the browser will be recycled under it`),
       );
       await settleThenFinish(progress, supabase, request.id, { status: 'failed', error: message });
       return { recycleBrowser: true };

@@ -76,6 +76,8 @@ export interface CoaOptions {
   readonly pacer: Pacer;
   readonly timeoutMs?: number;
   readonly onProgress?: (line: string) => void;
+  /** The run's cancellation, checked before every candidate (D-281). */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -105,6 +107,7 @@ export async function fetchCertificate(
   let sawTransport = false;
 
   for (const url of candidates.slice(0, 5)) {
+    options.signal?.throwIfAborted();
     await options.pacer.before();
 
     const response = await page.request

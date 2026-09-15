@@ -62,6 +62,8 @@ export interface GateInput {
   readonly access: AnonymousAccess;
   /** A product page for the checkout flow, or undefined when the crawl found none. */
   readonly productUrl?: string;
+  /** The run's cancellation, checked before every rule (D-281). */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -100,6 +102,7 @@ export async function runGateRules(input: GateInput): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   for (const rule of ruleset.rules) {
+    input.signal?.throwIfAborted();
     if (!wantsAnonymous(rule)) continue;
 
     if (rule.type === 'http_probe') {

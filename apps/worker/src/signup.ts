@@ -280,6 +280,8 @@ export interface DiscoverOptions {
    */
   readonly rankCandidates?: (urls: readonly string[]) => readonly string[];
   readonly context?: BrowserContext;
+  /** The run's cancellation, checked before every candidate and passed to every render (D-281). */
+  readonly signal?: AbortSignal;
   /** True when the crawl has already entered a gate on `context` (D-267). */
   readonly alreadyEnteredGate?: boolean;
   /** Called when a render here submitted a gate, so the caller can stop re-passing it. */
@@ -388,6 +390,7 @@ export async function discoverLayer3(
   /** Every page each surface established, for the surfaces that yield more than one (D-274). */
   const established = new Map<string, readonly PageContext[]>();
   for (const what of documents) {
+    options.signal?.throwIfAborted();
     step(what.label);
     const outcome = await findDocument(
       browser, origin, options, attempts, artifacts, pages, say, what, probe,
@@ -435,6 +438,7 @@ async function findSignupForm(
   let closest = '';
 
   for (const path of REGISTER_PATHS) {
+    options.signal?.throwIfAborted();
     const url = `${origin}${path}`;
     /*
       One visit, not two (D-155).
@@ -452,6 +456,7 @@ async function findSignupForm(
       pacer: options.pacer,
       timeoutMs: options.timeoutMs ?? 30_000,
       idleMs: PROBE_IDLE_MS,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       readSignupForm: true,
       ...gatePassOptions(options),
       keepCapture: (candidate) =>
@@ -755,6 +760,7 @@ async function findDocument(
   }
 
   for (const url of candidates) {
+    options.signal?.throwIfAborted();
     if (!url.startsWith(origin)) continue;
 
     /*
@@ -795,6 +801,7 @@ async function findDocument(
       pacer: options.pacer,
       timeoutMs: options.timeoutMs ?? 30_000,
       idleMs: PROBE_IDLE_MS,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       keepCapture: (page) => establishDocument(url, page, spec, []).located,
       ...gatePassOptions(options),
     });

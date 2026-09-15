@@ -57,6 +57,8 @@ export interface FlowOptions {
   /** A product page to start from. Chosen by the caller, never at random. */
   readonly productUrl: string;
   readonly origin: string;
+  /** The run's cancellation, checked before the flow starts (D-281). Its context is closed on abort. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -70,6 +72,7 @@ export async function runCheckoutFlow(
   context: BrowserContext,
   options: FlowOptions,
 ): Promise<FlowObservation> {
+  options.signal?.throwIfAborted();
   const timeout = options.timeoutMs ?? 20_000;
   const steps: string[] = [];
   const capturedAt = new Date().toISOString();

@@ -27,6 +27,8 @@ export interface ProbeOptions {
   /** A context carrying a session, or null to probe as an anonymous visitor. */
   readonly authenticated: BrowserContext | null;
   readonly timeoutMs?: number;
+  /** The run's cancellation, checked before every path (D-281). */
+  readonly signal?: AbortSignal;
 }
 
 /** Probes each path once, returning a result per path whether or not it completed. */
@@ -56,6 +58,7 @@ export async function probePaths(
 
   try {
     for (const path of paths) {
+      options.signal?.throwIfAborted();
       const url = new URL(path, origin).toString();
       const fetchedAt = new Date().toISOString();
       const page = await context.newPage();

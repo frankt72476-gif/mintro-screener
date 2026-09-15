@@ -18972,3 +18972,44 @@ render timeout. Together, 40 s for one page.
 wedged page fails at the read ceiling, an anonymous render still waits for network quiet, and the
 selector list and the extractor cannot drift apart.
 
+
+## D-281 — A run past its deadline is cancelled, not abandoned
+
+**Date:** 2026-09-15
+**Status:** accepted
+**Found on:** runs `905b4e0e`, `c12b8f8a` and `6cc959ea` (legendarypeptides.com)
+
+### What happened
+
+All three hit the 30-minute watchdog (D-152), and in all three the worker log kept going after
+`TERMINATED`. At `worker.ts:742` the watchdog did `void screening.catch(() => undefined)` and returned
+`recycleBrowser: true`: the crawl was detached, not stopped. Closing the browser made every pending
+call throw, but `renderPage` files any throw as a page that failed to render, so the crawl carried on
+through the rest of the site — the FAQ, the payment policy, eight editorial candidates — in a few
+seconds of dead requests, printing `layer 3: 0 fail · 3 review · 4 pass` into the log of the next job.
+Nothing in `screenStorefront`, `renderPage` or the layers could be told to stop.
+
+### The change
+
+- **An `AbortSignal` threads through the crawl.** `ScreenOptions`, `RenderOptions`, `DiscoverOptions`,
+  `CoaOptions`, `ProbeOptions`, `FlowOptions` and `GateInput` each take one.
+- **It is checked at every stage boundary** in `screenStorefront` — before the homepage, before and
+  after escalation, before and after the certificate, before discovery, before and after the gate
+  rules — **and at the top of every per-item loop**: the product sample, the sign-up paths, each
+  policy document and each of its candidates, each certificate candidate, each gate rule, each probe
+  path, and the checkout flow's start.
+- **The contexts a crawl owns close on abort** — the crawl context, the certificate context, the
+  checkout-flow context — so the call in flight throws at once instead of waiting out a 30 s
+  navigation. The signed-in context belongs to the worker, which closes it.
+- **`renderPage` rethrows an abort.** Every other failure is still a `PageContext` with `renderError`;
+  a cancelled run is not a page that failed.
+- **The worker aborts instead of detaching**, waits up to `CANCEL_SETTLE_MS` (15 s) for the crawl to
+  settle, says in the `TERMINATED` line whether it stopped, and still recycles the browser. A progress
+  event after the abort is not logged or written.
+
+`cancellation.test.ts` aborts a crawl of a slow local storefront as its first product page lands, and
+asserts the thing that went wrong: once it settles, not one more request reaches the storefront and
+not one more progress line is emitted.
+
+What the watchdog then records is D-282.
+
