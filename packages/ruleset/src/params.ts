@@ -203,7 +203,14 @@ const TEXT_MATCHERS = [
  */
 export const textMatchParams = z
   .object({
-    surface,
+    /**
+     * One surface, or several through `surfaces` — exactly one of the two (D-284).
+     *
+     * `surfaces` matches on any listed page type: a rule asking whether the terms *or* the guidelines
+     * name something reads both. Every existing rule keeps its single `surface` unchanged.
+     */
+    surface: surface.optional(),
+    surfaces: z.array(surface).min(2).optional(),
     terms: nonEmptyStrings.optional(),
     pattern: nonEmptyText.optional(),
     labels: nonEmptyStrings.optional(),
@@ -258,6 +265,15 @@ export const textMatchParams = z
   .superRefine((value, ctx) => {
     requireAtLeastOne(value, ctx, TEXT_MATCHERS, 'matcher');
     requireCompilableRegex(value.pattern, ctx, 'pattern');
+    if ((value.surface === undefined) === (value.surfaces === undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'must define exactly one of surface or surfaces',
+      });
+    }
+    if (value.surfaces !== undefined && new Set(value.surfaces).size !== value.surfaces.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'surfaces must not repeat a surface' });
+    }
   });
 
 /**

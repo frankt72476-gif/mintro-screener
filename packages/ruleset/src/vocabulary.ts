@@ -151,6 +151,16 @@ export const SURFACES = [
    * customers can see it. The footer and the public policy pages are where that appears.
    */
   'footer_and_public_pages',
+  /*
+    The adult AI page types (D-284), located through that vertical's page-type table
+    (`pageTypes.ts`) and read by its Layer 3 pass. `terms` above is shared.
+  */
+  'guidelines',
+  'removal',
+  'pricing',
+  'create',
+  'generate',
+  'docs',
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 

@@ -210,3 +210,14 @@ export {
   type SlotRow,
   type Removal,
 } from './composeSet.js';
+
+// Page types per vertical (D-274, D-284). Browser-safe data.
+export {
+  ADULT_AI_PAGES,
+  ADULT_AI_PAGE_TYPES,
+  PEPTIDE_PAGES,
+  PEPTIDE_PAGE_TYPES,
+  type PageTypeDocument,
+  type PageTypeTable,
+  type VerticalPages,
+} from './pageTypes.js';

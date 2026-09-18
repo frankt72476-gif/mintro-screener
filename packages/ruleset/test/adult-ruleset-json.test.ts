@@ -35,7 +35,8 @@ const PRESENT = /^(AITD-00[1-3]|AIGATE-00[1-3]|AIPOL-00[1-7]|AIBILL-00[1-3])$/;
 describe('rules/ruleset-adult-ai.json', () => {
   it('loads, at the version and date cluster 1 ships', () => {
     // 0.1.1: phrase-level term lists, AIGATE-003 retitled. 0.1.2: unambiguous single words and inflections.
-    expect(adult.version).toBe('0.1.2');
+    // 0.2.0: rules read several page types (cluster 2).
+    expect(adult.version).toBe('0.2.0');
     expect(adult.effective).toBe('2026-09-18');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
@@ -68,6 +69,24 @@ describe('rules/ruleset-adult-ai.json', () => {
       expect(rule.weight, rule.id).toBe('ordinary');
       expect(rule.sense, rule.id).toBe(PRESENT.test(rule.id) ? 'present' : 'absent');
     }
+  });
+
+  it('reads the page types cluster 2 scoped each rule to (D-284)', () => {
+    const scope = Object.fromEntries(
+      adult.rules.map((r) => [r.id, r.type === 'text_match' ? r.params.surfaces : undefined]),
+    );
+    expect(scope).toEqual({
+      'AIGATE-003': ['homepage', 'terms'],
+      'AIPOL-001': ['terms', 'guidelines'],
+      'AIPOL-002': ['terms', 'guidelines'],
+      'AIPOL-003': ['terms', 'guidelines'],
+      'AIPOL-004': ['terms', 'guidelines'],
+      'AIPOL-006': ['terms', 'guidelines'],
+      'AITD-001': ['footer', 'removal'],
+      'AITD-002': ['terms', 'removal'],
+    });
+    // The runner that reads several page types is Layer 3's.
+    expect(adult.rules.every((r) => r.layer === 3)).toBe(true);
   });
 
   it('carries no manual rule and no placeholder', () => {

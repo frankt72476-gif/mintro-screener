@@ -33,7 +33,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
-import { VERTICALS, isVertical, loadRulesetForVertical, type Ruleset, type Vertical } from '@mintro/ruleset';
+import { VERTICALS, VERTICAL_FILES, isVertical, loadRulesetForVertical, type Ruleset, type Vertical } from '@mintro/ruleset';
 import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
@@ -737,6 +737,8 @@ async function handle(
     const vertical = requestVertical(request);
     const screening = screenStorefront(browser, request.url, rulesets[vertical], {
       runId,
+      // The vertical's page types, which decide what the Layer 3 pass looks for (D-284).
+      pages: VERTICAL_FILES[vertical].pages,
       signal: controller.signal,
       onControl: (control) => {
         controls.current = control;

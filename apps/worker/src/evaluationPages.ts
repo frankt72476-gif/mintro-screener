@@ -50,7 +50,7 @@
  */
 
 import type { Browser } from 'playwright';
-import type { Ruleset } from '@mintro/ruleset';
+import { PEPTIDE_PAGE_TYPES, type PageTypeTable, type Ruleset } from '@mintro/ruleset';
 import { containsTokenSequence, tokenizePath, type ScreeningReport } from '@mintro/engine';
 import { extractPage } from './extract.js';
 import { createCrawlContext, PLAYWRIGHT_DEFAULT_VIEWPORT } from './render.js';
@@ -133,95 +133,32 @@ export const slugsNaming = (surface: string): readonly string[] =>
  * *surface*, not the page's own name for itself: angle 3 reads a cart the same way it reads a
  * checkout, and angle 4 reads a login the same way it reads a registration form.
  */
-export const SURFACE_SLUGS: readonly (readonly [string, string])[] = [
-  /*
-    Specific first, general second, and the split is load-bearing rather than tidy.
-
-    `/pages/shipping-policy` carries both `shipping` and `policy`. With `policy` listed first it was
-    labelled `terms` — a shipping policy filed as the terms page, which is wrong twice: the terms
-    page then looks present when it is not, and the shipping policy angle 5 wants is filed
-    somewhere nobody looks for it. Seen on run 97bf366a.
-  */
-  ['shipping', 'shipping_policy'],
-  ['refund', 'shipping_policy'],
-  ['return', 'shipping_policy'],
-  ['returns', 'shipping_policy'],
-  ['checkout', 'checkout'],
-  ['cart', 'checkout'],
-  ['register', 'register'],
-  ['registration', 'register'],
-  ['signup', 'register'],
-  ['sign-up', 'register'],
-  ['login', 'register'],
-  ['faq', 'faq'],
-
-  // General. Reached only when no specific token matched the path.
-  ['policy', 'terms'],
-  ['policies', 'terms'],
-  ['terms', 'terms'],
-
-  ['account', 'register'],
-
-  /*
-    How a storefront talks about itself — a third band, **after** the general one (D-270).
-
-    The table used to be two bands and the ordering rule was *specific before general*. About is
-    neither: it is the loosest reading of all, and a path carrying an about token and a policy token
-    is a policy page. `/about-our-return-policy` and `/blog/terms-of-service` are both real shapes,
-    and both should be read as what they are about rather than where they live.
-
-    So the rule is now *specific, then general, then about*, and `slugBands` in the test file is
-    what holds it.
-
-    `about-us` precedes `about` and `our-story` precedes `story` for the reason the shipping note
-    above records: these are token sequences, and the longer one has to be tried first or the
-    shorter one swallows it.
-  */
-  ['about-us', 'about'],
-  ['about', 'about'],
-  ['our-story', 'about'],
-  ['story', 'about'],
-  ['mission', 'about'],
-  ['why-us', 'about'],
-
-  /*
-    Editorial, last of all (D-274).
-
-    `blog` and `news` moved here from the about band: a blog is not a page a site wrote about
-    itself, it is a page a site wrote to be read, and the two answer different angles. `faq` is
-    **not** here — it keeps its own surface, because COMM-001 reads that document specifically and a
-    FAQ relabelled `editorial` would take a rule's subject away from it.
-
-    `quality`, `coa`, `certificates` and `promise` are on the list because CoMo has no blog, no
-    articles and no research pages, and does have `/quality-promise/`, `/how-to-read-a-coa/` and
-    `/certificates-of-analysis/`. A list that matched nothing on the one merchant we can test
-    against would be a surface that renders on no run.
-  */
-  ['articles', 'editorial'],
-  ['article', 'editorial'],
-  ['research', 'editorial'],
-  ['learn', 'editorial'],
-  ['guides', 'editorial'],
-  ['guide', 'editorial'],
-  ['resources', 'editorial'],
-  ['education', 'editorial'],
-  ['blog', 'editorial'],
-  ['news', 'editorial'],
-  ['quality', 'editorial'],
-  ['coa', 'editorial'],
-  ['certificates', 'editorial'],
-  ['certificate', 'editorial'],
-  ['promise', 'editorial'],
-];
+/*
+  Moved to `packages/ruleset/src/pageTypes.ts` as `PEPTIDE_PAGE_TYPES` (D-284), with its comments, so
+  each vertical carries its own table. Entries and order are unchanged; `pageTypes.test.ts` holds
+  them against a literal copy of this table as it stood.
+*/
+export const SURFACE_SLUGS: PageTypeTable = PEPTIDE_PAGE_TYPES;
 
 /**
  * The surface a URL's path names, or null.
  *
- * First match in `SURFACE_SLUGS` order wins, so the more specific token is listed before the more
- * general one where they could both hit. Reads the path only — a host or a query string carrying
- * `checkout` is not a checkout page.
+ * First match in table order wins, so the more specific token is listed before the more general one
+ * where they could both hit. Reads the path only — a host or a query string carrying `checkout` is
+ * not a checkout page. The table is the vertical's (D-284); absent, the peptide one.
  */
-export function surfaceFromSlug(url: string): string | null {
+export function surfaceFromSlug(url: string, table: PageTypeTable = SURFACE_SLUGS): string | null {
+  const index = pageTypeEntry(url, table);
+  return index === null ? null : table[index]![1];
+}
+
+/**
+ * The index of the table entry a URL's path matches first, or null (D-284).
+ *
+ * `surfaceFromSlug` reads the page type off it; `rankByPageTypeOrder` reads the index itself, so a
+ * terms page named by a terms slug is read ahead of one named only by a policy slug.
+ */
+export function pageTypeEntry(url: string, table: PageTypeTable = SURFACE_SLUGS): number | null {
   let path: string;
   try {
     path = new URL(url).pathname;
@@ -232,8 +169,8 @@ export function surfaceFromSlug(url: string): string | null {
   const tokens = tokenizePath(path);
   if (tokens.length === 0) return null;
 
-  for (const [slug, surface] of SURFACE_SLUGS) {
-    if (containsTokenSequence(tokens, tokenizePath(slug))) return surface;
+  for (let i = 0; i < table.length; i += 1) {
+    if (containsTokenSequence(tokens, tokenizePath(table[i]![0]))) return i;
   }
   return null;
 }

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { loadRulesetFile } from './loadFile.js';
 import type { Ruleset } from './schema.js';
 import type { Vertical } from './vocabulary.js';
+import { ADULT_AI_PAGES, PEPTIDE_PAGES, type VerticalPages } from './pageTypes.js';
 
 export interface VerticalFiles {
   /** The rule set, relative to the repository root. */
@@ -34,6 +35,8 @@ export interface VerticalFiles {
    * carry would name a policy nobody can read.
    */
   readonly referralPolicy: { readonly document: string; readonly version: string } | null;
+  /** The page types this vertical's crawl recognises and looks for (`pageTypes.ts`). */
+  readonly pages: VerticalPages;
 }
 
 export const VERTICAL_FILES: Readonly<Record<Vertical, VerticalFiles>> = {
@@ -42,12 +45,14 @@ export const VERTICAL_FILES: Readonly<Record<Vertical, VerticalFiles>> = {
     corpus: 'rules/sources/ruo-standards-v1.1.md',
     ratifiedTiers: true,
     referralPolicy: null,
+    pages: PEPTIDE_PAGES,
   },
   adult_ai: {
     ruleset: 'rules/ruleset-adult-ai.json',
     corpus: 'rules/sources/adult-ai-sources-v1.md',
     ratifiedTiers: false,
     referralPolicy: { document: 'docs/referral-policy-adult-ai.md', version: '1.0' },
+    pages: ADULT_AI_PAGES,
   },
 };
 

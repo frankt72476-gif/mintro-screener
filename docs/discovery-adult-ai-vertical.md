@@ -509,4 +509,15 @@ count.
   footer plus the removal page. Recorded 2026-09-18, after cluster 1 commit 2a.
 - **`text_match` takes one surface, and `params.note` renders nowhere (cluster 2).** AIGATE-003 stays a
   homepage stand-in, with its limits stated only in a note no reader sees, until a multi-surface
-  handler exists. Recorded 2026-09-18, after cluster 1 commit 2a.
+  handler exists. Recorded 2026-09-18, after cluster 1 commit 2a. **Update, cluster 2 commit 1:** the
+  multi-surface handler exists (`checkTextMatchAcross`), and AIGATE-003 reads the homepage and the terms
+  document. `params.note` still renders nowhere.
+- **The peptide about and editorial surfaces can never be established (peptide, found in cluster 2).**
+  `findDocument` in `apps/worker/src/signup.ts` builds its `SurfaceSpec` with `pathNames` taken from
+  `linkHints`, and `establishDocument` refuses any page whose path contains none of them
+  (`pathNamesSurface`, `packages/engine/src/surface.ts:173-181`). The about page and editorial surfaces
+  declare `linkHints: []`, so `pathNames` is empty and `pathNamesSurface` returns false for every
+  candidate: each is rendered and then refused with "does not name this surface in its path". Checked
+  by calling `pathNamesSurface` with an empty list; not checked against a stored run. Left unchanged
+  in cluster 2, which keeps peptide behaviour byte-identical; the adult page types pass their table's
+  slugs as `pathNames` and are not affected. Recorded 2026-09-18.

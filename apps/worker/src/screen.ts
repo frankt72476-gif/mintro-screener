@@ -24,7 +24,7 @@
 import type { Browser, BrowserContext } from 'playwright';
 import type { ProgressEvent } from '@mintro/engine';
 import { createScanProgress } from './scanProgress.js';
-import type { Ruleset } from '@mintro/ruleset';
+import type { Ruleset, VerticalPages } from '@mintro/ruleset';
 import {
   eyeTestManifest,
   createHttpFetcher,
@@ -112,6 +112,13 @@ export type Escalation =
 
 export interface ScreenOptions {
   readonly runId: string;
+  /**
+   * The vertical's page types (D-284). Absent: the peptide Layer 3 pass, exactly as it was.
+   *
+   * With `documents`, the Layer 3 pass locates those page types through the vertical's table, and
+   * a rule's `surfaces` resolve against what it located.
+   */
+  readonly pages?: VerticalPages;
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
   /**
    * Progress, with structure (D-173).
@@ -695,6 +702,7 @@ export async function screenStorefront(
       inFooter: link.inFooter,
     })),
     onProgress: (line, count) => say(line, count),
+    ...(options.pages === undefined ? {} : { pages: options.pages }),
   });
 
   // Every Layer 3 candidate this pass rendered, for the challenge count (D-264). Most were
@@ -716,6 +724,13 @@ export async function screenStorefront(
   if (discovered.faq.located) progress.surfaceRead('the FAQ');
   if (discovered.payment.located) progress.surfaceRead('the payment or refund policy');
   if (discovered.about.located) progress.surfaceRead('the about page');
+  // The vertical's own page types, where it names them (D-284). Terms is already listed above.
+  for (const [pageType, page] of discovered.pageTypes) {
+    if (pageType !== 'terms' && page.located) {
+      const label = options.pages?.documents?.find((d) => d.pageType === pageType)?.label ?? `${pageType} page`;
+      progress.surfaceRead(`the ${label}`);
+    }
+  }
   if (discovered.editorial.length > 0) {
     progress.surfaceRead(
       discovered.editorial.length === 1
@@ -758,6 +773,7 @@ export async function screenStorefront(
       shipping: discovered.shipping,
       faq: discovered.faq,
       payment: discovered.payment,
+      pages: discovered.pageTypes,
     },
     ruleset,
   );

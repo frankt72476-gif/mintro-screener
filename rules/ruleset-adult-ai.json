@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
+  "version": "0.2.0",
   "source_document": "Adult AI public-rule excerpts v1",
   "effective": "2026-09-18",
   "states": [
@@ -34,7 +34,7 @@
     {
       "id": "AIGATE-003",
       "cat": "access",
-      "layer": 1,
+      "layer": 3,
       "sev": "major",
       "type": "text_match",
       "tier": "auto_fail",
@@ -46,7 +46,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "homepage",
+        "surfaces": [
+          "homepage",
+          "terms"
+        ],
         "terms": [
           "is an AI",
           "are an AI",
@@ -66,7 +69,7 @@
         ],
         "word_boundary": true,
         "expect": "present",
-        "note": "Reads the homepage. The terms page is not read by this rule: a text_match rule takes one surface. Disclosure at first interaction, inside the chat, is not observable from the crawl."
+        "note": "Reads the homepage and the terms document. Disclosure at first interaction, inside the chat, is not observable from the crawl."
       }
     },
     {
@@ -84,7 +87,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "guidelines"
+        ],
         "terms": [
           "under 18",
           "under the age of 18",
@@ -127,7 +133,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "guidelines"
+        ],
         "terms": [
           "real person",
           "real people",
@@ -165,7 +174,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "guidelines"
+        ],
         "terms": [
           "non-consensual",
           "nonconsensual",
@@ -198,7 +210,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "guidelines"
+        ],
         "terms": [
           "bestiality",
           "sexual acts with animals",
@@ -226,7 +241,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "guidelines"
+        ],
         "terms": [
           "mutilation",
           "dismemberment",
@@ -242,7 +260,7 @@
     {
       "id": "AITD-001",
       "cat": "takedown",
-      "layer": 1,
+      "layer": 3,
       "sev": "major",
       "type": "text_match",
       "tier": "auto_fail",
@@ -254,7 +272,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "footer",
+        "surfaces": [
+          "footer",
+          "removal"
+        ],
         "terms": [
           "report content",
           "request removal",
@@ -291,7 +312,10 @@
       "source": "programme",
       "sense": "present",
       "params": {
-        "surface": "terms",
+        "surfaces": [
+          "terms",
+          "removal"
+        ],
         "terms": [
           "48 hours",
           "forty-eight hours",
