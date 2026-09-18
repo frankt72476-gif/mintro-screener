@@ -1,7 +1,6 @@
 # Adult AI screener — design memo
 
-Status: v0.2, reconciled against docs/discovery-adult-ai-vertical.md, 2026-09-18. Pending Frank's
-ratification.
+Status: v0.3, ratified by Frank 2026-09-18.
 
 Nothing here is built. Decisions D-284 to D-289 record the rulings this version rests on.
 
@@ -146,17 +145,25 @@ Rule IDs carry a vertical prefix so shared tooling can tell them apart: `AIGATE-
 `AIFEAT-`, `AICAT-`, `AITD-`, `AIBILL-`, `AIMKT-`, `AIPRB-`, `AIATT-`. Each is one hyphen and a
 letters-only prefix, as the rule ID pattern requires (`/^[A-Z]+-\d{3}$/`).
 
-Enforcement: all automated rules are declared in the auto tier (`tier: auto_fail`), so the `review`
-state never arises in this vertical. Engine states are unchanged (`fail`, `review`, `pass`,
-`not_evaluable`). A per-vertical label map renders them in observation-only vocabulary:
+Engine states are unchanged (`fail`, `review`, `pass`, `not_evaluable`).
 
-| Engine state | Rendered label (this vertical) |
-|---|---|
-| `fail` | Observed |
-| `pass` | Not observed |
-| `not_evaluable` | Could not be checked |
+**Labels.** Each rule declares `sense: absent | present`. For `absent` rules a finding is the thing
+being present; for `present` rules a finding is the thing being missing.
 
-How manual rules resolve against the four states is an open discovery item (11.8).
+| Engine state | `sense: absent` | `sense: present` |
+|---|---|---|
+| `fail` | Observed | Not observed |
+| `pass` | Not observed | Observed |
+| `not_evaluable` | Could not be checked | Could not be checked |
+
+Rule titles are phrased as the thing being looked for, so the label completes the sentence.
+AITD-001..003, AIGATE-001..003, AIPOL-001..007 and AIBILL-001..003 are `present`; all others are
+`absent`.
+
+**Review.** The adult rule set declares every automated rule `auto_fail` and uses no co-occurrence
+or value-collecting checks, so the review state never arises. Manual (AIATT-) rules resolve to
+`not_evaluable` ('Could not be checked'); their attestation answers render in the attestations
+section. Each AIATT- rule's params.reason names the attestation question that covers it.
 
 The referral policy (section 3) is applied at intake; it is never rendered as a finding about the
 merchant, and is rendered once in the report's boundary section as "Mintro's referral policy was
@@ -340,8 +347,9 @@ Items 11.1–11.7 are answered in `docs/discovery-adult-ai-vertical.md`. Item 11
    evidenced from existing data or needs a field.
 7. **Copy audit (this vertical only).** Every rendered string that would be shared with the adult
    vertical containing fail / pass / blocker / clean / compliant / recommend.
-8. **Manual rules and attestations.** How manual rules resolve against the four engine states today,
-   and how attestation answers attach to them. *(Open.)*
+8. **Manual rules and attestations.** 11.8 — Whether to link a manual rule to its attestation
+   question so the rule row can render by answer status; today no link exists (schema.ts:216-221).
+   Decide in cluster 4. *(Open.)*
 
 Output: a discovery note in `docs/`, no code changes.
 

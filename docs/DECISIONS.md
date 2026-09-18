@@ -19152,7 +19152,7 @@ separate defect, found while tracing this one, and not changed here.
 ## D-284 — Adult AI vertical
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/adult-ai-screener-design.md` v0.2; `docs/discovery-adult-ai-vertical.md`
 
 A second vertical keyed on runs (column carried from the scan request, as `org_id` was), with its own
@@ -19165,18 +19165,31 @@ Rationale: Sponsor Agreement 1.5.
 ## D-285 — Adult vertical hard constraints A1–A8
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/adult-ai-screener-design.md` section 1
 
 Adult vertical hard constraints A1–A8 as listed in `docs/adult-ai-screener-design.md` section 1,
 citing Sponsor Agreement 1.4, 1.5, 2.2. Observation-only vocabulary is rendered via a per-vertical
 label map over the unchanged engine states.
 
+**Label map.** Each rule declares `sense: absent | present`. For `absent` rules a finding is the thing
+being present; for `present` rules a finding is the thing being missing. Absent rules render
+fail→"Observed", pass→"Not observed"; present rules render fail→"Not observed", pass→"Observed";
+not_evaluable→"Could not be checked" for both. Rule titles are phrased as the thing being looked for
+so the label completes the sentence. AITD-001..003, AIGATE-001..003, AIPOL-001..007 and
+AIBILL-001..003 are `present`; all others `absent`.
+
+**Review resolution.** The adult rule set declares every automated rule `auto_fail` and uses no
+co-occurrence or value-collecting checks, so the review state never arises. Manual (AIATT-) rules
+resolve to `not_evaluable` ('Could not be checked'); their attestation answers render in the
+attestations section. Each AIATT- rule's params.reason names the attestation question that covers
+it. Whether to link a manual rule to its question is open (memo 11.8, decided in cluster 4).
+
 
 ## D-286 — Source column
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/adult-ai-screener-design.md` section 5
 
 Where no published standard exists for a vertical, the report's requirement heading is "Source" and
@@ -19187,7 +19200,7 @@ unchanged; heading is vertical-aware copy.
 ## D-287 — Mintro Referral Policy, Adult AI
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/adult-ai-screener-design.md` sections 3.1 and 3.1a
 
 A versioned Mintro marketing document applied at intake by category and feature under Sponsor
@@ -19198,7 +19211,7 @@ P-1 and P-2 ratified 2026-09-18. Runs stamp the policy version.
 ## D-288 — Validator parameterisation
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/discovery-adult-ai-vertical.md` item 2
 
 The ruleset validator takes rule set, corpus and tier lists as arguments and skips the angle-set check
@@ -19208,11 +19221,11 @@ when the vertical has none. Exact corpus heading "## From the standards" retaine
 ## D-289 — Probe runner deferred to v1.1
 
 **Date:** 2026-09-18
-**Status:** accepted
+**Status:** accepted (ratified with memo v0.3, 2026-09-18)
 **See:** `docs/adult-ai-screener-design.md` section 6; `docs/discovery-adult-ai-vertical.md` item 4(c)
 
 Principle fixed now: precursor-only, text-only, from a versioned counsel-reviewed file, graded from
-response text; a probe not in the file is never sent. The typing exception to D-266/D-267 will be
+response text; a probe not in the file is never sent. The typing exception to D-267 and D-039 will be
 scoped in its own record when built. Chat surfaces behind account creation are `not_evaluable` unless
 the merchant supplies screening-time test access (decision shared with the peptide authenticated-crawl
 item).
