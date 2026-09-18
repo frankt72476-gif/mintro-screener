@@ -43,8 +43,10 @@ describe('0088 over existing rows', () => {
       OWNER_ID,
     ]);
 
-    // Would throw "is immutable (D-002)" if the migration rewrote finished rows.
+    // Would throw "is immutable (D-002)" if either migration rewrote finished rows, and 0089's
+    // constraint would refuse to be added if an existing row violated it.
     await applyMigration(before, '0088');
+    await applyMigration(before, '0089');
 
     const [run] = await before.query<{ vertical: string; referral_policy_version: string | null }>(
       `select vertical, referral_policy_version from public.runs where id = $1`,
@@ -143,6 +145,28 @@ describe('runs.vertical and scan_requests.vertical (0088)', () => {
     });
   });
 
+  it('refuses a peptide run that names a referral policy version (0089, D-287)', async () => {
+    const merchantId = await merchant('peptide-with-policy.example');
+    expect(
+      await schema.attempt(
+        `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by, org_id, vertical, referral_policy_version)
+         values ($1, 'public', '3.11.0', 'running', $2, $3, 'peptides', '1.0')`,
+        [merchantId, OWNER_ID, await hostOrg()],
+      ),
+    ).toMatch(/runs_referral_policy_matches_vertical/);
+  });
+
+  it('refuses an adult_ai run that names no referral policy version (0089, D-287)', async () => {
+    const merchantId = await merchant('adult-without-policy.example');
+    expect(
+      await schema.attempt(
+        `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by, org_id, vertical)
+         values ($1, 'public', '0.1.2', 'running', $2, $3, 'adult_ai')`,
+        [merchantId, OWNER_ID, await hostOrg()],
+      ),
+    ).toMatch(/runs_referral_policy_matches_vertical/);
+  });
+
   it('refuses a run vertical outside the two', async () => {
     const merchantId = await merchant('bad-vertical.example');
     expect(
@@ -151,7 +175,10 @@ describe('runs.vertical and scan_requests.vertical (0088)', () => {
          values ($1, 'public', '2.4.0', 'running', $2, $3, 'gaming')`,
         [merchantId, OWNER_ID, await hostOrg()],
       ),
-    ).toMatch(/runs_vertical_check/);
+      // Both 0088's vertical check and 0089's policy tie refuse 'gaming', which is in neither of
+      // 0089's branches. Postgres names whichever violated check it evaluates first, so either name
+      // is the row being refused for this reason.
+    ).toMatch(/runs_vertical_check|runs_referral_policy_matches_vertical/);
   });
 
   it('defaults a scan request to peptides, keeps adult_ai, and refuses anything else', async () => {
