@@ -89,6 +89,22 @@ export {
 export { checkAgainstCorpus, corpusClauseLines, CORPUS_CLAUSE_HEADING } from './corpus.js';
 export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 
+// Which rule set and corpus each vertical uses (D-284, D-288). Node only.
+export {
+  VERTICAL_FILES,
+  loadRulesetForVertical,
+  referralPolicyVersion,
+  type VerticalFiles,
+} from './verticalFiles.js';
+export {
+  DEFAULT_RULESET_PATH,
+  TIER_LISTS,
+  parseValidateArgs,
+  type ParsedValidateArgs,
+  type TierList,
+  type ValidateArgs,
+} from './validateArgs.js';
+
 export { PARAMS_BY_CHECK_TYPE } from './params.js';
 
 export {
@@ -106,12 +122,17 @@ export {
   ROUTING_RULE_IDS,
   RULE_ID_PATTERN,
   RULE_WEIGHTS,
+  SENSES,
+  senseOf,
   SEVERITIES,
   STATES,
   SURFACES,
   THRESHOLDS,
   TIERS,
   URL_SCOPES,
+  VERTICALS,
+  DEFAULT_VERTICAL,
+  isVertical,
   WEIGHTED_TIERS,
   tierCarriesWeight,
   type CheckType,
@@ -123,12 +144,14 @@ export {
   type FlowFailure,
   type Layer,
   type RuleWeight,
+  type Sense,
   type Severity,
   type State,
   type Surface,
   type Threshold,
   type Tier,
   type UrlScope,
+  type Vertical,
 } from './vocabulary.js';
 
 // Documents Check slot definitions. Seeded from CHECK-INVENTORY §3/§4 for M1; M2 replaces the

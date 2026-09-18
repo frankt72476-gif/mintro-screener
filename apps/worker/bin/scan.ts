@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser } from 'playwright';
-import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
+import { DEFAULT_VERTICAL, loadRulesetFile, type Ruleset } from '@mintro/ruleset';
 import { tally, type EvidenceArtifact, type Finding } from '@mintro/engine';
 import { screenStorefront } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
@@ -155,6 +155,9 @@ async function scan(
       runId,
       createdBy: owner.id,
       orgId: owner.orgId,
+      // This entry point screens against `rules/ruleset.json` only, so its runs are peptide runs.
+      // Stated rather than left to the column default (D-284).
+      vertical: DEFAULT_VERTICAL,
     });
     // Read back rather than reported from the writer's own return value. `persistRun` refuses to
     // close an incomplete run, and this confirms from the database that it did close one.

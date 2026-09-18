@@ -16,6 +16,7 @@ import {
   LAYERS,
   RULE_ID_PATTERN,
   RULE_WEIGHTS,
+  SENSES,
   SEVERITIES,
   STATES,
   TIERS,
@@ -94,6 +95,11 @@ const ruleCommon = {
   subject: z.string().min(1),
   /** Whose statement `clause` is. Required — see `RULE_SOURCES`. */
   source: z.enum(RULE_SOURCES),
+  /**
+   * Which way a finding points, for a vertical's label map (D-285). Optional: absent reads as
+   * `absent` through `senseOf`, which is every peptide rule.
+   */
+  sense: z.enum(SENSES).optional(),
   /**
    * Rules that describe the same observation from another angle (D-050).
    *
@@ -291,8 +297,14 @@ export const rulesetSchema = z
     states: statesSchema,
     categories: z.array(categorySchema).min(1),
     rules: z.array(ruleSchema).min(1),
-    attestations: z.array(attestationSchema).min(1),
-    not_checked: z.array(notCheckedSchema).min(1),
+    /*
+      Both may be empty (Frank, 2026-09-18). The adult AI rule set carries no questions and no
+      boundary items until its attestation set is written in cluster 4, and inventing
+      merchant-facing copy to satisfy a schema is worse than an empty list. The peptide file's
+      counts stay pinned in `ruleset-json.test.ts`, which is where a dropped question is caught.
+    */
+    attestations: z.array(attestationSchema),
+    not_checked: z.array(notCheckedSchema),
     /**
      * Vocabulary the sampler reads, and nothing else does (D-223).
      *

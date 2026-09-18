@@ -1,8 +1,13 @@
 /**
  * Validates a rule set file and reports every defect.
  *
- *     npm run validate                 # validates rules/ruleset.json
- *     npm run validate -- path.json    # validates a specific file
+ *     npm run validate                               # rules/ruleset.json, then the adult AI rule set
+ *     node validate-ruleset.js                       # rules/ruleset.json, RUO corpus, ratified tiers
+ *     node validate-ruleset.js path.json             # that file, RUO corpus, ratified tiers
+ *     node validate-ruleset.js --ruleset P --corpus C [--tiers ratified]
+ *
+ * The argument shapes are `validateArgs.ts`'s (D-288). With no flags the behaviour is exactly what it
+ * was before a second vertical existed.
  *
  * Exit code 0 when the rule set is sound, 1 when it is not, so this can gate CI. The rule set
  * is the single source of truth for a screen that produces evidence in a merchant dispute; a
@@ -12,19 +17,24 @@
 import { resolve } from 'node:path';
 import {
   ANGLES_PATH,
-  CORPUS_PATH,
   checkAgainstCorpusFile,
   checkRatifiedTiers,
   corpusClauseLines,
   tryLoadAngleSetFile,
   tryLoadRulesetFile,
+  parseValidateArgs,
 } from '../src/index.js';
 import { readFileSync } from 'node:fs';
 
-const DEFAULT_PATH = 'rules/ruleset.json';
-
 function main(argv: readonly string[]): number {
-  const target = resolve(process.cwd(), argv[0] ?? DEFAULT_PATH);
+  const parsed = parseValidateArgs(argv);
+  if (!parsed.ok) {
+    console.error(parsed.error);
+    return 1;
+  }
+  const { args } = parsed;
+
+  const target = resolve(process.cwd(), args.ruleset);
   const result = tryLoadRulesetFile(target);
 
   if (!result.ok) {
@@ -51,15 +61,17 @@ function main(argv: readonly string[]): number {
     test is a perfectly well-formed rule set and holds none of the ratified ids — a loader that
     refused it would be asserting that every rule set in the world is Mintro's.
   */
-  const ratifiedDefects = checkRatifiedTiers(ruleset.rules);
+  const ratifiedDefects = args.tiers === undefined ? [] : checkRatifiedTiers(ruleset.rules);
 
   /*
     The corpus check (D-139).
 
-    Run against the file rather than an argument, because the corpus is not a parameter of the rule
-    set being validated — it is the document the rule set claims to quote, and there is one of it.
+    The corpus is the document the rule set claims to quote. There is one per vertical now (D-286,
+    D-288), so it is named alongside the rule set rather than fixed here — and never defaulted for a
+    named rule set, which `parseValidateArgs` refuses.
   */
-  const corpus = resolve(process.cwd(), CORPUS_PATH);
+  const corpusPath = args.corpus;
+  const corpus = resolve(process.cwd(), corpusPath);
   const corpusDefects = checkAgainstCorpusFile(ruleset, corpus);
 
   console.log(`${target}`);
@@ -83,7 +95,7 @@ function main(argv: readonly string[]): number {
   }
 
   if (corpusDefects.length > 0) {
-    console.error(`\nRule set at ${target} does not agree with ${CORPUS_PATH} — ${corpusDefects.length} defect(s):`);
+    console.error(`\nRule set at ${target} does not agree with ${corpusPath} — ${corpusDefects.length} defect(s):`);
     for (const defect of corpusDefects) {
       const where = defect.ruleId === undefined ? defect.path : `${defect.ruleId} (${defect.path})`;
       console.error(`  • ${where}: ${defect.message}`);
@@ -104,6 +116,18 @@ function main(argv: readonly string[]): number {
     lines = 0;
   }
   console.log(`  standards  ${programme} programme clause(s) matched against ${lines} corpus line(s)`);
+
+  /*
+    No tier-list argument: the ratified tiers and the angle set are the peptide programme's, and
+    neither applies (D-284, D-288). Said rather than skipped quietly — a check whose absence is
+    silent reads exactly like one that passed.
+  */
+  if (args.tiers === undefined) {
+    console.log("  ratified   not checked: no tier list given (the ratified legality and routing lists are the peptide programme's, D-259)");
+    console.log('  angles     not checked: no tier list given, so no angle set applies (D-284)');
+    console.log('\nValid.');
+    return 0;
+  }
 
   /*
     The angle set (D-260).

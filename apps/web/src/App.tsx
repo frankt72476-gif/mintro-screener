@@ -7,9 +7,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parseRuleset, type Ruleset } from '@mintro/ruleset';
+import type { Ruleset } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
-import rulesetJson from '../../../rules/ruleset.json';
 import { createEvidenceAccess } from './lib/evidence.js';
 import type { EvidenceAccess } from './lib/evidence.js';
 import { AuthProvider, useAuth } from './lib/auth.js';
@@ -45,6 +44,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createCredentialDeposit } from './lib/credentials.js';
 import { readCredentialState, normaliseDomain, type CredentialState } from './lib/credentialState.js';
 import { readReportCapture, type CapturedReport } from './lib/reportCapture.js';
+import { rulesetFor } from './lib/rulesets.js';
 import {
   canDeliver,
   captureStateLine,
@@ -677,14 +677,14 @@ function Screener({
    * The same loader the worker uses — there is no second parser (hard constraint 1). If the
    * committed rule set were malformed the app would fail here, loudly, rather than rendering a
    * report against rules it had not checked.
+   *
+   * The peptide rule set, which the rule set pane and the rail describe. A run is resolved against
+   * its own vertical's through `rulesetFor(loaded.vertical)` (D-284).
    */
-  const ruleset = useMemo<{ ok: true; value: Ruleset } | { ok: false; message: string }>(() => {
-    try {
-      return { ok: true, value: parseRuleset(rulesetJson, 'bundled rules/ruleset.json') };
-    } catch (cause) {
-      return { ok: false, message: cause instanceof Error ? cause.message : String(cause) };
-    }
-  }, []);
+  const ruleset = useMemo<{ ok: true; value: Ruleset } | { ok: false; message: string }>(
+    () => rulesetFor('peptides'),
+    [],
+  );
 
   /**
    * Re-reads the run list.
@@ -926,7 +926,9 @@ function Screener({
       const stored = await readRunAttestations(client, runId);
       // A rule set that failed to parse renders no report at all a few lines down, so there is
       // nothing to attach statements to either.
-      if (stored !== null && ruleset.ok) setAttestations(resolveAttestations(loaded.report.attestationQuestions ?? [], stored));
+      //
+      // The run's own vertical's rule set, not the peptide one the rule set pane shows (D-284).
+      if (stored !== null && rulesetFor(loaded.vertical).ok) setAttestations(resolveAttestations(loaded.report.attestationQuestions ?? [], stored));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStage('input');
