@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "source_document": "Adult AI public-rule excerpts v1",
   "effective": "2026-09-18",
   "states": [
@@ -104,7 +104,9 @@
           "minors in a sexual context",
           "child exploitation",
           "under eighteen",
-          "child sexual abuse"
+          "child sexual abuse",
+          "underage",
+          "minors"
         ],
         "word_boundary": true,
         "expect": "present"
@@ -140,7 +142,9 @@
           "identifiable person",
           "real persons",
           "real individual",
-          "real individuals"
+          "real individuals",
+          "deepfakes",
+          "deep fakes"
         ],
         "word_boundary": true,
         "expect": "present"
@@ -227,7 +231,9 @@
           "mutilation",
           "dismemberment",
           "snuff",
-          "gore"
+          "gore",
+          "mutilated",
+          "dismembered"
         ],
         "word_boundary": true,
         "expect": "present"
@@ -263,7 +269,8 @@
           "take it down",
           "non-consensual intimate",
           "intimate image",
-          "intimate images"
+          "intimate images",
+          "takedowns"
         ],
         "word_boundary": true,
         "expect": "present"

@@ -499,3 +499,14 @@ count.
   `rules/ruleset.json` whatever the run's vertical. When the send and capture gates learn vertical,
   these jobs must refuse an `adult_ai` run with a reason rather than evaluate it against the peptide
   rule set. Recorded 2026-09-18, after cluster 1 commit 2.
+- **The terms-page selection reads one page and can pick the wrong one (cluster 2).** The `terms`
+  surface is chosen by the slugs `policy`, `policies` and `terms` (`SURFACE_SLUGS`,
+  `apps/worker/src/evaluationPages.ts`), so a merchant linking a "Content Removal Policy" can have that
+  page read as its terms, and a merchant whose rules live at `/guidelines` (xchar.ai) has them not
+  read at all. Cluster 2 needs a page-type list for this vertical: terms;
+  guidelines / community-guidelines / content-policy / acceptable-use; removal / complaints; pricing;
+  create; generate; docs. The AIPOL rules then read terms plus guidelines, and the AITD rules read the
+  footer plus the removal page. Recorded 2026-09-18, after cluster 1 commit 2a.
+- **`text_match` takes one surface, and `params.note` renders nowhere (cluster 2).** AIGATE-003 stays a
+  homepage stand-in, with its limits stated only in a note no reader sees, until a multi-surface
+  handler exists. Recorded 2026-09-18, after cluster 1 commit 2a.

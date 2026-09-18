@@ -34,8 +34,8 @@ const PRESENT = /^(AITD-00[1-3]|AIGATE-00[1-3]|AIPOL-00[1-7]|AIBILL-00[1-3])$/;
 
 describe('rules/ruleset-adult-ai.json', () => {
   it('loads, at the version and date cluster 1 ships', () => {
-    // 0.1.1: phrase-level term lists and AIGATE-003 retitled (commit 2a).
-    expect(adult.version).toBe('0.1.1');
+    // 0.1.1: phrase-level term lists, AIGATE-003 retitled. 0.1.2: unambiguous single words and inflections.
+    expect(adult.version).toBe('0.1.2');
     expect(adult.effective).toBe('2026-09-18');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });

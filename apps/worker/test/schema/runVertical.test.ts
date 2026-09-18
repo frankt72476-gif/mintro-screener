@@ -111,6 +111,38 @@ describe('runs.vertical and scan_requests.vertical (0088)', () => {
     expect(stored).toEqual({ vertical: 'adult_ai' });
   });
 
+  it('stamps referral policy 1.0 on an adult_ai run and leaves a peptide run null (D-287)', async () => {
+    const open = async (runId: string, domain: string, vertical: 'peptides' | 'adult_ai') => {
+      const row = runRowFor({
+        runId,
+        merchantId: await merchant(domain),
+        report: { startedAt: new Date().toISOString(), mode: 'public', rulesetVersion: '0.1.2', politeness: 'none', truncations: [] },
+        createdBy: OWNER_ID,
+        orgId: await hostOrg(),
+        vertical,
+      });
+      const columns = Object.keys(row);
+      await schema.query(
+        `insert into public.runs (${columns.join(', ')}) values (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+        Object.values(row),
+      );
+      const [stored] = await schema.query<{ vertical: string; referral_policy_version: string | null }>(
+        `select vertical, referral_policy_version from public.runs where id = $1`,
+        [runId],
+      );
+      return stored;
+    };
+
+    expect(await open('00000000-0000-4000-8000-00000000a1a2', 'policy-adult.example', 'adult_ai')).toEqual({
+      vertical: 'adult_ai',
+      referral_policy_version: '1.0',
+    });
+    expect(await open('00000000-0000-4000-8000-00000000a1a3', 'policy-peptide.example', 'peptides')).toEqual({
+      vertical: 'peptides',
+      referral_policy_version: null,
+    });
+  });
+
   it('refuses a run vertical outside the two', async () => {
     const merchantId = await merchant('bad-vertical.example');
     expect(

@@ -44,7 +44,7 @@
  */
 
 import type { EvidenceArtifact, ReportFinding, ScreeningReport } from '@mintro/engine';
-import { isVertical, type Vertical } from '@mintro/ruleset';
+import { isVertical, referralPolicyVersion, type Vertical } from '@mintro/ruleset';
 import { putEvidence, type WorkerSupabase } from './supabase.js';
 import { assessContents, assessRun, countFindings } from './completeness.js';
 
@@ -339,6 +339,9 @@ export function runRowFor(input: {
     created_by: input.createdBy,
     org_id: input.orgId,
     vertical: input.vertical,
+    // Stamped at creation from the vertical, never passed in: the policy a run was screened under is
+    // the one in force for its vertical when it opened (D-287). Null for peptides, which has none.
+    referral_policy_version: referralPolicyVersion(input.vertical),
     started_at: input.report.startedAt,
     mode: input.report.mode,
     ruleset_version: input.report.rulesetVersion,

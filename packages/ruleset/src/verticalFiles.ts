@@ -26,6 +26,14 @@ export interface VerticalFiles {
    * code, and the angle set is the evaluation layer's, which D-284 does not use for adult AI.
    */
   readonly ratifiedTiers: boolean;
+  /**
+   * The Mintro Referral Policy this vertical applies at intake, and the version a run stamps (D-287).
+   *
+   * Null for peptides, which has none. `docs/referral-policy-adult-ai.md` states its own version in
+   * its header, and a test holds the two equal: a run stamped with a version the document does not
+   * carry would name a policy nobody can read.
+   */
+  readonly referralPolicy: { readonly document: string; readonly version: string } | null;
 }
 
 export const VERTICAL_FILES: Readonly<Record<Vertical, VerticalFiles>> = {
@@ -33,13 +41,20 @@ export const VERTICAL_FILES: Readonly<Record<Vertical, VerticalFiles>> = {
     ruleset: 'rules/ruleset.json',
     corpus: 'rules/sources/ruo-standards-v1.1.md',
     ratifiedTiers: true,
+    referralPolicy: null,
   },
   adult_ai: {
     ruleset: 'rules/ruleset-adult-ai.json',
     corpus: 'rules/sources/adult-ai-sources-v1.md',
     ratifiedTiers: false,
+    referralPolicy: { document: 'docs/referral-policy-adult-ai.md', version: '1.0' },
   },
 };
+
+/** The referral policy version a run of this vertical is stamped with, or null where there is none. */
+export function referralPolicyVersion(vertical: Vertical): string | null {
+  return VERTICAL_FILES[vertical].referralPolicy?.version ?? null;
+}
 
 /** The rule set a run of this vertical is screened against, read and validated. */
 export function loadRulesetForVertical(vertical: Vertical, root = '.'): Ruleset {

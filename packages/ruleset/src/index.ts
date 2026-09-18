@@ -90,7 +90,12 @@ export { checkAgainstCorpus, corpusClauseLines, CORPUS_CLAUSE_HEADING } from './
 export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 
 // Which rule set and corpus each vertical uses (D-284, D-288). Node only.
-export { VERTICAL_FILES, loadRulesetForVertical, type VerticalFiles } from './verticalFiles.js';
+export {
+  VERTICAL_FILES,
+  loadRulesetForVertical,
+  referralPolicyVersion,
+  type VerticalFiles,
+} from './verticalFiles.js';
 export {
   DEFAULT_RULESET_PATH,
   TIER_LISTS,
