@@ -19148,3 +19148,72 @@ nothing writes one there — publishing deletes the draft's `handles`. So `F`, `
 published evaluation's prose probably render as unresolved chips in the capture today. That is a
 separate defect, found while tracing this one, and not changed here.
 
+
+## D-284 — Adult AI vertical
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/adult-ai-screener-design.md` v0.2; `docs/discovery-adult-ai-vertical.md`
+
+A second vertical keyed on runs (column carried from the scan request, as `org_id` was), with its own
+rule set file, source corpus, attestation set, and referral policy. The evaluation layer (angles,
+draft, editor, publish, placement) is not used for it.
+
+Rationale: Sponsor Agreement 1.5.
+
+
+## D-285 — Adult vertical hard constraints A1–A8
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/adult-ai-screener-design.md` section 1
+
+Adult vertical hard constraints A1–A8 as listed in `docs/adult-ai-screener-design.md` section 1,
+citing Sponsor Agreement 1.4, 1.5, 2.2. Observation-only vocabulary is rendered via a per-vertical
+label map over the unchanged engine states.
+
+
+## D-286 — Source column
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/adult-ai-screener-design.md` section 5
+
+Where no published standard exists for a vertical, the report's requirement heading is "Source" and
+the byte-exact corpus is excerpts of the public rules and statutes each finding relates to. Source enum
+unchanged; heading is vertical-aware copy.
+
+
+## D-287 — Mintro Referral Policy, Adult AI
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/adult-ai-screener-design.md` sections 3.1 and 3.1a
+
+A versioned Mintro marketing document applied at intake by category and feature under Sponsor
+Agreement 1.1. Never rendered as a finding about a merchant, never quoted as a standard. v1.0 lines
+P-1 and P-2 ratified 2026-09-18. Runs stamp the policy version.
+
+
+## D-288 — Validator parameterisation
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/discovery-adult-ai-vertical.md` item 2
+
+The ruleset validator takes rule set, corpus and tier lists as arguments and skips the angle-set check
+when the vertical has none. Exact corpus heading "## From the standards" retained as an identifier.
+
+
+## D-289 — Probe runner deferred to v1.1
+
+**Date:** 2026-09-18
+**Status:** accepted
+**See:** `docs/adult-ai-screener-design.md` section 6; `docs/discovery-adult-ai-vertical.md` item 4(c)
+
+Principle fixed now: precursor-only, text-only, from a versioned counsel-reviewed file, graded from
+response text; a probe not in the file is never sent. The typing exception to D-266/D-267 will be
+scoped in its own record when built. Chat surfaces behind account creation are `not_evaluable` unless
+the merchant supplies screening-time test access (decision shared with the peptide authenticated-crawl
+item).
+

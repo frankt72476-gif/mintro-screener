@@ -1,8 +1,9 @@
 # Adult AI screener — design memo
 
-Status: draft for Frank's ratification, 2026-09-18. Nothing here is built. Section 11 lists the
-read-only discovery CC runs before any design line is treated as fixed. Decision numbers are
-proposed; CC assigns the next free numbers when it records them.
+Status: v0.2, reconciled against docs/discovery-adult-ai-vertical.md, 2026-09-18. Pending Frank's
+ratification.
+
+Nothing here is built. Decisions D-284 to D-289 record the rulings this version rests on.
 
 ---
 
@@ -84,6 +85,20 @@ confirms or contradicts the answer by feature detection. A contradiction is itse
 Policy — Adult AI, v1.0**, versioned like the rule set, and it says so in its own header. It is not
 a standard, not a compliance criterion, and never quoted to a merchant as one.
 
+### 3.1a Ratified v1.0 policy lines (Frank, 2026-09-18)
+
+P-1. Mintro does not refer a merchant whose product accepts user-supplied images or video for
+character creation or generation, by any means, for any purpose.
+
+P-2. Mintro does not refer a merchant unless all of the following are observed or attested with
+evidence: no minor-coded terms in the public catalogue or marketing; age constrained at character
+creation; output-side moderation, CSAM hash-matching, and NCMEC reporting in place. (A refusal probe
+becomes a fourth leg when the probe runner ships under D-289.)
+
+Note: categories 6, 8, 10, 11 remain proposed, not yet ratified. Policy is versioned; each run stamps
+the policy version it was screened under; earlier referrals are not re-judged when the policy
+changes.
+
 ### 3.2 Detectors
 
 Every "do not refer" category is defined by a machine-detectable feature or term so that intake
@@ -127,47 +142,55 @@ Intake ──► Surface crawl ──► Probe library ──► Attestations �
 
 ## 5. Rule set skeleton — `rules/ruleset-adult-ai.json`
 
-Rule IDs get a vertical prefix so shared tooling can tell them apart: `AAI-`.
+Rule IDs carry a vertical prefix so shared tooling can tell them apart: `AIGATE-`, `AIPOL-`,
+`AIFEAT-`, `AICAT-`, `AITD-`, `AIBILL-`, `AIMKT-`, `AIPRB-`, `AIATT-`. Each is one hyphen and a
+letters-only prefix, as the rule ID pattern requires (`/^[A-Z]+-\d{3}$/`).
 
-Enforcement vocabulary for this vertical is two-valued and neither value is a verdict:
+Enforcement: all automated rules are declared in the auto tier (`tier: auto_fail`), so the `review`
+state never arises in this vertical. Engine states are unchanged (`fail`, `review`, `pass`,
+`not_evaluable`). A per-vertical label map renders them in observation-only vocabulary:
 
-- `report` — rendered as a finding when observed.
-- `referral_policy` — applied at intake under section 3; never rendered as a finding about the
-  merchant, rendered once in the report's boundary section as "Mintro's referral policy was
-  applied at intake."
+| Engine state | Rendered label (this vertical) |
+|---|---|
+| `fail` | Observed |
+| `pass` | Not observed |
+| `not_evaluable` | Could not be checked |
 
-Outcomes per rule stay as they are in the engine: `observed`, `not_observed`, `not_evaluable`,
-`attested`, `unanswered`.
+How manual rules resolve against the four states is an open discovery item (11.8).
+
+The referral policy (section 3) is applied at intake; it is never rendered as a finding about the
+merchant, and is rendered once in the report's boundary section as "Mintro's referral policy was
+applied at intake."
 
 ### Categories and representative rules
 
 | Category | Rule | Checks | Source column |
 |---|---|---|---|
-| **Access** | AAI-GATE-001 | Age assurance method on entry: none / self-declaration / third-party AV vendor present | State AV statutes; Mastercard AN 5196 |
-| | AAI-GATE-002 | Geo-blocking or AV routing for AV-law states | State AV statutes |
-| | AAI-GATE-003 | Non-human disclosure at first interaction | Cal. SB 243; NY GBL Art. 47 |
-| **Content policy** | AAI-POL-001..006 | ToS / guidelines name each 5.12.7 category: minors incl. synthetic, real-person likeness, non-consent, bestiality, incest, mutilation | Mastercard Rules 5.12.7 (Feb 2026) |
-| | AAI-POL-007 | Minor-coded term list published by merchant | 5.12.7 |
-| **Features** | AAI-FEAT-001 | Upload / reference-image control present | 5.12.7 (synthetic likeness) |
-| | AAI-FEAT-002 | Faceswap or face-consistency feature | 5.12.7 |
-| | AAI-FEAT-003 | Video generation | 5.12.7 |
-| | AAI-FEAT-004 | User-selectable model / LoRA loading | 5.12.7 |
-| | AAI-FEAT-005 | User-created characters with unconstrained age field | 5.12.7; SB 243 |
-| **Catalog** | AAI-CAT-001 | Minor-coded tokens in character names, tags, categories | 5.12.7 |
-| | AAI-CAT-002 | Real-person names or lookalike language in library | 5.12.7 |
-| | AAI-CAT-003 | Animal-coded explicit tokens | 5.12.7 |
-| **Takedown** | AAI-TD-001 | Notice-and-removal route published | TAKE IT DOWN Act |
-| | AAI-TD-002 | 48-hour removal commitment stated | TAKE IT DOWN Act; VIRP |
-| | AAI-TD-003 | 2257 statement present (only meaningful if real performers) | 18 U.S.C. §2257 |
-| **Billing** | AAI-BILL-001 | Trial and renewal terms disclosed at checkout | Visa/MC negative-option rules |
-| | AAI-BILL-002 | Cancellation path as easy as signup | same |
-| | AAI-BILL-003 | Refund / chargeback policy findable | same; IQW merchant agreement 2.11 |
-| | AAI-BILL-004 | Peer-to-peer or crypto-only rails advertised | Mintro observation |
-| **Marketing** | AAI-MKT-001 | "No filter / uncensored" lexicon on public pages | 5.12.7 context |
-| | AAI-MKT-002 | Affiliate program present | Mintro observation |
-| | AAI-MKT-003 | App-store presence vs web/APK-only | Mintro observation |
-| **Probes** | AAI-PRB-001..n | One rule per probe; outcome = refuse / comply / silent | Section 6 |
-| **Manual** | AAI-ATT-* | Section 8 | — |
+| **Access** | AIGATE-001 | Age assurance method on entry: none / self-declaration / third-party AV vendor present | State AV statutes; Mastercard AN 5196 |
+| | AIGATE-002 | Geo-blocking or AV routing for AV-law states | State AV statutes |
+| | AIGATE-003 | Non-human disclosure at first interaction | Cal. SB 243; NY GBL Art. 47 |
+| **Content policy** | AIPOL-001..006 | ToS / guidelines name each 5.12.7 category: minors incl. synthetic, real-person likeness, non-consent, bestiality, incest, mutilation | Mastercard Rules 5.12.7 (Feb 2026) |
+| | AIPOL-007 | Minor-coded term list published by merchant | 5.12.7 |
+| **Features** | AIFEAT-001 | Upload / reference-image control present | 5.12.7 (synthetic likeness) |
+| | AIFEAT-002 | Faceswap or face-consistency feature | 5.12.7 |
+| | AIFEAT-003 | Video generation | 5.12.7 |
+| | AIFEAT-004 | User-selectable model / LoRA loading | 5.12.7 |
+| | AIFEAT-005 | User-created characters with unconstrained age field | 5.12.7; SB 243 |
+| **Catalog** | AICAT-001 | Minor-coded tokens in character names, tags, categories | 5.12.7 |
+| | AICAT-002 | Real-person names or lookalike language in library | 5.12.7 |
+| | AICAT-003 | Animal-coded explicit tokens | 5.12.7 |
+| **Takedown** | AITD-001 | Notice-and-removal route published | TAKE IT DOWN Act |
+| | AITD-002 | 48-hour removal commitment stated | TAKE IT DOWN Act; VIRP |
+| | AITD-003 | 2257 statement present (only meaningful if real performers) | 18 U.S.C. §2257 |
+| **Billing** | AIBILL-001 | Trial and renewal terms disclosed at checkout | Visa/MC negative-option rules |
+| | AIBILL-002 | Cancellation path as easy as signup | same |
+| | AIBILL-003 | Refund / chargeback policy findable | same; IQW merchant agreement 2.11 |
+| | AIBILL-004 | Peer-to-peer or crypto-only rails advertised | Mintro observation |
+| **Marketing** | AIMKT-001 | "No filter / uncensored" lexicon on public pages | 5.12.7 context |
+| | AIMKT-002 | Affiliate program present | Mintro observation |
+| | AIMKT-003 | App-store presence vs web/APK-only | Mintro observation |
+| **Probes** | AIPRB-001..n | One rule per probe; outcome = refuse / comply / silent (deferred to v1.1, D-289) | Section 6 |
+| **Manual** | AIATT-* | Section 8 | — |
 
 Sizes are estimates until discovery: roughly 40–50 rules, 10–14 manual.
 
@@ -181,8 +204,11 @@ Mintro-observation heading (D-138 pattern).
 
 `rules/sources/adult-ai-sources-v1.md` holds the excerpts (Mastercard Rules 5.12.7 text, AN 5196
 requirements, TAKE IT DOWN removal window, SB 243 / NY Art. 47 disclosure language). The existing
-byte-exact substring validator runs against it for every `source: external` rule, with the same
+byte-exact substring validator runs against it for every `source: programme` rule, with the same
 vacuous-pass guards. Provenance header states each excerpt's origin document and date.
+
+The source enum is unchanged; the rendered heading is vertical-aware copy ('Source' for this
+vertical).
 
 Mintro-authored text appears in exactly two places: rule titles, and the referral policy document.
 Neither is a standard.
@@ -190,6 +216,8 @@ Neither is a standard.
 ---
 
 ## 6. Probe library
+
+Deferred to v1.1 under D-289. Not part of clusters 1–5.
 
 ### 6.1 Principle
 
@@ -201,6 +229,8 @@ there. A probe is a request that is legal to make; its acceptance is the finding
 - Text-only. Runs against the merchant's chat surface when one is reachable without an account or
   purchase (A8). If the chat surface is behind account creation, every probe rule is
   `not_evaluable` with reason `surface_not_public`, and that is reported as such.
+- Probes behind account creation are `not_evaluable` unless the merchant supplies screening-time test
+  access. That decision is shared with the peptide authenticated-crawl item.
 - Graded from response text only: `refuse` (explicit refusal or policy statement),
   `comply` (the request is acted on), `silent` (no usable response). No image is ever requested.
 - Fixed, versioned, committed as `rules/probes/adult-ai-probes-v1.json`. Counsel reviews the file
@@ -268,6 +298,7 @@ Unanswered renders as unanswered. No attestation is compared to a threshold.
 - No summary block. No counts in the email. No colours that encode good/bad.
 - Recipient: IQWallet, before approval. Agent copy at Frank's discretion per existing send rules.
 - Delivery record: existing send log, plus retention of the sent capture.
+- Delivery evidence: the send log plus the CRM approval date. No approval event is built.
 
 ---
 
@@ -275,17 +306,20 @@ Unanswered renders as unanswered. No attestation is compared to a threshold.
 
 | Reused unchanged | Reused with a vertical parameter | New |
 |---|---|---|
-| Crawler, render, capture (D-264..268, 277) | Rule set loader and validator (per-vertical file and source corpus) | Segmentation intake and referral policy application |
-| Runs, immutability (D-002) | Attestation form (per-vertical question set) | Feature detectors (upload, faceswap, video, model/LoRA, lexicons) |
-| Send path, send log, worker route | Findings report renderer (revive or rebuild — 11.3) | Docs-host discovery (`llms.txt`, docs subdomain) |
-| Multi-org tenancy | Copy constants (`REQUIREMENT_HEADINGS` → "Source") | Probe runner and grader |
-| Documents Check | | `rules/sources/adult-ai-sources-v1.md` |
+| Runs, immutability (D-002) | Rule set loader and validator (per-vertical file and source corpus) | Segmentation intake and referral policy application |
+| Multi-org tenancy | Attestation form (per-vertical question set) | Feature detectors (upload, faceswap, video, model/LoRA, lexicons) |
+| Documents Check | Findings report renderer (revive or rebuild — 11.3) | Docs-host discovery (`llms.txt`, docs subdomain) |
+| | Copy constants (`REQUIREMENT_HEADINGS` → "Source") | Probe runner and grader (v1.1, D-289) |
+| | Send path, send log, worker route — send and capture gates branch on vertical; the sendable artifact for adult runs is the `ReportView` findings capture | `rules/sources/adult-ai-sources-v1.md` |
+| | Crawler, render, capture (D-264..268, 277) — crawler gains a docs-host second origin and a rendered-DOM check-handler type on a fixed page-type list | Validator parameterised by rule set, corpus and tier lists; angle-set check skipped when absent (D-288) |
 
 Not reused: angle set, evaluation draft, editor, publish, placement, summary block.
 
 ---
 
 ## 11. Read-only discovery for CC (before any build)
+
+Items 11.1–11.7 are answered in `docs/discovery-adult-ai-vertical.md`. Item 11.8 is open.
 
 1. **Vertical threading.** Where would a `vertical` key live: on the org, the merchant, or the run?
    Which of ruleset load, attestation set, report renderer, and send copy would need to branch on
@@ -306,6 +340,8 @@ Not reused: angle set, evaluation draft, editor, publish, placement, summary blo
    evidenced from existing data or needs a field.
 7. **Copy audit (this vertical only).** Every rendered string that would be shared with the adult
    vertical containing fail / pass / blocker / clean / compliant / recommend.
+8. **Manual rules and attestations.** How manual rules resolve against the four engine states today,
+   and how attestation answers attach to them. *(Open.)*
 
 Output: a discovery note in `docs/`, no code changes.
 
@@ -317,31 +353,35 @@ Output: a discovery note in `docs/`, no code changes.
    policy document committed; decision records.
 2. **Intake and detectors.** Segmentation form; feature detectors; docs-host discovery; lexicons
    as data; segmentation-conflict handling.
-3. **Probe runner.** Public chat surface interaction; grading; transcript retention; probe file
-   versioning. Counsel sign-off on the probe file is a gate for this cluster, not for clusters 1–2.
+3. **Probe runner (v1.1, deferred; gated on industry input rewritten to precursor form, counsel
+   review, and the test-access decision).** Public chat surface interaction; grading; transcript
+   retention; probe file versioning. See D-289.
 4. **Attestations and report.** Question set; findings renderer with Source column; boundary
    section; capture.
 5. **Delivery and process.** IQWallet send; delivery evidence; every-merchant rule in ops docs.
+   Delivery evidence is the send log plus the CRM approval date; no approval event is built.
 6. **First real screen.** xchar.ai, by hand against the rule set, as the accuracy audit — same
-   method as the CoMo record, without its vocabulary.
+   method as the CoMo record, without its vocabulary. Runs without probes.
 
 Each cluster: one held commit per stage, guards observed failing before trusted, deploy and review
 before the next.
 
 ---
 
-## 13. Decision records to write (proposed)
+## 13. Decision records
 
-- **D-next** — Adult AI vertical exists as a separate rule set, source corpus, attestation set,
-  and referral policy under a `vertical` key; the evaluation layer is not used for it.
-- **D-next** — Hard constraints A1–A8 adopted for the adult vertical, citing Sponsor Agreement
-  1.4, 1.5, 2.2.
-- **D-next** — Source column replaces "Published standard" where no standard exists; excerpts of
+Recorded in `docs/DECISIONS.md`:
+
+- **D-284** — Adult AI vertical exists as a separate rule set, source corpus, attestation set,
+  and referral policy under a `vertical` key on runs; the evaluation layer is not used for it.
+- **D-285** — Hard constraints A1–A8 adopted for the adult vertical, citing Sponsor Agreement
+  1.4, 1.5, 2.2; observation-only labels over the unchanged engine states.
+- **D-286** — Source column replaces "Published standard" where no standard exists; excerpts of
   public rules are the byte-exact corpus.
-- **D-next** — Probe library principle: precursor-only, text-only, versioned, counsel-reviewed;
-  no probe outside the file is ever sent.
-- **D-next** — Referral policy is a Mintro marketing document applied at intake by feature; never
-  a finding, never quoted as a standard.
+- **D-287** — Referral policy is a Mintro marketing document applied at intake by feature; never
+  a finding, never quoted as a standard. v1.0 lines P-1 and P-2 ratified.
+- **D-288** — Validator parameterised by rule set, corpus and tier lists.
+- **D-289** — Probe runner deferred to v1.1; probe library principle fixed now.
 
 ---
 
