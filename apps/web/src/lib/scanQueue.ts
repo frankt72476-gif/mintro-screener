@@ -19,6 +19,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SCAN_PHASES, type ScanPhase } from '@mintro/engine';
 import { RUN_DEADLINE_MS as DEADLINE } from '@mintro/engine';
+import { DEFAULT_VERTICAL, type Vertical } from '@mintro/ruleset';
 
 /** `truncated`: the run was cut short at its time limit and kept as it stood (D-282, 0087). */
 export type ScanStatus = 'queued' | 'running' | 'done' | 'truncated' | 'failed';
@@ -96,6 +97,11 @@ export interface ScanQueue {
    */
   request(
     url: string,
+    /**
+     * The vertical to screen under (D-284). Defaults to `peptides`, which is also the column's default
+     * (0088). No screen offers a choice yet; the parameter exists so the request row can carry one.
+     */
+    vertical?: Vertical,
   ): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
   list(limit?: number): Promise<RequestList>;
@@ -128,7 +134,7 @@ export interface ScanQueue {
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
   return {
-    async request(url) {
+    async request(url, vertical = DEFAULT_VERTICAL) {
       const normalised = normaliseUrl(url);
       if (normalised === null) {
         return {
@@ -141,7 +147,7 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
         .from('scan_requests')
         // Always public. The insert policy in 0014 refuses anything else, so this is the client
         // agreeing with a rule the database enforces rather than a decision made here.
-        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public' })
+        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public', vertical })
         .select('id')
         .single();
 

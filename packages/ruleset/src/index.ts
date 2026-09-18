@@ -112,6 +112,9 @@ export {
   THRESHOLDS,
   TIERS,
   URL_SCOPES,
+  VERTICALS,
+  DEFAULT_VERTICAL,
+  isVertical,
   WEIGHTED_TIERS,
   tierCarriesWeight,
   type CheckType,
@@ -129,6 +132,7 @@ export {
   type Threshold,
   type Tier,
   type UrlScope,
+  type Vertical,
 } from './vocabulary.js';
 
 // Documents Check slot definitions. Seeded from CHECK-INVENTORY §3/§4 for M1; M2 replaces the

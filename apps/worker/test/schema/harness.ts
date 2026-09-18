@@ -117,13 +117,29 @@ export interface SchemaFixture {
  * fails here — which is the entire point. A fixture built from hand-written DDL would drift from
  * what ships, and drift is what this is for.
  */
-export async function createSchema(): Promise<SchemaFixture> {
+export async function createSchema(
+  options: {
+    /**
+     * Stop before the first migration whose file name starts with this prefix, e.g. `'0088'`.
+     *
+     * For a migration that adds a column or constraint over existing rows: seed rows against the
+     * schema as it stood, then apply the migration with {@link applyMigration}. An empty-table
+     * migrate has no row for the change to meet (CLAUDE.md, "Constraints added over existing rows").
+     */
+    readonly stopBefore?: string;
+  } = {},
+): Promise<SchemaFixture> {
   const db = new PGlite({ extensions: { citext } });
   await db.exec(SUPABASE_STUBS);
 
-  const files = readdirSync(MIGRATIONS)
+  const all = readdirSync(MIGRATIONS)
     .filter((file) => file.endsWith('.sql'))
     .sort();
+  const stop = options.stopBefore === undefined ? -1 : all.findIndex((file) => file.startsWith(options.stopBefore!));
+  if (options.stopBefore !== undefined && stop === -1) {
+    throw new Error(`no migration starts with '${options.stopBefore}'`);
+  }
+  const files = stop === -1 ? all : all.slice(0, stop);
 
   for (const file of files) {
     const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
@@ -186,6 +202,13 @@ export async function createSchema(): Promise<SchemaFixture> {
 
     close: () => db.close(),
   };
+}
+
+/** Applies one migration file, by name prefix, to a fixture built with `stopBefore`. */
+export async function applyMigration(fixture: SchemaFixture, prefix: string): Promise<void> {
+  const file = readdirSync(MIGRATIONS).find((name) => name.startsWith(prefix) && name.endsWith('.sql'));
+  if (file === undefined) throw new Error(`no migration starts with '${prefix}'`);
+  await fixture.exec(readFileSync(join(MIGRATIONS, file), 'utf8'));
 }
 
 /** The account owner, a member of the host organization. */

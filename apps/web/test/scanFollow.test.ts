@@ -243,7 +243,16 @@ describe('createScanQueue.request', () => {
       status: 'queued',
       // Every scan begins anonymous, and the insert policy in 0014 refuses anything else (D-040).
       mode: 'public',
+      // No vertical asked for is a peptide scan (D-284, 0088), stated on the row.
+      vertical: 'peptides',
     });
+  });
+
+  it('carries the vertical it is asked for onto the request row (D-284)', async () => {
+    const { client, calls } = fakeClient(() => ({ data: { id: 'req-2' }, error: null }));
+    await createScanQueue(client, 'analyst-1').request('xchar.ai', 'adult_ai');
+
+    expect(calls[0]?.inserted).toMatchObject({ url: 'https://xchar.ai', vertical: 'adult_ai' });
   });
 
   it('reports failure when the insert succeeds but hands back no id', async () => {

@@ -44,6 +44,7 @@
  */
 
 import type { EvidenceArtifact, ReportFinding, ScreeningReport } from '@mintro/engine';
+import { isVertical, type Vertical } from '@mintro/ruleset';
 import { putEvidence, type WorkerSupabase } from './supabase.js';
 import { assessContents, assessRun, countFindings } from './completeness.js';
 
@@ -74,6 +75,14 @@ export interface PersistInput {
    * Required at the type level for the same reason `createdBy` is.
    */
   readonly orgId: string;
+  /**
+   * The vertical the run is screened under (D-284), carried from its scan request.
+   *
+   * Passed rather than left to the column's `peptides` default, for the reason `orgId` is: which rule
+   * set a run was screened against is a fact about the run at the time it was made, and a writer that
+   * forgot to say would silently file an adult AI run as a peptide one. Required at the type level.
+   */
+  readonly vertical: Vertical;
   /**
    * Every key the run captured, when that is known separately from `artifacts`.
    *
@@ -135,21 +144,24 @@ export async function ownerAnalystId(supabase: WorkerSupabase): Promise<{ id: st
 export async function runOwner(
   supabase: WorkerSupabase,
   runId: string,
-): Promise<{ createdBy: string; orgId: string }> {
+): Promise<{ createdBy: string; orgId: string; vertical: Vertical }> {
   const { data, error } = await supabase.client
     .from('runs')
-    .select('created_by, org_id')
+    .select('created_by, org_id, vertical')
     .eq('id', runId)
     .maybeSingle();
 
   if (error !== null) {
     throw new Error(`could not read the owner of run ${runId}: ${error.message}`);
   }
-  const row = data as { created_by: string; org_id: string } | null;
+  const row = data as { created_by: string; org_id: string; vertical: string } | null;
   if (row === null) {
     throw new Error(`run ${runId} does not exist, so it has no owner to preserve`);
   }
-  return { createdBy: row.created_by, orgId: row.org_id };
+  if (!isVertical(row.vertical)) {
+    throw new Error(`run ${runId} records vertical '${row.vertical}', which this worker does not know`);
+  }
+  return { createdBy: row.created_by, orgId: row.org_id, vertical: row.vertical };
 }
 
 export async function persistRun(
@@ -193,7 +205,7 @@ export async function persistRun(
           'would be visible to nobody or to everybody, and both are wrong.',
       );
     }
-    await insertRun(supabase, runId, merchantId, report, input.createdBy, input.orgId);
+    await insertRun(supabase, runId, merchantId, report, input.createdBy, input.orgId, input.vertical);
   }
 
   try {
@@ -307,6 +319,35 @@ async function upsertMerchant(supabase: WorkerSupabase, report: ScreeningReport)
   return (data as { id: string }).id;
 }
 
+/**
+ * The `runs` row this module opens a run with.
+ *
+ * Exported so the schema test inserts exactly this into the real schema, the arrangement `sendRowFor`
+ * has for `sends`: a test that typed the columns out itself would assert its own assumptions.
+ */
+export function runRowFor(input: {
+  readonly runId: string;
+  readonly merchantId: string;
+  readonly report: Pick<ScreeningReport, 'startedAt' | 'mode' | 'rulesetVersion' | 'politeness' | 'truncations'>;
+  readonly createdBy: string;
+  readonly orgId: string;
+  readonly vertical: Vertical;
+}): Record<string, unknown> {
+  return {
+    id: input.runId,
+    merchant_id: input.merchantId,
+    created_by: input.createdBy,
+    org_id: input.orgId,
+    vertical: input.vertical,
+    started_at: input.report.startedAt,
+    mode: input.report.mode,
+    ruleset_version: input.report.rulesetVersion,
+    status: 'running',
+    politeness: input.report.politeness,
+    truncations: input.report.truncations,
+  };
+}
+
 async function insertRun(
   supabase: WorkerSupabase,
   runId: string,
@@ -314,19 +355,11 @@ async function insertRun(
   report: ScreeningReport,
   createdBy: string,
   orgId: string,
+  vertical: Vertical,
 ): Promise<void> {
-  const { error } = await supabase.client.from('runs').insert({
-    id: runId,
-    merchant_id: merchantId,
-    created_by: createdBy,
-    org_id: orgId,
-    started_at: report.startedAt,
-    mode: report.mode,
-    ruleset_version: report.rulesetVersion,
-    status: 'running',
-    politeness: report.politeness,
-    truncations: report.truncations,
-  });
+  const { error } = await supabase.client
+    .from('runs')
+    .insert(runRowFor({ runId, merchantId, report, createdBy, orgId, vertical }));
 
   if (error !== null) {
     throw new Error(`could not open run ${runId}: ${error.message}`);

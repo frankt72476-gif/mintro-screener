@@ -223,6 +223,21 @@ export type Flow = (typeof FLOWS)[number];
 export const FLOW_FAILURES = ['payment_step_reached', 'accepted'] as const;
 export type FlowFailure = (typeof FLOW_FAILURES)[number];
 
+/**
+ * Screener verticals (D-284). Each selects its own rule set, source corpus, attestation set and,
+ * for `adult_ai`, referral policy. Stored on `scan_requests.vertical` and `runs.vertical` (0088),
+ * whose check constraints hold the same two values.
+ *
+ * `peptides` is the default everywhere a vertical is absent: every run before 0088 is one.
+ */
+export const VERTICALS = ['peptides', 'adult_ai'] as const;
+export type Vertical = (typeof VERTICALS)[number];
+export const DEFAULT_VERTICAL: Vertical = 'peptides';
+
+export function isVertical(value: unknown): value is Vertical {
+  return typeof value === 'string' && (VERTICALS as readonly string[]).includes(value);
+}
+
 /** Rule ID format. Stable, never reused. See CLAUDE.md § Conventions. */
 export const RULE_ID_PATTERN = /^[A-Z]+-\d{3}$/;
 

@@ -33,7 +33,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
-import { loadRulesetFile, type Ruleset } from '@mintro/ruleset';
+import { isVertical, loadRulesetFile, type Ruleset, type Vertical } from '@mintro/ruleset';
 import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
@@ -163,6 +163,12 @@ interface ScanRequest {
    * the run records the organization as it was when the work was done.
    */
   readonly analysts: { readonly org_id: string } | null;
+  /**
+   * Which vertical the requester asked for (D-284, 0088). Written to `runs.vertical` exactly as
+   * `org_id` is written to `runs.org_id`: read off the request at claim time, passed to the writer,
+   * never re-derived later. Not null in the schema, with `peptides` as its default.
+   */
+  readonly vertical: string;
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -607,7 +613,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
 
   const { data, error } = await supabase.client
     .from('scan_requests')
-    .select('id, url, status, claimed_at, mode, requested_by, analysts:requested_by (org_id)')
+    .select('id, url, status, claimed_at, mode, vertical, requested_by, analysts:requested_by (org_id)')
     .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -631,7 +637,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
     .update({ status: 'running', claimed_at: new Date().toISOString(), progress: 'starting' })
     .eq('id', candidate.id)
     .eq('status', candidate.status)
-    .select('id, url, status, claimed_at, mode, requested_by, analysts:requested_by (org_id)');
+    .select('id, url, status, claimed_at, mode, vertical, requested_by, analysts:requested_by (org_id)');
 
   if (claimError !== null) {
     throw new Error(`could not claim request ${candidate.id}: ${claimError.message}`);
@@ -658,6 +664,22 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
  */
 interface HandleOutcome {
   readonly recycleBrowser: boolean;
+}
+
+/**
+ * The request's vertical, checked against the vocabulary rather than trusted.
+ *
+ * `scan_requests_vertical_check` (0088) already refuses anything else, so a value outside the list
+ * means the schema and this code disagree. That is refused rather than read as `peptides`: guessing a
+ * vertical would screen a merchant against the wrong rule set and record that it had not.
+ */
+function requestVertical(request: Pick<ScanRequest, 'id' | 'vertical'>): Vertical {
+  if (!isVertical(request.vertical)) {
+    throw new Error(
+      `scan request ${request.id} names vertical '${String(request.vertical)}', which this worker does not know.`,
+    );
+  }
+  return request.vertical;
 }
 
 /** Screens one request and records what happened. Never throws: the queue row carries the outcome. */
@@ -799,6 +821,7 @@ async function handle(
       runId,
       createdBy: request.requested_by,
       orgId: requesterOrg,
+      vertical: requestVertical(request),
     });
 
     // What the run actually did, recorded against the request. `mode` stopped being a choice at

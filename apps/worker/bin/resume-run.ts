@@ -111,6 +111,7 @@ async function main(argv: readonly string[]): Promise<number> {
       artifactKeys,
       createdBy: existing.createdBy,
       orgId: existing.orgId,
+      vertical: existing.vertical,
     });
   } catch (error) {
     console.error(`\n${error instanceof Error ? error.message : String(error)}`);
