@@ -179,13 +179,23 @@ export interface VerticalPages {
    * candidates are read in the order they were found, as they always have been.
    */
   readonly rankByPageTypeOrder: boolean;
+  /**
+   * Whether the crawl reads a docs host linked from the primary site's chrome, as one additional
+   * origin (cluster 2). Off for peptides: a peptide crawl never follows one.
+   */
+  readonly docsOrigin: boolean;
 }
 
-export const PEPTIDE_PAGES: VerticalPages = { table: PEPTIDE_PAGE_TYPES, rankByPageTypeOrder: false };
+export const PEPTIDE_PAGES: VerticalPages = {
+  table: PEPTIDE_PAGE_TYPES,
+  rankByPageTypeOrder: false,
+  docsOrigin: false,
+};
 
 export const ADULT_AI_PAGES: VerticalPages = {
   table: ADULT_AI_PAGE_TYPES,
   rankByPageTypeOrder: true,
+  docsOrigin: true,
   documents: [
     {
       pageType: 'terms',

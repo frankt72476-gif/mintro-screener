@@ -521,3 +521,15 @@ count.
   by calling `pathNamesSurface` with an empty list; not checked against a stored run. Left unchanged
   in cluster 2, which keeps peptide behaviour byte-identical; the adult page types pass their table's
   slugs as `pathNames` and are not affected. Recorded 2026-09-18.
+
+  **Carried to the tabled peptide pass (Frank, 2026-09-18); not fixed in the adult clusters.** Blast
+  radius, for that pass: the about page and editorial pages reach the rules as `alsoRead` in
+  `runLayer2` (`packages/engine/src/layer2.ts:210`), so with neither ever established these rules
+  have read no about or editorial page on any run:
+    - designed to read them (`surface: all_sampled`, D-271, D-274): DISC-003, DISC-004, PROD-006,
+      PROD-007, PROD-008, PROD-010, PROD-011, PROD-012, PROD-013, PROD-014, PROD-016, PROD-017;
+    - receiving them through the same call at `layer2.ts:210` (per-page Layer 2 rules): PROD-001,
+      PROD-002, PROD-003, PROD-004, PROD-005, PROD-009, NAME-003, CATG-005, CATG-006, COA-001,
+      OFFS-002.
+  Also affected: the eye test's about and editorial captures (`eyeTestManifest`), and the about and
+  editorial pages the evaluation draft is given.

@@ -35,7 +35,8 @@ import type {
   SignupForm,
   SurfaceSpec,
 } from '@mintro/engine';
-import { located, NO_SIGNUP_FORM, unreachable, withoutFragment } from '@mintro/engine';
+import { discoverLayer0, located, NO_SIGNUP_FORM, unreachable, withoutFragment, type Fetcher } from '@mintro/engine';
+import { docsOriginFor, llmsTxtUrls } from './docsOrigin.js';
 import { pageTypeEntry, surfaceFromSlug } from './evaluationPages.js';
 import type { PageTypeDocument, PageTypeTable, VerticalPages } from '@mintro/ruleset';
 import { probeSurface } from './surfaceProbe.js';
@@ -240,6 +241,15 @@ export interface Layer3Discovery {
    * its vertical's `documents`, and `terms` above is the same entry as `pageTypes.get('terms')`.
    */
   readonly pageTypes: ReadonlyMap<string, Located<PageContext>>;
+  /**
+   * The docs host read as a second origin, where the vertical enables one and the primary site
+   * linked one (cluster 2). Absent otherwise — always absent on a peptide run.
+   */
+  readonly docsOrigin?: {
+    readonly origin: string;
+    /** Every docs page established on it, in the order read. */
+    readonly pages: readonly PageContext[];
+  };
   /** Every navigation made looking for any of them, and what it returned. */
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
@@ -324,6 +334,12 @@ export interface DiscoverOptions {
    * sign-up form, then each listed page type, located through the vertical's own table.
    */
   readonly pages?: VerticalPages;
+  /**
+   * What reading a docs host needs, where the vertical enables it (cluster 2): the fetcher Layer 0
+   * used, for its sitemap and `llms.txt`, and the page cap the primary origin's sample runs under.
+   * Absent: no docs host is read, whatever the vertical says.
+   */
+  readonly secondOrigin?: { readonly fetcher: Fetcher; readonly pageCap: number };
 }
 
 /**
@@ -512,6 +528,14 @@ async function discoverPageTypes(
   }
   say('policy pages read', { done, total });
 
+  const docs = await readDocsOrigin(browser, origin, options, vertical, sinks, probe);
+  if (docs !== undefined && docs.pages.length > 0) {
+    const primaryDocs = located.get('docs');
+    if (primaryDocs === undefined || !primaryDocs.located) {
+      located.set('docs', docs.first);
+    }
+  }
+
   const notRead = (label: string): Located<PageContext> =>
     unreachable(`the ${label} is not read by this vertical's crawl`, []);
 
@@ -525,6 +549,7 @@ async function discoverPageTypes(
     about: notRead('about page'),
     editorial: [],
     pageTypes: located,
+    ...(docs === undefined ? {} : { docsOrigin: { origin: docs.origin, pages: docs.pages } }),
     attempts,
     artifacts,
     pages,
@@ -800,6 +825,11 @@ async function findDocument(
      * nothing — so a page type found by its table alone passes its table's slugs here.
      */
     readonly pathNames?: readonly string[];
+    /**
+     * The candidates, given outright rather than found from the homepage links and sitemap
+     * (cluster 2). The docs host's pages come from its own sitemap and `llms.txt`.
+     */
+    readonly candidates?: readonly string[];
   },
   probeTally: { undecided: number; total: number },
 ): Promise<{ readonly located: Located<PageContext>; readonly pages: readonly PageContext[] }> {
@@ -872,7 +902,7 @@ async function findDocument(
   */
   const listed = selectListedCandidates(options.sitemapUrls ?? [], origin, what.surface, what.table);
 
-  const found = [...new Set([...linked, ...listed])];
+  const found = what.candidates !== undefined ? [...new Set(what.candidates)] : [...new Set([...linked, ...listed])];
   const ordered =
     what.rankByPageTypeOrder === true && what.table !== undefined
       ? rankByTableEntry(found, what.table)
@@ -1066,4 +1096,96 @@ export function rankByTableEntry(urls: readonly string[], table: PageTypeTable):
     .map((url, index) => ({ url, index, rank: rank(url) }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map((entry) => entry.url);
+}
+
+/**
+ * The docs host, read as the one additional origin a run may have (cluster 2).
+ *
+ * Only where the vertical enables it and the primary site's nav or footer links one
+ * (`docsOriginFor`). Its sitemap is read by Layer 0's own discovery, unchanged, and its `/llms.txt` as a
+ * plain URL list; the linked page leads, then `llms.txt`'s URLs, then the sitemap's. Pages are rendered
+ * through `findDocument` like every other Layer 3 page — the same probe, guards and attempts — under
+ * the run's pacer, up to the page cap the primary origin's sample runs under.
+ *
+ * Every page on the docs host is a docs page: the host names the surface, so the path guard is given
+ * `/`, which every path carries.
+ */
+async function readDocsOrigin(
+  browser: Browser,
+  primaryOrigin: string,
+  options: DiscoverOptions,
+  vertical: VerticalPages,
+  sinks: {
+    readonly attempts: FetchAttempt[];
+    readonly artifacts: EvidenceArtifact[];
+    readonly pages: PageContext[];
+    readonly say: (line: string, count?: { readonly done: number; readonly total: number }) => void;
+  },
+  probe: { undecided: number; total: number },
+): Promise<{ readonly origin: string; readonly first: Located<PageContext>; readonly pages: readonly PageContext[] } | undefined> {
+  if (options.secondOrigin === undefined) return undefined;
+  const links = options.homepageLinks ?? [];
+  const docsOrigin = docsOriginFor(vertical, primaryOrigin, links);
+  if (docsOrigin === null) return undefined;
+
+  const { fetcher, pageCap } = options.secondOrigin;
+  const { attempts, artifacts, pages, say } = sinks;
+  options.signal?.throwIfAborted();
+  say(`reading the docs host ${new URL(docsOrigin).host}`);
+
+  // Its sitemap, by the same discovery the primary origin's went through.
+  const layer0 = await discoverLayer0(docsOrigin, fetcher, { runId: options.runId });
+  artifacts.push(...layer0.artifacts);
+  attempts.push(...layer0.attempts);
+  const fromSitemap = layer0.urls
+    .map((slug) => slug.url)
+    .filter((url) => {
+      try {
+        return new URL(url).origin === docsOrigin;
+      } catch {
+        return false;
+      }
+    });
+
+  // `llms.txt`, as text. A file that is not served, or that bot protection answered, lists nothing.
+  const llmsUrl = `${docsOrigin}/llms.txt`;
+  const llms = await fetcher(llmsUrl);
+  attempts.push({
+    url: llmsUrl,
+    status: llms.status,
+    ...(llms.error === undefined ? {} : { error: llms.error }),
+  });
+  const fromLlms =
+    llms.status >= 200 && llms.status < 300 && llms.challenged === undefined ? llmsTxtUrls(llms.body, docsOrigin) : [];
+
+  const linked = links
+    .map((link) => withoutFragment(link.href))
+    .filter((href) => {
+      try {
+        return new URL(href).origin === docsOrigin;
+      } catch {
+        return false;
+      }
+    });
+
+  const outcome = await findDocument(
+    browser,
+    docsOrigin,
+    options,
+    attempts,
+    artifacts,
+    pages,
+    say,
+    {
+      label: 'documentation page',
+      paths: [],
+      linkHints: [],
+      pathNames: ['/'],
+      limit: pageCap,
+      candidates: [...linked, ...fromLlms, ...fromSitemap],
+    },
+    probe,
+  );
+
+  return { origin: docsOrigin, first: outcome.located, pages: outcome.pages };
 }
