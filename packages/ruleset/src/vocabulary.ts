@@ -169,6 +169,24 @@ export type Surface = (typeof SURFACES)[number];
 export const URL_SCOPES = ['all', 'collections', 'products', 'pages', 'content'] as const;
 export type UrlScope = (typeof URL_SCOPES)[number];
 
+/**
+ * Which way a rule's finding points, for the label a vertical renders it with (D-285).
+ *
+ * `absent`: a finding is the thing being present — a prohibited term, a feature. `present`: a
+ * finding is the thing being missing — a takedown route, a disclosure. The engine's four states do
+ * not change; a vertical's label map reads this to put the right word on them.
+ *
+ * **A rule that declares none is `absent`** ({@link senseOf}). That is every peptide rule, and the
+ * peptide report does not read this field at all.
+ */
+export const SENSES = ['absent', 'present'] as const;
+export type Sense = (typeof SENSES)[number];
+
+/** A rule's sense, `absent` when it declares none. */
+export function senseOf(rule: { readonly sense?: Sense | undefined }): Sense {
+  return rule.sense ?? 'absent';
+}
+
 /** Assertion direction shared by the presence-testing check types. */
 export const EXPECTATIONS = ['present', 'absent'] as const;
 export type Expectation = (typeof EXPECTATIONS)[number];

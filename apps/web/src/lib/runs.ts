@@ -13,6 +13,8 @@
  * change silently alter an old run's conclusions.
  */
 
+import type { Vertical } from '@mintro/ruleset';
+import { runVertical } from './rulesets.js';
 import { describeTruncation, type ScreeningReport } from '@mintro/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runCreators } from './internalIdentity.js';
@@ -155,6 +157,8 @@ export type RunList =
 export interface LoadedRun {
   readonly report: ScreeningReport;
   readonly quarantine: string | null;
+  /** Which vertical's rule set the run was screened against (D-284, 0088). */
+  readonly vertical: Vertical;
 }
 
 export interface RunSource {
@@ -266,16 +270,20 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
     async load(runId) {
       const { data, error } = await client
         .from('runs')
-        .select('report, run_quarantine ( reason )')
+        .select('report, vertical, run_quarantine ( reason )')
         .eq('id', runId)
         .maybeSingle();
 
       if (error !== null || data === null) return null;
 
-      const row = data as { report: ScreeningReport | null; run_quarantine: QuarantineEmbed };
+      const row = data as { report: ScreeningReport | null; vertical?: unknown; run_quarantine: QuarantineEmbed };
       if (row.report === null) return null;
 
-      return { report: row.report, quarantine: quarantineReason(row.run_quarantine) };
+      return {
+        report: row.report,
+        quarantine: quarantineReason(row.run_quarantine),
+        vertical: runVertical(row.vertical),
+      };
     },
   };
 }
@@ -433,7 +441,8 @@ export function createLocalRunSource(): RunSource {
         .then((response) => (response.ok ? (response.json() as Promise<ScreeningReport>) : null))
         .catch(() => null);
 
-      return report === null ? null : { report, quarantine: null };
+      // A local report has no row, so no recorded vertical: it is a peptide run (`runVertical`).
+      return report === null ? null : { report, quarantine: null, vertical: runVertical(undefined) };
     },
   };
 }

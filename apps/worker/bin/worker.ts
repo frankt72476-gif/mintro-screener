@@ -33,7 +33,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
-import { isVertical, loadRulesetFile, type Ruleset, type Vertical } from '@mintro/ruleset';
+import { VERTICALS, isVertical, loadRulesetForVertical, type Ruleset, type Vertical } from '@mintro/ruleset';
 import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
@@ -173,13 +173,25 @@ interface ScanRequest {
 
 async function main(argv: readonly string[]): Promise<number> {
   const once = argv.includes('--once');
-  const ruleset = loadRulesetFile('rules/ruleset.json');
+  /*
+    Every vertical's rule set, loaded and validated at start (D-284, D-288).
+
+    Both, before any work is claimed: a rule set that fails validation stops the worker here rather
+    than failing the first request of that vertical an hour later. Each request is screened against
+    the one its `vertical` names.
+  */
+  const rulesets = Object.fromEntries(
+    VERTICALS.map((vertical) => [vertical, loadRulesetForVertical(vertical)]),
+  ) as Readonly<Record<Vertical, Ruleset>>;
   const supabase = createWorkerSupabase();
 
   // The commit the image was built from (D-279). `GIT_SHA` is a build argument, because Fly's release
   // view names an image and not a commit; a deploy that passed none says so.
   const commit = process.env['GIT_SHA'] || 'unrecorded';
-  console.log(`mintro worker · commit ${commit} · rule set ${ruleset.version} (effective ${ruleset.effective})`);
+  console.log(
+    `mintro worker · commit ${commit} · rule sets ` +
+      VERTICALS.map((v) => `${v} ${rulesets[v].version} (effective ${rulesets[v].effective})`).join(', '),
+  );
 
   const checks = await preflight(supabase);
   for (const check of checks.checks) {
@@ -310,7 +322,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
       const request = await claimNext(supabase);
       if (request !== null) {
-        const outcome = await handle(supabase, browser, ruleset, request, keys);
+        const outcome = await handle(supabase, browser, rulesets, request, keys);
 
         /*
           A timed-out crawl is still holding pages in this browser (D-152).
@@ -686,7 +698,7 @@ function requestVertical(request: Pick<ScanRequest, 'id' | 'vertical'>): Vertica
 async function handle(
   supabase: WorkerSupabase,
   browser: Browser,
-  ruleset: Ruleset,
+  rulesets: Readonly<Record<Vertical, Ruleset>>,
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
 ): Promise<HandleOutcome> {
@@ -720,7 +732,10 @@ async function handle(
   const progress = createProgressWriter(supabase, request.id);
 
   try {
-    const screening = screenStorefront(browser, request.url, ruleset, {
+    // Inside the try: a vertical this worker does not know fails the request with the reason,
+    // rather than being screened against some other vertical's rules.
+    const vertical = requestVertical(request);
+    const screening = screenStorefront(browser, request.url, rulesets[vertical], {
       runId,
       signal: controller.signal,
       onControl: (control) => {
@@ -821,7 +836,7 @@ async function handle(
       runId,
       createdBy: request.requested_by,
       orgId: requesterOrg,
-      vertical: requestVertical(request),
+      vertical,
     });
 
     // What the run actually did, recorded against the request. `mode` stopped being a choice at
