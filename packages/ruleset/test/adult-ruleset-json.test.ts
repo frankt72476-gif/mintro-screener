@@ -34,7 +34,8 @@ const PRESENT = /^(AITD-00[1-3]|AIGATE-00[1-3]|AIPOL-00[1-7]|AIBILL-00[1-3])$/;
 
 describe('rules/ruleset-adult-ai.json', () => {
   it('loads, at the version and date cluster 1 ships', () => {
-    expect(adult.version).toBe('0.1.0');
+    // 0.1.1: phrase-level term lists and AIGATE-003 retitled (commit 2a).
+    expect(adult.version).toBe('0.1.1');
     expect(adult.effective).toBe('2026-09-18');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
@@ -73,6 +74,21 @@ describe('rules/ruleset-adult-ai.json', () => {
     // A rule whose detector lands in cluster 2 is left out until cluster 2 (Frank, 2026-09-18).
     expect(adult.rules.filter((rule) => rule.type === 'manual')).toEqual([]);
     expect(readFileSync(ADULT_RULESET_PATH, 'utf8')).not.toMatch(/cluster 2|detector lands/i);
+  });
+
+  it('matches phrases, never the standalone words that match a privacy section or any AI homepage', () => {
+    /*
+      A present-sense rule reads "Observed" when a term appears. "children" appears in every privacy
+      policy's section on children's data, and "chatbot" on every AI companion homepage — so either as
+      a standalone term would report the rule observed on a page that says nothing on the subject
+      (Frank, 2026-09-18).
+    */
+    const dropped = ['child', 'children', 'chatbot', 'ai companion'];
+    for (const rule of adult.rules) {
+      if (rule.type !== 'text_match') continue;
+      const terms = (rule.params.terms ?? []).map((term) => term.toLowerCase());
+      for (const word of dropped) expect(terms, rule.id).not.toContain(word);
+    }
   });
 
   it('carries no attestations and no not-checked items until cluster 4', () => {

@@ -488,3 +488,14 @@ count.
 - `REPORT_POSTURE`: "…surface things early, while there's time to address them, before the
   underwriting team makes its boarding decision." (`copy.ts:649-652`, rendered by `ReportView`).
 - `ReportView.tsx:1031-1032`: "One stopping condition applies" / `` `${…} stopping conditions apply` ``.
+
+---
+
+## Open items carried forward
+
+- **Evaluation-layer jobs load the peptide rule set unconditionally (cluster 4).**
+  `apps/worker/src/evaluationRun.ts`, `apps/worker/src/evaluationPublishJob.ts` and
+  `apps/worker/bin/evaluate.ts` read
+  `rules/ruleset.json` whatever the run's vertical. When the send and capture gates learn vertical,
+  these jobs must refuse an `adult_ai` run with a reason rather than evaluate it against the peptide
+  rule set. Recorded 2026-09-18, after cluster 1 commit 2.

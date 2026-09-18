@@ -15,9 +15,20 @@ Provenance
 1. Mastercard Rules, 2 June 2026 edition, Rule 5.12.7 "Illegal or Brand-damaging Transactions",
    item 2 (page 125).
    https://www.mastercard.com/content/dam/mccom/shared/business/support/rules-pdfs/mastercard-rules.pdf
-   Accessed 2026-09-18. The item's leading enumerator "2." is omitted. The apostrophe in "person’s"
-   is U+2019, as in the source. Quoted by AIPOL-001, AIPOL-002, AIPOL-003, AIPOL-004 and AIPOL-006;
-   the line repeats once per rule because the validator holds one corpus line per quoting rule.
+   Accessed 2026-09-18. The item's leading enumerator "2." is omitted. Quoted by AIPOL-001, AIPOL-002,
+   AIPOL-003, AIPOL-004 and AIPOL-006; the line repeats once per rule because the validator holds one
+   corpus line per quoting rule.
+
+   How it was extracted, because this is where the peptide corpus went wrong (D-139): Mastercard's
+   CDN refuses non-browser requests (HTTP 403), so the PDF was not fetched as raw bytes. It was opened
+   in a Chrome browser session and its text layer read with pdf.js 4.10.38; no copy of the PDF is kept
+   in this repository. The excerpt's characters were checked against that text layer: it holds ASCII
+   letters, digits, spaces, parentheses, commas and a final period, and exactly one non-ASCII
+   character, the apostrophe in "person’s", which the text layer gives as U+2019. No private-use code
+   point, no U+02BC or U+02EE, and no U+FFFD appears in it. The excerpt contains no quotation mark,
+   hyphen or dash, and the item has no hyphen broken across a line end, so the hyphen and dash
+   mappings that failed on the peptide PDF have nothing here to act on. The text layer was not
+   compared against the rendered glyphs.
 
 2. TAKE IT DOWN Act, Public Law 119-12 (S. 146, 119th Congress, enacted 19 May 2025), section 3(a)(2)
    and section 3(a)(3).
