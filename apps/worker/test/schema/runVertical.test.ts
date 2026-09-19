@@ -20,7 +20,7 @@ import {
   seedRun,
   type SchemaFixture,
 } from './harness.js';
-import { runRowFor } from '../../src/store/persist.js';
+import { finishRowFor, runRowFor } from '../../src/store/persist.js';
 
 describe('0088 over existing rows', () => {
   let before: SchemaFixture;
@@ -47,12 +47,25 @@ describe('0088 over existing rows', () => {
     // constraint would refuse to be added if an existing row violated it.
     await applyMigration(before, '0088');
     await applyMigration(before, '0089');
+    await applyMigration(before, '0090');
 
-    const [run] = await before.query<{ vertical: string; referral_policy_version: string | null }>(
-      `select vertical, referral_policy_version from public.runs where id = $1`,
+    const [run] = await before.query<{
+      vertical: string;
+      referral_policy_version: string | null;
+      segments: string[];
+      referral_status: string | null;
+      referral_reasons: string[];
+    }>(
+      `select vertical, referral_policy_version, segments, referral_status, referral_reasons from public.runs where id = $1`,
       [runId],
     );
-    expect(run).toEqual({ vertical: 'peptides', referral_policy_version: null });
+    expect(run).toEqual({
+      vertical: 'peptides',
+      referral_policy_version: null,
+      segments: [],
+      referral_status: null,
+      referral_reasons: [],
+    });
 
     const [request] = await before.query<{ vertical: string }>(
       `select vertical from public.scan_requests where url = 'https://queued-before.example'`,
@@ -203,5 +216,118 @@ describe('runs.vertical and scan_requests.vertical (0088)', () => {
         [OWNER_ID],
       ),
     ).toMatch(/scan_requests_vertical_check/);
+  });
+});
+
+describe('segments and the referral result (0090, D-287)', () => {
+  let schema: SchemaFixture;
+
+  beforeAll(async () => {
+    schema = await createSchema();
+  }, 60_000);
+
+  afterAll(async () => {
+    await schema?.close();
+  });
+
+  const merchant = async (domain: string): Promise<string> =>
+    (await schema.query<{ id: string }>(`insert into public.merchants (domain) values ($1) returning id`, [domain]))[0]!
+      .id;
+  const hostOrg = async (): Promise<string> =>
+    (await schema.query<{ org_id: string }>(`select org_id from public.analysts where id = $1`, [OWNER_ID]))[0]!.org_id;
+
+  async function open(runId: string, domain: string, vertical: 'peptides' | 'adult_ai', segments: string[]) {
+    const row = runRowFor({
+      runId,
+      merchantId: await merchant(domain),
+      report: { startedAt: new Date().toISOString(), mode: 'public', rulesetVersion: '0.3.0', politeness: 'none', truncations: [] },
+      createdBy: OWNER_ID,
+      orgId: await hostOrg(),
+      vertical,
+      segments,
+    });
+    const columns = Object.keys(row);
+    await schema.query(
+      `insert into public.runs (${columns.join(', ')}) values (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+      Object.values(row),
+    );
+  }
+
+  async function finish(runId: string, referral: { status: 'proceeds' | 'not_referred'; reasons: string[] } | null) {
+    const row = finishRowFor({ finishedAt: new Date().toISOString() }, referral);
+    const columns = Object.keys(row);
+    return schema.attempt(
+      `update public.runs set ${columns.map((c, i) => `${c} = $${i + 1}`).join(', ')} where id = $${columns.length + 1}`,
+      [...Object.values(row).map((v) => (typeof v === 'object' && v !== null && !Array.isArray(v) ? JSON.stringify(v) : v)), runId],
+    );
+  }
+
+  it('records an adult_ai run\'s declared segments and its referral result, written as it finishes', async () => {
+    const runId = '00000000-0000-4000-8000-00000000b0b1';
+    await open(runId, 'referral-adult.example', 'adult_ai', ['1']);
+    expect(await finish(runId, { status: 'not_referred', reasons: ['P-1: AIFEAT-001 observed'] })).toBeNull();
+    const [row] = await schema.query<{ segments: string[]; referral_status: string; referral_reasons: string[]; frozen: boolean }>(
+      `select segments, referral_status, referral_reasons, finished_at is not null as frozen from public.runs where id = $1`,
+      [runId],
+    );
+    expect(row).toEqual({
+      segments: ['1'],
+      referral_status: 'not_referred',
+      referral_reasons: ['P-1: AIFEAT-001 observed'],
+      frozen: true,
+    });
+  });
+
+  it('leaves a peptide run with no segments and no referral result', async () => {
+    const runId = '00000000-0000-4000-8000-00000000b0b2';
+    await open(runId, 'referral-peptide.example', 'peptides', []);
+    expect(await finish(runId, null)).toBeNull();
+    const [row] = await schema.query<{ segments: string[]; referral_status: string | null; referral_reasons: string[] }>(
+      `select segments, referral_status, referral_reasons from public.runs where id = $1`,
+      [runId],
+    );
+    expect(row).toEqual({ segments: [], referral_status: null, referral_reasons: [] });
+  });
+
+  it('refuses a peptide run carrying a referral result or segments', async () => {
+    const runId = '00000000-0000-4000-8000-00000000b0b3';
+    await open(runId, 'peptide-with-referral.example', 'peptides', []);
+    expect(await finish(runId, { status: 'proceeds', reasons: [] })).toMatch(/runs_referral_matches_vertical/);
+    expect(
+      await schema.attempt(
+        `insert into public.runs (merchant_id, mode, ruleset_version, status, created_by, org_id, vertical, segments)
+         values ($1, 'public', '3.11.0', 'running', $2, $3, 'peptides', array['1'])`,
+        [await merchant('peptide-with-segments.example'), OWNER_ID, await hostOrg()],
+      ),
+    ).toMatch(/runs_referral_matches_vertical/);
+  });
+
+  it('refuses not_referred with no reason, and a segment id outside the list', async () => {
+    const runId = '00000000-0000-4000-8000-00000000b0b4';
+    await open(runId, 'referral-no-reason.example', 'adult_ai', ['2']);
+    expect(await finish(runId, { status: 'not_referred', reasons: [] })).toMatch(/runs_not_referred_says_why/);
+    expect(
+      await schema.attempt(
+        `insert into public.scan_requests (url, requested_by, vertical, segments) values ('https://seg.example', $1, 'adult_ai', array['12'])`,
+        [OWNER_ID],
+      ),
+    ).toMatch(/scan_requests_segments_check/);
+  });
+
+  it('refuses segments on a peptide scan request, and keeps them on an adult one', async () => {
+    expect(
+      await schema.attempt(
+        `insert into public.scan_requests (url, requested_by, vertical, segments) values ('https://pep.example', $1, 'peptides', array['1'])`,
+        [OWNER_ID],
+      ),
+    ).toMatch(/scan_requests_segments_match_vertical/);
+    await schema.query(
+      `insert into public.scan_requests (url, requested_by, vertical, segments) values ('https://adult-seg.example', $1, 'adult_ai', array['1','4'])`,
+      [OWNER_ID],
+    );
+    const [row] = await schema.query<{ segments: string[] }>(
+      `select segments from public.scan_requests where url = 'https://adult-seg.example'`,
+    );
+    expect(row).toEqual({ segments: ['1', '4'] });
   });
 });

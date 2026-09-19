@@ -102,6 +102,11 @@ export interface ScanQueue {
      * (0088). No screen offers a choice yet; the parameter exists so the request row can carry one.
      */
     vertical?: Vertical,
+    /**
+     * The categories an adult AI scan is declared under (0090). Ignored for any other vertical, whose
+     * requests the schema holds to none.
+     */
+    segments?: readonly string[],
   ): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly error: string }>;
   /** The most recent requests, newest first. */
   list(limit?: number): Promise<RequestList>;
@@ -134,7 +139,7 @@ export interface ScanQueue {
 
 export function createScanQueue(client: SupabaseClient, analystId: string): ScanQueue {
   return {
-    async request(url, vertical = DEFAULT_VERTICAL) {
+    async request(url, vertical = DEFAULT_VERTICAL, segments = []) {
       const normalised = normaliseUrl(url);
       if (normalised === null) {
         return {
@@ -147,7 +152,14 @@ export function createScanQueue(client: SupabaseClient, analystId: string): Scan
         .from('scan_requests')
         // Always public. The insert policy in 0014 refuses anything else, so this is the client
         // agreeing with a rule the database enforces rather than a decision made here.
-        .insert({ url: normalised, requested_by: analystId, status: 'queued', mode: 'public', vertical })
+        .insert({
+          url: normalised,
+          requested_by: analystId,
+          status: 'queued',
+          mode: 'public',
+          vertical,
+          ...(vertical === 'adult_ai' ? { segments: [...segments] } : {}),
+        })
         .select('id')
         .single();
 

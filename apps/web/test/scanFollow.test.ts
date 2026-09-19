@@ -255,6 +255,16 @@ describe('createScanQueue.request', () => {
     expect(calls[0]?.inserted).toMatchObject({ url: 'https://xchar.ai', vertical: 'adult_ai' });
   });
 
+  it('carries declared categories on an adult AI request only (D-287)', async () => {
+    const adult = fakeClient(() => ({ data: { id: 'req-3' }, error: null }));
+    await createScanQueue(adult.client, 'analyst-1').request('xchar.ai', 'adult_ai', ['1', '4']);
+    expect(adult.calls[0]?.inserted).toMatchObject({ vertical: 'adult_ai', segments: ['1', '4'] });
+
+    const peptide = fakeClient(() => ({ data: { id: 'req-4' }, error: null }));
+    await createScanQueue(peptide.client, 'analyst-1').request('shop.example', 'peptides', ['1']);
+    expect(peptide.calls[0]?.inserted).not.toHaveProperty('segments');
+  });
+
   it('reports failure when the insert succeeds but hands back no id', async () => {
     // Nothing to follow means the only remaining move is "open whichever run is newest", which is
     // the wrong report delivered confidently. It has to fail loudly instead.

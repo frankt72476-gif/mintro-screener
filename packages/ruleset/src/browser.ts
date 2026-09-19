@@ -87,3 +87,15 @@ export {
   type PageTypeTable,
   type VerticalPages,
 } from './pageTypes.js';
+
+// Referral policy application (D-287, cluster 2). Browser-safe and pure.
+export {
+  applyReferralPolicy,
+  parseReferralPolicy,
+  referralPolicyLine,
+  referralPolicyRuleIds,
+  referralPolicySchema,
+  type ReferralOutcome,
+  type ReferralPolicy,
+  type ReferralStatus,
+} from './referralPolicy.js';

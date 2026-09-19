@@ -44,7 +44,7 @@
  */
 
 import type { EvidenceArtifact, ReportFinding, ScreeningReport } from '@mintro/engine';
-import { isVertical, referralPolicyVersion, type Vertical } from '@mintro/ruleset';
+import { isVertical, referralPolicyVersion, type ReferralOutcome, type Vertical } from '@mintro/ruleset';
 import { putEvidence, type WorkerSupabase } from './supabase.js';
 import { assessContents, assessRun, countFindings } from './completeness.js';
 
@@ -83,6 +83,16 @@ export interface PersistInput {
    * forgot to say would silently file an adult AI run as a peptide one. Required at the type level.
    */
   readonly vertical: Vertical;
+  /**
+   * The categories the scan was declared under, carried from its scan request (0090). Empty for
+   * peptides, which the schema enforces.
+   */
+  readonly segments: readonly string[];
+  /**
+   * The referral policy's result for an adult AI run (D-287), written in the update that finishes the
+   * run. Null for peptides, and for a resume, which finishes a run it did not screen.
+   */
+  readonly referral?: ReferralOutcome | null;
   /**
    * Every key the run captured, when that is known separately from `artifacts`.
    *
@@ -144,24 +154,24 @@ export async function ownerAnalystId(supabase: WorkerSupabase): Promise<{ id: st
 export async function runOwner(
   supabase: WorkerSupabase,
   runId: string,
-): Promise<{ createdBy: string; orgId: string; vertical: Vertical }> {
+): Promise<{ createdBy: string; orgId: string; vertical: Vertical; segments: readonly string[] }> {
   const { data, error } = await supabase.client
     .from('runs')
-    .select('created_by, org_id, vertical')
+    .select('created_by, org_id, vertical, segments')
     .eq('id', runId)
     .maybeSingle();
 
   if (error !== null) {
     throw new Error(`could not read the owner of run ${runId}: ${error.message}`);
   }
-  const row = data as { created_by: string; org_id: string; vertical: string } | null;
+  const row = data as { created_by: string; org_id: string; vertical: string; segments: string[] | null } | null;
   if (row === null) {
     throw new Error(`run ${runId} does not exist, so it has no owner to preserve`);
   }
   if (!isVertical(row.vertical)) {
     throw new Error(`run ${runId} records vertical '${row.vertical}', which this worker does not know`);
   }
-  return { createdBy: row.created_by, orgId: row.org_id, vertical: row.vertical };
+  return { createdBy: row.created_by, orgId: row.org_id, vertical: row.vertical, segments: row.segments ?? [] };
 }
 
 export async function persistRun(
@@ -205,7 +215,7 @@ export async function persistRun(
           'would be visible to nobody or to everybody, and both are wrong.',
       );
     }
-    await insertRun(supabase, runId, merchantId, report, input.createdBy, input.orgId, input.vertical);
+    await insertRun(supabase, runId, merchantId, report, input.createdBy, input.orgId, input.vertical, input.segments);
   }
 
   try {
@@ -281,7 +291,7 @@ ${listed}
   }
 
   // Last, and only now. Everything above is repairable; this is not.
-  await finishRun(supabase, runId, report);
+  await finishRun(supabase, runId, report, input.referral ?? null);
 
   return {
     runId,
@@ -332,6 +342,7 @@ export function runRowFor(input: {
   readonly createdBy: string;
   readonly orgId: string;
   readonly vertical: Vertical;
+  readonly segments?: readonly string[];
 }): Record<string, unknown> {
   return {
     id: input.runId,
@@ -339,6 +350,7 @@ export function runRowFor(input: {
     created_by: input.createdBy,
     org_id: input.orgId,
     vertical: input.vertical,
+    segments: [...(input.segments ?? [])],
     // Stamped at creation from the vertical, never passed in: the policy a run was screened under is
     // the one in force for its vertical when it opened (D-287). Null for peptides, which has none.
     referral_policy_version: referralPolicyVersion(input.vertical),
@@ -359,10 +371,11 @@ async function insertRun(
   createdBy: string,
   orgId: string,
   vertical: Vertical,
+  segments: readonly string[],
 ): Promise<void> {
   const { error } = await supabase.client
     .from('runs')
-    .insert(runRowFor({ runId, merchantId, report, createdBy, orgId, vertical }));
+    .insert(runRowFor({ runId, merchantId, report, createdBy, orgId, vertical, segments }));
 
   if (error !== null) {
     throw new Error(`could not open run ${runId}: ${error.message}`);
@@ -435,15 +448,11 @@ async function finishRun(
   supabase: WorkerSupabase,
   runId: string,
   report: ScreeningReport,
+  referral: ReferralOutcome | null,
 ): Promise<void> {
   const { error } = await supabase.client
     .from('runs')
-    .update({
-      finished_at: report.finishedAt,
-      // A run the watchdog cut short is finished too, and frozen the same way (D-282, D-002).
-      status: report.truncated === undefined ? 'complete' : 'truncated',
-      report,
-    })
+    .update(finishRowFor(report, referral))
     .eq('id', runId);
 
   if (error !== null) {
@@ -501,4 +510,24 @@ export function explainFindingsInsert(message: string, runId: string): string {
 function isDuplicate(message: string): boolean {
   const lower = message.toLowerCase();
   return lower.includes('duplicate') || lower.includes('already exists');
+}
+
+/**
+ * The update that finishes a run, and freezes it (D-002).
+ *
+ * The referral policy's result travels in the same update (D-287, 0090): after it, the run is
+ * immutable, and a status written later could not be. Exported so the schema test applies exactly
+ * this to the real schema.
+ */
+export function finishRowFor(
+  report: Pick<ScreeningReport, 'finishedAt' | 'truncated'> & Partial<ScreeningReport>,
+  referral: ReferralOutcome | null,
+): Record<string, unknown> {
+  return {
+    finished_at: report.finishedAt,
+    // A run the watchdog cut short is finished too, and frozen the same way (D-282, D-002).
+    status: report.truncated === undefined ? 'complete' : 'truncated',
+    report,
+    ...(referral === null ? {} : { referral_status: referral.status, referral_reasons: [...referral.reasons] }),
+  };
 }
