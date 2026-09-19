@@ -503,7 +503,13 @@ count.
   `evaluation_drafts` row, validator status `rejected`; no published evaluation, capture or send).
   **Resolved in cluster 4 commit 1:** every evaluation job refuses a non-peptide run with the reason
   "evaluation layer does not apply to vertical adult_ai (D-284)", and the web renders no evaluation UI
-  for one.
+  for one. **Commit 1a:** migration 0091 makes the tables refuse such a request or draft on insert or
+  update, whatever writes it. 6571d6a9's `evaluation_requests` row is kept as the record.
+
+  **A fact for the retention question in memo §14.** Before the guard existed, generating that draft
+  sent about 19k tokens of the merchant's page text — homepage, terms of service and a docs page,
+  each cut to 3,000 characters — to the model provider (Claude Opus 5; the draft row records 19,324
+  input and 2,245 output tokens). Adult AI runs send nothing to a model provider from cluster 4 on.
 - **The terms-page selection reads one page and can pick the wrong one (cluster 2).** The `terms`
   surface is chosen by the slugs `policy`, `policies` and `terms` (`SURFACE_SLUGS`,
   `apps/worker/src/evaluationPages.ts`), so a merchant linking a "Content Removal Policy" can have that
