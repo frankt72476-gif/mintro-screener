@@ -4006,3 +4006,7 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 .capture-superseded{font-size:11px;color:var(--ink-mid);align-self:center}
 /* Why Send and Open are absent (D-275). Sits where they would be, in the actions row. */
 .capture-pending{font-size:12px;color:var(--ink-mid);align-self:center;max-width:34ch;line-height:1.35}
+
+/* The declared-categories list on the scan form, adult AI (cluster 2, D-287). */
+fieldset.field { border: 0; padding: 0; margin: 0; }
+.check-row { display: block; margin: 4px 0; font-size: 14px; }

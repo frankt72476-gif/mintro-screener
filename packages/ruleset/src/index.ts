@@ -92,6 +92,7 @@ export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 // Which rule set and corpus each vertical uses (D-284, D-288). Node only.
 export {
   VERTICAL_FILES,
+  loadReferralPolicy,
   loadRulesetForVertical,
   referralPolicyVersion,
   type VerticalFiles,
@@ -110,6 +111,7 @@ export { PARAMS_BY_CHECK_TYPE } from './params.js';
 export {
   CHECK_TYPES,
   COA_FIELDS,
+  DOM_FEATURE_DETECTORS,
   DOC_EXTRACTS,
   DOM_COLLECTS,
   DOM_DETECTS,
@@ -137,6 +139,7 @@ export {
   tierCarriesWeight,
   type CheckType,
   type CoaField,
+  type DomFeatureDetector,
   type DocExtract,
   type EvaluationTier,
   type Expectation,
@@ -210,3 +213,26 @@ export {
   type SlotRow,
   type Removal,
 } from './composeSet.js';
+
+// Page types per vertical (D-274, D-284). Browser-safe data.
+export {
+  ADULT_AI_PAGES,
+  ADULT_AI_PAGE_TYPES,
+  PEPTIDE_PAGES,
+  PEPTIDE_PAGE_TYPES,
+  type PageTypeDocument,
+  type PageTypeTable,
+  type VerticalPages,
+} from './pageTypes.js';
+
+// Referral policy application (D-287, cluster 2). Browser-safe and pure.
+export {
+  applyReferralPolicy,
+  parseReferralPolicy,
+  referralPolicyLine,
+  referralPolicyRuleIds,
+  referralPolicySchema,
+  type ReferralOutcome,
+  type ReferralPolicy,
+  type ReferralStatus,
+} from './referralPolicy.js';

@@ -477,6 +477,14 @@ export interface SampleBasis {
   /** Surfaces this run read, named. Only ones actually reached. */
   readonly surfacesRead: readonly string[];
   /**
+   * The docs host read as a second origin, and how many of its pages (cluster 2, D-284).
+   *
+   * Apart from `surfacesRead` because it is another site, not another page of this one, and the
+   * coverage line says so in its own clause. Absent when none was read, and on every run before it
+   * existed (D-002).
+   */
+  readonly secondOrigin?: { readonly host: string; readonly pagesRead: number };
+  /**
    * Product pages the run did not render, and why they were the ones left (D-223, D-076).
    *
    * **Declared, never silently omitted, and never attested.** The sampler has always rendered a

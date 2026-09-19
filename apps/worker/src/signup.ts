@@ -35,8 +35,10 @@ import type {
   SignupForm,
   SurfaceSpec,
 } from '@mintro/engine';
-import { located, NO_SIGNUP_FORM, unreachable, withoutFragment } from '@mintro/engine';
-import { surfaceFromSlug } from './evaluationPages.js';
+import { discoverLayer0, located, NO_SIGNUP_FORM, unreachable, withoutFragment, type Fetcher } from '@mintro/engine';
+import { docsOriginFor, docsPacerFor, llmsTxtUrls } from './docsOrigin.js';
+import { pageTypeEntry, surfaceFromSlug } from './evaluationPages.js';
+import type { PageTypeDocument, PageTypeTable, VerticalPages } from '@mintro/ruleset';
 import { probeSurface } from './surfaceProbe.js';
 import { establishDocument } from './locate.js';
 import { PROBE_IDLE_MS, renderPage } from './render.js';
@@ -232,6 +234,29 @@ export interface Layer3Discovery {
    * captures. Empty on a storefront that publishes none, which is most of them.
    */
   readonly editorial: readonly PageContext[];
+  /**
+   * Every page type the vertical's documents list asked for, located or not (D-284).
+   *
+   * Empty for peptides, whose surfaces are the named fields above. An adult AI crawl fills it from
+   * its vertical's `documents`, and `terms` above is the same entry as `pageTypes.get('terms')`.
+   */
+  readonly pageTypes: ReadonlyMap<string, Located<PageContext>>;
+  /**
+   * Every page established for each page type, in the order read (cluster 2 commit 3).
+   *
+   * `pageTypes` holds the first, which is what a `text_match` rule reads; a `dom_feature` rule reads
+   * them all. The docs host's pages are appended to `docs`. Empty for peptides.
+   */
+  readonly pagesByType: ReadonlyMap<string, readonly PageContext[]>;
+  /**
+   * The docs host read as a second origin, where the vertical enables one and the primary site
+   * linked one (cluster 2). Absent otherwise — always absent on a peptide run.
+   */
+  readonly docsOrigin?: {
+    readonly origin: string;
+    /** Every docs page established on it, in the order read. */
+    readonly pages: readonly PageContext[];
+  };
   /** Every navigation made looking for any of them, and what it returned. */
   readonly attempts: readonly FetchAttempt[];
   readonly artifacts: readonly EvidenceArtifact[];
@@ -309,6 +334,19 @@ export interface DiscoverOptions {
    * nobody could read while telling a reader nothing about how much of the crawl is left.
    */
   readonly onProgress?: (line: string, count?: { readonly done: number; readonly total: number }) => void;
+  /**
+   * The vertical's page types (D-284).
+   *
+   * Absent or without `documents`: the peptide pass below, exactly as it was. With `documents`: the
+   * sign-up form, then each listed page type, located through the vertical's own table.
+   */
+  readonly pages?: VerticalPages;
+  /**
+   * What reading a docs host needs, where the vertical enables it (cluster 2): the fetcher Layer 0
+   * used, for its sitemap and `llms.txt`, and the page cap the primary origin's sample runs under.
+   * Absent: no docs host is read, whatever the vertical says.
+   */
+  readonly secondOrigin?: { readonly fetcher: Fetcher; readonly pageCap: number };
 }
 
 /**
@@ -327,6 +365,16 @@ export async function discoverLayer3(
   const attempts: FetchAttempt[] = [];
   const artifacts: EvidenceArtifact[] = [];
   const pages: PageContext[] = [];
+
+  const byPageType = options.pages?.documents;
+  if (options.pages !== undefined && byPageType !== undefined) {
+    return discoverPageTypes(browser, origin, options, options.pages, byPageType, {
+      attempts,
+      artifacts,
+      pages,
+      say,
+    });
+  }
 
   /*
     The four documents as a table, so the denominator is structural (D-173).
@@ -415,6 +463,105 @@ export async function discoverLayer3(
     about: surface('about page'),
     // Every editorial page, not the first, and the FAQ ahead of them (D-274).
     editorial: editorialSample(established.get('FAQ') ?? [], established.get('editorial page') ?? []),
+    pageTypes: new Map(),
+    pagesByType: new Map(),
+    attempts,
+    artifacts,
+    pages,
+    probe,
+  };
+}
+
+/**
+ * The Layer 3 pass for a vertical that names its documents by page type (D-284).
+ *
+ * The sign-up form first, as for peptides, then each page type in the vertical's order through the
+ * same `findDocument` — the same probe, the same guards, the same attempts on every miss. Only the
+ * candidate sources differ: a page type is found by the homepage links and sitemap entries its
+ * vertical's table classifies as that type, ranked by table order where the vertical asks, then by
+ * any conventional paths it lists.
+ *
+ * The peptide surfaces this vertical does not read are reported as not looked for, with no attempts:
+ * no rule in its rule set reads them, and nothing claims they were searched.
+ */
+async function discoverPageTypes(
+  browser: Browser,
+  origin: string,
+  options: DiscoverOptions,
+  vertical: VerticalPages,
+  documents: readonly PageTypeDocument[],
+  sinks: {
+    readonly attempts: FetchAttempt[];
+    readonly artifacts: EvidenceArtifact[];
+    readonly pages: PageContext[];
+    readonly say: (line: string, count?: { readonly done: number; readonly total: number }) => void;
+  },
+): Promise<Layer3Discovery> {
+  const { attempts, artifacts, pages, say } = sinks;
+  const total = documents.length + 1;
+  let done = 0;
+
+  say('looking for the sign-up form', { done, total });
+  const signupFound = await findSignupForm(browser, origin, options, attempts, artifacts, pages, say);
+  done += 1;
+
+  const probe = { undecided: 0, total: 0 };
+  const located = new Map<string, Located<PageContext>>();
+  const pagesByType = new Map<string, PageContext[]>();
+  for (const document of documents) {
+    options.signal?.throwIfAborted();
+    say(`looking for the ${document.label}`, { done, total });
+    const outcome = await findDocument(
+      browser,
+      origin,
+      options,
+      attempts,
+      artifacts,
+      pages,
+      say,
+      {
+        label: document.label,
+        paths: document.paths,
+        linkHints: [],
+        surface: document.pageType,
+        ...(document.limit === undefined ? {} : { limit: document.limit }),
+        table: vertical.table,
+        rankByPageTypeOrder: vertical.rankByPageTypeOrder,
+        // The page type's own slugs, as its path would carry them (`character/new` as written).
+        pathNames: vertical.table.filter(([, type]) => type === document.pageType).map(([slug]) => slug),
+      },
+      probe,
+    );
+    located.set(document.pageType, outcome.located);
+    pagesByType.set(document.pageType, [...outcome.pages]);
+    done += 1;
+  }
+  say('policy pages read', { done, total });
+
+  const docs = await readDocsOrigin(browser, origin, options, vertical, sinks, probe);
+  if (docs !== undefined && docs.pages.length > 0) {
+    const primaryDocs = located.get('docs');
+    if (primaryDocs === undefined || !primaryDocs.located) {
+      located.set('docs', docs.first);
+    }
+    pagesByType.set('docs', [...(pagesByType.get('docs') ?? []), ...docs.pages]);
+  }
+
+  const notRead = (label: string): Located<PageContext> =>
+    unreachable(`the ${label} is not read by this vertical's crawl`, []);
+
+  return {
+    signup: signupFound.form,
+    ...(signupFound.page === undefined ? {} : { signupPage: signupFound.page }),
+    terms: located.get('terms') ?? notRead('terms document'),
+    shipping: notRead('shipping policy'),
+    faq: notRead('FAQ'),
+    payment: notRead('payment or refund policy'),
+    about: notRead('about page'),
+    editorial: [],
+    pageTypes: located,
+    pagesByType,
+    ...(docs === undefined ? {} : { docsOrigin: { origin: docs.origin, pages: docs.pages } }),
     attempts,
     artifacts,
     pages,
@@ -547,9 +694,11 @@ export function selectListedCandidates(
   sitemapUrls: readonly string[],
   origin: string,
   surface: string | undefined,
+  /** The vertical's page-type table (D-284). Absent, the peptide one. */
+  table?: PageTypeTable,
 ): readonly string[] {
   if (surface === undefined) return [];
-  return sitemapUrls.filter((url) => url.startsWith(origin) && surfaceFromSlug(url) === surface);
+  return sitemapUrls.filter((url) => url.startsWith(origin) && surfaceFromSlug(url, table) === surface);
 }
 
 /**
@@ -592,6 +741,14 @@ export function selectLinkedCandidates(
   linkTexts: readonly string[] = [],
   /** The surface `surfaceFromSlug` must agree the href names, when `linkTexts` is in play. */
   surface?: string,
+  /**
+   * A vertical whose page types are decided by the href alone (D-284).
+   *
+   * With a table, any homepage link whose href the table classifies as `surface` is a candidate,
+   * wherever it sits — the merchant linking the page is the merchant telling us it exists. Absent,
+   * the peptide doors above, unchanged.
+   */
+  table?: PageTypeTable,
 ): { readonly followed: readonly string[]; readonly dropped: number; readonly matched: number } {
   const wanted = new Set(linkTexts.map((text) => text.toLowerCase()));
 
@@ -630,6 +787,9 @@ export function selectLinkedCandidates(
       homepageLinks
         .filter((link) => {
           const haystack = `${link.href} ${link.text}`.toLowerCase();
+          if (table !== undefined && surface !== undefined && surfaceFromSlug(link.href, table) === surface) {
+            return true;
+          }
           return linkHints.some((hint) => haystack.includes(hint)) || namesTheSurface(link);
         })
         .map((link) => withoutFragment(link.href)),
@@ -666,6 +826,22 @@ async function findDocument(
     readonly surface?: string;
     /** How many pages of this surface one run reads. Absent means one (D-271). */
     readonly limit?: number;
+    /** The vertical's page-type table, where it is not the peptide one (D-284). */
+    readonly table?: PageTypeTable;
+    /** Read candidates in the order of the table entry that classified them (D-284). */
+    readonly rankByPageTypeOrder?: boolean;
+    /**
+     * What the located page's own path must contain, where it is not `linkHints` (D-284).
+     *
+     * `establishDocument` refuses a page whose path names none of these, and an empty list names
+     * nothing — so a page type found by its table alone passes its table's slugs here.
+     */
+    readonly pathNames?: readonly string[];
+    /**
+     * The candidates, given outright rather than found from the homepage links and sitemap
+     * (cluster 2). The docs host's pages come from its own sitemap and `llms.txt`.
+     */
+    readonly candidates?: readonly string[];
   },
   probeTally: { undecided: number; total: number },
 ): Promise<{ readonly located: Located<PageContext>; readonly pages: readonly PageContext[] }> {
@@ -706,7 +882,7 @@ async function findDocument(
     is the document — six instances of one defect were six call sites each deciding that for
     itself, and the fix for one never reached the next.
   */
-  const spec: SurfaceSpec = { label: what.label, pathNames: [...what.linkHints] };
+  const spec: SurfaceSpec = { label: what.label, pathNames: [...(what.pathNames ?? what.linkHints)] };
 
   // A link on the homepage is how a visitor actually reaches the document, and it survives themes
   // that spell the path their own way. The path still has to name the surface — `establishDocument`
@@ -718,6 +894,7 @@ async function findDocument(
     origin,
     what.linkTexts ?? [],
     what.surface,
+    what.table,
   );
 
   if (dropped > 0) {
@@ -735,10 +912,18 @@ async function findDocument(
     pages the page selector knows how to label — one definition, two sources. A sitemap entry that
     names no surface is somebody else's page.
   */
-  const listed = selectListedCandidates(options.sitemapUrls ?? [], origin, what.surface);
+  const listed = selectListedCandidates(options.sitemapUrls ?? [], origin, what.surface, what.table);
 
-  const found = [...new Set([...linked, ...listed])];
-  const ordered = options.rankCandidates === undefined ? found : [...options.rankCandidates(found)];
+  const found = what.candidates !== undefined ? [...new Set(what.candidates)] : [...new Set([...linked, ...listed])];
+  // Candidates given outright are already in the order to read them: they are not re-ranked.
+  const ordered =
+    what.candidates !== undefined
+      ? found
+      : what.rankByPageTypeOrder === true && what.table !== undefined
+      ? rankByTableEntry(found, what.table)
+      : options.rankCandidates === undefined
+        ? found
+        : [...options.rankCandidates(found)];
 
   const limit = what.limit ?? Infinity;
   const candidates = [
@@ -912,4 +1097,131 @@ function describeCandidates(attempts: readonly FetchAttempt[]): string {
   return answered === 0
     ? `none of the ${attempts.length} path(s) tried was served`
     : `${answered} of the ${attempts.length} path(s) tried was served but could not be read as one`;
+}
+
+/**
+ * Candidates in the order of the table entry that classified each (D-284).
+ *
+ * Stable, so candidates classified by the same entry keep the order they were found in. What makes a
+ * page named by a terms slug read ahead of one named only by a policy slug, when both are linked.
+ */
+export function rankByTableEntry(urls: readonly string[], table: PageTypeTable): readonly string[] {
+  const rank = (url: string): number => pageTypeEntry(url, table) ?? Infinity;
+  return urls
+    .map((url, index) => ({ url, index, rank: rank(url) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((entry) => entry.url);
+}
+
+/**
+ * The docs host, read as the one additional origin a run may have (cluster 2).
+ *
+ * Only where the vertical enables it and the primary site's nav or footer links one
+ * (`docsOriginFor`). Its sitemap is read by Layer 0's own discovery, unchanged, and its `/llms.txt` as a
+ * plain URL list; the linked page leads, then `llms.txt`'s URLs, then the sitemap's. Pages are rendered
+ * through `findDocument` like every other Layer 3 page — the same probe, guards and attempts — under
+ * the run's pacer, up to the page cap the primary origin's sample runs under.
+ *
+ * Every page on the docs host is a docs page: the host names the surface, so the path guard is given
+ * `/`, which every path carries.
+ */
+async function readDocsOrigin(
+  browser: Browser,
+  primaryOrigin: string,
+  options: DiscoverOptions,
+  vertical: VerticalPages,
+  sinks: {
+    readonly attempts: FetchAttempt[];
+    readonly artifacts: EvidenceArtifact[];
+    readonly pages: PageContext[];
+    readonly say: (line: string, count?: { readonly done: number; readonly total: number }) => void;
+  },
+  probe: { undecided: number; total: number },
+): Promise<{ readonly origin: string; readonly first: Located<PageContext>; readonly pages: readonly PageContext[] } | undefined> {
+  if (options.secondOrigin === undefined) return undefined;
+  const links = options.homepageLinks ?? [];
+  const docsOrigin = docsOriginFor(vertical, primaryOrigin, links);
+  if (docsOrigin === null) return undefined;
+
+  const { fetcher, pageCap } = options.secondOrigin;
+  const { attempts, artifacts, pages, say } = sinks;
+  options.signal?.throwIfAborted();
+  say(`reading the docs host ${new URL(docsOrigin).host}`);
+
+  // Its sitemap, by the same discovery the primary origin's went through.
+  const layer0 = await discoverLayer0(docsOrigin, fetcher, { runId: options.runId });
+  artifacts.push(...layer0.artifacts);
+  attempts.push(...layer0.attempts);
+  const fromSitemap = layer0.urls
+    .map((slug) => slug.url)
+    .filter((url) => {
+      try {
+        return new URL(url).origin === docsOrigin;
+      } catch {
+        return false;
+      }
+    });
+
+  // `llms.txt`, as text. A file that is not served, or that bot protection answered, lists nothing.
+  const llmsUrl = `${docsOrigin}/llms.txt`;
+  const llms = await fetcher(llmsUrl);
+  attempts.push({
+    url: llmsUrl,
+    status: llms.status,
+    ...(llms.error === undefined ? {} : { error: llms.error }),
+  });
+  const fromLlms =
+    llms.status >= 200 && llms.status < 300 && llms.challenged === undefined ? llmsTxtUrls(llms.body, docsOrigin) : [];
+
+  const linked = links
+    .map((link) => withoutFragment(link.href))
+    .filter((href) => {
+      try {
+        return new URL(href).origin === docsOrigin;
+      } catch {
+        return false;
+      }
+    });
+
+  /*
+    The docs host's own Crawl-delay, where it asks for more than the primary's (cluster 2 commit 2a).
+    Its robots.txt was read by the Layer 0 pass above.
+  */
+  const pacer = docsPacerFor(options.pacer, layer0.robots.crawlDelaySeconds);
+  if (pacer !== options.pacer) {
+    say(`  the docs host asks for a longer crawl delay; its requests are paced at ${pacer.delay.effectiveMs} ms`);
+  }
+
+  const candidates = [...new Set([...linked, ...fromLlms, ...fromSitemap])];
+  const outcome = await findDocument(
+    browser,
+    docsOrigin,
+    { ...options, pacer },
+    attempts,
+    artifacts,
+    pages,
+    say,
+    {
+      label: 'documentation page',
+      paths: [],
+      linkHints: [],
+      pathNames: ['/'],
+      limit: pageCap,
+      candidates,
+    },
+    probe,
+  );
+
+  // What the docs read covered, in the attempts whatever it was: a read that stopped at the cap is
+  // visible as one (D-076).
+  attempts.push({
+    url: docsOrigin,
+    status: 0,
+    error:
+      `docs host ${new URL(docsOrigin).host}: ${outcome.pages.length} page(s) read of ` +
+      `${candidates.length} candidate(s); the cap is ${pageCap}` +
+      (candidates.length > pageCap ? `, so ${candidates.length - pageCap} or more were not requested` : ''),
+  });
+
+  return { origin: docsOrigin, first: outcome.located, pages: outcome.pages };
 }

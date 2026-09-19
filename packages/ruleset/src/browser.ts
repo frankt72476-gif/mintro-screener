@@ -76,3 +76,26 @@ export {
  * and the one in the browser is the one an operator acts on.
  */
 export { PLACEMENT_BY_SPECTRUM, type PlacementId, type SpectrumId } from './angles.js';
+
+// Page types per vertical (D-274, D-284). Browser-safe data.
+export {
+  ADULT_AI_PAGES,
+  ADULT_AI_PAGE_TYPES,
+  PEPTIDE_PAGES,
+  PEPTIDE_PAGE_TYPES,
+  type PageTypeDocument,
+  type PageTypeTable,
+  type VerticalPages,
+} from './pageTypes.js';
+
+// Referral policy application (D-287, cluster 2). Browser-safe and pure.
+export {
+  applyReferralPolicy,
+  parseReferralPolicy,
+  referralPolicyLine,
+  referralPolicyRuleIds,
+  referralPolicySchema,
+  type ReferralOutcome,
+  type ReferralPolicy,
+  type ReferralStatus,
+} from './referralPolicy.js';

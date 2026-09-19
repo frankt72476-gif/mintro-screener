@@ -217,8 +217,9 @@ vacuous-pass guards. Provenance header states each excerpt's origin document and
 The source enum is unchanged; the rendered heading is vertical-aware copy ('Source' for this
 vertical).
 
-Mintro-authored text appears in exactly two places: rule titles, and the referral policy document.
-Neither is a standard.
+Mintro-authored text appears in rule titles, in the clauses of `source: mintro` rules (descriptive
+"this rule reports whether…" form only), and in the referral policy. Nothing else. None of it is a
+standard.
 
 ---
 

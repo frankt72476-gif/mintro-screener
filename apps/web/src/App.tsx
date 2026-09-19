@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Ruleset } from '@mintro/ruleset';
+import type { Ruleset, Vertical } from '@mintro/ruleset';
 import type { ScreeningReport } from '@mintro/engine';
 import { createEvidenceAccess } from './lib/evidence.js';
 import type { EvidenceAccess } from './lib/evidence.js';
@@ -45,6 +45,7 @@ import { createCredentialDeposit } from './lib/credentials.js';
 import { readCredentialState, normaliseDomain, type CredentialState } from './lib/credentialState.js';
 import { readReportCapture, type CapturedReport } from './lib/reportCapture.js';
 import { rulesetFor } from './lib/rulesets.js';
+import { SEGMENT_OPTIONS, UNKNOWN_SEGMENT, toggleSegment } from './lib/segments.js';
 import {
   canDeliver,
   captureStateLine,
@@ -1252,8 +1253,8 @@ function Screener({
               credentialEpoch={credentialEpoch}
               depositedAt={depositedAt}
               showsRunBy={shape.showsRunBy}
-              onRequest={async (url) => {
-                const result = await queue.request(url);
+              onRequest={async (url, vertical, segments) => {
+                const result = await queue.request(url, vertical, segments);
                 if (result.ok) {
                   setError(null);
                   setToast('Scan queued — the worker will pick it up');
@@ -1548,9 +1549,19 @@ export function ScanInput({
   readonly showsRunBy: boolean;
   readonly onRequest: (
     url: string,
+    vertical: Vertical,
+    segments: readonly string[],
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }): JSX.Element {
   const [url, setUrl] = useState('');
+  /*
+    The vertical and, for adult AI, the declared categories (D-284, D-287). Peptides is the default and
+    declares nothing; an adult AI scan is not queued until something is declared, "I don't know"
+    included, so a request never records silence as a declaration.
+  */
+  const [vertical, setVertical] = useState<Vertical>('peptides');
+  const [segments, setSegments] = useState<readonly string[]>([]);
+  const segmentsReady = vertical !== 'adult_ai' || segments.length > 0;
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -1605,9 +1616,12 @@ export function ScanInput({
   const submit = async (): Promise<void> => {
     setRequesting(true);
     setRequestError(null);
-    const result = await onRequest(url);
+    const result = await onRequest(url, vertical, vertical === 'adult_ai' ? segments : []);
     setRequesting(false);
-    if (result.ok) setUrl('');
+    if (result.ok) {
+      setUrl('');
+      setSegments([]);
+    }
     else setRequestError(result.error);
   };
 
@@ -1671,12 +1685,12 @@ export function ScanInput({
               placeholder="https://shop.example"
               onChange={(event) => setUrl(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && url.trim() !== '' && !requesting) void submit();
+                if (event.key === 'Enter' && url.trim() !== '' && !requesting && segmentsReady) void submit();
               }}
             />
             <button
               className="btn btn-primary"
-              disabled={url.trim() === '' || requesting}
+              disabled={url.trim() === '' || requesting || !segmentsReady}
               onClick={() => void submit()}
             >
               {requesting ? 'Queueing…' : 'Run scan'}
@@ -1688,6 +1702,43 @@ export function ScanInput({
             </div>
           )}
         </div>
+
+        <div className="field">
+          <label className="flabel" htmlFor="scan-vertical">
+            Rule set
+          </label>
+          <select
+            className="input"
+            id="scan-vertical"
+            value={vertical}
+            onChange={(event) => {
+              setVertical(event.target.value as Vertical);
+              setSegments([]);
+            }}
+          >
+            <option value="peptides">Peptides</option>
+            <option value="adult_ai">Adult AI</option>
+          </select>
+        </div>
+
+        {vertical === 'adult_ai' && (
+          <fieldset className="field">
+            <legend className="flabel">Declared categories</legend>
+            <p className="fhint">
+              The categories the product is declared under. The crawl observes its features separately.
+            </p>
+            {SEGMENT_OPTIONS.map((option) => (
+              <label key={option.id} className="check-row">
+                <input
+                  type="checkbox"
+                  checked={segments.includes(option.id)}
+                  onChange={() => setSegments(toggleSegment(segments, option.id))}
+                />{' '}
+                {option.id === UNKNOWN_SEGMENT ? option.label : `${option.id}. ${option.label}`}
+              </label>
+            ))}
+          </fieldset>
+        )}
 
         {/*
           The screening account, directly beneath the storefront it attaches to (D-192).

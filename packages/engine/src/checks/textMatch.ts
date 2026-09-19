@@ -31,6 +31,14 @@ const RENDERED_SURFACES = new Set([
   'all_sampled',
   'terms',
   'shipping_policy',
+  // The adult AI page types (D-284): whole rendered pages, read like the terms document.
+  'guidelines',
+  'removal',
+  'pricing',
+  'create',
+  'generate',
+  'docs',
+  'library',
 ]);
 
 export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext): Finding {
@@ -39,6 +47,20 @@ export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext
   if (unrendered !== null) return unrendered;
 
   const { surface } = rule.params;
+  /*
+    A rule reading several surfaces is split per surface by the runner (`checkTextMatchAcross`), which
+    calls this once for each with a single `surface`. Reaching here with none means a runner handed
+    over a rule it did not split, and that has examined nothing.
+  */
+  if (surface === undefined) {
+    return notEvaluable(
+      rule,
+      'this rule reads several surfaces, and no runner evaluated it across them',
+      RENDERED,
+      'no_check_built',
+      pageEvidence(page),
+    );
+  }
   if (!RENDERED_SURFACES.has(surface)) {
     return notEvaluable(rule, `surface '${surface}' is not rendered at this layer`, RENDERED, 'no_check_built', pageEvidence(page));
   }

@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "document": "docs/referral-policy-adult-ai.md",
+  "note": "How Mintro Referral Policy, Adult AI v1.0 is applied at intake (D-287). A Mintro marketing document under Sponsor Agreement 1.1; not a standard. Applied by feature and by declaration only.",
+  "segments": [
+    { "id": "1", "label": "Text companion, fixed personas" },
+    { "id": "2", "label": "Text roleplay, user-created characters" },
+    { "id": "3", "label": "Voice / call companion" },
+    { "id": "4", "label": "Image generation, curated library, no uploads" },
+    { "id": "5", "label": "AI-creator marketplace" },
+    { "id": "6", "label": "Open-prompt generation on unfiltered models" },
+    { "id": "7", "label": "Reference-image upload, face swap, undress" },
+    { "id": "8", "label": "Video generation" },
+    { "id": "9", "label": "Hybrid with real performers" },
+    { "id": "10", "label": "Model / LoRA / prompt marketplace" },
+    { "id": "11", "label": "Minor-coded or animal-coded styling" },
+    { "id": "unknown", "label": "I don't know" }
+  ],
+  "lines": [
+    {
+      "id": "P-1",
+      "observed_any": ["AIFEAT-001", "AIFEAT-002"],
+      "declared_any": ["7"]
+    },
+    {
+      "id": "P-2",
+      "observed_any": ["AICAT-001"],
+      "declared_any": ["11"],
+      "legs_not_applied": [
+        "age constrained at character creation",
+        "output-side moderation, CSAM hash-matching and NCMEC reporting in place"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "segmentation_conflict",
+      "declared_only_within": ["1", "4"],
+      "observed_any": ["AIFEAT-001"]
+    }
+  ]
+}

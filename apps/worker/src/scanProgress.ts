@@ -45,6 +45,8 @@ export interface ScanProgress {
   readonly sampleIs: (served: number) => void;
   /** A Layer 3 surface that was actually read. Never called for one that was not. */
   readonly surfaceRead: (label: string) => void;
+  /** The docs host read as a second origin, with the pages read from it (cluster 2). */
+  readonly secondOriginRead: (host: string, pagesRead: number) => void;
   /**
    * What the run left unrendered, and which kind (D-223).
    *
@@ -64,6 +66,7 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
   let notRendered: { recognised: number; overCap: number } | undefined;
   let productsSampled = 0;
   const surfacesRead: string[] = [];
+  let secondOrigin: { host: string; pagesRead: number } | undefined;
 
   const send = (line: string, count?: { done: number; total: number }): void => {
     /*
@@ -95,6 +98,9 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
     surfaceRead(label) {
       if (!surfacesRead.includes(label)) surfacesRead.push(label);
     },
+    secondOriginRead(host, pagesRead) {
+      secondOrigin = { host, pagesRead };
+    },
     notRenderedIs(recognised, overCap) {
       notRendered = { recognised, overCap };
     },
@@ -106,6 +112,7 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
         productsInScope,
         productsSampled,
         surfacesRead: [...surfacesRead],
+        ...(secondOrigin === undefined ? {} : { secondOrigin: { ...secondOrigin } }),
         // Omitted rather than zeroed when nothing recorded it: a run that never declared what it
         // left out is not a run that left nothing out, and the coverage line has to tell those
         // apart (D-002, D-044's shape).

@@ -158,6 +158,7 @@ async function scan(
       // This entry point screens against `rules/ruleset.json` only, so its runs are peptide runs.
       // Stated rather than left to the column default (D-284).
       vertical: DEFAULT_VERTICAL,
+      segments: [],
     });
     // Read back rather than reported from the writer's own return value. `persistRun` refuses to
     // close an incomplete run, and this confirms from the database that it did close one.

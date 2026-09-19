@@ -33,7 +33,18 @@
 
 import { randomUUID } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
-import { VERTICALS, isVertical, loadRulesetForVertical, type Ruleset, type Vertical } from '@mintro/ruleset';
+import {
+  VERTICALS,
+  VERTICAL_FILES,
+  applyReferralPolicy,
+  isVertical,
+  loadReferralPolicy,
+  loadRulesetForVertical,
+  referralPolicyRuleIds,
+  type ReferralPolicy,
+  type Ruleset,
+  type Vertical,
+} from '@mintro/ruleset';
 import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
@@ -169,6 +180,8 @@ interface ScanRequest {
    * never re-derived later. Not null in the schema, with `peptides` as its default.
    */
   readonly vertical: string;
+  /** The categories an adult AI scan was declared under (0090). Empty for peptides. */
+  readonly segments: readonly string[] | null;
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -183,6 +196,24 @@ async function main(argv: readonly string[]): Promise<number> {
   const rulesets = Object.fromEntries(
     VERTICALS.map((vertical) => [vertical, loadRulesetForVertical(vertical)]),
   ) as Readonly<Record<Vertical, Ruleset>>;
+  /*
+    Each vertical's referral policy application, where it has one (D-287), loaded and checked at start
+    like the rule sets: every rule id it names must be a rule in that vertical's rule set, or a policy
+    trigger could name a rule no run produces and never fire.
+  */
+  const policies = Object.fromEntries(
+    VERTICALS.map((vertical) => {
+      const policy = loadReferralPolicy(vertical);
+      if (policy !== null) {
+        const known = new Set(rulesets[vertical].rules.map((rule) => rule.id));
+        const unknown = referralPolicyRuleIds(policy).filter((id) => !known.has(id));
+        if (unknown.length > 0) {
+          throw new Error(`the ${vertical} referral policy names rules its rule set does not have: ${unknown.join(', ')}`);
+        }
+      }
+      return [vertical, policy];
+    }),
+  ) as Readonly<Record<Vertical, ReferralPolicy | null>>;
   const supabase = createWorkerSupabase();
 
   // The commit the image was built from (D-279). `GIT_SHA` is a build argument, because Fly's release
@@ -322,7 +353,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
       const request = await claimNext(supabase);
       if (request !== null) {
-        const outcome = await handle(supabase, browser, rulesets, request, keys);
+        const outcome = await handle(supabase, browser, rulesets, policies, request, keys);
 
         /*
           A timed-out crawl is still holding pages in this browser (D-152).
@@ -625,7 +656,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
 
   const { data, error } = await supabase.client
     .from('scan_requests')
-    .select('id, url, status, claimed_at, mode, vertical, requested_by, analysts:requested_by (org_id)')
+    .select('id, url, status, claimed_at, mode, vertical, segments, requested_by, analysts:requested_by (org_id)')
     .or(`status.eq.queued,and(status.eq.running,claimed_at.lt.${staleBefore})`)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -649,7 +680,7 @@ async function claimNext(supabase: WorkerSupabase): Promise<ScanRequest | null> 
     .update({ status: 'running', claimed_at: new Date().toISOString(), progress: 'starting' })
     .eq('id', candidate.id)
     .eq('status', candidate.status)
-    .select('id, url, status, claimed_at, mode, vertical, requested_by, analysts:requested_by (org_id)');
+    .select('id, url, status, claimed_at, mode, vertical, segments, requested_by, analysts:requested_by (org_id)');
 
   if (claimError !== null) {
     throw new Error(`could not claim request ${candidate.id}: ${claimError.message}`);
@@ -699,6 +730,7 @@ async function handle(
   supabase: WorkerSupabase,
   browser: Browser,
   rulesets: Readonly<Record<Vertical, Ruleset>>,
+  policies: Readonly<Record<Vertical, ReferralPolicy | null>>,
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
 ): Promise<HandleOutcome> {
@@ -737,6 +769,8 @@ async function handle(
     const vertical = requestVertical(request);
     const screening = screenStorefront(browser, request.url, rulesets[vertical], {
       runId,
+      // The vertical's page types, which decide what the Layer 3 pass looks for (D-284).
+      pages: VERTICAL_FILES[vertical].pages,
       signal: controller.signal,
       onControl: (control) => {
         controls.current = control;
@@ -837,6 +871,15 @@ async function handle(
       createdBy: request.requested_by,
       orgId: requesterOrg,
       vertical,
+      segments: request.segments ?? [],
+      /*
+        The referral policy, applied at completion to what this run observed and what the request
+        declared (D-287). Only a vertical with a policy has one; a peptide run records none.
+      */
+      referral:
+        policies[vertical] === null
+          ? null
+          : applyReferralPolicy(policies[vertical]!, request.segments ?? [], report.strip),
     });
 
     // What the run actually did, recorded against the request. `mode` stopped being a choice at

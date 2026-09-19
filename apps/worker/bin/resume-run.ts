@@ -112,6 +112,7 @@ async function main(argv: readonly string[]): Promise<number> {
       createdBy: existing.createdBy,
       orgId: existing.orgId,
       vertical: existing.vertical,
+      segments: existing.segments,
     });
   } catch (error) {
     console.error(`\n${error instanceof Error ? error.message : String(error)}`);

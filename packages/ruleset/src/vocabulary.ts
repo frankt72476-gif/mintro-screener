@@ -27,8 +27,26 @@ export const CHECK_TYPES = [
   'doc_parse',
   'flow_probe',
   'manual',
+  /**
+   * A feature detected in a page's retained rendered DOM or text (cluster 2). The detector is chosen
+   * by data (`DOM_FEATURE_DETECTORS`); what it looks for beyond its structural signals is the rule's
+   * `terms`.
+   */
+  'dom_feature',
 ] as const;
 export type CheckType = (typeof CHECK_TYPES)[number];
+
+/**
+ * What a `dom_feature` rule detects (cluster 2).
+ *
+ *   `upload_control` — a control that takes a file: `input[type=file]`, or a drop zone named as one
+ *                      in its role, aria or class attributes; plus the rule's `terms` read as text, on
+ *                      the surfaces its `terms_on` names.
+ *   `lexicon`        — the rule's `terms` as whole-token phrases in the page's text, by the same
+ *                      tokeniser NAME-002 matches slugs with.
+ */
+export const DOM_FEATURE_DETECTORS = ['upload_control', 'lexicon'] as const;
+export type DomFeatureDetector = (typeof DOM_FEATURE_DETECTORS)[number];
 
 /**
  * Tier decides state on violation, and nothing else decides it. See D-009.
@@ -151,6 +169,18 @@ export const SURFACES = [
    * customers can see it. The footer and the public policy pages are where that appears.
    */
   'footer_and_public_pages',
+  /*
+    The adult AI page types (D-284), located through that vertical's page-type table
+    (`pageTypes.ts`) and read by its Layer 3 pass. `terms` above is shared.
+  */
+  'guidelines',
+  'removal',
+  'pricing',
+  'create',
+  'generate',
+  'docs',
+  /** Character library and discovery pages, adult AI (cluster 2 commit 3). */
+  'library',
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
