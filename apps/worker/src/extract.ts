@@ -529,7 +529,23 @@ export function extractPage(args: ExtractArgs): RawExtraction {
   }
 
   // ---- payment terms in the footer (collected for Layer 3, not evaluated here) ---------
-  const footerText = (footerElement?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  /*
+    Each text node joined with a space, not `textContent` (D-286).
+
+    `textContent` concatenates text nodes with nothing between them, so adjacent list items with no
+    whitespace in the markup ran together: xchar.ai's footer read "Complaints PolicyContent Removal
+    PolicyDMCA Policy", and `\bcontent removal\b` found no word boundary before "Content". The same
+    nodes, the same order, the same content as before; only the boundaries between them are kept,
+    as the page's own `text` already keeps them.
+  */
+  const footerNodes: string[] = [];
+  if (footerElement !== null) {
+    const footerWalker = document.createTreeWalker(footerElement, NodeFilter.SHOW_TEXT);
+    for (let n = footerWalker.nextNode(); n !== null; n = footerWalker.nextNode()) {
+      footerNodes.push(n.textContent ?? '');
+    }
+  }
+  const footerText = footerNodes.join(' ').replace(/\s+/g, ' ').trim();
   const footerLower = footerText.toLowerCase();
   const footerPaymentTerms = paymentTerms.filter((term) => footerLower.includes(term.toLowerCase()));
 

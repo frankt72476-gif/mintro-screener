@@ -493,6 +493,22 @@ count.
 
 ## Open items carried forward
 
+- **Footer-scoped peptide rules may now observe wording they previously missed (new runs only).**
+  Footer text was `footerElement.textContent`, which ran adjacent text nodes together with no space
+  (`apps/worker/src/extract.ts`, "Crawl gaps, first adult screen" §2). It is now each text node
+  joined with a space. On a new run, a rule reading footer text can observe words it could not match
+  before, wherever a storefront's footer has no whitespace between elements. No completed run changes
+  (D-002). The peptide rules that read `footer.text`:
+    - DISC-001 (`text_match`, `surface: footer`), the disclaimer wording;
+    - PAY-001 (`text_match`, `footer_and_public_pages`), which reads the homepage footer as a required
+      surface through `publicSurfaces` (`packages/engine/src/layer3.ts`);
+    - DISC-003 (`dom_assert`, `all_sampled`), whose candidate statements include
+      `splitStatements(page.footer.text)` on every sampled page.
+
+  Not affected: PAY-003 reads footer *links* (`link_text_contains`), and DISC-002 reads styled text
+  runs, and neither reads `footer.text`. `footerPaymentTerms` changes the same way but is stored,
+  and no rule reads it. **The check is the CoMo re-screen after this cluster deploys:** compare its
+  DISC-001, DISC-003 and PAY-001 findings with CoMo's last run. Recorded 2026-09-19.
 - **Evaluation-layer jobs load the peptide rule set unconditionally (cluster 4).**
   `apps/worker/src/evaluationRun.ts`, `apps/worker/src/evaluationPublishJob.ts` and
   `apps/worker/bin/evaluate.ts` read
@@ -594,6 +610,11 @@ This is in shared extraction, so it affects every footer text match, peptide foo
 **Not fixed in 3a:** fixing it changes peptide footer behaviour, which is outside a crawl fix and needs
 its own ruling. After 3a, AITD-001 also reads the located removal page, so for xchar it no longer
 rests on the footer text alone.
+
+**Update, fixed in its own commit after 3a (Frank, 2026-09-19).** Footer text is now each text node
+joined with a space. The nodes, their order and their content are unchanged; only the boundaries
+between them are kept. Completed runs are not touched (D-002). The peptide consequence is carried
+forward under "Open items carried forward".
 
 ### Fixed in commit 3a (adult page-type discovery only)
 
