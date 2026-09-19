@@ -34,6 +34,7 @@ type Answer = {
 const render = (answers: ReadonlyMap<string, Answer>): string =>
   renderToStaticMarkup(
     createElement(AttestationForm, {
+      vertical: 'peptides',
       questions: QUESTIONS,
       answers,
       identified: true,

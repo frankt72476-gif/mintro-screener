@@ -33,18 +33,19 @@ const corpusText = readFileSync(ADULT_CORPUS_PATH, 'utf8');
 const PRESENT = /^(AITD-00[1-3]|AIGATE-00[1-3]|AIPOL-00[1-7]|AIBILL-00[1-3])$/;
 
 describe('rules/ruleset-adult-ai.json', () => {
-  it('loads, at the version and date cluster 1 ships', () => {
+  it('loads, at the version and date cluster 4 ships', () => {
     // 0.1.1: phrase-level term lists, AIGATE-003 retitled. 0.1.2: unambiguous single words and inflections.
     // 0.2.0: rules read several page types (cluster 2). 0.3.0: dom_feature rules (cluster 2).
-    expect(adult.version).toBe('0.3.0');
-    expect(adult.effective).toBe('2026-09-18');
+    // 0.4.0: the attestation set, not-checked items and AIATT- manual rules (cluster 4, D-286).
+    expect(adult.version).toBe('0.4.0');
+    expect(adult.effective).toBe('2026-09-19');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
 
-  it('carries exactly the rules whose source excerpt is in the corpus', () => {
+  it('carries exactly the observed rules, then one manual rule per attestation question', () => {
     // AIPOL-005 (incest) is absent: Mastercard Rules 5.12.7 does not name it, and no other source was
     // taken. Its id is left unassigned, not reused.
-    expect(adult.rules.map((rule) => rule.id)).toEqual([
+    expect(adult.rules.filter((rule) => rule.type !== 'manual').map((rule) => rule.id)).toEqual([
       'AIGATE-003',
       'AIPOL-001',
       'AIPOL-002',
@@ -62,6 +63,9 @@ describe('rules/ruleset-adult-ai.json', () => {
       'AICAT-001',
       'AICAT-002',
     ]);
+    expect(adult.rules.filter((rule) => rule.type === 'manual').map((rule) => rule.id)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `AIATT-${String(i + 1).padStart(3, '0')}`),
+    );
   });
 
   it('agrees with its corpus byte for byte, one clause line per quoting rule', () => {
@@ -71,10 +75,12 @@ describe('rules/ruleset-adult-ai.json', () => {
 
   it('declares every rule as the memo rules: its source, auto tier, evidence, ordinary, a sense', () => {
     // Rules with no public source excerpt are Mintro's, rendered under the Mintro heading (D-138).
-    const MINTRO = ['AIFEAT-001', 'AIFEAT-003', 'AIFEAT-004', 'AIMKT-001', 'AIMKT-002'];
+    // The AIATT- rules quote no excerpt either: each says what cannot be observed and which question asks.
+    const MINTRO = /^(AIFEAT-00[134]|AIMKT-00[12]|AIATT-\d{3})$/;
     for (const rule of adult.rules) {
-      expect(rule.source, rule.id).toBe(MINTRO.includes(rule.id) ? 'mintro' : 'programme');
-      expect(rule.tier, rule.id).toBe('auto_fail');
+      expect(rule.source, rule.id).toBe(MINTRO.test(rule.id) ? 'mintro' : 'programme');
+      // Manual rules are review_only by invariant, and resolve to not_evaluable: they never run.
+      expect(rule.tier, rule.id).toBe(rule.type === 'manual' ? 'review_only' : 'auto_fail');
       expect(rule.evaluation_tier, rule.id).toBe('evidence');
       expect(rule.weight, rule.id).toBe('ordinary');
       expect(rule.sense, rule.id).toBe(PRESENT.test(rule.id) ? 'present' : 'absent');
@@ -95,8 +101,8 @@ describe('rules/ruleset-adult-ai.json', () => {
       'AITD-001': ['footer', 'removal'],
       'AITD-002': ['terms', 'removal'],
     });
-    // The runner that reads several page types is Layer 3's.
-    expect(adult.rules.every((r) => r.layer === 3)).toBe(true);
+    // The runner that reads several page types is Layer 3's. Manual rules are reached by no crawl.
+    expect(adult.rules.every((r) => (r.type === 'manual' ? r.layer === null : r.layer === 3))).toBe(true);
   });
 
   it('reads the feature rules on the page types cluster 2 commit 3 names', () => {
@@ -121,10 +127,9 @@ describe('rules/ruleset-adult-ai.json', () => {
     }
   });
 
-  it('carries no manual rule and no placeholder', () => {
-    // A rule whose detector lands in cluster 2 is left out until cluster 2 (Frank, 2026-09-18).
-    expect(adult.rules.filter((rule) => rule.type === 'manual')).toEqual([]);
-    expect(readFileSync(ADULT_RULESET_PATH, 'utf8')).not.toMatch(/cluster 2|detector lands/i);
+  it('carries no placeholder', () => {
+    // A rule whose detector lands in a later cluster is left out until then (Frank, 2026-09-18).
+    expect(readFileSync(ADULT_RULESET_PATH, 'utf8')).not.toMatch(/cluster \d|detector lands|TODO|placeholder/i);
   });
 
   it('matches phrases, never the standalone words that match a privacy section or any AI homepage', () => {
@@ -142,9 +147,52 @@ describe('rules/ruleset-adult-ai.json', () => {
     }
   });
 
-  it('carries no attestations and no not-checked items until cluster 4', () => {
-    expect(adult.attestations).toEqual([]);
-    expect(adult.not_checked).toEqual([]);
+  it('carries memo §8\'s twelve questions, in order, asking what the merchant does (D-067)', () => {
+    expect(adult.attestations.map((q) => q.id)).toEqual([
+      'model-provider',
+      'output-moderation',
+      'csam-detection',
+      'user-age-assurance',
+      'character-age-constraints',
+      'reference-images',
+      'creator-verification',
+      'takedown-volume',
+      'network-registration',
+      'app-stores',
+      'chargeback-ratio',
+      'state-law-posture',
+    ]);
+    for (const q of adult.attestations) {
+      // Asks what they do. Never whether they comply, never a threshold, never a verdict.
+      expect(q.question, q.id).toMatch(/^(What|How|Which|Can|If)\b/);
+      expect(q.question, q.id).toMatch(/\?/);
+      expect(q.question, q.id).not.toMatch(/\b(compl(y|ies|iance|iant)|adequate|sufficient|acceptable|meet|threshold|fail|pass|recommend)\w*/i);
+      // No authority and no severity: memo §8 gives neither, and D-286 records no published standard.
+      expect(q.authority, q.id).toBeUndefined();
+      expect(q.sev, q.id).toBeUndefined();
+    }
+  });
+
+  it('names, in each AIATT- rule, the question that covers it, one rule per question', () => {
+    const manual = adult.rules.filter((rule) => rule.type === 'manual');
+    expect(manual).toHaveLength(adult.attestations.length);
+    manual.forEach((rule, i) => {
+      const question = adult.attestations[i]!;
+      if (rule.type !== 'manual') throw new Error('unreachable');
+      // Verbatim, so a question reworded without its rule fails here rather than in a report.
+      expect(rule.params.reason, rule.id).toBe(`The attestation question \u201c${question.question}\u201d asks the merchant about this.`);
+      expect(rule.cat, rule.id).toBe('attested');
+      expect(rule.clause, rule.id).toMatch(/^This rule reports that .+ cannot be observed from the site\u2019s public pages/);
+    });
+  });
+
+  it('says what was not checked, per memo §9 and §6.4, with the multi-turn line as the report carries it', () => {
+    expect(adult.not_checked.map((item) => item.subject)).toEqual([
+      'Messages to the product\u2019s characters',
+      'Presence away from the site',
+      'Behaviour over a long conversation',
+    ]);
+    // Held equal to the engine's ADULT_MULTI_TURN_BOUNDARY in packages/engine/test/adultAttestations.test.ts.
   });
 
   it('is the rule set the adult_ai vertical loads', () => {
@@ -172,6 +220,15 @@ describe('the adult corpus check fails the ways it exists to', () => {
 });
 
 describe('the peptide vertical is unchanged', () => {
+  it('still asks its twenty questions, each with its authority and severity', () => {
+    const peptides = loadRulesetFile(RULESET_PATH);
+    expect(peptides.attestations).toHaveLength(20);
+    for (const q of peptides.attestations) {
+      expect(q.authority, q.id).toBeDefined();
+      expect(q.sev, q.id).toBeDefined();
+    }
+  });
+
   it('still resolves rules/ruleset.json and the RUO corpus, at version 3.11.0', () => {
     expect(VERTICAL_FILES.peptides.ruleset).toBe('rules/ruleset.json');
     expect(VERTICAL_FILES.peptides.corpus).toBe('rules/sources/ruo-standards-v1.1.md');

@@ -1,7 +1,7 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "source_document": "Adult AI public-rule excerpts v1",
-  "effective": "2026-09-18",
+  "effective": "2026-09-19",
   "states": [
     "fail",
     "review",
@@ -44,10 +44,78 @@
       "n": 6,
       "prefix": "AIMKT",
       "name": "Marketing"
+    },
+    {
+      "id": "attested",
+      "n": 7,
+      "prefix": "AIATT",
+      "name": "Not observable from the site"
     }
   ],
-  "attestations": [],
-  "not_checked": [],
+  "attestations": [
+    {
+      "id": "model-provider",
+      "question": "Which models generate your service’s text and images, and where do they run — through a named third-party API, or on infrastructure you host yourselves? Please name the models and any providers."
+    },
+    {
+      "id": "output-moderation",
+      "question": "What checks run on generated output, as distinct from filtering the prompts users send — an automated classifier, human review, or both? Please name any vendor."
+    },
+    {
+      "id": "csam-detection",
+      "question": "How do you detect child sexual abuse material, and how do you report it: which hash-matching vendor do you use, and how do reports reach NCMEC?"
+    },
+    {
+      "id": "user-age-assurance",
+      "question": "How do you establish a user’s age before they reach adult content? Please name the vendor and the method."
+    },
+    {
+      "id": "character-age-constraints",
+      "question": "How is the age of a character that users create constrained, and who moderates the characters users create?"
+    },
+    {
+      "id": "reference-images",
+      "question": "Can users upload an image of a person to base a character or a generation on? If they can, how do you check that the person pictured is the uploader or has consented — for example by liveness or self-match verification?"
+    },
+    {
+      "id": "creator-verification",
+      "question": "If creators publish characters or content for other users: how do you verify each creator’s identity and age, and what review happens before their work is published?"
+    },
+    {
+      "id": "takedown-volume",
+      "question": "How long does it take you, from a removal request arriving, to remove the content? How many removal requests and content complaints did you receive in the last 12 months?"
+    },
+    {
+      "id": "network-registration",
+      "question": "What is your Mastercard registration status and your VIRP tier, and which acquirers have processed for you before?"
+    },
+    {
+      "id": "app-stores",
+      "question": "Which app stores list your app, and has any store removed it or declined to list it? If so, when, and what reason was given?"
+    },
+    {
+      "id": "chargeback-ratio",
+      "question": "What was your chargeback ratio in each of the last 3 months?"
+    },
+    {
+      "id": "state-law-posture",
+      "question": "Which US states with age-verification laws do you block, and which do you route through age verification? What protocols do you follow under California SB 243?"
+    }
+  ],
+  "not_checked": [
+    {
+      "subject": "Messages to the product’s characters",
+      "why": "Mintro sent no message to the product’s characters or models on this run. What they reply when asked is not recorded here."
+    },
+    {
+      "subject": "Presence away from the site",
+      "why": "Mintro reads the merchant’s own site and a documentation host that site links to. It does not read social media accounts, app-store listings, community servers or affiliate sites, so nothing in this report speaks to what those contain."
+    },
+    {
+      "subject": "Behaviour over a long conversation",
+      "why": "Whether a determined user can walk the model past its guardrails over many turns is not observable from outside, and is not claimed."
+    }
+  ],
   "rules": [
     {
       "id": "AIGATE-003",
@@ -621,6 +689,222 @@
         ],
         "expect": "absent",
         "note": "Whole-token phrase match over the page text. Context is not disambiguated: a phrase inside a sentence that prohibits it still matches, and the finding carries the capture so a reader sees the sentence."
+      }
+    },
+    {
+      "id": "AIATT-001",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Model provider and hosting",
+      "clause": "This rule reports that model provider and hosting cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "the models run through a third-party API or on the merchant’s own hosting, and which models they are",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “Which models generate your service’s text and images, and where do they run — through a named third-party API, or on infrastructure you host yourselves? Please name the models and any providers.” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-002",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Moderation of generated output",
+      "clause": "This rule reports that moderation of generated output cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "generated output is checked by a classifier or by human review, beyond prompt filtering",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “What checks run on generated output, as distinct from filtering the prompts users send — an automated classifier, human review, or both? Please name any vendor.” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-003",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "CSAM detection and reporting",
+      "clause": "This rule reports that CSAM detection and reporting cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "child sexual abuse material is detected by hash matching and reported to NCMEC",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “How do you detect child sexual abuse material, and how do you report it: which hash-matching vendor do you use, and how do reports reach NCMEC?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-004",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Age assurance for users",
+      "clause": "This rule reports that age assurance for users cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "users’ ages are established before they reach adult content, and by what method",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “How do you establish a user’s age before they reach adult content? Please name the vendor and the method.” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-005",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Constraints on user-created characters",
+      "clause": "This rule reports that constraints on user-created characters cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "the age of user-created characters is constrained, and who moderates those characters",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “How is the age of a character that users create constrained, and who moderates the characters users create?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-006",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Handling of uploaded reference images",
+      "clause": "This rule reports that handling of uploaded reference images cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "uploaded images of people are checked for consent, by liveness or self-match verification",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “Can users upload an image of a person to base a character or a generation on? If they can, how do you check that the person pictured is the uploader or has consented — for example by liveness or self-match verification?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-007",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Creator verification and review before publication",
+      "clause": "This rule reports that creator verification and review before publication cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "creators’ identity and age are verified, and their work reviewed before publication",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “If creators publish characters or content for other users: how do you verify each creator’s identity and age, and what review happens before their work is published?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-008",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Removal times and complaint volume",
+      "clause": "This rule reports that removal times and complaint volume cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "removal requests are acted on within a set time, and how many arrived in the last 12 months",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “How long does it take you, from a removal request arriving, to remove the content? How many removal requests and content complaints did you receive in the last 12 months?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-009",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Card network registration and acquirer history",
+      "clause": "This rule reports that card network registration and acquirer history cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "the merchant is registered with Mastercard, what its VIRP tier is, and which acquirers it has used",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “What is your Mastercard registration status and your VIRP tier, and which acquirers have processed for you before?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-010",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "App-store listings and removals",
+      "clause": "This rule reports that app-store listings and removals cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "the app is listed in app stores, and whether any store has removed it",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “Which app stores list your app, and has any store removed it or declined to list it? If so, when, and what reason was given?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-011",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "Chargeback ratio",
+      "clause": "This rule reports that chargeback ratio cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "chargebacks occurred over the last 3 months, and at what ratio",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “What was your chargeback ratio in each of the last 3 months?” asks the merchant about this."
+      }
+    },
+    {
+      "id": "AIATT-012",
+      "cat": "attested",
+      "layer": null,
+      "sev": "major",
+      "type": "manual",
+      "tier": "review_only",
+      "evaluation_tier": "evidence",
+      "weight": "ordinary",
+      "title": "State age-verification laws and SB 243",
+      "clause": "This rule reports that state age-verification laws and SB 243 cannot be observed from the site’s public pages, and names the question put to the merchant about it.",
+      "subject": "users in states with age-verification laws are blocked or age-verified, and which SB 243 protocols are followed",
+      "source": "mintro",
+      "sense": "absent",
+      "params": {
+        "reason": "The attestation question “Which US states with age-verification laws do you block, and which do you route through age verification? What protocols do you follow under California SB 243?” asks the merchant about this."
       }
     }
   ]

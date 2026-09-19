@@ -29,7 +29,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLineNumber } from '../lib/numbering.js';
 import type { Attestation, NotChecked } from '@mintro/ruleset';
-import { attestationAsking, type AttestationAsking } from '@mintro/engine';
+import { ATTESTATION_COPY, attestationAsking, type AttestationAsking } from '@mintro/engine';
+import type { Vertical } from '@mintro/ruleset';
 import { formatStamp } from '../lib/format.js';
 import type { AttestationOutcome, ResolvedAttestation, RunAttestations } from '@mintro/engine';
 
@@ -95,7 +96,7 @@ const NO_ANSWER_MEANING =
  * D-060's logic applies — an identifier is not something an underwriter reads — while the label is,
  * and "Programme" left a merchant asking whose.
  */
-const AUTHORITY_LABEL: Readonly<Record<ResolvedAttestation['authority'], string>> = {
+const AUTHORITY_LABEL: Readonly<Record<NonNullable<ResolvedAttestation['authority']>, string>> = {
   law: 'Law',
   network: 'Card network',
   programme: 'Standards',
@@ -109,10 +110,13 @@ const AUTHORITY_LABEL: Readonly<Record<ResolvedAttestation['authority'], string>
  */
 export function AttestationSection({
   attestations,
+  vertical,
   invited,
   print = false,
 }: {
   readonly attestations: RunAttestations;
+  /** Whose copy frames the questions. Required: a default is the peptide sentence on an adult run. */
+  readonly vertical: Vertical;
   /**
    * Whether a comment link was transmitted for this run (D-199).
    *
@@ -149,7 +153,7 @@ export function AttestationSection({
           questions went. The first and last clauses hold on every run.
         */}
         <p className="att-lede">
-          These are published standards that a crawl of a website cannot observe.{' '}
+          {ATTESTATION_COPY[vertical].sectionLede}{' '}
           {asking === 'asked'
             ? 'Mintro put them to the merchant and recorded the replies exactly as written.'
             : asking === 'not_asked'
@@ -280,9 +284,15 @@ function AttestationRow({
         </span>
       </div>
 
-      <div className="att-meta">
-        {AUTHORITY_LABEL[question.authority]} · {question.sev}
-      </div>
+      {/*
+        Only where the question declares both. The adult AI questions declare neither, and
+        "Standards · major" beneath one would assert a standard D-286 records does not exist.
+      */}
+      {question.authority !== undefined && question.sev !== undefined && (
+        <div className="att-meta">
+          {AUTHORITY_LABEL[question.authority]} · {question.sev}
+        </div>
+      )}
 
       {/*
         Where a carried-forward answer came from (D-204).
@@ -434,6 +444,7 @@ export function NotCheckedSection({
  */
 export function AttestationForm({
   questions,
+  vertical,
   answers,
   identified,
   recordingFor,
@@ -449,6 +460,8 @@ export function AttestationForm({
    * appears in the document as one they ignored.
    */
   readonly questions: readonly Attestation[];
+  /** Whose copy frames the questions. Required, as on `AttestationSection`. */
+  readonly vertical: Vertical;
   /** What this visitor has already sent, by question id, for showing back to them. */
   readonly answers: ReadonlyMap<string, { readonly outcome: 'answered'; readonly body?: string }>;
   /**
@@ -499,12 +512,7 @@ export function AttestationForm({
           </p>
         )}
         {recordingFor === undefined && (
-        <p className="att-lede">
-          Some of these standards are about what happens away from your website — where you
-          ship, what your support team says, who tests your batches. Mintro has no way to observe
-          those, so they are put to you directly. Your answers are recorded exactly as you write
-          them and passed on with the report, shown as yours.
-        </p>
+        <p className="att-lede">{ATTESTATION_COPY[vertical].formLede}</p>
         )}
         <p className="att-lede">
           You can answer any of these, or none. If you would rather not answer one, saying so is

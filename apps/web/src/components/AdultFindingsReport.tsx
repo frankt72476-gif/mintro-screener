@@ -8,7 +8,8 @@
  *      observed, its capture, and the public rule or statute it relates to under "Source" — or, for a
  *      rule Mintro wrote, "Mintro observation".
  *   3. What the merchant stated, where questions were put; a line saying none were where they were not.
- *   4. What was not checked: the rule set's own list and the multi-turn boundary of memo §6.4.
+ *      On the merchant's own link, the form that asks them (`questionsForm`), as on the peptide side.
+ *   4. What was not checked: the rule set's own list and the multi-turn boundary of memo §6.4, once.
  *   5. One line: the referral policy as applied at intake (`referralPolicyLine`).
  *
  * What it deliberately does not carry: a summary block, counts, a verdict, a placement, an evaluation,
@@ -18,8 +19,8 @@
  */
 
 import {
-  ADULT_MULTI_TURN_BOUNDARY,
   ADULT_REPORT_POSTURE,
+  adultNotChecked,
   clauseHeadingFor,
   formatReportDate,
   notObservedSentence,
@@ -38,10 +39,18 @@ export interface AdultFindingsReportProps {
   readonly access: EvidenceAccess;
   /** What the merchant stated, where it was read. Absent: the section says no questions were put. */
   readonly attestations?: RunAttestations;
+  /** The merchant's link: the questions with a way to answer them, in place of what was answered. */
+  readonly questionsForm?: JSX.Element;
   readonly print?: boolean;
 }
 
-export function AdultFindingsReport({ report, access, attestations, print = false }: AdultFindingsReportProps): JSX.Element {
+export function AdultFindingsReport({
+  report,
+  access,
+  attestations,
+  questionsForm,
+  print = false,
+}: AdultFindingsReportProps): JSX.Element {
   const asked = attestations !== undefined && attestations.questions.length > 0;
 
   return (
@@ -71,8 +80,10 @@ export function AdultFindingsReport({ report, access, attestations, print = fals
         )}
       </section>
 
-      {asked ? (
-        <AttestationSection attestations={attestations} print={print} />
+      {questionsForm !== undefined ? (
+        questionsForm
+      ) : asked ? (
+        <AttestationSection attestations={attestations} vertical="adult_ai" print={print} />
       ) : (
         <section className="adult-attested" aria-labelledby="adult-attested-head">
           <h2 id="adult-attested-head">What the merchant stated</h2>
@@ -80,7 +91,7 @@ export function AdultFindingsReport({ report, access, attestations, print = fals
         </section>
       )}
 
-      <NotCheckedSection items={[...(report.notChecked ?? []), ADULT_MULTI_TURN_BOUNDARY]} />
+      <NotCheckedSection items={adultNotChecked(report.notChecked)} />
 
       {report.referral !== undefined && (
         <p className="adult-referral">

@@ -37,6 +37,7 @@ const QUESTIONS = RULESET.attestations;
 const render = (stored: readonly StoredAttestation[] = [], invited = true): string =>
   renderToStaticMarkup(
     createElement(AttestationSection, {
+      vertical: 'peptides',
       attestations: resolveAttestations(QUESTIONS, stored),
       invited,
     }),

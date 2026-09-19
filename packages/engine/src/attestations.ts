@@ -85,8 +85,9 @@ export type AttestationOutcome = 'answered' | 'unanswered';
 export interface ResolvedAttestation {
   readonly questionId: string;
   readonly question: string;
-  readonly authority: Attestation['authority'];
-  readonly sev: Severity;
+  /** Absent where the question declares none (the adult AI set, D-286). */
+  readonly authority?: NonNullable<Attestation['authority']>;
+  readonly sev?: Severity;
   readonly outcome: AttestationOutcome;
   /** Present only when answered. */
   readonly body?: string;
@@ -258,8 +259,7 @@ export function resolveAttestations(
       return {
         questionId: question.id,
         question: question.question,
-        authority: question.authority,
-        sev: question.sev,
+        ...weightOf(question),
         outcome: 'unanswered',
       };
     }
@@ -268,8 +268,7 @@ export function resolveAttestations(
     return {
       questionId: question.id,
       question: question.question,
-      authority: question.authority,
-      sev: question.sev,
+      ...weightOf(question),
       /*
         The collapse (D-253). A stored row carrying no answer reads as `unanswered`.
 
@@ -398,4 +397,12 @@ export async function readRunAttestations(
       },
     ];
   });
+}
+
+/** A question's authority and severity, where it declares them. */
+function weightOf(question: Attestation): { authority?: NonNullable<Attestation['authority']>; sev?: Severity } {
+  return {
+    ...(question.authority === undefined ? {} : { authority: question.authority }),
+    ...(question.sev === undefined ? {} : { sev: question.sev }),
+  };
 }

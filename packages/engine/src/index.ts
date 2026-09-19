@@ -490,6 +490,8 @@ export {
   ADULT_REPORT_POSTURE,
   ADULT_REQUIREMENT_HEADINGS,
   ADULT_STATE_LABEL,
+  adultNotChecked,
+  ATTESTATION_COPY,
   clauseHeadingFor,
   describeObservationCounts,
   findingSense,

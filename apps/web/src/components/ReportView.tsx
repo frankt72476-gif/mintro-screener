@@ -311,6 +311,7 @@ export function ReportView(props: Props): JSX.Element {
         report={props.report}
         access={props.access}
         {...(props.attestations === undefined ? {} : { attestations: props.attestations })}
+        {...(props.questionsForm === undefined ? {} : { questionsForm: props.questionsForm })}
         {...(props.print === undefined ? {} : { print: props.print })}
       />
     );
@@ -682,6 +683,7 @@ function PeptideReportView({
                 (questionsForm ?? (attestations === undefined ? null : (
                   <AttestationSection
                     attestations={attestations}
+                    vertical="peptides"
                     {...(participation === undefined ? {} : { invited: participation.invited })}
                     print={print}
                   />
@@ -746,6 +748,7 @@ function PeptideReportView({
                 (questionsForm ?? (attestations === undefined ? null : (
                   <AttestationSection
                     attestations={attestations}
+                    vertical="peptides"
                     {...(participation === undefined ? {} : { invited: participation.invited })}
                     print={print}
                   />

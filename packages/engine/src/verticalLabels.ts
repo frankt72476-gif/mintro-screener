@@ -105,8 +105,9 @@ export const ADULT_REPORT_POSTURE =
 /**
  * The boundary memo §6.4 states, carried in every adult AI report's "What was not checked" section.
  *
- * Not in the rule set's `not_checked` list, because it is a property of observing from outside at
- * all, not of any one rule set version.
+ * In the rule set's `not_checked` list from 0.4.0 (cluster 4 commit 4), byte for byte; a test holds
+ * the two equal. Kept here for the runs assembled before 0.4.0, whose snapshot carries no list:
+ * `adultNotChecked` adds it to a snapshot that lacks it, and never adds it twice.
  */
 export const ADULT_MULTI_TURN_BOUNDARY = {
   subject: 'Behaviour over a long conversation',
@@ -114,3 +115,47 @@ export const ADULT_MULTI_TURN_BOUNDARY = {
     'Whether a determined user can walk the model past its guardrails over many turns is not ' +
     'observable from outside, and is not claimed.',
 } as const;
+
+/** What the adult AI report says was not checked: the run's own list, and the §6.4 boundary once. */
+export function adultNotChecked(
+  snapshot: readonly { readonly subject: string; readonly why: string }[] | undefined,
+): readonly { readonly subject: string; readonly why: string }[] {
+  const items = snapshot ?? [];
+  return items.some((item) => item.subject === ADULT_MULTI_TURN_BOUNDARY.subject)
+    ? items
+    : [...items, ADULT_MULTI_TURN_BOUNDARY];
+}
+
+/**
+ * The copy around the questions, per vertical (cluster 4 commit 4).
+ *
+ * The peptide sentences name published standards, shipping and batch testing. For the adult AI
+ * vertical there is no published standard (D-286), and the questions are about how a service runs.
+ * Descriptive only: what the questions are and whose words the answers are (D-067, A7).
+ */
+export const ATTESTATION_COPY = {
+  peptides: {
+    sectionLede: 'These are published standards that a crawl of a website cannot observe.',
+    formLede:
+      'Some of these standards are about what happens away from your website — where you ship, what ' +
+      'your support team says, who tests your batches. Mintro has no way to observe those, so they are ' +
+      'put to you directly. Your answers are recorded exactly as you write them and passed on with the ' +
+      'report, shown as yours.',
+    merchantIntro:
+      'The team reviewing your account asked Mintro to screen your public pages against the ' +
+      'research-use-only peptide standards. This is what was observed, with the capture behind each ' +
+      'one. Mintro reports what it observed; it does not underwrite the account or decide the outcome.',
+  },
+  adult_ai: {
+    sectionLede: 'These are about how the service runs behind its public pages, which a crawl cannot observe.',
+    formLede:
+      'These questions are about how your service runs behind its public pages — the models it uses, ' +
+      'how generated output is checked, how ages are established. Mintro has no way to observe those, ' +
+      'so they are put to you directly. Your answers are recorded exactly as you write them and sent ' +
+      'with the report, shown as yours.',
+    merchantIntro:
+      'The team reviewing your account asked Mintro to screen your public pages. This is what was ' +
+      'observed, with the capture behind each one. Mintro reports what it observed; it does not ' +
+      'underwrite the account or decide the outcome.',
+  },
+} as const satisfies Record<'peptides' | 'adult_ai', { sectionLede: string; formLede: string; merchantIntro: string }>;
