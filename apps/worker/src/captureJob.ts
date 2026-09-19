@@ -41,6 +41,7 @@ import { fontFaceCss } from './capture/fonts.js';
 import { storeReportCapture, type StoredCapture } from './reportCaptureStore.js';
 import { signEvidenceUrl, type WorkerSupabase } from './store/supabase.js';
 import { readPublishedEvaluation } from './evaluationCapture.js';
+import { isVertical } from '@mintro/ruleset';
 
 export interface CaptureJobResult extends StoredCapture {
   readonly runId: string;
@@ -61,6 +62,17 @@ export async function captureRunReport(
   input: { readonly runId: string; readonly webRoot: string },
 ): Promise<CaptureJobResult> {
   const report = await loadReport(supabase, input.runId);
+  const vertical = report.vertical ?? 'peptides';
+
+  /*
+    An adult AI run's document is its findings report (cluster 4 commit 5; memo §9; D-284, D-285).
+
+    There is no evaluation to wait for and none may exist (0091), so the published-version gate below
+    is the peptide run's alone. The page renders `ReportView`, which renders an adult run as the
+    findings report; `assertCapturable` checks the file says so. Sending stays refused: `send.ts`
+    requires a published evaluation, which an adult run cannot have.
+  */
+  const published = vertical === 'peptides' ? await readPublishedEvaluation(supabase, input.runId) : null;
 
   /*
     No published evaluation, no capture (D-263).
@@ -73,8 +85,7 @@ export async function captureRunReport(
     This is also what makes "a draft cannot be sent" structural: `send.ts` refuses to compose
     without a capture, and a capture cannot exist without a published version.
   */
-  const published = await readPublishedEvaluation(supabase, input.runId);
-  if (published === null) {
+  if (vertical === 'peptides' && published === null) {
     throw new Error(
       `run ${input.runId} has no published evaluation, so there is nothing to capture. The ` +
         'evaluation is the report (D-256); a run is captured when its evaluation is published.',
@@ -108,24 +119,29 @@ export async function captureRunReport(
         eyeTest,
         ...(attestations === undefined ? {} : { attestations }),
         /*
-          The evaluation, which is what the page renders.
+          The evaluation, which is what the page renders for a peptide run.
 
-          `commentary`, `eyeTest` and `attestations` still travel and nothing reads them. Left in
-          the payload rather than removed: taking them out is the same decision as taking the
-          components out of the tree, and that is cluster 5's.
+          `commentary`, `eyeTest` and `attestations` still travel and nothing reads them on that
+          path. Left in the payload rather than removed: taking them out is the same decision as
+          taking the components out of the tree, and that is cluster 5's. The adult findings report
+          reads `attestations`.
         */
-        evaluation: {
-          content: published.content,
-          version: published.version,
-          publishedAt: published.publishedAt,
-          operator: published.operator,
-          handles: published.handles,
-          rulesetVersion: published.rulesetVersion,
-          anglesVersion: published.anglesVersion,
-          model: published.model,
-          findings: (await readFindings(supabase, input.runId)),
-          evidenceRows: (await readEvidenceRows(supabase, input.runId)),
-        },
+        ...(published === null
+          ? {}
+          : {
+              evaluation: {
+                content: published.content,
+                version: published.version,
+                publishedAt: published.publishedAt,
+                operator: published.operator,
+                handles: published.handles,
+                rulesetVersion: published.rulesetVersion,
+                anglesVersion: published.anglesVersion,
+                model: published.model,
+                findings: await readFindings(supabase, input.runId),
+                evidenceRows: await readEvidenceRows(supabase, input.runId),
+              },
+            }),
       } as never,
     });
 
@@ -165,7 +181,9 @@ export async function captureRunReport(
       runId: input.runId,
       html,
       images: rendered.images.total,
-      published: { version: published.version, publishedAt: published.publishedAt },
+      ...(published === null
+        ? { findingsReport: 'adult_ai' as const }
+        : { published: { version: published.version, publishedAt: published.publishedAt } }),
     });
 
     return { ...stored, runId: input.runId, images: rendered.images.total };
@@ -228,15 +246,25 @@ export async function deliverCapture(
     readonly runId: string;
     readonly html: string;
     readonly images: number;
-    /** The published version this file is of, asserted in the bytes before anything is written. */
-    readonly published: { readonly version: number; readonly publishedAt: string };
-  },
+  } & (
+    | {
+        /** The published version this file is of, asserted in the bytes before anything is written. */
+        readonly published: { readonly version: number; readonly publishedAt: string };
+        readonly findingsReport?: undefined;
+      }
+    | {
+        /** The adult AI findings report, which has no published version behind it. */
+        readonly findingsReport: 'adult_ai';
+        readonly published?: undefined;
+      }
+  ),
 ): Promise<StoredCapture> {
-  assertCapturable(input.html, {
-    images: input.images,
-    runId: input.runId,
-    published: input.published,
-  });
+  assertCapturable(
+    input.html,
+    input.findingsReport === 'adult_ai'
+      ? { images: input.images, runId: input.runId, findingsReport: 'adult_ai' }
+      : { images: input.images, runId: input.runId, published: input.published },
+  );
 
   return storeReportCapture(supabase, {
     runId: input.runId,
@@ -366,7 +394,7 @@ export async function inlineStylesheetUrls(css: string, origin: string): Promise
 async function loadReport(supabase: WorkerSupabase, runId: string): Promise<ScreeningReport> {
   const { data, error } = await supabase.client
     .from('runs')
-    .select('report')
+    .select('report, vertical, referral_status, referral_reasons, referral_policy_version')
     .eq('id', runId)
     .maybeSingle();
 
@@ -375,14 +403,44 @@ async function loadReport(supabase: WorkerSupabase, runId: string): Promise<Scre
     throw new Error(`could not read run ${runId}: ${error.message}`);
   }
 
-  const report = (data as { report: ScreeningReport | null } | null)?.report ?? null;
+  const row = data as {
+    report: ScreeningReport | null;
+    vertical: string | null;
+    referral_status: 'proceeds' | 'not_referred' | null;
+    referral_reasons: string[] | null;
+    referral_policy_version: string | null;
+  } | null;
+  const report = row?.report ?? null;
   if (report === null) {
     throw new Error(
       `run ${runId} has no stored report, so there is nothing to capture. ` +
         'A run without a report never finished — check whether it is still open.',
     );
   }
-  return report;
+
+  /*
+    The row's vertical and referral, stamped on as the web's `runs.load` stamps them (cluster 4).
+
+    The column is the record of which vertical the run was screened under; the page decides which
+    document to render from it, so it is read from the row rather than trusted to the snapshot.
+  */
+  const vertical = row?.vertical ?? 'peptides';
+  if (!isVertical(vertical)) {
+    throw new Error(`run ${runId} names vertical '${vertical}', which this worker does not know.`);
+  }
+  return {
+    ...report,
+    vertical,
+    ...(row?.referral_status == null || row.referral_policy_version == null
+      ? {}
+      : {
+          referral: {
+            version: row.referral_policy_version,
+            status: row.referral_status,
+            reasons: row.referral_reasons ?? [],
+          },
+        }),
+  };
 }
 
 /**

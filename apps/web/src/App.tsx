@@ -183,7 +183,7 @@ interface InjectedEvaluation {
   readonly model: string;
 }
 
-interface InjectedPrint {
+export interface InjectedPrint {
   readonly report: ScreeningReport;
   /**
    * The published evaluation this capture is of (D-263).
@@ -1339,7 +1339,15 @@ function Screener({
                     A run with no published evaluation is `'none'` and unaffected. Its checklist
                     capture is what was sent and stays sendable; nothing is back-filled (D-002).
                   */
-                  ...(shape.showsSubmitAction && canDeliver(evaluationCapture, capture !== null)
+                  /*
+                    Never for an adult AI run in cluster 4 (D-284). Such a run now has a capture — its
+                    findings report — and `canDeliver` would offer Send on it; `send.ts` would then
+                    refuse for want of a published evaluation. Absent, as D-230 has it, rather than
+                    a control that can only fail. Delivery for this vertical is cluster 5's.
+                  */
+                  ...(shape.showsSubmitAction &&
+                  reportVertical === 'peptides' &&
+                  canDeliver(evaluationCapture, capture !== null)
                     ? { onSend: () => setSending(true) }
                     : {}),
                   ...(shape.showsMarkReadyAction && reviewState === 'complete'
@@ -2051,7 +2059,7 @@ function DocumentsPrintOnly({ injected }: { readonly injected: InjectedDocuments
   return <DocumentsReportView {...injected.documents} />;
 }
 
-function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Element {
+export function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Element {
   const access = useMemo(
     () => ({
       description: 'signed URLs pre-minted by the worker for this render',
@@ -2078,6 +2086,28 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
     payload is the same decision as taking the components out of the tree — cluster 5's, not this
     commit's.
   */
+  /*
+    An adult AI run's document is its findings report (cluster 4 commit 5; D-284, D-285).
+
+    `ReportView` renders it: the one component, fed from the payload, as the run screen feeds it from
+    a fetch. No evaluation is looked for — none may exist for this run (0091).
+  */
+  if ((injected.report.vertical ?? 'peptides') !== 'peptides') {
+    return (
+      <div className="shell">
+        <main className="main">
+          <PrintHeader report={injected.report} />
+          <ReportView
+            report={injected.report}
+            access={access}
+            {...(injected.attestations === undefined ? {} : { attestations: injected.attestations })}
+            print
+          />
+        </main>
+      </div>
+    );
+  }
+
   if (injected.evaluation === undefined) {
     return (
       <div className="shell">
