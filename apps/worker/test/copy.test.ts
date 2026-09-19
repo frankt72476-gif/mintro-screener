@@ -599,8 +599,8 @@ describe('the covering email', () => {
 
       expect(body).not.toContain(`${report.counts.fail} ${STATE_LABEL_LOWER.fail}`);
       expect(body).not.toContain('findings were evaluable from this crawl');
-      expect(body).not.toMatch(/\d+\s+of\s+\d+/);
-      expect(body).not.toMatch(/\d+\s+findings?/i);
+      expect(body).not.toMatch(/\b\d+\s+of\s+\d+\b/);
+      expect(body).not.toMatch(/\b\d+\s+findings?\b/i);
     },
   );
 

@@ -100,7 +100,7 @@ describe('an answer carried forward from an earlier screening', () => {
     const body = text(render(carried));
 
     expect(body).not.toContain('you chose not to answer');
-    expect(body).not.toMatch(/you answered/i);
+    expect(body).not.toMatch(/\byou answered\b/i);
     expect(body).toContain('We keep a list.');
   });
 });
