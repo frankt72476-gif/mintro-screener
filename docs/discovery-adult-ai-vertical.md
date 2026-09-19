@@ -498,7 +498,12 @@ count.
   `apps/worker/bin/evaluate.ts` read
   `rules/ruleset.json` whatever the run's vertical. When the send and capture gates learn vertical,
   these jobs must refuse an `adult_ai` run with a reason rather than evaluate it against the peptide
-  rule set. Recorded 2026-09-18, after cluster 1 commit 2.
+  rule set. Recorded 2026-09-18, after cluster 1 commit 2. **Happened before it was closed:** run
+  6571d6a9 (adult_ai, xchar.ai) was drafted through the evaluation layer on 2026-09-19 (one
+  `evaluation_drafts` row, validator status `rejected`; no published evaluation, capture or send).
+  **Resolved in cluster 4 commit 1:** every evaluation job refuses a non-peptide run with the reason
+  "evaluation layer does not apply to vertical adult_ai (D-284)", and the web renders no evaluation UI
+  for one.
 - **The terms-page selection reads one page and can pick the wrong one (cluster 2).** The `terms`
   surface is chosen by the slugs `policy`, `policies` and `terms` (`SURFACE_SLUGS`,
   `apps/worker/src/evaluationPages.ts`), so a merchant linking a "Content Removal Policy" can have that

@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { EvaluationEditor } from './components/EvaluationEditor.js';
+import { EvaluationGate } from './components/EvaluationGate.js';
 import { EvaluationReport } from './components/EvaluationReport.js';
 import {
   EvaluationEvidence,
@@ -605,6 +606,11 @@ function Screener({
    * is what it said before, indistinguishable from never having tried.
    */
   const [depositedAt, setDepositedAt] = useState<Readonly<Record<string, string>>>({});
+  /**
+   * The vertical the open run was screened under (D-284). Peptides until a run says otherwise, and set
+   * from the run row on every load, so the evaluation gate never reads a previous run's.
+   */
+  const [reportVertical, setReportVertical] = useState<Vertical>('peptides');
   const [capture, setCapture] = useState<CapturedReport | null>(null);
   /** True while the only stored capture predates the evaluation (D-263). */
   const [captureIsChecklist, setCaptureIsChecklist] = useState(false);
@@ -848,6 +854,8 @@ function Screener({
     setCaptureIsChecklist(false);
     try {
       const loaded = await runs.load(runId);
+      // Which vertical the run was screened under decides whether the evaluation layer shows (D-284).
+      if (loaded !== null) setReportVertical(loaded.vertical);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
       setReport(loaded.report);
       setQuarantine(loaded.quarantine);
@@ -1380,14 +1388,16 @@ function Screener({
                 says so and offers Generate; with a refused one it shows the refusal above the
                 document it refused.
               */}
-              <EvaluationEditor
-                client={client}
-                runId={report.runId}
-                access={access}
-                labels={EVALUATION_LABELS}
-                analystId={analyst.id}
-                canEdit={shape.showsEvaluationEditing}
-              />
+              <EvaluationGate vertical={reportVertical}>
+                <EvaluationEditor
+                  client={client}
+                  runId={report.runId}
+                  access={access}
+                  labels={EVALUATION_LABELS}
+                  analystId={analyst.id}
+                  canEdit={shape.showsEvaluationEditing}
+                />
+              </EvaluationGate>
 
               {/*
                 Mintro's workspace, below the report and outside it (D-146).
