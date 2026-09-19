@@ -284,10 +284,13 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
       const row = data as { report: ScreeningReport | null; vertical?: unknown; run_quarantine: QuarantineEmbed };
       if (row.report === null) return null;
 
+      const vertical = runVertical(row.vertical);
       return {
-        report: row.report,
+        // The row's vertical on the report the page renders, so a run assembled before reports
+        // carried one still reads in its vertical's labels (D-284, D-285).
+        report: { ...row.report, vertical },
         quarantine: quarantineReason(row.run_quarantine),
-        vertical: runVertical(row.vertical),
+        vertical,
       };
     },
   };

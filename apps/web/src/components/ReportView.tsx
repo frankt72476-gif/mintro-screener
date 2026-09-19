@@ -8,8 +8,8 @@
  * unchanged; the data's own name for it is `not_evaluable`.
  */
 
-import { Fragment, useContext, useMemo, useState } from 'react';
-import type { State } from '@mintro/ruleset';
+import { createContext, Fragment, useContext, useMemo, useState } from 'react';
+import type { State, Vertical } from '@mintro/ruleset';
 import {
   REPORT_POSTURE,
   REQUIREMENT_HEADINGS,
@@ -46,7 +46,21 @@ import { AttestationSection, NotCheckedSection } from './Attestations.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
 import { NumberingContext, createNumbering, eyeLineOrdinal, useFindingNumber } from '../lib/numbering.js';
 import { MerchantResponse } from './MerchantResponse.js';
-import { describeTruncation, leadSentence, notObservedSentence } from '@mintro/engine';
+import {
+  clauseHeadingFor,
+  describeTruncation,
+  leadSentence,
+  notObservedSentence,
+  requirementHeadingsFor,
+  stateLabelFor,
+} from '@mintro/engine';
+
+/**
+ * The vertical the report's run was screened under (D-284), for the labels and headings that differ by
+ * vertical (D-285, D-286). Read from `report.vertical` at the root; a report that carries none is a
+ * peptide one, which is every run recorded before the field existed.
+ */
+const ReportVerticalContext = createContext<Vertical>('peptides');
 import { formatStamp } from '../lib/format.js';
 import { ParticipationRecord } from './Participation.js';
 import { formatReportDate, rowSentence, stateClass, STATE_LABEL, STATE_LABEL_LOWER } from '../lib/format.js';
@@ -344,6 +358,7 @@ export function ReportView({
   const numbering = useMemo(() => createNumbering(), [report, eyeTest]);
 
   return (
+    <ReportVerticalContext.Provider value={report.vertical ?? 'peptides'}>
     <NumberingContext.Provider value={numbering}>
     <div id="top">
       <div className="rhead">
@@ -789,6 +804,7 @@ export function ReportView({
       <RunMeta report={report} access={access} />
     </div>
     </NumberingContext.Provider>
+    </ReportVerticalContext.Provider>
   );
 }
 
@@ -1699,6 +1715,8 @@ function FindingRow({
 }): JSX.Element {
   // Allocated on first sight, which is display order (D-248).
   const number = useFindingNumber(finding);
+  // The label a state renders with differs by vertical and, for adult AI, by the rule's sense (D-285).
+  const vertical = useContext(ReportVerticalContext);
   const [open, setOpen] = useState(false);
   const source = finding.evidence[0]?.sourceUrl;
   // Every finding is expanded in the export. Nothing is collapsed, grouped or dropped.
@@ -1714,7 +1732,7 @@ function FindingRow({
       }
     >
       <button className="find-head" onClick={() => setOpen(!open)} disabled={print}>
-        <span className={`state ${stateClass(finding.state)}`}>{STATE_LABEL[finding.state]}</span>
+        <span className={`state ${stateClass(finding.state)}`}>{stateLabelFor(vertical, finding)}</span>
         <span className="find-main">
           <span className="find-title">
             {/*
@@ -1886,12 +1904,15 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
   if (finding.state === 'pass') return null;
 
   const notEvaluable = finding.state === 'not_evaluable';
+  // Headings in the vertical's words: "Source" where no published standard exists (D-286).
+  const vertical = useContext(ReportVerticalContext);
+  const headings = requirementHeadingsFor(vertical);
 
   return (
     <div className="req">
       <div className="req-col">
         <span className="req-h">
-          {notEvaluable ? REQUIREMENT_HEADINGS.notAssessed : REQUIREMENT_HEADINGS.observed}
+          {notEvaluable ? headings.notAssessed : headings.observed}
         </span>
         <p className="req-t">
           {/*
@@ -1918,9 +1939,7 @@ function Requirement({ finding }: { readonly finding: ReportFinding }): JSX.Elem
           as it did (D-002).
         */}
         <span className="req-h">
-          {finding.source === 'mintro'
-            ? REQUIREMENT_HEADINGS.mintroObservation
-            : REQUIREMENT_HEADINGS.required}
+          {clauseHeadingFor(vertical, finding.source)}
         </span>
         {/* Verbatim. No trim, no ellipsis, no sentence case. */}
         <blockquote className="req-t req-quote">{finding.clause}</blockquote>

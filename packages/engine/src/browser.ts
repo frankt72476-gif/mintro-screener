@@ -297,3 +297,14 @@ export {
 */
 export { MAX_SHORE_UPS, MINTRO_COST_WORDS, OPERATOR_NOTE_WORDS, PRICE_WORDS } from './evaluation.js';
 
+// Per-vertical labels and headings (D-285, D-286). Browser-safe.
+export {
+  ADULT_REQUIREMENT_HEADINGS,
+  ADULT_STATE_LABEL,
+  clauseHeadingFor,
+  describeObservationCounts,
+  findingSense,
+  requirementHeadingsFor,
+  stateLabelFor,
+  type RequirementHeadings,
+} from './verticalLabels.js';

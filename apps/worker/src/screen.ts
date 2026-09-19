@@ -24,7 +24,7 @@
 import type { Browser, BrowserContext } from 'playwright';
 import type { ProgressEvent } from '@mintro/engine';
 import { createScanProgress } from './scanProgress.js';
-import type { Ruleset, VerticalPages } from '@mintro/ruleset';
+import type { Ruleset, Vertical, VerticalPages } from '@mintro/ruleset';
 import {
   eyeTestManifest,
   createHttpFetcher,
@@ -47,6 +47,7 @@ import {
   type SlugUrl,
   selectSample,
   tally,
+  describeObservationCounts,
   assessWall,
   wasServed,
   describeTruncation,
@@ -120,6 +121,8 @@ export interface ScreenOptions {
    * a rule's `surfaces` resolve against what it located.
    */
   readonly pages?: VerticalPages;
+  /** The vertical the run is screened under, recorded on the report it assembles (D-284). */
+  readonly vertical?: Vertical;
   /** Progress lines. The CLI prints them; the worker records them against the queue row. */
   /**
    * Progress, with structure (D-173).
@@ -328,6 +331,7 @@ export async function screenStorefront(
     const report = assembleReport(
       {
         runId,
+        ...(options.vertical === undefined ? {} : { vertical: options.vertical }),
         ...(reached.sampleSettled && reached.wall !== undefined
           ? { access: describeAccess(reached.wall, reached.mode, reached.usedCredential, reached.escalation) }
           : {}),
@@ -793,10 +797,7 @@ export async function screenStorefront(
   reached.layer2Findings = layer2.findings;
   reached.layer3Findings = layer3.findings;
 
-  say(
-    `layer 3: ${layer3.counts.fail} fail · ${layer3.counts.review} review · ${layer3.counts.pass} pass ` +
-      `· ${layer3.counts.not_evaluable} not evaluable`,
-  );
+  say(`layer 3: ${describeObservationCounts(sensed(layer3.findings, ruleset))}`);
 
   // ---- the gate rules, always without a session -----------------------------------------
   //
@@ -852,10 +853,7 @@ export async function screenStorefront(
   ];
 
   const counts = tally(findings);
-  say(
-    `${counts.fail} fail · ${counts.review} review · ${counts.pass} pass · ${counts.not_evaluable} not evaluable ` +
-      `· ${artifacts.length} capture(s)`,
-  );
+  say(`${describeObservationCounts(sensed(findings, ruleset))} · ${artifacts.length} capture(s)`);
 
   const challengedPages = renderedPages.filter((page) => page.challenged !== undefined).length;
   const gatedPages = renderedPages.filter((page) => page.gated !== undefined).length;
@@ -865,6 +863,7 @@ export async function screenStorefront(
   const report = assembleReport(
     {
       runId,
+      ...(options.vertical === undefined ? {} : { vertical: options.vertical }),
       access: describeAccess(wall, mode, usedCredential, escalation),
       merchantDomain: new URL(layer0.origin).host,
       ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
@@ -1142,4 +1141,26 @@ export function probeUndecided(probe: { readonly undecided: number; readonly tot
       `Layer 3 candidate(s); each was rendered in full rather than skipped, so no surface was ` +
       `missed, but the check was not doing its work on this run`,
   ];
+}
+
+/**
+ * Findings with the sense their rule declares, for the analyst's progress line (cluster 4).
+ *
+ * The rule's `sense`, then its `expect`, so a rule looking for wording that should be there counts a
+ * miss as not observed. Analyst-only: nothing here reaches a report.
+ */
+function sensed(
+  findings: readonly Finding[],
+  ruleset: Ruleset,
+): readonly { state: Finding['state']; sense?: 'absent' | 'present'; expect?: 'absent' | 'present' }[] {
+  const rules = new Map(ruleset.rules.map((rule) => [rule.id, rule]));
+  return findings.map((finding) => {
+    const rule = rules.get(finding.ruleId);
+    const expect = (rule?.params as { expect?: unknown } | undefined)?.expect;
+    return {
+      state: finding.state,
+      ...(rule?.sense === undefined ? {} : { sense: rule.sense }),
+      ...(expect === 'absent' || expect === 'present' ? { expect } : {}),
+    };
+  });
 }

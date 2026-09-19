@@ -771,6 +771,7 @@ async function handle(
       runId,
       // The vertical's page types, which decide what the Layer 3 pass looks for (D-284).
       pages: VERTICAL_FILES[vertical].pages,
+      vertical,
       signal: controller.signal,
       onControl: (control) => {
         controls.current = control;
