@@ -35,8 +35,8 @@ const PRESENT = /^(AITD-00[1-3]|AIGATE-00[1-3]|AIPOL-00[1-7]|AIBILL-00[1-3])$/;
 describe('rules/ruleset-adult-ai.json', () => {
   it('loads, at the version and date cluster 1 ships', () => {
     // 0.1.1: phrase-level term lists, AIGATE-003 retitled. 0.1.2: unambiguous single words and inflections.
-    // 0.2.0: rules read several page types (cluster 2).
-    expect(adult.version).toBe('0.2.0');
+    // 0.2.0: rules read several page types (cluster 2). 0.3.0: dom_feature rules (cluster 2).
+    expect(adult.version).toBe('0.3.0');
     expect(adult.effective).toBe('2026-09-18');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
@@ -53,17 +53,27 @@ describe('rules/ruleset-adult-ai.json', () => {
       'AIPOL-006',
       'AITD-001',
       'AITD-002',
+      'AIFEAT-001',
+      'AIFEAT-002',
+      'AIFEAT-003',
+      'AIFEAT-004',
+      'AIMKT-001',
+      'AIMKT-002',
+      'AICAT-001',
+      'AICAT-002',
     ]);
   });
 
   it('agrees with its corpus byte for byte, one clause line per quoting rule', () => {
     expect(checkAgainstCorpusFile(adult, ADULT_CORPUS_PATH)).toEqual([]);
-    expect(corpusClauseLines(corpusText)).toHaveLength(8);
+    expect(corpusClauseLines(corpusText)).toHaveLength(11);
   });
 
-  it('declares every rule as the memo rules: programme source, auto tier, evidence, ordinary, a sense', () => {
+  it('declares every rule as the memo rules: its source, auto tier, evidence, ordinary, a sense', () => {
+    // Rules with no public source excerpt are Mintro's, rendered under the Mintro heading (D-138).
+    const MINTRO = ['AIFEAT-001', 'AIFEAT-003', 'AIFEAT-004', 'AIMKT-001', 'AIMKT-002'];
     for (const rule of adult.rules) {
-      expect(rule.source, rule.id).toBe('programme');
+      expect(rule.source, rule.id).toBe(MINTRO.includes(rule.id) ? 'mintro' : 'programme');
       expect(rule.tier, rule.id).toBe('auto_fail');
       expect(rule.evaluation_tier, rule.id).toBe('evidence');
       expect(rule.weight, rule.id).toBe('ordinary');
@@ -73,7 +83,7 @@ describe('rules/ruleset-adult-ai.json', () => {
 
   it('reads the page types cluster 2 scoped each rule to (D-284)', () => {
     const scope = Object.fromEntries(
-      adult.rules.map((r) => [r.id, r.type === 'text_match' ? r.params.surfaces : undefined]),
+      adult.rules.filter((r) => r.type === 'text_match').map((r) => [r.id, r.type === 'text_match' ? r.params.surfaces : undefined]),
     );
     expect(scope).toEqual({
       'AIGATE-003': ['homepage', 'terms'],
@@ -87,6 +97,28 @@ describe('rules/ruleset-adult-ai.json', () => {
     });
     // The runner that reads several page types is Layer 3's.
     expect(adult.rules.every((r) => r.layer === 3)).toBe(true);
+  });
+
+  it('reads the feature rules on the page types cluster 2 commit 3 names', () => {
+    const scope = Object.fromEntries(
+      adult.rules.filter((r) => r.type === 'dom_feature').map((r) => [r.id, r.type === 'dom_feature' ? r.params.surfaces : undefined]),
+    );
+    expect(scope).toEqual({
+      'AIFEAT-001': ['create', 'generate', 'pricing', 'docs'],
+      'AIFEAT-002': ['create', 'generate', 'pricing', 'docs'],
+      'AIFEAT-003': ['homepage', 'pricing', 'generate', 'docs'],
+      'AIFEAT-004': ['create', 'generate', 'docs'],
+      'AIMKT-001': ['homepage', 'pricing'],
+      'AIMKT-002': ['homepage', 'footer'],
+      'AICAT-001': ['homepage', 'create', 'generate', 'library'],
+      'AICAT-002': ['homepage', 'create', 'generate', 'library'],
+    });
+  });
+
+  it('titles every rule as the thing looked for, never as a verdict', () => {
+    for (const rule of adult.rules) {
+      expect(rule.title, rule.id).not.toMatch(/\b(fail|failed|pass|passed|blocker|clean|compliant|recommend)\w*/i);
+    }
   });
 
   it('carries no manual rule and no placeholder', () => {

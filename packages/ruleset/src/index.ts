@@ -110,6 +110,7 @@ export { PARAMS_BY_CHECK_TYPE } from './params.js';
 export {
   CHECK_TYPES,
   COA_FIELDS,
+  DOM_FEATURE_DETECTORS,
   DOC_EXTRACTS,
   DOM_COLLECTS,
   DOM_DETECTS,
@@ -137,6 +138,7 @@ export {
   tierCarriesWeight,
   type CheckType,
   type CoaField,
+  type DomFeatureDetector,
   type DocExtract,
   type EvaluationTier,
   type Expectation,

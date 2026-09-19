@@ -29,6 +29,7 @@ import { checkDomAssert } from './checks/domAssert.js';
 import { checkTextCooccurrence } from './checks/textCooccurrence.js';
 import { checkTextMatch } from './checks/textMatch.js';
 import { checkTextMatchAcross } from './checks/textMatchAcross.js';
+import { checkDomFeature } from './checks/domFeature.js';
 import { located, unreachable, type Located } from './surface.js';
 import { notEvaluable, tally, unbuiltCheckReason, type Finding } from './findings.js';
 import { RENDERED } from './checks/pageEvidence.js';
@@ -82,13 +83,29 @@ export interface Layer3Input {
    * Absent or empty on a peptide run, whose rules name single surfaces.
    */
   readonly pages?: ReadonlyMap<string, Located<PageContext>>;
+  /**
+   * Every page established for each page type (cluster 2 commit 3). A `dom_feature` rule reads all
+   * of them; `pages` above holds the first of each, which is what a `text_match` rule reads.
+   */
+  readonly pagesByType?: ReadonlyMap<string, readonly PageContext[]>;
 }
 
 /**
  * The surfaces a `surfaces` rule may list: the homepage and its footer, which Layer 1 already has,
  * and every page type a vertical's Layer 3 pass locates (D-284).
  */
-const ACROSS_SURFACES = new Set(['homepage', 'footer', 'terms', 'guidelines', 'removal', 'pricing', 'create', 'generate', 'docs']);
+const ACROSS_SURFACES = new Set([
+  'homepage',
+  'footer',
+  'terms',
+  'guidelines',
+  'removal',
+  'pricing',
+  'create',
+  'generate',
+  'docs',
+  'library',
+]);
 
 export interface Layer3Run {
   readonly rulesetVersion: string;
@@ -110,6 +127,9 @@ export function layer3Rules(ruleset: Ruleset): Rule[] {
 
 /** True when this runner has a handler for the rule, as opposed to knowing it exists. */
 export function isBuilt(rule: Rule): boolean {
+  if (rule.type === 'dom_feature') {
+    return rule.params.surfaces.every((listed) => ACROSS_SURFACES.has(listed));
+  }
   if (rule.type === 'text_match' && rule.params.surfaces !== undefined) {
     return rule.params.surfaces.every((listed) => ACROSS_SURFACES.has(listed));
   }
@@ -131,6 +151,17 @@ export function runLayer3(input: Layer3Input, ruleset: Ruleset): Layer3Run {
       // Not built yet, and it says so in the same words D-044 gave every unbuilt check. This is
       // the bucket the layer is being written to empty.
       return notEvaluable(rule, unbuiltCheckReason(rule), RENDERED, 'no_check_built');
+    }
+
+    // A feature in the rendered DOM of every page each listed surface established (cluster 2).
+    if (rule.type === 'dom_feature') {
+      return checkDomFeature(
+        rule,
+        rule.params.surfaces.map((listed) => {
+          const found = resolveSurface(listed, input);
+          return { surface: listed, found, pages: found.located ? allPages(listed, found.value, input) : [] };
+        }),
+      );
     }
 
     // A rule reading several page types, each resolved to what the crawl located (D-284).
@@ -349,4 +380,17 @@ function resolveSurface(surface: string, input: Layer3Input): Located<PageContex
   }
   if (surface === 'terms') return input.terms;
   return input.pages?.get(surface) ?? unreachable(`no ${surface} page was looked for on this run`, []);
+}
+
+/**
+ * Every page established for a located surface (cluster 2 commit 3).
+ *
+ * The homepage, its footer and the terms document are one page each. A vertical page type may have
+ * several — a character library, a docs host — and a `dom_feature` rule reads them all. Falls back to
+ * the one located page where the discovery recorded no list.
+ */
+function allPages(surface: string, first: PageContext, input: Layer3Input): readonly PageContext[] {
+  if (surface === 'homepage' || surface === 'footer' || surface === 'terms') return [first];
+  const all = input.pagesByType?.get(surface);
+  return all !== undefined && all.length > 0 ? all : [first];
 }

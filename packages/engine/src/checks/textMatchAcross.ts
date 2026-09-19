@@ -64,6 +64,8 @@ export function surfaceLabel(surface: Surface): string {
       return 'the generation page';
     case 'docs':
       return 'the documentation page';
+    case 'library':
+      return 'the character library page';
     default:
       return `the ${surface.replace(/_/g, ' ')}`;
   }

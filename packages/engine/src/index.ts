@@ -357,6 +357,7 @@ export {
 } from './suspicion.js';
 export { checkTextMatch, isCasNumber, passesValidator } from './checks/textMatch.js';
 export { checkTextMatchAcross, surfaceLabel, type SurfaceReading } from './checks/textMatchAcross.js';
+export { checkDomFeature, detect as detectDomFeature, matchedPhrases, type FeatureReading } from './checks/domFeature.js';
 export { checkComputedStyle, locateDisclaimer } from './checks/computedStyle.js';
 export { pageEvidence, renderFailureEvidence, hasRenderedCaptures, readsTheEntryGate, gatedFinding, RENDERED } from './checks/pageEvidence.js';
 

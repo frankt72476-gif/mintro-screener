@@ -111,7 +111,8 @@ export const PEPTIDE_PAGE_TYPES: PageTypeTable = [
  *   - a bare `policy` / `policies` slug is read as terms only when nothing more specific matched, and
  *     among terms candidates a terms slug is read before a policy slug (`rankByPageTypeOrder`).
  *
- * `character/new` is the token sequence `character new`, as `/character/new` tokenises.
+ * `character/new` is the token sequence `character new`, as `/character/new` tokenises. The library
+ * band comes after create and generate for that reason.
  */
 export const ADULT_AI_PAGE_TYPES: PageTypeTable = [
   ['content-removal', 'removal'],
@@ -139,6 +140,17 @@ export const ADULT_AI_PAGE_TYPES: PageTypeTable = [
   ['image', 'generate'],
   ['imagine', 'generate'],
   ['studio', 'generate'],
+  /*
+    Character libraries (cluster 2 commit 3). After create and generate, so `/character/new` and
+    `/create-character` stay creation pages; a path that only says `character` or `characters` is a
+    page listing them.
+  */
+  ['characters', 'library'],
+  ['character', 'library'],
+  ['explore', 'library'],
+  ['discover', 'library'],
+  ['library', 'library'],
+  ['browse', 'library'],
   ['documentation', 'docs'],
   ['docs', 'docs'],
   ['help', 'docs'],
@@ -208,5 +220,7 @@ export const ADULT_AI_PAGES: VerticalPages = {
     { pageType: 'create', label: 'character creation page', paths: [] },
     { pageType: 'generate', label: 'generation page', paths: [] },
     { pageType: 'docs', label: 'documentation page', paths: [] },
+    // Several: a character library is a set of listing pages, and the names are the subject.
+    { pageType: 'library', label: 'character library page', paths: [], limit: 3 },
   ],
 };

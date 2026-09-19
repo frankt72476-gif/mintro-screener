@@ -148,6 +148,14 @@ describe('adult AI page types', () => {
       'create',
       'generate',
       'docs',
+      'library',
     ]);
+  });
+
+  it('reads character libraries after creation, so /character/new stays a creation page', () => {
+    expect(adult('/character/new')).toBe('create');
+    expect(adult('/characters')).toBe('library');
+    expect(adult('/explore/trending')).toBe('library');
+    expect(adult('/ai-anime-character')).toBe('library');
   });
 });

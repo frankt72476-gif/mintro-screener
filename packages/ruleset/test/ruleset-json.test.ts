@@ -8,8 +8,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { loadRulesetFile, checkInvariants, CHECK_TYPES, corpusClauseLines } from '../src/index.js';
-import { CORPUS_PATH, RULESET_PATH } from './paths.js';
+import { resolve } from 'node:path';
+import { loadRulesetFile, checkInvariants, CHECK_TYPES, corpusClauseLines, VERTICAL_FILES } from '../src/index.js';
+import { CORPUS_PATH, REPO_ROOT, RULESET_PATH } from './paths.js';
 
 const ruleset = loadRulesetFile(RULESET_PATH);
 
@@ -225,7 +226,12 @@ describe('rules/ruleset.json', () => {
    * rule set has lost something or the engine is carrying a handler nothing uses.
    */
   it('exercises every check type the engine implements', () => {
-    const used = new Set(ruleset.rules.map((rule) => rule.type));
+    /*
+      Across the rule sets this repository ships, since there are two (D-284). `dom_feature` is used
+      only by the adult AI rule set; a handler neither file uses is still what this catches.
+    */
+    const adult = loadRulesetFile(resolve(REPO_ROOT, VERTICAL_FILES.adult_ai.ruleset));
+    const used = new Set([...ruleset.rules, ...adult.rules].map((rule) => rule.type));
     expect([...CHECK_TYPES].filter((type) => !used.has(type))).toEqual([]);
   });
 });

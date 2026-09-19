@@ -180,6 +180,7 @@ export const ruleSchema = z.discriminatedUnion('type', [
   variant('doc_parse', PARAMS_BY_CHECK_TYPE.doc_parse),
   variant('flow_probe', PARAMS_BY_CHECK_TYPE.flow_probe),
   variant('manual', PARAMS_BY_CHECK_TYPE.manual),
+  variant('dom_feature', PARAMS_BY_CHECK_TYPE.dom_feature),
 ]);
 
 /**

@@ -36,6 +36,7 @@ import {
   SURFACES,
   THRESHOLDS,
   URL_SCOPES,
+  DOM_FEATURE_DETECTORS,
 } from './vocabulary.js';
 
 /** A list that must actually contain something. An empty term list checks nothing. */
@@ -398,6 +399,42 @@ export const flowProbeParams = z
  * `reason` is required and must say something. It is printed in the report as the explanation
  * of why the rule could not be observed, so an empty one would leave a bare unexplained gap.
  */
+/**
+ * `dom_feature` — a feature detected in the retained rendered DOM of the pages a rule names
+ * (cluster 2).
+ *
+ * `surfaces` lists the page types read; every page established for each is read. `terms` are
+ * whole-token phrases: the whole of a `lexicon` detector, and the text half of `upload_control`.
+ * `terms_on` narrows where the terms count — `upload_control`'s wording signals are read on the
+ * creation and generation pages only, while its structural signals are read everywhere listed.
+ */
+export const domFeatureParams = z
+  .object({
+    surfaces: z.array(surface).min(1),
+    detector: z.enum(DOM_FEATURE_DETECTORS),
+    terms: nonEmptyStrings.optional(),
+    terms_on: z.array(surface).min(1).optional(),
+    expect,
+    note,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.detector === 'lexicon' && value.terms === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'a lexicon detector must define terms' });
+    }
+    if (new Set(value.surfaces).size !== value.surfaces.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'surfaces must not repeat a surface' });
+    }
+    for (const listed of value.terms_on ?? []) {
+      if (!value.surfaces.includes(listed)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `terms_on names '${listed}', which is not one of the rule's surfaces`,
+        });
+      }
+    }
+  });
+
 export const manualParams = z
   .object({
     reason: nonEmptyText,
@@ -418,4 +455,5 @@ export const PARAMS_BY_CHECK_TYPE = {
   doc_parse: docParseParams,
   flow_probe: flowProbeParams,
   manual: manualParams,
+  dom_feature: domFeatureParams,
 } as const;

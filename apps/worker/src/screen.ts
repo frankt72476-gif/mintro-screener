@@ -785,6 +785,7 @@ export async function screenStorefront(
       faq: discovered.faq,
       payment: discovered.payment,
       pages: discovered.pageTypes,
+      pagesByType: discovered.pagesByType,
     },
     ruleset,
   );

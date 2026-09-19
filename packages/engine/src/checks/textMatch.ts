@@ -38,6 +38,7 @@ const RENDERED_SURFACES = new Set([
   'create',
   'generate',
   'docs',
+  'library',
 ]);
 
 export function checkTextMatch(rule: RuleOfType<'text_match'>, page: PageContext): Finding {

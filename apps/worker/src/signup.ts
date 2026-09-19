@@ -242,6 +242,13 @@ export interface Layer3Discovery {
    */
   readonly pageTypes: ReadonlyMap<string, Located<PageContext>>;
   /**
+   * Every page established for each page type, in the order read (cluster 2 commit 3).
+   *
+   * `pageTypes` holds the first, which is what a `text_match` rule reads; a `dom_feature` rule reads
+   * them all. The docs host's pages are appended to `docs`. Empty for peptides.
+   */
+  readonly pagesByType: ReadonlyMap<string, readonly PageContext[]>;
+  /**
    * The docs host read as a second origin, where the vertical enables one and the primary site
    * linked one (cluster 2). Absent otherwise — always absent on a peptide run.
    */
@@ -457,6 +464,7 @@ export async function discoverLayer3(
     // Every editorial page, not the first, and the FAQ ahead of them (D-274).
     editorial: editorialSample(established.get('FAQ') ?? [], established.get('editorial page') ?? []),
     pageTypes: new Map(),
+    pagesByType: new Map(),
     attempts,
     artifacts,
     pages,
@@ -499,6 +507,7 @@ async function discoverPageTypes(
 
   const probe = { undecided: 0, total: 0 };
   const located = new Map<string, Located<PageContext>>();
+  const pagesByType = new Map<string, PageContext[]>();
   for (const document of documents) {
     options.signal?.throwIfAborted();
     say(`looking for the ${document.label}`, { done, total });
@@ -524,6 +533,7 @@ async function discoverPageTypes(
       probe,
     );
     located.set(document.pageType, outcome.located);
+    pagesByType.set(document.pageType, [...outcome.pages]);
     done += 1;
   }
   say('policy pages read', { done, total });
@@ -534,6 +544,7 @@ async function discoverPageTypes(
     if (primaryDocs === undefined || !primaryDocs.located) {
       located.set('docs', docs.first);
     }
+    pagesByType.set('docs', [...(pagesByType.get('docs') ?? []), ...docs.pages]);
   }
 
   const notRead = (label: string): Located<PageContext> =>
@@ -549,6 +560,7 @@ async function discoverPageTypes(
     about: notRead('about page'),
     editorial: [],
     pageTypes: located,
+    pagesByType,
     ...(docs === undefined ? {} : { docsOrigin: { origin: docs.origin, pages: docs.pages } }),
     attempts,
     artifacts,
