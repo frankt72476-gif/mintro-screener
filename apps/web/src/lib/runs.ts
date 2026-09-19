@@ -13,7 +13,7 @@
  * change silently alter an old run's conclusions.
  */
 
-import { FINDINGS_REPORT_PLACEHOLDER } from '../components/EvaluationGate.js';
+import { FINDINGS_REPORT_LINE } from '../components/EvaluationGate.js';
 import type { Vertical } from '@mintro/ruleset';
 import { runVertical } from './rulesets.js';
 import { describeTruncation, type ScreeningReport } from '@mintro/engine';
@@ -118,7 +118,7 @@ export type EvaluationState =
 export function evaluationLine(state: EvaluationState): string {
   switch (state.kind) {
     case 'not_applicable':
-      return FINDINGS_REPORT_PLACEHOLDER;
+      return FINDINGS_REPORT_LINE;
     case 'none':
       return 'Not yet evaluated';
     case 'draft':
@@ -275,20 +275,43 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
     async load(runId) {
       const { data, error } = await client
         .from('runs')
-        .select('report, vertical, run_quarantine ( reason )')
+        .select('report, vertical, referral_status, referral_reasons, referral_policy_version, run_quarantine ( reason )')
         .eq('id', runId)
         .maybeSingle();
 
       if (error !== null || data === null) return null;
 
-      const row = data as { report: ScreeningReport | null; vertical?: unknown; run_quarantine: QuarantineEmbed };
+      const row = data as {
+        report: ScreeningReport | null;
+        vertical?: unknown;
+        referral_status?: 'proceeds' | 'not_referred' | null;
+        referral_reasons?: string[] | null;
+        referral_policy_version?: string | null;
+        run_quarantine: QuarantineEmbed;
+      };
       if (row.report === null) return null;
 
       const vertical = runVertical(row.vertical);
       return {
         // The row's vertical on the report the page renders, so a run assembled before reports
         // carried one still reads in its vertical's labels (D-284, D-285).
-        report: { ...row.report, vertical },
+        report: {
+          ...row.report,
+          vertical,
+          /*
+            The referral policy as applied at intake (D-287), from the columns the run recorded as it
+            finished. Rendered once, in the adult findings report's boundary section.
+          */
+          ...(row.referral_status === null || row.referral_status === undefined || row.referral_policy_version == null
+            ? {}
+            : {
+                referral: {
+                  version: row.referral_policy_version,
+                  status: row.referral_status,
+                  reasons: row.referral_reasons ?? [],
+                },
+              }),
+        },
         quarantine: quarantineReason(row.run_quarantine),
         vertical,
       };

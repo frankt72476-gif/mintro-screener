@@ -16,6 +16,7 @@ import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { EvaluationEditor } from './components/EvaluationEditor.js';
 import { EvaluationGate } from './components/EvaluationGate.js';
+import { AdultFindingsReport } from './components/AdultFindingsReport.js';
 import { EvaluationReport } from './components/EvaluationReport.js';
 import {
   EvaluationEvidence,
@@ -1388,7 +1389,20 @@ function Screener({
                 says so and offers Generate; with a refused one it shows the refusal above the
                 document it refused.
               */}
-              <EvaluationGate vertical={reportVertical}>
+              <EvaluationGate
+                vertical={reportVertical}
+                findingsReport={
+                  /*
+                    The adult AI findings report itself, not the checklist `ReportView`: this screen
+                    does not mount the checklist (D-262), and an adult run's document is this one.
+                  */
+                  <AdultFindingsReport
+                    report={report}
+                    access={access}
+                    {...(attestations === undefined ? {} : { attestations })}
+                  />
+                }
+              >
                 <EvaluationEditor
                   client={client}
                   runId={report.runId}

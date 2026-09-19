@@ -257,6 +257,16 @@ export interface ScreeningReport {
    * there onto the report it loads. A reader that finds neither treats the run as a peptide one.
    */
   readonly vertical?: Vertical;
+  /**
+   * The referral policy as applied at intake (D-287), read from the run row onto the report a reader
+   * renders. Never assembled by the engine — the run records it as it finishes — and never a finding:
+   * it renders once, as `referralPolicyLine`'s sentence, in an adult AI report's boundary section.
+   */
+  readonly referral?: {
+    readonly version: string;
+    readonly status: 'proceeds' | 'not_referred';
+    readonly reasons: readonly string[];
+  };
   readonly merchantDomain: string;
   readonly merchantName?: string;
   readonly platform?: string;

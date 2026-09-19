@@ -43,6 +43,7 @@ import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { DeclineNotice, hasFailedStoppingConditions } from './DeclineNotice.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
+import { AdultFindingsReport } from './AdultFindingsReport.js';
 import { ReportSectionView, SectionBand } from './Sections.js';
 import { NumberingContext, createNumbering, eyeLineOrdinal, useFindingNumber } from '../lib/numbering.js';
 import { MerchantResponse } from './MerchantResponse.js';
@@ -295,7 +296,29 @@ interface Props {
   readonly surface?: Surface;
 }
 
-export function ReportView({
+/**
+ * The report, for the vertical its run was screened under (D-284).
+ *
+ * A peptide run renders the checklist report below, unchanged. An adult AI run renders its findings
+ * report (`AdultFindingsReport`): observation, capture, source, and none of the checklist's summary,
+ * counts, legend or verdict. Chosen here, before any hook runs, so neither view's hooks ever depend
+ * on which one rendered last.
+ */
+export function ReportView(props: Props): JSX.Element {
+  if ((props.report.vertical ?? 'peptides') !== 'peptides') {
+    return (
+      <AdultFindingsReport
+        report={props.report}
+        access={props.access}
+        {...(props.attestations === undefined ? {} : { attestations: props.attestations })}
+        {...(props.print === undefined ? {} : { print: props.print })}
+      />
+    );
+  }
+  return <PeptideReportView {...props} />;
+}
+
+function PeptideReportView({
   report,
   access,
   actions,

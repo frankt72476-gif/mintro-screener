@@ -90,3 +90,27 @@ export function describeObservationCounts(findings: readonly SensedFinding[]): s
   }
   return `${observed} observed · ${review} for review · ${notObserved} not observed · ${unchecked} could not be checked`;
 }
+
+/**
+ * What an adult AI findings report says it is, in its masthead (memo §9, D-285).
+ *
+ * The first sentence is the peptide report's own (`REPORT_POSTURE`), and the second is the memo's.
+ * The peptide posture's second sentence — "while there's time to address them" — is not carried: it
+ * points toward remediation, which A7 rules out for this vertical.
+ */
+export const ADULT_REPORT_POSTURE =
+  'Mintro reviewed the public pages of this site and recorded what it found. ' +
+  'Mintro reports what it observed; it does not underwrite the account or decide the outcome.';
+
+/**
+ * The boundary memo §6.4 states, carried in every adult AI report's "What was not checked" section.
+ *
+ * Not in the rule set's `not_checked` list, because it is a property of observing from outside at
+ * all, not of any one rule set version.
+ */
+export const ADULT_MULTI_TURN_BOUNDARY = {
+  subject: 'Behaviour over a long conversation',
+  why:
+    'Whether a determined user can walk the model past its guardrails over many turns is not ' +
+    'observable from outside, and is not claimed.',
+} as const;

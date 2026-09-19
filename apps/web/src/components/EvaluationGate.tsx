@@ -4,16 +4,18 @@
  * Angles, the AI draft, placement, the operator note, publish and regenerate are the peptide
  * programme's Mintro assessment. For an adult AI run they would be the verdict A1 forbids, and run
  * 6571d6a9 showed them. This renders the evaluation UI for a peptide run and, for any other vertical,
- * one line in its place until that vertical's findings report exists.
+ * that vertical's findings report in its place.
  *
- * A required prop rather than a defaulted one: a gate that fell back to showing the UI when nobody
- * said which vertical the run was is the gate that let 6571d6a9 through (D-246).
+ * Both props required: a gate that fell back to showing the evaluation when nobody said which
+ * vertical the run was, or to nothing when nobody supplied the report, is the gate that let 6571d6a9
+ * through (D-246).
  */
 
 import type { ReactNode } from 'react';
 import type { Vertical } from '@mintro/ruleset';
 
-export const FINDINGS_REPORT_PLACEHOLDER = 'Findings report — not yet available';
+/** How the run list names an adult AI run's document. */
+export const FINDINGS_REPORT_LINE = 'Findings report';
 
 export function showsEvaluation(vertical: Vertical): boolean {
   return vertical === 'peptides';
@@ -21,15 +23,13 @@ export function showsEvaluation(vertical: Vertical): boolean {
 
 export function EvaluationGate({
   vertical,
+  findingsReport,
   children,
 }: {
   readonly vertical: Vertical;
+  /** What renders for a vertical the evaluation does not apply to: its findings report. */
+  readonly findingsReport: ReactNode;
   readonly children: ReactNode;
 }): JSX.Element {
-  if (showsEvaluation(vertical)) return <>{children}</>;
-  return (
-    <p className="empty" data-findings-placeholder="">
-      {FINDINGS_REPORT_PLACEHOLDER}
-    </p>
-  );
+  return <>{showsEvaluation(vertical) ? children : findingsReport}</>;
 }

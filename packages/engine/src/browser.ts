@@ -299,6 +299,8 @@ export { MAX_SHORE_UPS, MINTRO_COST_WORDS, OPERATOR_NOTE_WORDS, PRICE_WORDS } fr
 
 // Per-vertical labels and headings (D-285, D-286). Browser-safe.
 export {
+  ADULT_MULTI_TURN_BOUNDARY,
+  ADULT_REPORT_POSTURE,
   ADULT_REQUIREMENT_HEADINGS,
   ADULT_STATE_LABEL,
   clauseHeadingFor,

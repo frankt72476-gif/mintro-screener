@@ -4010,3 +4010,16 @@ button.eval-chip:hover{border-color:var(--violet);color:var(--violet)}
 /* The declared-categories list on the scan form, adult AI (cluster 2, D-287). */
 fieldset.field { border: 0; padding: 0; margin: 0; }
 .check-row { display: block; margin: 4px 0; font-size: 14px; }
+
+/*
+  The adult AI findings report (cluster 4, D-285). One neutral style for every label: no colour
+  encodes good or bad (memo §9).
+*/
+.state.neutral { background: #EFEDF5; color: #3D3857; }
+.adult-report .adult-category { margin: 24px 0; }
+.adult-report .adult-category h3 { font-size: 15px; margin: 0 0 12px; }
+.adult-finding { border-top: 1px solid #E4E1EE; padding: 14px 0; }
+.adult-finding-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.adult-finding-head .rid { color: #6D6788; font-size: 12px; }
+.adult-note { margin: 8px 0; }
+.adult-empty, .adult-referral { margin: 16px 0; }
