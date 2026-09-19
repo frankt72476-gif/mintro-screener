@@ -714,6 +714,11 @@ export async function screenStorefront(
       peptide crawl cannot follow one.
     */
     ...(options.pages?.docsOrigin === true ? { secondOrigin: { fetcher, pageCap: DOCS_PAGE_CAP } } : {}),
+    /*
+      The origin the homepage was served from, for a vertical that locates its pages by type (commit
+      3a). The peptide pass ignores it, so peptide discovery is unchanged.
+    */
+    ...(options.pages?.documents === undefined ? {} : { servedOrigin: servedOriginOf(rendered.page, layer0.origin) }),
   });
 
   // Every Layer 3 candidate this pass rendered, for the challenge count (D-264). Most were
@@ -1163,4 +1168,20 @@ function sensed(
       ...(expect === 'absent' || expect === 'present' ? { expect } : {}),
     };
   });
+}
+
+/**
+ * The origin a page was actually served from, or the crawl's own where the page says nothing usable
+ * (commit 3a). A redirect to another registrable domain is not followed as the site: only the same
+ * host, or the same host with or without `www.`, counts.
+ */
+export function servedOriginOf(page: Pick<PageContext, 'finalUrl'>, crawlOrigin: string): string {
+  try {
+    const served = new URL(page.finalUrl);
+    const crawl = new URL(crawlOrigin);
+    const bare = (host: string): string => host.toLowerCase().replace(/^www\./, '');
+    return bare(served.host) === bare(crawl.host) ? served.origin : crawlOrigin;
+  } catch {
+    return crawlOrigin;
+  }
 }

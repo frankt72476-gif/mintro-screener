@@ -544,3 +544,70 @@ count.
       OFFS-002.
   Also affected: the eye test's about and editorial captures (`eyeTestManifest`), and the about and
   editorial pages the evaluation draft is given.
+
+## Crawl gaps, first adult screen
+
+Run 6571d6a9 (adult_ai, xchar.ai, 2026-09-19) reached one primary-site page type, terms. Three of the
+sixteen findings rest on pages the crawl never reached. Investigated read-only against the stored run
+(its report, its stored rendered homepage) and a fresh raw fetch of the homepage, before commit 3a.
+
+### 1. Why Create Character, Generate, Pricing and the library were never candidates
+
+**Discovery reads links from the rendered DOM.** `screen.ts` passes `rendered.page.links` (the links
+`extractPage` read in the browser, after render) to `discoverLayer3` as `homepageLinks`. There is no
+raw-fetch link path for page types.
+
+**xchar's nav is not client-rendered.** The raw homepage HTML already carries all 49 anchors, nav and
+footer included, the same set the stored rendered DOM carries. So rendering was not the cause.
+
+**The cause was the origin.** The run was queued as `https://xchar.ai`, and Layer 0 took that apex as
+the crawl origin. The homepage is served from `https://www.xchar.ai/`, so every homepage link and every
+sitemap entry carries `www`. Page-type discovery then compared each candidate with the apex:
+`selectLinkedCandidates` and `selectListedCandidates` both end in `.filter((url) =>
+url.startsWith(origin))`, and the `findDocument` loop skips any URL that fails the same test.
+`https://www.xchar.ai/create` does not start with `https://xchar.ai`, so every linked and listed
+candidate was dropped before a request was made. Create, generate, pricing, library, guidelines and
+removal declare no conventional paths, so they had nothing left to try. The run recorded "no candidate
+paths were available to try". Terms was reached only because it has conventional paths
+(`/terms-of-service`), and the apex request redirected to www.
+
+Those three findings were already visible in the committed fixture. AIFEAT-001 and AICAT-001/002 rest
+on the homepage or the docs host where the rules name create, generate and library.
+
+### 2. Why the removal page was not located
+
+**Discovery read homepage links only.** `homepageLinks` was the single link source for every page
+type. Links on an established page such as terms or guidelines were never read as candidates.
+
+**The homepage footer does not differ from the inner-page footer.** The stored rendered homepage has
+one footer, and it links "Content Removal Policy" at `https://www.xchar.ai/content-removal-policy`, as
+/guidelines' footer does. So it was a candidate on the homepage too. It was dropped by the origin
+filter in (1), not by where it sat.
+
+**Separately, AITD-001 did not match the footer text.** The footer does contain the words.
+`extract.ts:532` builds footer text as `footerElement.textContent`, which joins adjacent list items
+with no space: "…Complaints PolicyContent Removal PolicyDMCA Policy…". `\bcontent removal\b` does not
+match "PolicyContent", so AITD-001's footer surface read Not observed. Checked by running the matcher's
+word-boundary test over the stored footer text.
+
+This is in shared extraction, so it affects every footer text match, peptide footer rules included.
+**Not fixed in 3a:** fixing it changes peptide footer behaviour, which is outside a crawl fix and needs
+its own ruling. After 3a, AITD-001 also reads the located removal page, so for xchar it no longer
+rests on the footer text alone.
+
+### Fixed in commit 3a (adult page-type discovery only)
+
+- **Served origin.** Candidates are read on the origin the homepage was served from
+  (`servedOriginOf`), but only when that differs from the crawl origin by a leading `www.`. A redirect
+  to any other host keeps the crawl origin.
+- **Links from every established page.** Each page a page type establishes adds its nav and footer
+  links (`chromeLinksOf`) to the candidates for the page types after it. These links come from the
+  rendered DOM, so a client-built nav is read as the browser shows it. The cap is unchanged: 4 linked
+  candidates per type.
+- **Peptide discovery unchanged.** The peptide pass does not read `servedOrigin` or the pool.
+
+The docs-host lookup and the sign-up probe still use the crawl origin. Both worked on 6571d6a9.
+
+**Re-running xchar.** The committed fixture holds the stored report and row, not the crawled pages. So
+it cannot be re-crawled through the fix in a test. The live re-screen of xchar.ai happens after the
+cluster deploys.

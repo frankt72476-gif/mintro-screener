@@ -398,6 +398,7 @@ Recorded in `docs/DECISIONS.md`:
 
 1. Ratify the referral policy table in 3.1 as v1.0, or amend the refer / do-not-refer lines.
 2. Retention and internal access policy for adult-content screenshots.
+   Committed test fixtures hold merchant page text only (quoted findings and notes), no capture bytes.
 3. Whether agents receive the adult-vertical report, or IQWallet only.
 4. Counsel engagement: probe file review; the 1.4 / 1.5 boundary question; insurance for residual
    exposure.
