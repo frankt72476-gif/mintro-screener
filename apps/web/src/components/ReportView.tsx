@@ -1562,9 +1562,8 @@ function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.
   const sentences: string[] = [];
 
   if (sample !== undefined) {
-    const surfaces = sample.surfacesRead.length > 0 ? `, plus ${listOf(sample.surfacesRead)}` : '';
     sentences.push(
-      `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages${surfaces}.`,
+      `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages${coverageSurfaces(sample)}.`,
     );
 
     /*
@@ -1620,6 +1619,25 @@ const plural = (n: number, one: string, many?: string): string =>
   n === 1 ? one : (many ?? `${one}s`);
 
 /** "a, b and c" — an Oxford-free list, because these are read aloud in meetings. */
+/**
+ * What the coverage line says was read besides the product pages.
+ *
+ * The surfaces of this site as a list, then the docs host read as a second origin in its own clause
+ * (cluster 2): `, plus the homepage and the terms document; also read docs.example.com (4 pages)`.
+ * A semicolon, because the docs host is another site and not another page of this one.
+ */
+export function coverageSurfaces(
+  sample: Pick<NonNullable<ScreeningReport['sample']>, 'surfacesRead' | 'secondOrigin'>,
+): string {
+  const surfaces = sample.surfacesRead.length > 0 ? `, plus ${listOf(sample.surfacesRead)}` : '';
+  const second = sample.secondOrigin;
+  const docs =
+    second === undefined
+      ? ''
+      : `; also read ${second.host} (${second.pagesRead} ${second.pagesRead === 1 ? 'page' : 'pages'})`;
+  return `${surfaces}${docs}`;
+}
+
 function listOf(parts: readonly string[]): string {
   if (parts.length <= 1) return parts[0] ?? '';
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;

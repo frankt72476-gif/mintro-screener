@@ -36,7 +36,7 @@ import type {
   SurfaceSpec,
 } from '@mintro/engine';
 import { discoverLayer0, located, NO_SIGNUP_FORM, unreachable, withoutFragment, type Fetcher } from '@mintro/engine';
-import { docsOriginFor, llmsTxtUrls } from './docsOrigin.js';
+import { docsOriginFor, docsPacerFor, llmsTxtUrls } from './docsOrigin.js';
 import { pageTypeEntry, surfaceFromSlug } from './evaluationPages.js';
 import type { PageTypeDocument, PageTypeTable, VerticalPages } from '@mintro/ruleset';
 import { probeSurface } from './surfaceProbe.js';
@@ -903,8 +903,11 @@ async function findDocument(
   const listed = selectListedCandidates(options.sitemapUrls ?? [], origin, what.surface, what.table);
 
   const found = what.candidates !== undefined ? [...new Set(what.candidates)] : [...new Set([...linked, ...listed])];
+  // Candidates given outright are already in the order to read them: they are not re-ranked.
   const ordered =
-    what.rankByPageTypeOrder === true && what.table !== undefined
+    what.candidates !== undefined
+      ? found
+      : what.rankByPageTypeOrder === true && what.table !== undefined
       ? rankByTableEntry(found, what.table)
       : options.rankCandidates === undefined
         ? found
@@ -1168,10 +1171,20 @@ async function readDocsOrigin(
       }
     });
 
+  /*
+    The docs host's own Crawl-delay, where it asks for more than the primary's (cluster 2 commit 2a).
+    Its robots.txt was read by the Layer 0 pass above.
+  */
+  const pacer = docsPacerFor(options.pacer, layer0.robots.crawlDelaySeconds);
+  if (pacer !== options.pacer) {
+    say(`  the docs host asks for a longer crawl delay; its requests are paced at ${pacer.delay.effectiveMs} ms`);
+  }
+
+  const candidates = [...new Set([...linked, ...fromLlms, ...fromSitemap])];
   const outcome = await findDocument(
     browser,
     docsOrigin,
-    options,
+    { ...options, pacer },
     attempts,
     artifacts,
     pages,
@@ -1182,10 +1195,21 @@ async function readDocsOrigin(
       linkHints: [],
       pathNames: ['/'],
       limit: pageCap,
-      candidates: [...linked, ...fromLlms, ...fromSitemap],
+      candidates,
     },
     probe,
   );
+
+  // What the docs read covered, in the attempts whatever it was: a read that stopped at the cap is
+  // visible as one (D-076).
+  attempts.push({
+    url: docsOrigin,
+    status: 0,
+    error:
+      `docs host ${new URL(docsOrigin).host}: ${outcome.pages.length} page(s) read of ` +
+      `${candidates.length} candidate(s); the cap is ${pageCap}` +
+      (candidates.length > pageCap ? `, so ${candidates.length - pageCap} or more were not requested` : ''),
+  });
 
   return { origin: docsOrigin, first: outcome.located, pages: outcome.pages };
 }

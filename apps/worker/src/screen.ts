@@ -66,6 +66,7 @@ import {
 import { createCrawlContext, renderPage } from './render.js';
 import { runGateRules, type AnonymousAccess } from './gate.js';
 import { discoverLayer3 } from './signup.js';
+import { DOCS_PAGE_CAP } from './docsOrigin.js';
 import { coaLinkVocabulary, fetchCertificate } from './coa.js';
 import { probePaths } from './probe.js';
 import { runCheckoutFlow } from './flow.js';
@@ -704,11 +705,11 @@ export async function screenStorefront(
     onProgress: (line, count) => say(line, count),
     ...(options.pages === undefined ? {} : { pages: options.pages }),
     /*
-      A docs host, only where the vertical reads one (cluster 2). Layer 0's fetcher, and the same
-      page cap the product sample renders under. Never passed for peptides, whose page config does not
-      enable it, so a peptide crawl cannot follow one.
+      A docs host, only where the vertical reads one (cluster 2). Layer 0's fetcher, and the docs
+      host's own page cap. Never passed for peptides, whose page config does not enable it, so a
+      peptide crawl cannot follow one.
     */
-    ...(options.pages?.docsOrigin === true ? { secondOrigin: { fetcher, pageCap: RENDER_CAP } } : {}),
+    ...(options.pages?.docsOrigin === true ? { secondOrigin: { fetcher, pageCap: DOCS_PAGE_CAP } } : {}),
   });
 
   // Every Layer 3 candidate this pass rendered, for the challenge count (D-264). Most were
@@ -732,10 +733,7 @@ export async function screenStorefront(
   if (discovered.about.located) progress.surfaceRead('the about page');
   // The docs host, where one was read as a second origin (cluster 2). Named in the coverage line.
   if (discovered.docsOrigin !== undefined && discovered.docsOrigin.pages.length > 0) {
-    const count = discovered.docsOrigin.pages.length;
-    progress.surfaceRead(
-      `also read ${new URL(discovered.docsOrigin.origin).host}, ${count} ${count === 1 ? 'page' : 'pages'}`,
-    );
+    progress.secondOriginRead(new URL(discovered.docsOrigin.origin).host, discovered.docsOrigin.pages.length);
   }
   // The vertical's own page types, where it names them (D-284). Terms is already listed above.
   for (const [pageType, page] of discovered.pageTypes) {

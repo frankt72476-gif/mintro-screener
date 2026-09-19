@@ -8,7 +8,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { ADULT_AI_PAGES, PEPTIDE_PAGES, VERTICAL_FILES } from '@mintro/ruleset';
-import { docsOriginFor, llmsTxtUrls } from '../src/docsOrigin.js';
+import { createPacer, resolveCrawlDelay } from '@mintro/engine';
+import { DOCS_PAGE_CAP, docsOriginFor, docsPacerFor, llmsTxtUrls } from '../src/docsOrigin.js';
+import { createScanProgress } from '../src/scanProgress.js';
 
 const PRIMARY = 'https://www.xchar.ai';
 
@@ -75,5 +77,44 @@ describe('llmsTxtUrls', () => {
 
   it('reads nothing from a file with no URLs on the docs origin', () => {
     expect(llmsTxtUrls('# nothing here\nhttps://other.example/x', 'https://docs.xchar.ai')).toEqual([]);
+  });
+});
+
+describe('docsPacerFor (commit 2a)', () => {
+  const primary = createPacer(resolveCrawlDelay(2));
+
+  it('paces docs-host requests at the docs host\'s own Crawl-delay when it is longer', () => {
+    const pacer = docsPacerFor(primary, 4);
+    expect(pacer).not.toBe(primary);
+    expect(pacer.delay.effectiveMs).toBe(4000);
+  });
+
+  it('keeps the primary\'s pacer when the docs host asks for less, or for nothing', () => {
+    expect(docsPacerFor(primary, 1)).toBe(primary);
+    expect(docsPacerFor(primary, 2)).toBe(primary);
+    expect(docsPacerFor(primary, null)).toBe(primary);
+  });
+
+  it('still caps a docs host\'s declared delay the way the primary\'s is capped (D-013)', () => {
+    expect(docsPacerFor(primary, 600).delay.effectiveMs).toBe(resolveCrawlDelay(600).effectiveMs);
+  });
+});
+
+describe('the docs read is capped at ten pages (commit 2a)', () => {
+  it('is ten', () => {
+    expect(DOCS_PAGE_CAP).toBe(10);
+  });
+});
+
+describe('the second origin on the sample basis', () => {
+  it('is recorded apart from the surfaces read, and absent when none was read', () => {
+    const progress = createScanProgress(() => undefined);
+    progress.surfaceRead('the homepage');
+    expect(progress.sampleBasis().secondOrigin).toBeUndefined();
+    progress.secondOriginRead('docs.example.com', 4);
+    expect(progress.sampleBasis()).toMatchObject({
+      surfacesRead: ['the homepage'],
+      secondOrigin: { host: 'docs.example.com', pagesRead: 4 },
+    });
   });
 });

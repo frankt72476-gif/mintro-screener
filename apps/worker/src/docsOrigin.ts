@@ -19,6 +19,32 @@
  */
 
 import type { VerticalPages } from '@mintro/ruleset';
+import { createPacer, resolveCrawlDelay, type Pacer } from '@mintro/engine';
+
+/**
+ * The most docs-host pages one run renders (Frank, 2026-09-18).
+ *
+ * Ten, read in priority order: the page the merchant linked, then `llms.txt`'s order, then the
+ * sitemap's. A docs read that stopped at the cap says so in the run's attempts.
+ */
+export const DOCS_PAGE_CAP = 10;
+
+/**
+ * The pacer docs-host requests go through.
+ *
+ * The primary's, unless the docs host's own robots.txt declares a longer Crawl-delay, in which case
+ * that one (D-013's cap still applies through `resolveCrawlDelay`). Shorter or absent, the primary's:
+ * the run already paces itself for the primary site, and a docs host asking for less is not a reason
+ * to go faster.
+ */
+export function docsPacerFor(
+  primary: Pacer,
+  docsDeclaredSeconds: number | null,
+  create: (delay: ReturnType<typeof resolveCrawlDelay>) => Pacer = createPacer,
+): Pacer {
+  const docs = resolveCrawlDelay(docsDeclaredSeconds);
+  return docs.effectiveMs > primary.delay.effectiveMs ? create(docs) : primary;
+}
 
 export interface ChromeLink {
   readonly href: string;
