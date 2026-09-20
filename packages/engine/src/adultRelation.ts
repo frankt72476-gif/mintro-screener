@@ -157,13 +157,21 @@ function relationOf(finding: ReportFinding): RelationGroupId | null {
   const direction = directionOf(finding);
 
   /*
-    A rule Mintro wrote that observed nothing is in no group.
+    A rule Mintro wrote that observed nothing, on pages it actually read, is in no group.
 
     There is no cited rule for it to be consistent with, and nothing was observed to report. A row
     saying Mintro looked for something no source mentions and did not find it is a fact about Mintro's
     rule set, not about the merchant, and this block is about the merchant's site.
+
+    **Only where the pages were read.** Run 6571d6a9's upload-control rule observed nothing and never
+    reached the creation, generation or pricing pages, and it fell out of the block entirely: "nothing
+    to report" and "nothing was looked at" rendered the same, which is the shape hard constraint 2
+    forbids. Where coverage is short or unrecorded, the row is not reached, and says which pages.
   */
-  if (direction === null) return observed ? 'no_published_rule' : null;
+  if (direction === null) {
+    if (observed) return 'no_published_rule';
+    return coverageOf(finding) === 'covered' ? null : 'not_reached';
+  }
 
   if (direction === 'requires') return observed ? 'consistent' : 'required_not_found';
   if (observed) return 'restricted';

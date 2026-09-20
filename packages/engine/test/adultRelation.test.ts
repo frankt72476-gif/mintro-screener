@@ -77,7 +77,11 @@ describe('every cell of source, direction and state', () => {
     { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'not_evaluable', group: 'not_reached' },
     // A rule Mintro wrote, which cites nobody.
     { source: 'mintro', sense: 'absent', state: 'fail', group: 'no_published_rule' },
-    { source: 'mintro', sense: 'absent', state: 'pass', group: undefined },
+    // Nothing observed on pages that were all read: nothing to report, and no cited rule to report it against.
+    { source: 'mintro', sense: 'absent', state: 'pass', covered: true, group: undefined },
+    // Nothing observed, but pages were missing: that is a gap, not an absence (6571d6a9's AIFEAT-001).
+    { source: 'mintro', sense: 'absent', state: 'pass', covered: false, group: 'not_reached' },
+    { source: 'mintro', sense: 'absent', state: 'pass', group: 'not_reached' },
     { source: 'mintro', sense: 'absent', state: 'not_evaluable', group: 'not_reached' },
   ];
 
@@ -107,9 +111,14 @@ describe('every cell of source, direction and state', () => {
     },
   );
 
-  it('omits a Mintro rule that observed nothing, rather than filing it as consistency', () => {
+  it('omits a Mintro rule that observed nothing on every page it read', () => {
     // There is no cited rule for it to be consistent with, and nothing was observed to report.
-    const f = finding({ source: 'mintro', sense: 'absent', state: 'pass' });
+    const f = finding({
+      source: 'mintro',
+      sense: 'absent',
+      state: 'pass',
+      surfaces: [{ surface: 'docs', status: 'read' }],
+    });
     const groups = adultRelations(reportOf([f])).groups;
 
     expect(groups.flatMap((g) => g.rows.flatMap((r) => r.ruleIds))).toEqual([]);
@@ -118,6 +127,13 @@ describe('every cell of source, direction and state', () => {
     expect(groups[0]!.rows.map((r) => r.title)).toEqual(['Behaviour over a long conversation']);
   });
 });
+
+const stored = (
+  JSON.parse(readFileSync(resolve(REPO_ROOT, 'fixtures/adult-ai/xchar.ai-6571d6a9.json'), 'utf8')) as {
+    report: ScreeningReport;
+  }
+).report;
+const findings = stored.categories.flatMap((c) => c.findings);
 
 describe('a run recorded before directions existed', () => {
   it('reads the direction from the sense the rule set holds equal to it', () => {
@@ -162,19 +178,37 @@ describe('a run recorded before directions existed', () => {
   });
 
   it('groups run 6571d6a9 without a single direction recorded on it', () => {
-    const stored = JSON.parse(
-      readFileSync(resolve(REPO_ROOT, 'fixtures/adult-ai/xchar.ai-6571d6a9.json'), 'utf8'),
-    ) as { report: ScreeningReport };
-    const findings = stored.report.categories.flatMap((c) => c.findings);
     expect(findings.every((f) => f.direction === undefined)).toBe(true);
 
-    const groups = adultRelations(stored.report).groups;
+    const groups = adultRelations(stored).groups;
     const ids = groups.map((g) => g.id);
     expect(ids).toEqual(['consistent', 'restricted', 'required_not_found', 'no_published_rule', 'not_reached']);
 
     // Every finding of the run is in exactly one group, and none is lost.
     const placed = groups.flatMap((g) => g.rows.flatMap((r) => r.ruleIds));
-    expect(new Set(placed)).toEqual(new Set(findings.filter((f) => f.state !== 'pass' || f.source !== 'mintro').map((f) => f.ruleId)));
+    expect(new Set(placed)).toEqual(new Set(findings.map((f) => f.ruleId)));
+  });
+
+  /*
+    No finding vanishes.
+
+    AIFEAT-001 did: a Mintro rule that observed nothing was omitted as "nothing to report", though its
+    creation, generation and pricing pages were never reached. The block carried fifteen of sixteen
+    findings and said nothing about the sixteenth. Counted, not sampled, and counted as *exactly* one
+    group each — a row in two groups is the same defect wearing the other face.
+  */
+  it('places every finding of the run in exactly one group', () => {
+    const placements = new Map<string, number>();
+    for (const group of adultRelations(stored).groups) {
+      for (const row of group.rows) {
+        for (const ruleId of row.ruleIds) placements.set(ruleId, (placements.get(ruleId) ?? 0) + 1);
+      }
+    }
+
+    for (const finding of findings) {
+      expect(placements.get(finding.ruleId), `${finding.ruleId} (${finding.source}, ${finding.state})`).toBe(1);
+    }
+    expect(placements.size).toBe(findings.length);
   });
 });
 

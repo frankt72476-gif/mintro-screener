@@ -4061,35 +4061,68 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
 }
 
 /*
-  At a glance (cluster 4d, D-290). One hue per relationship to the cited rule — teal where the
-  observation and the rule agree, purple where the rule names the thing as restricted, plum where the
-  rule requires something not found, grey where no rule was cited or nothing was reached.
+  At a glance (cluster 4d, D-290; the approved mock).
 
-  No red, amber, yellow, orange or green appears anywhere in this block: those read as a verdict on
-  the merchant, and the grouping is about the source's text, not about the merchant (A1). Nothing here
-  is keyed to a finding's state, and every row of a group carries its group's hue.
+  One ramp per relationship to the cited rule: the 50 stop fills the card, the 600 stop draws its
+  border and the surface note, the 800 stop sets the heading. Teal where the observation and the rule
+  agree, purple where the rule names the thing as restricted, pink where the rule requires something
+  that was not found, and the page's own surface for the two groups with no cited rule to point at.
+
+  Every row of a card carries its card's colours whatever its finding's state, and no rule state names
+  a class here: the colour says which relationship, never how it went (A1). The guard in
+  `adultRelationBlock.test.ts` pins each group to its pair of stops and refuses any other colour.
 */
 .adult-glance { margin: 20px 0 8px; }
 .adult-glance h2 { font-size: 15px; margin: 0 0 10px; }
-.glance-headline { margin: 0 0 14px; padding-left: 10px; border-left: 3px solid #5B5A66; color: #4A4750; font-size: 13px; }
-.glance-cards { display: grid; gap: 10px; }
-.glance-card { border: 1px solid #DDDCE2; border-left-width: 3px; border-radius: 4px; padding: 10px 12px; }
-.glance-card h3 { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; }
-.glance-cite { margin: 3px 0 6px; font-size: 11px; color: #5F5B6B; }
-.glance-card ul { list-style: none; margin: 0; padding: 0; }
-.glance-card li { display: flex; gap: 12px; justify-content: space-between; font-size: 13px; padding: 3px 0; }
-.glance-where { color: #5F5B6B; font-size: 12px; white-space: nowrap; }
-.glance-card li a { color: inherit; text-decoration: none; border-bottom: 1px solid #D5D2DA; }
-.glance-card li a:hover { border-bottom-color: #4A4750; }
-.glance-legend { margin: 12px 0 0; font-size: 12px; color: #5F5B6B; }
 
-.glance-consistent { border-left-color: #2F6F73; }
-.glance-consistent h3 { color: #2F6F73; }
-.glance-restricted { border-left-color: #4C4A8A; }
-.glance-restricted h3 { color: #4C4A8A; }
-.glance-required-not-found { border-left-color: #6B4E71; }
-.glance-required-not-found h3 { color: #6B4E71; }
-.glance-no-published-rule { border-left-color: #5B5A66; }
-.glance-no-published-rule h3 { color: #5B5A66; }
-.glance-not-reached { border-left-color: #5B5A66; }
-.glance-not-reached h3 { color: #5B5A66; }
+.glance-headline {
+  margin: 0 0 14px;
+  padding-left: 12px;
+  border-left: 3px solid #534AB7;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.glance-cards { display: grid; gap: 10px; }
+
+.glance-card {
+  background: var(--surface-1);
+  border: 1px solid #C9C4DA;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.glance-card h3 { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; color: var(--ink); }
+.glance-cite { margin: 3px 0 8px; font-size: 11px; color: var(--ink-mid); }
+.glance-card ul { list-style: none; margin: 0; padding: 0; }
+.glance-card li {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 3px 0;
+}
+.glance-where { font-size: 12px; text-align: right; color: var(--ink-mid); }
+.glance-card li a { color: inherit; text-decoration: none; border-bottom: 1px solid #C9C4DA; }
+.glance-card li a:hover { border-bottom-color: var(--ink); }
+.glance-legend { margin: 12px 0 0; font-size: 12px; color: var(--ink-mid); }
+
+/* Consistent with the cited rule — teal 50 / 600 / 800. */
+.glance-consistent { background: #E1F5EE; border-color: #0F6E56; }
+.glance-consistent h3 { color: #0A4D3C; }
+.glance-consistent .glance-where { color: #0F6E56; }
+
+/* Named as restricted by the cited rule — purple 50 / 600 / 800. */
+.glance-restricted { background: #EEEDFE; border-color: #534AB7; }
+.glance-restricted h3 { color: #322C7A; }
+.glance-restricted .glance-where { color: #534AB7; }
+
+/* Required by the cited rule and not found — pink 50 / 600 / 800, the ramp standing in for plum. */
+.glance-required-not-found { background: #FBEAF0; border-color: #993556; }
+.glance-required-not-found h3 { color: #6E2440; }
+.glance-required-not-found .glance-where { color: #993556; }
+
+/* No cited rule to take a colour from: the page's own surface, with the stronger line. */
+.glance-no-published-rule,
+.glance-not-reached { background: var(--surface-1); border-color: #C9C4DA; }
