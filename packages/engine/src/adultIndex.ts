@@ -115,3 +115,23 @@ export function adultIndexRows(
     })),
   );
 }
+
+/**
+ * The plain sentence a finding opens with (cluster 4b commit 2).
+ *
+ * Written from data, never by a model: the rule's title, the sense label its state gives it, and the
+ * page the capture is of. Titles already read as the thing looked for — "Minors named in the terms",
+ * "Video generation language" — so the label completes the sentence rather than restating it.
+ *
+ * One template per state, which is where the sense has already been resolved: `stateLabelFor` reads
+ * the rule's sense, so "Observed" on an `absent` rule and on a `present` rule reach here as the same
+ * word, and the sentence says the same thing in both directions. A rule that could not be checked
+ * names no page, because the page is what was missing; the line beneath it says what was attempted.
+ */
+export function adultLeadSentence(finding: ReportFinding): string {
+  const label = stateLabelFor('adult_ai', finding).toLowerCase();
+  const where = finding.checkType === 'manual' ? NO_PAGE : whereWords(finding);
+
+  if (finding.state === 'not_evaluable' || where === NO_PAGE) return `${finding.title} — ${label}.`;
+  return `${finding.title} — ${label} on the ${where}.`;
+}

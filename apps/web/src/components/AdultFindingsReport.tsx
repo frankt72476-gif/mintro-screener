@@ -23,6 +23,7 @@
 import {
   ADULT_REPORT_POSTURE,
   adultIndexRows,
+  adultLeadSentence,
   adultNotChecked,
   clauseHeadingFor,
   formatReportDate,
@@ -166,6 +167,14 @@ function AdultFinding({ finding, access }: { readonly finding: ReportFinding; re
         <span className="find-title">{finding.title}</span>
         <span className="rid">{finding.ruleId}</span>
       </header>
+      {/*
+        The plain sentence first, the matched phrases beneath it (cluster 4b commit 2).
+
+        `adultLeadSentence` writes it from the title, the label and the page — no model, no
+        paraphrase of the merchant's words. The line beneath is the evidence exactly as the check
+        wrote it: "Observed: 'minors'", or what was attempted where nothing could be read.
+      */}
+      <p className="adult-lead">{adultLeadSentence(finding)}</p>
       <p className="adult-note">{note}</p>
       <EvidenceSlip finding={finding} access={access} />
       <div className="req-col">

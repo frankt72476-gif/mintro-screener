@@ -4035,3 +4035,7 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
 .adult-index thead th { color: #6D6788; font-size: 12px; border-bottom: 1px solid #E4E1EE; }
 .adult-index tbody a { color: inherit; text-decoration: none; border-bottom: 1px solid #CFC9E4; }
 .adult-index tbody a:hover { border-bottom-color: #3D3857; }
+
+/* The finding's plain sentence, and the evidence line beneath it (cluster 4b). */
+.adult-lead { margin: 8px 0 4px; }
+.adult-report .adult-note { margin: 0 0 8px; color: #4A4563; font-size: 13px; }
