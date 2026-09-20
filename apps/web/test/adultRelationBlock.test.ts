@@ -129,11 +129,13 @@ describe('run 6571d6a9, by relationship', () => {
       reached the creation, generation or library pages, which is where character names live. The
       rows carry the run's own account of that, from the note beneath each finding.
     */
-    const gap =
+    const catalogue =
       'the character creation page, the generation page and the character library page not published';
     expect(cardRows(block, 'not-reached')).toEqual([
-      `Minor-coded terms — ${gap}`,
-      `Real-person likeness terms — ${gap}`,
+      'Upload control on creation, generation, pricing or documentation pages — ' +
+        'the character creation page, the generation page and the pricing page not published',
+      `Minor-coded terms — ${catalogue}`,
+      `Real-person likeness terms — ${catalogue}`,
       'Behaviour over a long conversation',
     ]);
   });
@@ -172,53 +174,66 @@ describe('the guards', () => {
     expect(block).not.toContain(' style="');
   });
 
-  it('colours by relationship only: three hues and near-grey, each group pinned to one', () => {
+  it('colours by relationship only: each group pinned to its ramp, and no other colour at all', () => {
     const css = readFileSync('apps/web/src/styles.css', 'utf8');
     const styles = css.slice(css.indexOf('.adult-glance {'));
 
-    /** Hue in degrees and saturation, as HSL reads them. */
-    const hsl = (hex: string): { h: number; s: number } => {
-      const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const d = max - min;
-      const l = (max + min) / 2;
-      if (d === 0) return { h: 0, s: 0 };
-      const h = max === r ? 60 * (((g - b) / d + 6) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
-      return { h, s: d / (1 - Math.abs(2 * l - 1)) };
+    /*
+      The palette, pinned by value rather than by hue band (the approved mock).
+
+      A band was the wrong instrument: the approved teal 600 sits at hue 165 and the pink 600 at 340,
+      either side of a band drawn to exclude green and red, while an unapproved colour inside the band
+      would have passed. Pinning the stops says what is actually allowed — these ramps, for these
+      groups — and refuses everything else, which is the property that matters.
+    */
+    const RAMPS: Record<string, { fill: string; border: string; heading: string }> = {
+      consistent: { fill: '#E1F5EE', border: '#0F6E56', heading: '#0A4D3C' },
+      restricted: { fill: '#EEEDFE', border: '#534AB7', heading: '#322C7A' },
+      'required-not-found': { fill: '#FBEAF0', border: '#993556', heading: '#6E2440' },
     };
+    /** The neutrals: the stronger line the grey cards and the links take. */
+    const NEUTRAL = ['#C9C4DA'];
 
-    /** The three hues this block may use, and nothing else with colour in it. */
-    const ALLOWED = [184, 242, 290];
-    const hexes = [...styles.matchAll(/#([0-9A-Fa-f]{6})\b/g)].map((m) => m[1]!);
-    expect(hexes.length).toBeGreaterThan(5);
+    for (const [group, ramp] of Object.entries(RAMPS)) {
+      const card = new RegExp(`\\.glance-${group} \\{ background: (#[0-9A-Fa-f]{6}); border-color: (#[0-9A-Fa-f]{6}); \\}`).exec(
+        styles,
+      );
+      const heading = new RegExp(`\\.glance-${group} h3 \\{ color: (#[0-9A-Fa-f]{6}); \\}`).exec(styles);
+      const note = new RegExp(`\\.glance-${group} \\.glance-where \\{ color: (#[0-9A-Fa-f]{6}); \\}`).exec(styles);
 
-    for (const hex of hexes) {
-      const { h, s } = hsl(hex);
-      if (s < 0.12) continue; // near-grey: hairlines, quiet text, the two grey groups
-      expect(ALLOWED.some((allowed) => Math.abs(h - allowed) <= 2), `#${hex} at hue ${Math.round(h)}`).toBe(true);
+      expect({ group, fill: card?.[1], border: card?.[2], heading: heading?.[1], note: note?.[1] }).toEqual({
+        group,
+        fill: ramp.fill,
+        border: ramp.border,
+        heading: ramp.heading,
+        // The surface note takes the 600 stop, not a muted grey.
+        note: ramp.border,
+      });
     }
 
-    const hueOf = (group: string): number | 'grey' => {
-      const hex = new RegExp(`\\.glance-${group} h3 \\{ color: #([0-9A-Fa-f]{6})`).exec(styles)?.[1] ?? '';
-      const { h, s } = hsl(hex);
-      return s < 0.12 ? 'grey' : Math.round(h);
-    };
+    // The two groups with no cited rule take the page's own surface and the stronger line.
+    expect(styles).toContain('.glance-not-reached { background: var(--surface-1); border-color: #C9C4DA; }');
 
-    expect({
-      consistent: hueOf('consistent'),
-      restricted: hueOf('restricted'),
-      requiredNotFound: hueOf('required-not-found'),
-      noPublishedRule: hueOf('no-published-rule'),
-      notReached: hueOf('not-reached'),
-    }).toEqual({
-      consistent: 184,
-      restricted: 242,
-      requiredNotFound: 290,
-      noPublishedRule: 'grey',
-      notReached: 'grey',
-    });
+    // And nothing else with colour in it appears anywhere in the block.
+    const allowed = new Set([...Object.values(RAMPS).flatMap((r) => Object.values(r)), ...NEUTRAL]);
+    const used = [...styles.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((m) => m[0]);
+    expect([...new Set(used)].filter((hex) => !allowed.has(hex))).toEqual([]);
   });
+
+  it('takes the mock\'s shape: 12px radius, tinted card, 14px rows', () => {
+    const css = readFileSync('apps/web/src/styles.css', 'utf8');
+    const styles = css.slice(css.indexOf('.adult-glance {'));
+
+    expect(styles).toMatch(/\.glance-card \{[^}]*border-radius: 12px;/s);
+    expect(styles).toMatch(/\.glance-card \{[^}]*padding: 12px 16px;/s);
+    expect(styles).toMatch(/\.glance-cards \{[^}]*gap: 10px;/s);
+    expect(styles).toMatch(/\.glance-card li \{[^}]*font-size: 14px;/s);
+    expect(styles).toMatch(/\.glance-card li \{[^}]*color: var\(--ink\);/s);
+    // The referral line: the purple rule, at the rows' size.
+    expect(styles).toMatch(/\.glance-headline \{[^}]*border-left: 3px solid #534AB7;/s);
+    expect(styles).toMatch(/\.glance-headline \{[^}]*font-size: 14px;/s);
+  });
+
 });
 
 describe('a run of the shape findings have now', () => {
