@@ -151,6 +151,36 @@ export function adultIndexRows(
 }
 
 /**
+ * Where a finding was looked for, as a clause a sentence can take (cluster 4c).
+ *
+ * "in the footer; removal page not published" — the surfaces read, then the ones that were not, named
+ * as what they were. A run recorded before surfaces were snapshotted says "on the homepage", the page
+ * its capture is of, which is the honest answer available from it.
+ *
+ * Shared by the lead sentence and the glance so the two cannot drift into saying different things
+ * about the same finding (D-216).
+ */
+export function whereClause(finding: ReportFinding): string {
+  const surfaces = finding.surfaces;
+  if (surfaces === undefined || surfaces.length === 0) {
+    const where = whereWords(finding);
+    return where === NO_PAGE ? '' : `on the ${where}`;
+  }
+
+  const read = surfaces.filter((s) => s.status === 'read');
+  const gap = (status: FindingSurface['status'], tail: string): string => {
+    const gaps = surfaces.filter((s) => s.status === status);
+    return gaps.length === 0 ? '' : `; ${listOf(gaps)} ${tail}`;
+  };
+
+  return (
+    (read.length > 0 ? `${preposition(read[0]?.surface)} the ${listOf(read)}` : '') +
+    gap('not_published', 'not published') +
+    gap('unreadable', 'could not be read')
+  ).replace(/^;\s*/, '');
+}
+
+/**
  * The plain sentence a finding opens with (cluster 4b commit 2).
  *
  * Written from data, never by a model: the rule's title, the sense label its state gives it, and the

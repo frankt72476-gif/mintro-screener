@@ -4059,3 +4059,28 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
   .cap-fold > summary { list-style: none; }
   .cap-fold > *:not(summary) { display: block; }
 }
+
+/*
+  At a glance (cluster 4c). One muted hue per group, on the heading and a rule down the left of its
+  rows — slate-blue, indigo, teal, violet, plum. Every hue sits between 180 and 300 degrees: no red,
+  amber, yellow, orange or green appears anywhere in this block, because those read as a verdict on
+  what the group contains (A1). Nothing here is keyed to a finding's state.
+*/
+.adult-glance { margin: 20px 0 8px; }
+.adult-glance h2 { font-size: 15px; margin: 0 0 10px; }
+.glance-headline { margin: 0 0 14px; padding-left: 10px; border-left: 3px solid #35627A; color: #35627A; font-size: 13px; }
+.glance-group { margin: 12px 0; }
+.glance-group h3 { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
+.glance-group ul { list-style: none; margin: 0; padding: 0 0 0 10px; border-left: 2px solid #E4E1EE; }
+.glance-group li { font-size: 13px; padding: 3px 0; }
+.glance-group li a { color: inherit; text-decoration: none; border-bottom: 1px solid #CFC9E4; }
+.glance-group li a:hover { border-bottom-color: #3D3857; }
+
+.glance-site h3 { color: #4C4A8A; }
+.glance-site ul { border-left-color: #4C4A8A; }
+.glance-policies h3 { color: #2F6F73; }
+.glance-policies ul { border-left-color: #2F6F73; }
+.glance-missing h3 { color: #5E4B8B; }
+.glance-missing ul { border-left-color: #5E4B8B; }
+.glance-unchecked h3 { color: #6B4E71; }
+.glance-unchecked ul { border-left-color: #6B4E71; }
