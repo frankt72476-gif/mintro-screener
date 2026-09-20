@@ -138,6 +138,21 @@ export interface Evidence {
   readonly session?: SessionDescriptor;
 }
 
+/**
+ * A surface a rule reads, and what became of it on this run (cluster 4b commit 5).
+ *
+ * `read` — the page was rendered and the rule ran over it. `not_published` — the site does not have
+ * one, as far as the crawl could tell. `unreadable` — it exists and could not be read: a gate, a bot
+ * challenge, a request that did not return.
+ *
+ * Snapshotted onto the finding so a report can say *where* without consulting today's rule set, which
+ * is a different document from the one the run was screened under (D-002).
+ */
+export interface FindingSurface {
+  readonly surface: string;
+  readonly status: 'read' | 'not_published' | 'unreadable';
+}
+
 export interface Finding {
   readonly ruleId: string;
   readonly state: State;
@@ -156,6 +171,14 @@ export interface Finding {
    * see `bucketOf` in `report.ts`.
    */
   readonly notEvaluableKind?: NotEvaluableKind;
+  /**
+   * The surfaces this rule read, and what became of each (cluster 4b commit 5).
+   *
+   * Set by the runners that read more than one — `checkTextMatchAcross`, `checkDomFeature`. Absent on
+   * every finding recorded before this existed, and on single-surface checks, where the report falls
+   * back to classifying the page its capture is of.
+   */
+  readonly surfaces?: readonly FindingSurface[];
 }
 
 /**

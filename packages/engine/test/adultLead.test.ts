@@ -71,7 +71,7 @@ describe('the page it names', () => {
   it.each([
     ['https://www.x.test/', 'homepage'],
     ['https://www.x.test/terms-of-service', 'terms document'],
-    ['https://www.x.test/content-removal-policy', 'content removal page'],
+    ['https://www.x.test/content-removal-policy', 'removal page'],
     ['https://www.x.test/community-guidelines', 'guidelines page'],
     ['https://www.x.test/pricing', 'pricing page'],
     ['https://www.x.test/create-character', 'creation page'],

@@ -32,7 +32,15 @@
 import type { RuleOfType, Surface } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import type { Located } from '../surface.js';
-import { notEvaluable, satisfied, violation, type Evidence, type Finding, type NotEvaluableKind } from '../findings.js';
+import {
+  notEvaluable,
+  satisfied,
+  violation,
+  type Evidence,
+  type Finding,
+  type FindingSurface,
+  type NotEvaluableKind,
+} from '../findings.js';
 import { containsTokenSequence, tokenizePath } from '../slug.js';
 import { pageEvidence, renderFailure, RENDERED } from './pageEvidence.js';
 import { surfaceLabel } from './textMatchAcross.js';
@@ -104,6 +112,24 @@ export function checkDomFeature(rule: RuleOfType<'dom_feature'>, readings: reado
   const onWhat = (surface: Surface, page: PageContext): string => `${surfaceLabel(surface)} (${page.finalUrl})`;
   const expect = rule.params.expect;
 
+  /*
+    What became of each listed surface, carried on the finding (cluster 4b commit 5).
+
+    One entry per surface the rule lists, in the order it lists them — a surface whose pages were read
+    counts as read, whatever the pages showed, because the question here is what the run reached.
+  */
+  const statusOf = (surface: Surface): FindingSurface['status'] =>
+    read.some((r) => r.surface === surface)
+      ? 'read'
+      : unreadable.some((u) => u.surface === surface)
+        ? 'unreadable'
+        : 'not_published';
+  const surfaces: readonly FindingSurface[] = readings.map((reading) => ({
+    surface: reading.surface,
+    status: statusOf(reading.surface),
+  }));
+  const withSurfaces = (finding: Finding): Finding => ({ ...finding, surfaces });
+
   if (observed.length > 0) {
     const first = observed[0]!;
     const where = observed.map((o) => `${onWhat(o.surface, o.observation.page)}: ${quote(o.observation.signals)}`);
@@ -113,7 +139,9 @@ export function checkDomFeature(rule: RuleOfType<'dom_feature'>, readings: reado
     const evidence = observed.flatMap((o) =>
       pageEvidence(o.observation.page).map((e) => ({ ...e, matchedValue: o.observation.signals.join(', ') })),
     );
-    return expect === 'present' ? satisfied(rule, note, RENDERED, evidence) : violation(rule, note, RENDERED, evidence);
+    return withSurfaces(
+      expect === 'present' ? satisfied(rule, note, RENDERED, evidence) : violation(rule, note, RENDERED, evidence),
+    );
   }
 
   if (read.length === 0 || unreadable.length > 0) {
@@ -125,10 +153,12 @@ export function checkDomFeature(rule: RuleOfType<'dom_feature'>, readings: reado
         : `not observed on the ${read.length} page(s) read, and not every listed page was read`) +
       ': ' +
       gaps.map((g) => `${surfaceLabel(g.surface)}: ${g.reason}`).join('; ');
-    return notEvaluable(rule, reason, RENDERED, kind, [
-      ...read.flatMap((r) => pageEvidence(r.page)),
-      ...gaps.flatMap((g) => g.evidence),
-    ]);
+    return withSurfaces(
+      notEvaluable(rule, reason, RENDERED, kind, [
+        ...read.flatMap((r) => pageEvidence(r.page)),
+        ...gaps.flatMap((g) => g.evidence),
+      ]),
+    );
   }
 
   const readList = read.map((r) => onWhat(r.surface, r.page)).join(', ');
@@ -138,7 +168,9 @@ export function checkDomFeature(rule: RuleOfType<'dom_feature'>, readings: reado
       : ` Not published: ${notPublished.map((n) => `${surfaceLabel(n.surface)} (${n.reason})`).join('; ')}.`;
   const note = `Not observed on ${read.length} page(s) read: ${readList}.${notPublishedClause}`;
   const evidence = read.flatMap((r) => pageEvidence(r.page));
-  return expect === 'present' ? violation(rule, note, RENDERED, evidence) : satisfied(rule, note, RENDERED, evidence);
+  return withSurfaces(
+    expect === 'present' ? violation(rule, note, RENDERED, evidence) : satisfied(rule, note, RENDERED, evidence),
+  );
 }
 
 /** The signals one page carries for this rule's detector. */
