@@ -102,3 +102,6 @@ export {
 
 // The short name of the source each rule quotes, read from the corpus's provenance (cluster 4b).
 export { citationsByRule } from './corpus.js';
+
+// Which way a cited source runs (D-290). Browser-safe: the report groups findings by it.
+export { DIRECTIONS, type Direction } from './vocabulary.js';

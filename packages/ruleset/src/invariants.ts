@@ -41,6 +41,68 @@ function defect(ruleId: string, path: string, message: string): RulesetDefect {
  * `prefix` uniqueness is what makes prefix-matches-category decidable: two categories sharing
  * a prefix would leave a rule ID belonging to both.
  */
+/**
+ * Direction, where a rule set uses it (D-290).
+ *
+ * Three properties, and each one is a way the report could otherwise mislead:
+ *
+ *   - **A rule that cites a source declares which way it runs.** A set that uses directions and left
+ *     one off would drop that finding out of every group built on the relationship, silently.
+ *   - **A rule Mintro wrote declares none.** Mintro quotes nobody, so there is no source's text to
+ *     read a direction off, and a direction there would be Mintro's own view wearing a citation's
+ *     clothes. Held whether or not the set uses directions elsewhere.
+ *   - **It agrees with the sense.** `requires` goes with a thing that must be present, `prohibits`
+ *     with one that must be absent. They are the same fact said twice, and two facts that can
+ *     disagree eventually do (D-181) — the report reads `sense` for the label and `direction` for the
+ *     group, so a mismatch would file "Observed" under the heading for what was not found.
+ */
+function checkDirection(rules: readonly IndexedRule[]): RulesetDefect[] {
+  const defects: RulesetDefect[] = [];
+  const used = rules.some(({ rule }) => rule.direction !== undefined);
+
+  for (const { rule, index } of rules) {
+    if (rule.source === 'mintro') {
+      if (rule.direction !== undefined) {
+        defects.push(
+          defect(
+            rule.id,
+            `rules[${index}].direction`,
+            "a rule Mintro wrote cites no source, so there is no source's text to take a direction from",
+          ),
+        );
+      }
+      continue;
+    }
+
+    if (used && rule.direction === undefined) {
+      defects.push(
+        defect(
+          rule.id,
+          `rules[${index}].direction`,
+          'this rule set declares directions, so every rule citing a source must declare which way it runs',
+        ),
+      );
+      continue;
+    }
+
+    if (rule.direction === undefined) continue;
+
+    const wanted = rule.direction === 'requires' ? 'present' : 'absent';
+    const sense = rule.sense ?? ('expect' in rule.params ? rule.params.expect : undefined);
+    if (sense !== undefined && sense !== wanted) {
+      defects.push(
+        defect(
+          rule.id,
+          `rules[${index}].direction`,
+          `direction '${rule.direction}' and sense '${String(sense)}' disagree: ` +
+            `'${rule.direction}' goes with sense '${wanted}'`,
+        ),
+      );
+    }
+  }
+  return defects;
+}
+
 function checkCategoryUniqueness(categories: readonly Category[]): RulesetDefect[] {
   const defects: RulesetDefect[] = [];
   const fields = [
@@ -313,6 +375,7 @@ export function checkInvariantsOn(
   const defects: RulesetDefect[] = [
     ...checkCategoryUniqueness(categories),
     ...checkRuleIdUniqueness(rules),
+    ...checkDirection(rules),
   ];
 
   const categoriesById = new Map(categories.map((category) => [category.id, category]));

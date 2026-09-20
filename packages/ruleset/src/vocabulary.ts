@@ -291,3 +291,13 @@ export const RULE_ID_PATTERN = /^[A-Z]+-\d{3}$/;
 
 /** Category ID prefix format, as declared by `categories[].prefix`. */
 export const CATEGORY_PREFIX_PATTERN = /^[A-Z]+$/;
+
+/**
+ * Which way a cited source runs (D-290).
+ *
+ * The source's own text decides it: a rule quoting "a covered platform shall provide ... notice"
+ * requires, one quoting "the sale of a product ... which is patently offensive" prohibits. Mintro
+ * never decides it, and no merchant's conduct changes it.
+ */
+export const DIRECTIONS = ['prohibits', 'requires'] as const;
+export type Direction = (typeof DIRECTIONS)[number];

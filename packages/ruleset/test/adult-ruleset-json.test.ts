@@ -39,8 +39,9 @@ describe('rules/ruleset-adult-ai.json', () => {
     // 0.2.0: rules read several page types (cluster 2). 0.3.0: dom_feature rules (cluster 2).
     // 0.4.0: the attestation set, not-checked items and AIATT- manual rules (cluster 4, D-286).
     // 0.4.1: titles are noun phrases naming the thing looked for, with no surface (cluster 4b, D-286).
-    expect(adult.version).toBe('0.4.1');
-    expect(adult.effective).toBe('2026-09-20');
+    // 0.5.0: each rule citing a source declares which way that source runs (cluster 4d, D-290).
+    expect(adult.version).toBe('0.5.0');
+    expect(adult.effective).toBe('2026-09-21');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
 
@@ -245,6 +246,38 @@ describe('rules/ruleset-adult-ai.json', () => {
     expect(new Set(Object.values(citations))).toEqual(
       new Set(['Mastercard Rules 5.12.7', 'TAKE IT DOWN Act § 3(a)', 'Cal. SB 243, Bus. & Prof. Code § 22602(a)']),
     );
+  });
+
+  it('declares which way each cited source runs, and nothing for its own rules (D-290)', () => {
+    const directions = Object.fromEntries(adult.rules.map((rule) => [rule.id, rule.direction]));
+
+    expect(directions).toMatchObject({
+      // Sources that oblige the merchant to have something.
+      'AIGATE-003': 'requires',
+      'AIPOL-001': 'requires',
+      'AIPOL-002': 'requires',
+      'AIPOL-003': 'requires',
+      'AIPOL-004': 'requires',
+      'AIPOL-006': 'requires',
+      'AITD-001': 'requires',
+      'AITD-002': 'requires',
+      // Sources that forbid something.
+      'AIFEAT-002': 'prohibits',
+      'AICAT-001': 'prohibits',
+      'AICAT-002': 'prohibits',
+    });
+
+    for (const rule of adult.rules) {
+      if (rule.source === 'mintro') expect(rule.direction, rule.id).toBeUndefined();
+      else expect(rule.direction, rule.id).toBeDefined();
+    }
+  });
+
+  it('agrees, rule by rule, with the sense the label is read from', () => {
+    for (const rule of adult.rules) {
+      if (rule.direction === undefined) continue;
+      expect(rule.sense, rule.id).toBe(rule.direction === 'requires' ? 'present' : 'absent');
+    }
   });
 
   it('is the rule set the adult_ai vertical loads', () => {

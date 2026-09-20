@@ -12,6 +12,7 @@ import {
   CATEGORY_PREFIX_PATTERN,
   CHECK_TYPES,
   type CheckType,
+  DIRECTIONS,
   EVALUATION_TIERS,
   LAYERS,
   RULE_ID_PATTERN,
@@ -100,6 +101,18 @@ const ruleCommon = {
    * `absent` through `senseOf`, which is every peptide rule.
    */
   sense: z.enum(SENSES).optional(),
+  /**
+   * Which way the cited source runs (D-290).
+   *
+   * `requires` — the source obliges the merchant to have the thing. `prohibits` — the source forbids
+   * it. Read off the source's own text and never from Mintro's view of the merchant, which is what
+   * makes it safe to group and colour a report by it.
+   *
+   * Only where a rule cites a published source: a `source: mintro` rule quotes nobody, so it declares
+   * none, and a report says exactly that of it. A rule set that uses directions at all must give one
+   * to every rule that cites a source — the invariants hold that, so a set cannot half-adopt it.
+   */
+  direction: z.enum(DIRECTIONS).optional(),
   /**
    * Rules that describe the same observation from another angle (D-050).
    *

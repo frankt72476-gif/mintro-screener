@@ -19245,3 +19245,33 @@ scoped in its own record when built. Chat surfaces behind account creation are `
 the merchant supplies screening-time test access (decision shared with the peptide authenticated-crawl
 item).
 
+## D-290 — Findings grouped by their relationship to the cited rule
+
+**Date:** 2026-09-21
+**Status:** accepted; **counsel review of this framing is pending**
+**See:** `docs/adult-ai-screener-design.md` sections 5 and 9; D-284, D-285, D-286
+
+Findings in the adult AI report may be grouped by their relationship to the public rule each one
+cites. Three properties make that safe, and all three are load-bearing:
+
+- **The direction comes from the source's own text, never from Mintro.** Each rule citing a published
+  source declares `direction: prohibits | requires` in the rule set, read off the wording of the rule
+  or statute it quotes. A rule Mintro wrote cites nobody and declares none; its findings are reported
+  as observed with no published rule cited. The validator holds direction against `sense`, refuses a
+  direction on a Mintro rule, and refuses a missing one in any set that uses directions.
+- **Colour is keyed to the relationship, never to a rule's state or to a rating of the merchant.**
+  One hue per group, the same hue for every row in it whatever each finding's state. The palette
+  excludes red, green, amber, yellow and orange, because those read as a verdict; a test computes the
+  hue of every colour in the block and refuses them, and refuses any class keyed to fail, pass or
+  not_evaluable.
+- **Grouping is not scoring.** No group is ranked above another, no group is counted, and the block
+  carries a legend saying what it is: "Grouping and colour follow the cited rule's own text. Mintro
+  states what it observed; it does not rate the merchant."
+
+A prohibition that was not observed counts as consistent only where every page the rule lists was
+read. Where a page was not reached, the finding is reported as not reached and names the page —
+a gap in the crawl must never read as a statement about the merchant (hard constraint 2).
+
+**Counsel review pending.** Whether a report that sorts observations by their relationship to a
+named rule still sits on the screening side of Sponsor Agreement 1.4 is the question to put, along
+with the group headings' wording. Until that review, the framing ships to Mintro's own review only.
