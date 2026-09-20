@@ -9,6 +9,7 @@
  * makes no API call and writes no row. A dry run that reached the vendor would not be one.
  */
 
+import { evaluationRefusal } from '../src/evaluationVertical.js';
 import { chromium } from 'playwright';
 import { loadRulesetFile, loadAngleSetFile, ANGLES_PATH } from '@mintro/ruleset';
 import { readRunEyeTest, type ScreeningReport } from '@mintro/engine';
@@ -44,12 +45,15 @@ interface FindingRecord {
 async function loadReport(supabase: WorkerSupabase, runId: string): Promise<ScreeningReport> {
   const { data, error } = await supabase.client
     .from('runs')
-    .select('report, status')
+    .select('report, status, vertical')
     .eq('id', runId)
     .maybeSingle();
 
   if (error !== null) throw new Error(`could not read run ${runId}: ${error.message}`);
   if (data === null) throw new Error(`run ${runId} does not exist`);
+  // The evaluation layer is the peptide programme's (D-284); refused before any draft is generated.
+  const refused = evaluationRefusal((data as { vertical?: unknown }).vertical);
+  if (refused !== null) throw new Error(refused);
 
   const row = data as { report: unknown; status: string };
   // Complete or truncated: a truncated run is finished, and is evaluated like any other (D-282).

@@ -195,6 +195,7 @@ describe('every section is in the sequence (D-250)', () => {
         `eyeLineCommentBox` one commit earlier: a prop every real caller supplies, omitted here.
       */
       questionsForm: createElement(AttestationForm, {
+      vertical: 'peptides',
         questions: ATTESTATION_QUESTIONS,
         answers: new Map(),
         identified: true,

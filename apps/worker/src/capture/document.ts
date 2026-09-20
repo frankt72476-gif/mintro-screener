@@ -22,7 +22,7 @@
  * report handed to a bank's processor. It comes out.
  */
 
-import { EVALUATION_POSTURE } from '@mintro/engine';
+import { ADULT_REPORT_POSTURE, EVALUATION_POSTURE } from '@mintro/engine';
 import { MARKER_PREFIX } from '../capture.js';
 import { CAPTURE_CLASS, deduplicateImages, pointImagesAtCaptures } from './images.js';
 
@@ -207,10 +207,20 @@ export const CAPTURE_SIZE_CEILING_BYTES = 40 * 1024 * 1024;
  */
 export const CAPTURE_SIZE_FLOOR_BYTES = 8 * 1024;
 
-export interface CaptureExpectation {
+/**
+ * Which document a capture is, and the one thing each kind must carry (D-263; cluster 4 commit 5).
+ *
+ * A peptide run's capture is its published evaluation, checked for the version it is of. An adult AI
+ * run has no evaluation and never will (D-284, 0091): its capture is the findings report, checked for
+ * the report's own statement of what it is and refused if it carries the evaluation's. Exactly one of
+ * the two, so a caller cannot leave the question open.
+ */
+export type CaptureExpectation = {
   /** How many `<img>` the page reported. Every one must be inline in the delivered file. */
   readonly images: number;
   readonly runId: string;
+} & (
+  | {
   /**
    * The published evaluation this file is of (D-263).
    *
@@ -225,7 +235,14 @@ export interface CaptureExpectation {
    * already applies to `REPORT_POSTURE`.
    */
   readonly published: { readonly version: number; readonly publishedAt: string };
-}
+      readonly findingsReport?: undefined;
+    }
+  | {
+      /** The adult AI findings report (memo §9, D-285). No evaluation stands behind it. */
+      readonly findingsReport: 'adult_ai';
+      readonly published?: undefined;
+    }
+);
 
 /** The text a reader sees, for assertions about words rather than about markup. */
 function stripTags(html: string): string {
@@ -295,11 +312,25 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
     opened by someone at the sponsoring bank with no covering email and no idea who Mintro is —
     and this is the only thing in the document that tells them.
   */
-  if (!html.includes(EVALUATION_POSTURE)) {
+  const posture = expected.findingsReport === 'adult_ai' ? ADULT_REPORT_POSTURE : EVALUATION_POSTURE;
+  if (!html.includes(posture)) {
     throw new Error(
-      'the captured evaluation does not carry the statement of what it is. It is delivered as a ' +
-        'forwardable link and may be opened with no email around it, so the sentence has to be ' +
-        'in the document.',
+      `the captured ${expected.findingsReport === 'adult_ai' ? 'findings report' : 'evaluation'} does not ` +
+        'carry the statement of what it is. It is delivered as a forwardable link and may be opened ' +
+        'with no email around it, so the sentence has to be in the document.',
+    );
+  }
+
+  /*
+    And an adult AI findings report is not an evaluation (A1, D-284).
+
+    Run 6571d6a9 was drafted through the evaluation layer before the guard existed. A file that carried
+    the evaluation's statement under an adult run's name would be that defect reaching the bucket.
+  */
+  if (expected.findingsReport === 'adult_ai' && html.includes(EVALUATION_POSTURE)) {
+    throw new Error(
+      'the captured findings report carries the evaluation\'s statement of what it is. The evaluation ' +
+        'does not apply to an adult AI run (D-284), and a file that says it is one is the wrong document.',
     );
   }
 
@@ -383,7 +414,7 @@ export function assertCapturable(html: string, expected: CaptureExpectation): vo
     document from the wrong moment — worse, because it would pass every other check here and reach
     an underwriter as current.
   */
-  if (!html.includes(`Version ${expected.published.version}`)) {
+  if (expected.published !== undefined && !html.includes(`Version ${expected.published.version}`)) {
     throw new Error(
       `the captured file does not say it is version ${expected.published.version}. A capture with ` +
         'no published version behind it is a draft or a checklist, and neither may be sent.',

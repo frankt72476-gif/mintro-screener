@@ -19196,6 +19196,21 @@ Where no published standard exists for a vertical, the report's requirement head
 the byte-exact corpus is excerpts of the public rules and statutes each finding relates to. Source enum
 unchanged; heading is vertical-aware copy.
 
+**Addendum, 2026-09-19 (cluster 4 commit 4): adult AI rule set 0.4.0.**
+- **Questions.** Memo §8's twelve attestation questions, asked in D-067 form: what the merchant does,
+  never whether they comply.
+- **Not checked.** Memo §9's three items: the probe boundary, off-site presence, and the multi-turn
+  boundary from §6.4.
+- **AIATT- rules.** AIATT-001..012, one `manual` rule per question, in category `attested`. Each rule
+  is `source: mintro`, and its `params.reason` quotes its question verbatim. Each renders "Could not be
+  checked".
+- **Questions carry no authority and no severity.** For this reason `authority` and `sev` became
+  optional on a question. "Standards · major" beneath an adult question would assert a published
+  standard that this record says does not exist. The peptide set still carries both on all twenty
+  questions, and a test pins that.
+- **Text answers only.** The attestation form accepts text only, on both verticals, so no adult question
+  carries an upload.
+
 
 ## D-287 — Mintro Referral Policy, Adult AI
 

@@ -13,7 +13,7 @@
  *     no instruction attached (D-001, hard constraint 7).
  */
 
-import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State } from '@mintro/ruleset';
+import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State, Sense, Vertical } from '@mintro/ruleset';
 import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { STATE_LABEL_LOWER } from './stateLabel.js';
 import type { EyeTestCaptureRequest } from './eyetest.js';
@@ -53,6 +53,14 @@ export interface ReportFinding extends Finding {
    * this existed. `boundarySentence` returns null for those rather than guessing.
    */
   readonly expect?: 'absent' | 'present';
+  /**
+   * The rule's declared sense, snapshotted like `expect` (D-285, cluster 4).
+   *
+   * Which way a finding points, for the label an adult AI report renders it with. Present only where
+   * the rule declares one; a run recorded before the field existed reads its sense from `expect`
+   * (`findingSense`).
+   */
+  readonly sense?: Sense;
   /**
    * Whose statement `clause` is (D-138).
    *
@@ -242,6 +250,23 @@ export function describeTruncation(truncated: RunTruncation): string {
 
 export interface ScreeningReport {
   readonly runId: string;
+  /**
+   * The vertical the run was screened under (D-284), snapshotted at assembly from cluster 4.
+   *
+   * Absent on a run recorded before then; the run row carries it (0088), and the web reads it from
+   * there onto the report it loads. A reader that finds neither treats the run as a peptide one.
+   */
+  readonly vertical?: Vertical;
+  /**
+   * The referral policy as applied at intake (D-287), read from the run row onto the report a reader
+   * renders. Never assembled by the engine — the run records it as it finishes — and never a finding:
+   * it renders once, as `referralPolicyLine`'s sentence, in an adult AI report's boundary section.
+   */
+  readonly referral?: {
+    readonly version: string;
+    readonly status: 'proceeds' | 'not_referred';
+    readonly reasons: readonly string[];
+  };
   readonly merchantDomain: string;
   readonly merchantName?: string;
   readonly platform?: string;
@@ -506,6 +531,8 @@ export interface SampleBasis {
 
 export interface AssembleInput {
   readonly runId: string;
+  /** The vertical the run is screened under (D-284). Absent: the report records none. */
+  readonly vertical?: Vertical;
   readonly merchantDomain: string;
   readonly merchantName?: string;
   readonly platform?: string;
@@ -563,6 +590,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         clause: rule.clause,
         subject: rule.subject,
         ...expectOf(rule),
+        ...(rule.sense === undefined ? {} : { sense: rule.sense }),
         source: rule.source,
         severity: rule.sev,
         tier: rule.tier,
@@ -592,6 +620,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
       clause: rule.clause,
       subject: rule.subject,
       ...expectOf(rule),
+      ...(rule.sense === undefined ? {} : { sense: rule.sense }),
       // The unrun path carries `source` too. It was missed when the field was added and only the
       // evaluated path got it, which left twelve findings on a live run with no attribution — see
       // D-138. Invisible today, because every unrun rule happens to be a program rule and the
@@ -612,6 +641,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
 
   return {
     runId: input.runId,
+    ...(input.vertical === undefined ? {} : { vertical: input.vertical }),
     merchantDomain: input.merchantDomain,
     ...(input.merchantName === undefined ? {} : { merchantName: input.merchantName }),
     ...(input.platform === undefined ? {} : { platform: input.platform }),

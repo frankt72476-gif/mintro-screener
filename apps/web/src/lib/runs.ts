@@ -13,6 +13,7 @@
  * change silently alter an old run's conclusions.
  */
 
+import { FINDINGS_REPORT_LINE } from '../components/EvaluationGate.js';
 import type { Vertical } from '@mintro/ruleset';
 import { runVertical } from './rulesets.js';
 import { describeTruncation, type ScreeningReport } from '@mintro/engine';
@@ -94,6 +95,8 @@ export interface RunSummary {
  * module keeps holding data.
  */
 export type EvaluationState =
+  /** A run of a vertical the evaluation layer does not apply to (D-284). */
+  | { readonly kind: 'not_applicable' }
   | { readonly kind: 'none' }
   | { readonly kind: 'draft' }
   | {
@@ -114,6 +117,8 @@ export type EvaluationState =
  */
 export function evaluationLine(state: EvaluationState): string {
   switch (state.kind) {
+    case 'not_applicable':
+      return FINDINGS_REPORT_LINE;
     case 'none':
       return 'Not yet evaluated';
     case 'draft':
@@ -178,7 +183,7 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
         .select(
           // `created_by` for the Run by column. The name is resolved separately by
           // `internalIdentity`, which is gated by `analysts_select` (D-233).
-          'id, status, finished_at, report, created_by, merchants ( domain ), run_quarantine ( reason ), ' +
+          'id, status, finished_at, report, created_by, vertical, merchants ( domain ), run_quarantine ( reason ), ' +
             /*
               Named relationship, not a bare table name (D-213).
 
@@ -270,19 +275,45 @@ export function createSupabaseRunSource(client: SupabaseClient): RunSource {
     async load(runId) {
       const { data, error } = await client
         .from('runs')
-        .select('report, vertical, run_quarantine ( reason )')
+        .select('report, vertical, referral_status, referral_reasons, referral_policy_version, run_quarantine ( reason )')
         .eq('id', runId)
         .maybeSingle();
 
       if (error !== null || data === null) return null;
 
-      const row = data as { report: ScreeningReport | null; vertical?: unknown; run_quarantine: QuarantineEmbed };
+      const row = data as {
+        report: ScreeningReport | null;
+        vertical?: unknown;
+        referral_status?: 'proceeds' | 'not_referred' | null;
+        referral_reasons?: string[] | null;
+        referral_policy_version?: string | null;
+        run_quarantine: QuarantineEmbed;
+      };
       if (row.report === null) return null;
 
+      const vertical = runVertical(row.vertical);
       return {
-        report: row.report,
+        // The row's vertical on the report the page renders, so a run assembled before reports
+        // carried one still reads in its vertical's labels (D-284, D-285).
+        report: {
+          ...row.report,
+          vertical,
+          /*
+            The referral policy as applied at intake (D-287), from the columns the run recorded as it
+            finished. Rendered once, in the adult findings report's boundary section.
+          */
+          ...(row.referral_status === null || row.referral_status === undefined || row.referral_policy_version == null
+            ? {}
+            : {
+                referral: {
+                  version: row.referral_policy_version,
+                  status: row.referral_status,
+                  reasons: row.referral_reasons ?? [],
+                },
+              }),
+        },
         quarantine: quarantineReason(row.run_quarantine),
-        vertical: runVertical(row.vertical),
+        vertical,
       };
     },
   };
@@ -308,7 +339,9 @@ type QuarantineEmbed = { reason: string } | { reason: string }[] | null | undefi
  * development-only. Both are answered as *unreadable* rather than as *not yet evaluated*, because
  * only one of the two possible mistakes tells an agent that finished work does not exist.
  */
-function evaluationStateOf(row: RunRow): EvaluationState {
+export function evaluationStateOf(row: RunRow): EvaluationState {
+  // Before any embed is read: an adult AI run has no evaluation to show, whatever rows exist (D-284).
+  if (row.vertical !== undefined && row.vertical !== 'peptides') return { kind: 'not_applicable' };
   if (row.evaluations === undefined || row.evaluation_drafts === undefined) {
     return { kind: 'unreadable' };
   }
@@ -354,12 +387,14 @@ function embedCount(embed: unknown): number {
   return Array.isArray(embed) ? embed.length : 1;
 }
 
-interface RunRow {
+export interface RunRow {
   readonly merchant_comments?: unknown;
   readonly run_review_requests?: unknown;
   readonly sends?: unknown;
   readonly evaluations?: unknown;
   readonly evaluation_drafts?: unknown;
+  /** The vertical the run was screened under (0088). Absent on a local-file run, which is a peptide one. */
+  readonly vertical?: string;
   id: string;
   /** `complete` or `truncated` — the two the list reads (D-282). Optional for local-file runs. */
   status?: string;

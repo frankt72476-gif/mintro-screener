@@ -39,6 +39,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  ATTESTATION_COPY,
   commentaryFor,
   commentTokenFrom,
   type CommentVisit,
@@ -855,10 +856,7 @@ function OpenReport({
             something. It does not, and the page says so first rather than leaving them to infer it
             from the absence of a verdict.
           */}
-          The team reviewing your account asked Mintro to screen your public pages against the
-          research-use-only peptide standards. This is what was observed, with the capture
-          behind each one. Mintro reports what it observed; it does not underwrite the account or
-          decide the outcome.
+          {ATTESTATION_COPY[opened.report.vertical ?? 'peptides'].merchantIntro}
         </p>
 
         <p className="sub">
@@ -932,6 +930,7 @@ function OpenReport({
                 questionsForm: (
                   <AttestationForm
                     questions={opened.report.attestationQuestions}
+                    vertical={opened.report.vertical ?? 'peptides'}
                     answers={answers}
                     identified={identity !== null}
                     onAnswer={answer}

@@ -24,9 +24,10 @@ import type { ScreeningReport } from '@mintro/engine';
 const access = { description: 'test', urlFor: async () => null };
 
 /** A minimal report carrying one finding, so the requirement pair is what is under test. */
-function reportWith(finding: Record<string, unknown>): ScreeningReport {
+function reportWith(finding: Record<string, unknown>, vertical?: 'peptides' | 'adult_ai'): ScreeningReport {
   return {
     runId: 'run-1',
+    ...(vertical === undefined ? {} : { vertical }),
     merchantDomain: 'shop.example',
     mode: 'public',
     rulesetVersion: '2.15.0',
@@ -59,8 +60,8 @@ const base = {
   evidence: [],
 };
 
-const html = (finding: Record<string, unknown>): string =>
-  renderToStaticMarkup(createElement(ReportView, { report: reportWith(finding), access, print: true }));
+const html = (finding: Record<string, unknown>, vertical?: 'peptides' | 'adult_ai'): string =>
+  renderToStaticMarkup(createElement(ReportView, { report: reportWith(finding, vertical), access, print: true }));
 
 const text = (markup: string): string =>
   markup.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
@@ -105,5 +106,43 @@ describe('the requirement heading names the author', () => {
     for (const source of ['mintro', 'programme']) {
       expect(text(html({ ...base, source }))).toContain(base.clause);
     }
+  });
+});
+
+/**
+ * The adult AI headings (D-286). No published standard exists for the vertical: the clause column is
+ * the public rule it relates to, headed "Source", and a rule Mintro wrote is "Mintro observation".
+ * The peptide headings above are pinned unchanged; these are pinned beside them.
+ */
+describe('the requirement heading for an adult AI run', () => {
+  const adult = { ...base, ruleId: 'AICAT-001', state: 'fail', tier: 'auto_fail', sense: 'absent', expect: 'absent' };
+
+  it('heads a public-rule excerpt as its Source', () => {
+    const rendered = text(html({ ...adult, source: 'programme' }, 'adult_ai'));
+    expect(rendered).toContain('Source');
+    expect(rendered).not.toMatch(/published standard/i);
+  });
+
+  it('heads a Mintro rule as a Mintro observation, and never as a standard', () => {
+    const rendered = text(html({ ...adult, ruleId: 'AIMKT-001', source: 'mintro' }, 'adult_ai'));
+    expect(rendered).toContain('Mintro observation');
+    expect(rendered).not.toMatch(/published standard/i);
+  });
+
+  it('labels the finding by its sense, not with the peptide words', () => {
+    /*
+      The finding's own badge. The page around it is still the peptide layout until the adult findings
+      report replaces it (cluster 4 commit 3), whose verdict-word guard covers the whole page.
+    */
+    const badges = [...html({ ...adult, source: 'programme' }, 'adult_ai').matchAll(/<span class="state [^"]*">([^<]*)<\/span>/g)].map(
+      (m) => m[1],
+    );
+    expect(badges).toContain('Observed');
+    expect(badges).not.toContain('Not met');
+    expect(badges).not.toContain('Met');
+  });
+
+  it('keeps the peptide headings for a peptide run that says so', () => {
+    expect(text(html({ ...base, ruleId: 'CATG-001', source: 'programme' }, 'peptides'))).toContain('Published standard');
   });
 });

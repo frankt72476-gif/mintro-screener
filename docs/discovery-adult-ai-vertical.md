@@ -493,12 +493,39 @@ count.
 
 ## Open items carried forward
 
+- **Footer-scoped peptide rules may now observe wording they previously missed (new runs only).**
+  Footer text was `footerElement.textContent`, which ran adjacent text nodes together with no space
+  (`apps/worker/src/extract.ts`, "Crawl gaps, first adult screen" §2). It is now each text node
+  joined with a space. On a new run, a rule reading footer text can observe words it could not match
+  before, wherever a storefront's footer has no whitespace between elements. No completed run changes
+  (D-002). The peptide rules that read `footer.text`:
+    - DISC-001 (`text_match`, `surface: footer`), the disclaimer wording;
+    - PAY-001 (`text_match`, `footer_and_public_pages`), which reads the homepage footer as a required
+      surface through `publicSurfaces` (`packages/engine/src/layer3.ts`);
+    - DISC-003 (`dom_assert`, `all_sampled`), whose candidate statements include
+      `splitStatements(page.footer.text)` on every sampled page.
+
+  Not affected: PAY-003 reads footer *links* (`link_text_contains`), and DISC-002 reads styled text
+  runs, and neither reads `footer.text`. `footerPaymentTerms` changes the same way but is stored,
+  and no rule reads it. **The check is the CoMo re-screen after this cluster deploys:** compare its
+  DISC-001, DISC-003 and PAY-001 findings with CoMo's last run. Recorded 2026-09-19.
 - **Evaluation-layer jobs load the peptide rule set unconditionally (cluster 4).**
   `apps/worker/src/evaluationRun.ts`, `apps/worker/src/evaluationPublishJob.ts` and
   `apps/worker/bin/evaluate.ts` read
   `rules/ruleset.json` whatever the run's vertical. When the send and capture gates learn vertical,
   these jobs must refuse an `adult_ai` run with a reason rather than evaluate it against the peptide
-  rule set. Recorded 2026-09-18, after cluster 1 commit 2.
+  rule set. Recorded 2026-09-18, after cluster 1 commit 2. **Happened before it was closed:** run
+  6571d6a9 (adult_ai, xchar.ai) was drafted through the evaluation layer on 2026-09-19 (one
+  `evaluation_drafts` row, validator status `rejected`; no published evaluation, capture or send).
+  **Resolved in cluster 4 commit 1:** every evaluation job refuses a non-peptide run with the reason
+  "evaluation layer does not apply to vertical adult_ai (D-284)", and the web renders no evaluation UI
+  for one. **Commit 1a:** migration 0091 makes the tables refuse such a request or draft on insert or
+  update, whatever writes it. 6571d6a9's `evaluation_requests` row is kept as the record.
+
+  **A fact for the retention question in memo §14.** Before the guard existed, generating that draft
+  sent about 19k tokens of the merchant's page text — homepage, terms of service and a docs page,
+  each cut to 3,000 characters — to the model provider (Claude Opus 5; the draft row records 19,324
+  input and 2,245 output tokens). Adult AI runs send nothing to a model provider from cluster 4 on.
 - **The terms-page selection reads one page and can pick the wrong one (cluster 2).** The `terms`
   surface is chosen by the slugs `policy`, `policies` and `terms` (`SURFACE_SLUGS`,
   `apps/worker/src/evaluationPages.ts`), so a merchant linking a "Content Removal Policy" can have that
@@ -533,3 +560,75 @@ count.
       OFFS-002.
   Also affected: the eye test's about and editorial captures (`eyeTestManifest`), and the about and
   editorial pages the evaluation draft is given.
+
+## Crawl gaps, first adult screen
+
+Run 6571d6a9 (adult_ai, xchar.ai, 2026-09-19) reached one primary-site page type, terms. Three of the
+sixteen findings rest on pages the crawl never reached. Investigated read-only against the stored run
+(its report, its stored rendered homepage) and a fresh raw fetch of the homepage, before commit 3a.
+
+### 1. Why Create Character, Generate, Pricing and the library were never candidates
+
+**Discovery reads links from the rendered DOM.** `screen.ts` passes `rendered.page.links` (the links
+`extractPage` read in the browser, after render) to `discoverLayer3` as `homepageLinks`. There is no
+raw-fetch link path for page types.
+
+**xchar's nav is not client-rendered.** The raw homepage HTML already carries all 49 anchors, nav and
+footer included, the same set the stored rendered DOM carries. So rendering was not the cause.
+
+**The cause was the origin.** The run was queued as `https://xchar.ai`, and Layer 0 took that apex as
+the crawl origin. The homepage is served from `https://www.xchar.ai/`, so every homepage link and every
+sitemap entry carries `www`. Page-type discovery then compared each candidate with the apex:
+`selectLinkedCandidates` and `selectListedCandidates` both end in `.filter((url) =>
+url.startsWith(origin))`, and the `findDocument` loop skips any URL that fails the same test.
+`https://www.xchar.ai/create` does not start with `https://xchar.ai`, so every linked and listed
+candidate was dropped before a request was made. Create, generate, pricing, library, guidelines and
+removal declare no conventional paths, so they had nothing left to try. The run recorded "no candidate
+paths were available to try". Terms was reached only because it has conventional paths
+(`/terms-of-service`), and the apex request redirected to www.
+
+Those three findings were already visible in the committed fixture. AIFEAT-001 and AICAT-001/002 rest
+on the homepage or the docs host where the rules name create, generate and library.
+
+### 2. Why the removal page was not located
+
+**Discovery read homepage links only.** `homepageLinks` was the single link source for every page
+type. Links on an established page such as terms or guidelines were never read as candidates.
+
+**The homepage footer does not differ from the inner-page footer.** The stored rendered homepage has
+one footer, and it links "Content Removal Policy" at `https://www.xchar.ai/content-removal-policy`, as
+/guidelines' footer does. So it was a candidate on the homepage too. It was dropped by the origin
+filter in (1), not by where it sat.
+
+**Separately, AITD-001 did not match the footer text.** The footer does contain the words.
+`extract.ts:532` builds footer text as `footerElement.textContent`, which joins adjacent list items
+with no space: "…Complaints PolicyContent Removal PolicyDMCA Policy…". `\bcontent removal\b` does not
+match "PolicyContent", so AITD-001's footer surface read Not observed. Checked by running the matcher's
+word-boundary test over the stored footer text.
+
+This is in shared extraction, so it affects every footer text match, peptide footer rules included.
+**Not fixed in 3a:** fixing it changes peptide footer behaviour, which is outside a crawl fix and needs
+its own ruling. After 3a, AITD-001 also reads the located removal page, so for xchar it no longer
+rests on the footer text alone.
+
+**Update, fixed in its own commit after 3a (Frank, 2026-09-19).** Footer text is now each text node
+joined with a space. The nodes, their order and their content are unchanged; only the boundaries
+between them are kept. Completed runs are not touched (D-002). The peptide consequence is carried
+forward under "Open items carried forward".
+
+### Fixed in commit 3a (adult page-type discovery only)
+
+- **Served origin.** Candidates are read on the origin the homepage was served from
+  (`servedOriginOf`), but only when that differs from the crawl origin by a leading `www.`. A redirect
+  to any other host keeps the crawl origin.
+- **Links from every established page.** Each page a page type establishes adds its nav and footer
+  links (`chromeLinksOf`) to the candidates for the page types after it. These links come from the
+  rendered DOM, so a client-built nav is read as the browser shows it. The cap is unchanged: 4 linked
+  candidates per type.
+- **Peptide discovery unchanged.** The peptide pass does not read `servedOrigin` or the pool.
+
+The docs-host lookup and the sign-up probe still use the crawl origin. Both worked on 6571d6a9.
+
+**Re-running xchar.** The committed fixture holds the stored report and row, not the crawled pages. So
+it cannot be re-crawled through the fix in a test. The live re-screen of xchar.ai happens after the
+cluster deploys.

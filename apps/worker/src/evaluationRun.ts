@@ -23,6 +23,7 @@ import type { WorkerSupabase } from './store/supabase.js';
 import { generateDraft, storeDraft, type EvaluationInputs } from './evaluateJob.js';
 import { createLoader, orderPages, readPages, surfacesByUrl, type EvidenceRow } from './evaluationPages.js';
 import { ruleSelectors } from './screen.js';
+import { evaluationRefusal } from './evaluationVertical.js';
 
 const RULESET_PATH = 'rules/ruleset.json';
 
@@ -39,19 +40,25 @@ export async function runEvaluationRequest(
   runId: string,
 ): Promise<string | null> {
   try {
-    const ruleset = loadRulesetFile(RULESET_PATH);
-    const angles = loadAngleSetFile(ruleset, ANGLES_PATH);
-
     const { data: runRow, error: runError } = await supabase.client
       .from('runs')
-      .select('report, status')
+      .select('report, status, vertical')
       .eq('id', runId)
       .maybeSingle();
 
     if (runError !== null) return `could not read run ${runId}: ${runError.message}`;
     if (runRow === null) return `run ${runId} does not exist`;
 
-    const row = runRow as { report: unknown; status: string };
+    const row = runRow as { report: unknown; status: string; vertical: unknown };
+    /*
+      The evaluation layer is the peptide programme's (D-284). Refused before anything else is read or
+      any draft is written, and recorded on the request as its reason.
+    */
+    const refused = evaluationRefusal(row.vertical);
+    if (refused !== null) return refused;
+
+    const ruleset = loadRulesetFile(RULESET_PATH);
+    const angles = loadAngleSetFile(ruleset, ANGLES_PATH);
     /*
       A finished run only. A draft over a half-written one would cite findings the run had not made
       yet — the same refusal `bin/evaluate.ts` makes, and it belongs on both paths because the

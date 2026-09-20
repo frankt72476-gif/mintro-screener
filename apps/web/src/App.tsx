@@ -15,6 +15,8 @@ import { AuthProvider, useAuth } from './lib/auth.js';
 import { SetPassword } from './components/SetPassword.js';
 import { matchesSetPasswordRoute } from './lib/setPasswordRoute.js';
 import { EvaluationEditor } from './components/EvaluationEditor.js';
+import { EvaluationGate } from './components/EvaluationGate.js';
+import { AdultFindingsReport } from './components/AdultFindingsReport.js';
 import { EvaluationReport } from './components/EvaluationReport.js';
 import {
   EvaluationEvidence,
@@ -181,7 +183,7 @@ interface InjectedEvaluation {
   readonly model: string;
 }
 
-interface InjectedPrint {
+export interface InjectedPrint {
   readonly report: ScreeningReport;
   /**
    * The published evaluation this capture is of (D-263).
@@ -605,6 +607,11 @@ function Screener({
    * is what it said before, indistinguishable from never having tried.
    */
   const [depositedAt, setDepositedAt] = useState<Readonly<Record<string, string>>>({});
+  /**
+   * The vertical the open run was screened under (D-284). Peptides until a run says otherwise, and set
+   * from the run row on every load, so the evaluation gate never reads a previous run's.
+   */
+  const [reportVertical, setReportVertical] = useState<Vertical>('peptides');
   const [capture, setCapture] = useState<CapturedReport | null>(null);
   /** True while the only stored capture predates the evaluation (D-263). */
   const [captureIsChecklist, setCaptureIsChecklist] = useState(false);
@@ -848,6 +855,8 @@ function Screener({
     setCaptureIsChecklist(false);
     try {
       const loaded = await runs.load(runId);
+      // Which vertical the run was screened under decides whether the evaluation layer shows (D-284).
+      if (loaded !== null) setReportVertical(loaded.vertical);
       if (loaded === null) throw new Error(`no run readable for ${runId}`);
       setReport(loaded.report);
       setQuarantine(loaded.quarantine);
@@ -1330,7 +1339,15 @@ function Screener({
                     A run with no published evaluation is `'none'` and unaffected. Its checklist
                     capture is what was sent and stays sendable; nothing is back-filled (D-002).
                   */
-                  ...(shape.showsSubmitAction && canDeliver(evaluationCapture, capture !== null)
+                  /*
+                    Never for an adult AI run in cluster 4 (D-284). Such a run now has a capture — its
+                    findings report — and `canDeliver` would offer Send on it; `send.ts` would then
+                    refuse for want of a published evaluation. Absent, as D-230 has it, rather than
+                    a control that can only fail. Delivery for this vertical is cluster 5's.
+                  */
+                  ...(shape.showsSubmitAction &&
+                  reportVertical === 'peptides' &&
+                  canDeliver(evaluationCapture, capture !== null)
                     ? { onSend: () => setSending(true) }
                     : {}),
                   ...(shape.showsMarkReadyAction && reviewState === 'complete'
@@ -1380,14 +1397,29 @@ function Screener({
                 says so and offers Generate; with a refused one it shows the refusal above the
                 document it refused.
               */}
-              <EvaluationEditor
-                client={client}
-                runId={report.runId}
-                access={access}
-                labels={EVALUATION_LABELS}
-                analystId={analyst.id}
-                canEdit={shape.showsEvaluationEditing}
-              />
+              <EvaluationGate
+                vertical={reportVertical}
+                findingsReport={
+                  /*
+                    The adult AI findings report itself, not the checklist `ReportView`: this screen
+                    does not mount the checklist (D-262), and an adult run's document is this one.
+                  */
+                  <AdultFindingsReport
+                    report={report}
+                    access={access}
+                    {...(attestations === undefined ? {} : { attestations })}
+                  />
+                }
+              >
+                <EvaluationEditor
+                  client={client}
+                  runId={report.runId}
+                  access={access}
+                  labels={EVALUATION_LABELS}
+                  analystId={analyst.id}
+                  canEdit={shape.showsEvaluationEditing}
+                />
+              </EvaluationGate>
 
               {/*
                 Mintro's workspace, below the report and outside it (D-146).
@@ -2027,7 +2059,7 @@ function DocumentsPrintOnly({ injected }: { readonly injected: InjectedDocuments
   return <DocumentsReportView {...injected.documents} />;
 }
 
-function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Element {
+export function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Element {
   const access = useMemo(
     () => ({
       description: 'signed URLs pre-minted by the worker for this render',
@@ -2054,6 +2086,28 @@ function PrintOnly({ injected }: { readonly injected: InjectedPrint }): JSX.Elem
     payload is the same decision as taking the components out of the tree — cluster 5's, not this
     commit's.
   */
+  /*
+    An adult AI run's document is its findings report (cluster 4 commit 5; D-284, D-285).
+
+    `ReportView` renders it: the one component, fed from the payload, as the run screen feeds it from
+    a fetch. No evaluation is looked for — none may exist for this run (0091).
+  */
+  if ((injected.report.vertical ?? 'peptides') !== 'peptides') {
+    return (
+      <div className="shell">
+        <main className="main">
+          <PrintHeader report={injected.report} />
+          <ReportView
+            report={injected.report}
+            access={access}
+            {...(injected.attestations === undefined ? {} : { attestations: injected.attestations })}
+            print
+          />
+        </main>
+      </div>
+    );
+  }
+
   if (injected.evaluation === undefined) {
     return (
       <div className="shell">

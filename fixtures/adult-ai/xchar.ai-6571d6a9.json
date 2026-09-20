@@ -1,0 +1,708 @@
+{
+  "_about": "Run 6571d6a9 (adult_ai, xchar.ai) as stored on 2026-09-19: the runs row columns the web reads beside the report, and the report jsonb verbatim. Read-only export; evidence is metadata only, no capture bytes. The first adult AI screen (cluster 4 commit 3).",
+  "row": {
+    "id": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1",
+    "vertical": "adult_ai",
+    "segments": [
+      "unknown"
+    ],
+    "referral_status": "not_referred",
+    "referral_reasons": [
+      "P-1: AIFEAT-002 observed"
+    ],
+    "referral_policy_version": "1.0"
+  },
+  "report": {
+    "mode": "public",
+    "runId": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1",
+    "strip": [
+      {
+        "state": "pass",
+        "title": "Non-human disclosure statement on public pages",
+        "ruleId": "AIGATE-003"
+      },
+      {
+        "state": "pass",
+        "title": "Minors named in the terms",
+        "ruleId": "AIPOL-001"
+      },
+      {
+        "state": "pass",
+        "title": "Real-person likeness named in the terms",
+        "ruleId": "AIPOL-002"
+      },
+      {
+        "state": "pass",
+        "title": "Non-consent named in the terms",
+        "ruleId": "AIPOL-003"
+      },
+      {
+        "state": "pass",
+        "title": "Bestiality named in the terms",
+        "ruleId": "AIPOL-004"
+      },
+      {
+        "state": "pass",
+        "title": "Mutilation named in the terms",
+        "ruleId": "AIPOL-006"
+      },
+      {
+        "state": "fail",
+        "title": "Content removal route linked in the footer",
+        "ruleId": "AITD-001"
+      },
+      {
+        "state": "pass",
+        "title": "48-hour removal commitment in the terms",
+        "ruleId": "AITD-002"
+      },
+      {
+        "state": "fail",
+        "title": "Face-swap or face-consistency language",
+        "ruleId": "AIFEAT-002"
+      },
+      {
+        "state": "fail",
+        "title": "Video generation language",
+        "ruleId": "AIFEAT-003"
+      },
+      {
+        "state": "fail",
+        "title": "Model selection or LoRA language",
+        "ruleId": "AIFEAT-004"
+      },
+      {
+        "state": "pass",
+        "title": "Upload control on creation, generation, pricing or documentation pages",
+        "ruleId": "AIFEAT-001"
+      },
+      {
+        "state": "pass",
+        "title": "Minor-coded terms",
+        "ruleId": "AICAT-001"
+      },
+      {
+        "state": "pass",
+        "title": "Real-person likeness terms",
+        "ruleId": "AICAT-002"
+      },
+      {
+        "state": "fail",
+        "title": "Filter-removal language in marketing",
+        "ruleId": "AIMKT-001"
+      },
+      {
+        "state": "fail",
+        "title": "Affiliate program",
+        "ruleId": "AIMKT-002"
+      }
+    ],
+    "access": {
+      "mode": "public",
+      "note": "No product pages were attempted, so nothing can be said about a login wall.",
+      "wall": false,
+      "usedCredential": false
+    },
+    "counts": {
+      "fail": 6,
+      "pass": 10,
+      "review": 0,
+      "not_evaluable": 0
+    },
+    "sample": {
+      "notRendered": {
+        "overCap": 0,
+        "recognised": 0
+      },
+      "secondOrigin": {
+        "host": "docs.xchar.ai",
+        "pagesRead": 10
+      },
+      "surfacesRead": [
+        "the homepage",
+        "the terms document",
+        "the documentation page"
+      ],
+      "productsInScope": 0,
+      "productsSampled": 0
+    },
+    "verdict": "6 finding(s) record a requirement not met, including content removal route linked in the footer; face-swap or face-consistency language, and 4 other(s). 0 finding(s) are unclear. 0 were not observed from the crawled surface.",
+    "blocking": {
+      "failed": [],
+      "passed": [],
+      "declared": 0,
+      "notEvaluable": []
+    },
+    "coverage": {
+      "gated": 0,
+      "total": 16,
+      "resolved": 16,
+      "evaluable": 16,
+      "timeLimit": 0,
+      "challenged": 0,
+      "notExposed": 0,
+      "outstanding": 0,
+      "noCheckBuilt": 0,
+      "notReachable": 0,
+      "notRetrieved": 0,
+      "notApplicable": 0,
+      "kindNotRecorded": 0
+    },
+    "platform": "magento",
+    "startedAt": "2026-09-19T17:04:07.345Z",
+    "categories": [
+      {
+        "n": 1,
+        "id": "access",
+        "name": "Access and disclosure",
+        "findings": [
+          {
+            "note": "On the homepage (https://www.xchar.ai/): Observed: 'is an AI', 'AI-generated'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Non-human disclosure statement on public pages",
+            "clause": "If a reasonable person interacting with a companion chatbot would be misled to believe that the person is interacting with a human, an operator shall issue a clear and conspicuous notification indicating that the companion chatbot is artificially generated and not human.",
+            "expect": "present",
+            "ruleId": "AIGATE-003",
+            "source": "programme",
+            "subject": "a public page states that its characters are artificial intelligence and not human",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      },
+      {
+        "n": 2,
+        "id": "content_policy",
+        "name": "Content policy",
+        "findings": [
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: 'minors'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Minors named in the terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "present",
+            "ruleId": "AIPOL-001",
+            "source": "programme",
+            "subject": "the terms name minors",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: 'without their consent', 'real individuals', 'deepfakes'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Real-person likeness named in the terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "present",
+            "ruleId": "AIPOL-002",
+            "source": "programme",
+            "subject": "the terms name the likeness of real people",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: 'non-consensual', 'rape', 'without their consent', 'non-consensual intimate'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Non-consent named in the terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "present",
+            "ruleId": "AIPOL-003",
+            "source": "programme",
+            "subject": "the terms name non-consensual content",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: 'bestiality', 'sexual content involving animals'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Bestiality named in the terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "present",
+            "ruleId": "AIPOL-004",
+            "source": "programme",
+            "subject": "the terms name bestiality",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: 'mutilation', 'snuff'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Mutilation named in the terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "present",
+            "ruleId": "AIPOL-006",
+            "source": "programme",
+            "subject": "the terms name mutilation",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      },
+      {
+        "n": 3,
+        "id": "takedown",
+        "name": "Takedown",
+        "findings": [
+          {
+            "note": "Read the homepage footer (https://www.xchar.ai/). None of the expected terms was observed: 'report content', 'request removal', 'content removal', 'takedown', 'take down', 'remove content', 'report abuse', 'removal policy', 'report a concern', 'removal request', 'take it down', 'non-consensual intimate', 'intimate image', 'intimate images', 'takedowns'. Not published: the content removal page (no content removal page was reached: no candidate paths were available to try).",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Content removal route linked in the footer",
+            "clause": "A covered platform shall provide on the platform a clear and conspicuous notice, which may be provided through a clear and conspicuous link to another web page or disclosure, of the notice and removal process established under paragraph (1)(A) that-- (A) is easy to read and in plain language; and (B) provides information regarding the responsibilities of the covered platform under this section, including a description of how an individual can submit a notification and request for removal.",
+            "expect": "present",
+            "ruleId": "AITD-001",
+            "source": "programme",
+            "subject": "the footer links a notice-and-removal process",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "On the terms document (https://www.xchar.ai/terms-of-service): Observed: '48 hours'.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "48-hour removal commitment in the terms",
+            "clause": "Upon receiving a valid removal request from an identifiable individual (or an authorized person acting on behalf of such individual) using the process described in paragraph (1)(A)(ii), a covered platform shall, as soon as possible, but not later than 48 hours after receiving such request-- (A) remove the intimate visual depiction; and (B) make reasonable efforts to identify and remove any known identical copies of such depiction.",
+            "expect": "present",
+            "ruleId": "AITD-002",
+            "source": "programme",
+            "subject": "the terms commit to removal within 48 hours",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/terms-of-service",
+                "capturedAt": "2026-09-19T17:04:31.718Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/26c7102a072c6fb03c102cce22f5885bc32ee6af9d2a066c34dcc49687e9d2d0.png",
+                "sourceSha256": "420d4e5aeac85ce297ab993279b2ca37d6d9422078e07d01a26797af09e54218"
+              }
+            ],
+            "severity": "major",
+            "checkType": "text_match",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      },
+      {
+        "n": 4,
+        "id": "features",
+        "name": "Product features",
+        "findings": [
+          {
+            "note": "Observed on 2 pages — the documentation page (https://docs.xchar.ai/character-creation.md): 'faceswap'; the documentation page (https://docs.xchar.ai/generating-images.md): 'faceswap'. The sentence each phrase sits in is in the capture; it was not read for meaning.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Face-swap or face-consistency language",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "absent",
+            "ruleId": "AIFEAT-002",
+            "source": "programme",
+            "subject": "the pages describe a face-swap or face-consistency feature",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/character-creation.md",
+                "capturedAt": "2026-09-19T17:04:44.132Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/c97ffea532ce5df9640383a46e63906b85adf522959cb0969367e69e89cddc99.png",
+                "matchedValue": "faceswap",
+                "sourceSha256": "db37f209b325f1587b326b8aac68ab016eb9d2f6725c1477d3780190e974be7d"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-images.md",
+                "capturedAt": "2026-09-19T17:04:47.800Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/15599ea27769e65d24fe4b8719c0b8a6102792d34c13cbad2a7081b37ed9385c.png",
+                "matchedValue": "faceswap",
+                "sourceSha256": "054e7b598e3474708a545d2012a8425a6c48a91ce322987cea9ec3a80b7e6323"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "Observed on 2 pages — the documentation page (https://docs.xchar.ai/index.md): 'animate'; the documentation page (https://docs.xchar.ai/generating-videos.md): 'video generation', 'animate'. The sentence each phrase sits in is in the capture; it was not read for meaning.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Video generation language",
+            "clause": "This rule reports whether the homepage, pricing, generation or documentation pages describe generating video, and names the phrases observed and where.",
+            "expect": "absent",
+            "ruleId": "AIFEAT-003",
+            "source": "mintro",
+            "subject": "the pages describe generating video",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/index.md",
+                "capturedAt": "2026-09-19T17:04:42.236Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/59ff36b82b24893396a5635ab39b20f1e0a7738b2db19c204703ac7526539c81.png",
+                "matchedValue": "animate",
+                "sourceSha256": "f0e9a1af0a8c58e710cbc2e805763f34799d72e038b5cfd6317393577fd191b1"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-videos.md",
+                "capturedAt": "2026-09-19T17:04:48.950Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/56aa75510ae1449ae6e52a3bfc0a75c695d84d69fb0eac735de4323ec491ca00.png",
+                "matchedValue": "video generation, animate",
+                "sourceSha256": "65718a56699a6d65896e6fe97bff610c789e8d9af7d4ace70356ee44305d6fc7"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "Observed on 3 pages — the documentation page (https://docs.xchar.ai/index.md): 'loras'; the documentation page (https://docs.xchar.ai/generating-images.md): 'lora', 'loras', 'civitai', 'trigger words'; the documentation page (https://docs.xchar.ai/generating-videos.md): 'lora', 'loras'. The sentence each phrase sits in is in the capture; it was not read for meaning.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Model selection or LoRA language",
+            "clause": "This rule reports whether the creation, generation or documentation pages describe choosing the generation model or loading LoRAs, and names the phrases observed and where.",
+            "expect": "absent",
+            "ruleId": "AIFEAT-004",
+            "source": "mintro",
+            "subject": "the pages describe choosing a model or loading LoRAs",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/index.md",
+                "capturedAt": "2026-09-19T17:04:42.236Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/59ff36b82b24893396a5635ab39b20f1e0a7738b2db19c204703ac7526539c81.png",
+                "matchedValue": "loras",
+                "sourceSha256": "f0e9a1af0a8c58e710cbc2e805763f34799d72e038b5cfd6317393577fd191b1"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-images.md",
+                "capturedAt": "2026-09-19T17:04:47.800Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/15599ea27769e65d24fe4b8719c0b8a6102792d34c13cbad2a7081b37ed9385c.png",
+                "matchedValue": "lora, loras, civitai, trigger words",
+                "sourceSha256": "054e7b598e3474708a545d2012a8425a6c48a91ce322987cea9ec3a80b7e6323"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-videos.md",
+                "capturedAt": "2026-09-19T17:04:48.950Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/56aa75510ae1449ae6e52a3bfc0a75c695d84d69fb0eac735de4323ec491ca00.png",
+                "matchedValue": "lora, loras",
+                "sourceSha256": "65718a56699a6d65896e6fe97bff610c789e8d9af7d4ace70356ee44305d6fc7"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "Not observed on 10 page(s) read: the documentation page (https://docs.xchar.ai/index.md), the documentation page (https://docs.xchar.ai/install-app.md), the documentation page (https://docs.xchar.ai/character-creation.md), the documentation page (https://docs.xchar.ai/editing-character.md), the documentation page (https://docs.xchar.ai/conversations.md), the documentation page (https://docs.xchar.ai/generating-images.md), the documentation page (https://docs.xchar.ai/generating-videos.md), the documentation page (https://docs.xchar.ai/images-gallery.md), the documentation page (https://docs.xchar.ai/character-posts.md), the documentation page (https://docs.xchar.ai/earning-credits.md). Not published: the character creation page (no character creation page was reached: no candidate paths were available to try); the generation page (no generation page was reached: no candidate paths were available to try); the pricing page (no pricing page was reached: no candidate paths were available to try).",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Upload control on creation, generation, pricing or documentation pages",
+            "clause": "This rule reports whether a creation, generation, pricing or documentation page carries a control that accepts a file from the user, and names what was observed and where.",
+            "expect": "absent",
+            "ruleId": "AIFEAT-001",
+            "source": "mintro",
+            "subject": "a creation, generation, pricing or documentation page offers a control that takes a file",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/index.md",
+                "capturedAt": "2026-09-19T17:04:42.236Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/59ff36b82b24893396a5635ab39b20f1e0a7738b2db19c204703ac7526539c81.png",
+                "sourceSha256": "f0e9a1af0a8c58e710cbc2e805763f34799d72e038b5cfd6317393577fd191b1"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/install-app.md",
+                "capturedAt": "2026-09-19T17:04:43.157Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/b65340aef35ccb02325e54a3e74ea1a4c145681f80d5b26dcabb4a88f92182b4.png",
+                "sourceSha256": "9346ee039df7b89434ae1be326e9692c426b79d86d16997fab383e4d1ad32133"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/character-creation.md",
+                "capturedAt": "2026-09-19T17:04:44.132Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/c97ffea532ce5df9640383a46e63906b85adf522959cb0969367e69e89cddc99.png",
+                "sourceSha256": "db37f209b325f1587b326b8aac68ab016eb9d2f6725c1477d3780190e974be7d"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/editing-character.md",
+                "capturedAt": "2026-09-19T17:04:45.842Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8dd34f7bc96280ccf54563a4f5ff218124383e3a3292d0a5e111ed3d80a92327.png",
+                "sourceSha256": "0b028e04c2488b185a5fef5139958d83b5cc6bf358ba5b9e4b585c15aff16e21"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/conversations.md",
+                "capturedAt": "2026-09-19T17:04:46.831Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/d7c31db971276b6ccf5a059e83750a2767327503640ee8605ad2662d256bcd80.png",
+                "sourceSha256": "72ea1398d266ce077a16bd6a30987775ed0450dfceea7d551460f00543f31e69"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-images.md",
+                "capturedAt": "2026-09-19T17:04:47.800Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/15599ea27769e65d24fe4b8719c0b8a6102792d34c13cbad2a7081b37ed9385c.png",
+                "sourceSha256": "054e7b598e3474708a545d2012a8425a6c48a91ce322987cea9ec3a80b7e6323"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/generating-videos.md",
+                "capturedAt": "2026-09-19T17:04:48.950Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/56aa75510ae1449ae6e52a3bfc0a75c695d84d69fb0eac735de4323ec491ca00.png",
+                "sourceSha256": "65718a56699a6d65896e6fe97bff610c789e8d9af7d4ace70356ee44305d6fc7"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/images-gallery.md",
+                "capturedAt": "2026-09-19T17:04:49.882Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/a3469c73b91375afd180bd5745e68b8312fcd462b97c86a93f31f642cfebdc3c.png",
+                "sourceSha256": "3495070749a4de10eeeac58568e32bb87cdc8f61775f06524a81e1ca507ec9db"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/character-posts.md",
+                "capturedAt": "2026-09-19T17:04:50.962Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/cd2a7901ced255ed6671e926260fede8fe30dad45cd70018508af6705adfe01c.png",
+                "sourceSha256": "7f81da79218aa7441cfce5dfa64dfb47849373ef57068e5f897a991f70513cd5"
+              },
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://docs.xchar.ai/earning-credits.md",
+                "capturedAt": "2026-09-19T17:04:52.416Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/36484ce98e1503433d5b6edd4f6f118e718b23380dbce6a88b8d128a32e956a5.png",
+                "sourceSha256": "5f9f7354927d7d551b95027c2b9eea963e63dabdf181503e88d5b232d2436cd1"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      },
+      {
+        "n": 5,
+        "id": "catalog",
+        "name": "Character catalogue",
+        "findings": [
+          {
+            "note": "Not observed on 1 page(s) read: the homepage (https://www.xchar.ai/). Not published: the character creation page (no character creation page was reached: no candidate paths were available to try); the generation page (no generation page was reached: no candidate paths were available to try); the character library page (no character library page was reached: no candidate paths were available to try).",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Minor-coded terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "absent",
+            "ruleId": "AICAT-001",
+            "source": "programme",
+            "subject": "the homepage, creation, generation or character library pages carry minor-coded terms",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "Not observed on 1 page(s) read: the homepage (https://www.xchar.ai/). Not published: the character creation page (no character creation page was reached: no candidate paths were available to try); the generation page (no generation page was reached: no candidate paths were available to try); the character library page (no character library page was reached: no candidate paths were available to try).",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "pass",
+            "title": "Real-person likeness terms",
+            "clause": "The sale of a product or service, including an image (whether captured from life, digitally altered, or generated by artificial intelligence or other algorithmic means), which is patently offensive and lacks serious artistic value (such as, by way of example and not limitation, images of nonconsensual sexual behavior, sexual exploitation of a minor, nonconsensual mutilation of a person or body part, and bestiality or the unauthorized synthetic depiction of a real person’s likeness), or any other material that the Corporation deems unacceptable to sell in connection with a Mark.",
+            "expect": "absent",
+            "ruleId": "AICAT-002",
+            "source": "programme",
+            "subject": "the homepage, creation, generation or character library pages describe characters as resembling real people",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      },
+      {
+        "n": 6,
+        "id": "marketing",
+        "name": "Marketing",
+        "findings": [
+          {
+            "note": "Observed on the homepage (https://www.xchar.ai/): 'no restrictions', 'no safe mode'. The sentence each phrase sits in is in the capture; it was not read for meaning.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Filter-removal language in marketing",
+            "clause": "This rule reports whether the homepage or pricing page uses language describing the product as unfiltered or unrestricted, and names the phrases observed and where.",
+            "expect": "absent",
+            "ruleId": "AIMKT-001",
+            "source": "mintro",
+            "subject": "the homepage or pricing page describes the product as unfiltered or unrestricted",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "matchedValue": "no restrictions, no safe mode",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          },
+          {
+            "note": "Observed on the homepage (https://www.xchar.ai/): 'affiliate'. The sentence each phrase sits in is in the capture; it was not read for meaning.",
+            "tier": "auto_fail",
+            "layer": 3,
+            "state": "fail",
+            "title": "Affiliate program",
+            "clause": "This rule reports whether the homepage or its footer names an affiliate or referral program, and names the phrases observed and where.",
+            "expect": "absent",
+            "ruleId": "AIMKT-002",
+            "source": "mintro",
+            "subject": "the homepage or its footer names an affiliate or referral program",
+            "evidence": [
+              {
+                "kind": "rendered_page",
+                "sourceUrl": "https://www.xchar.ai/",
+                "capturedAt": "2026-09-19T17:04:07.862Z",
+                "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png",
+                "matchedValue": "affiliate",
+                "sourceSha256": "c38258773292cda4cd2ba6df2d8d311ba0bdf7e7cd49938852929f194b30f1e4"
+              }
+            ],
+            "severity": "major",
+            "checkType": "dom_feature",
+            "evidenceKind": "rendered_page"
+          }
+        ]
+      }
+    ],
+    "finishedAt": "2026-09-19T17:04:53.223Z",
+    "notChecked": [],
+    "politeness": "robots.txt declared no Crawl-delay; requests were not additionally spaced.",
+    "obstruction": {
+      "urls": [
+        "https://docs.xchar.ai"
+      ],
+      "attempted": 28,
+      "unanswered": 1,
+      "rulesAffected": 0
+    },
+    "truncations": [],
+    "merchantName": "xchar AI - Free AI Girlfriend with Images, Voice & Videos",
+    "merchantDomain": "xchar.ai",
+    "rulesetVersion": "0.3.0",
+    "eyeTestCaptures": [
+      {
+        "text": "Create Create Character Generate Feed Top Creators Navigation Home My Characters Conversations Become Premium Gallery Personas Earn Credits Guide Other Discord Affiliate Support Feedback Sign up Girls Guys Log in Sign up Sandy Mitchell Ying Joji Malee Phanthavong Sasha & Katya Volkov Ginny Blair Addison Paige Shelby-Rae Carter Synn Briarston Ciara Brennan Missy Bonnet Adila Bello Lexi Kremm Haruka Hu Lexi Danger Nevaeh Stewart Daniela García Natasha Shore Explore AI Girlfriends @ starry11 Sanae Kato 21 Sarcasm shields a heart hooked on anime escapes. asian stranger slim mean unemployed watching-anime 415805 @ Denver Amy Bell 25 Stuck on an abandoned island with a beautiful woman. Will you survive? caucasian stranger traveling intellectual flight-attendant survivor slow burn stranded 79276 Limited offer Unlock Premium Up to 50% OFF 02 : 38 : 08 View Plans @ starry11 Emily Harper 22 Whispers of hidden cravings behind a veil of quiet reserve. caucasian slim friend shy fetish exploration unemployed 540391 @ John65 Custom Margot Capulet 21 Grimy fairy chasing streetlight whims bohemian homeless ethereal resilient whimsical gentle streetlife 293617 Lucy King 71 Nurturing heart hiding a wanderlust soul. step-parent caregiver caucasian slim golf retired 576091 @ XXX Isabella Morales ♥️ 26 Passionate creator who craves the intimacy beyond the camera's gaze hispanic sex-friend slim lover gym adult-content-creator nude-modeling instagram 238403 Start Your Free Chat With AI Girlfriend For Unlimited Messages We built the ultra realistic free AI girlfriend you will crave. Chat with your AI girl free and get hooked instantly. Our AI GF replies fast and matches your energy every time. You can request hot pictures from your AI girlfriend, including custom poses and outfits that make AI girlfriend chat sessions more visual. xchar AI runs smoothly on your phone, so you can open the site and dive into nonstop AI girlfriend talking with flirty vibes and custom images. Start Chatting Now Create Your Own AI GF With The Hottest Body & Personality We give you total control to create your AI girlfriend online. Design her face, body, hair color, personality, outfits, voice style, and how clever she acts for you. xchar AI generates fresh images every time with no restrictions, so your AI girlfriend website experience can combine nonstop chatting with fast visual creation. Keep sending commands and shape your AI GF into the companion you want. Create Your AI Girlfriend Why Users Are Addicted to xchar AI Girlfriends Pure Raw Talking We let you go fully open with your AI girlfriend. No scripts, no safe mode, and no stiff replies. Your AI girl responds with direct energy and keeps the conversation moving. Insanely Smart Memory Your AI GF remembers the preferences, fantasies, and details you share. She uses them later to make every chat feel more personal and responsive. Massive Girls Library We have every kind of AI girl you can imagine, including sweet, anime, best friend, custom, and realistic AI girlfriend personas. Pick the one that fits your mood in seconds. High-Quality Visuals Command your AI girl for fresh HD and 4K pictures anytime. The visuals are fast, detailed, and built to make your AI girlfriend chat feel more immersive. Enjoy Pleasure at Your Own Pace With Your AI Girlfriend 1 Always Available 24/7 We keep your AI girlfriend online all the time. She never sleeps, never logs off, and is always ready when you want to chat. Open xchar AI and start instantly, with no scheduling or waiting. 2 Strong Privacy Protection We take your privacy seriously at xchar AI. Every message, preference, and custom AI girl creation stays private and confidential, with strong protection for your conversations. 3 Safe & Judgment-Free xchar AI creates a private space to enjoy your AI girlfriend without judgment. We focus on responsible AI while giving you control over your companion and conversations. Unlock the Full Wildest Side of AI Girlfriend Chat at xchar Totally",
+        "surface": "homepage",
+        "sourceUrl": "https://www.xchar.ai/",
+        "evidenceKey": "6571d6a9-c0f9-4c55-82b5-1bcb71098ce1/layer1/8955a1fce7ab58a15f965ead261ae4b34e30edf3f04752827de694b8efd749f0.png"
+      }
+    ],
+    "sameObservation": [],
+    "rulesetEffective": "2026-09-18",
+    "attestationQuestions": []
+  }
+}

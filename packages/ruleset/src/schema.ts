@@ -244,10 +244,15 @@ export const attestationSchema = z
      * Where the requirement comes from, which is how much negotiating room there is.
      * `law` is statute or regulation; `network` is Mastercard BRAM or Visa VIRP; `programme` is
      * the peptide programme's own requirement.
+     *
+     * Optional since the adult AI set (cluster 4 commit 4, D-286). Memo §8's questions carry no
+     * authority and no severity, and "Standards · major" beneath one would assert a published standard
+     * that D-286 records does not exist. The peptide set carries both on all twenty questions, and
+     * `ruleset-json.test.ts` pins that.
      */
-    authority: z.enum(['law', 'network', 'programme']),
-    /** The same axis and the same three values `sev` carries on a rule. */
-    sev: z.enum(SEVERITIES),
+    authority: z.enum(['law', 'network', 'programme']).optional(),
+    /** The same axis and the same three values `sev` carries on a rule. Optional, as `authority`. */
+    sev: z.enum(SEVERITIES).optional(),
     /**
      * The standard's own sentence, where this question replaced a rule that could not observe it
      * (D-226).

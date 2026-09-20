@@ -771,6 +771,7 @@ async function handle(
       runId,
       // The vertical's page types, which decide what the Layer 3 pass looks for (D-284).
       pages: VERTICAL_FILES[vertical].pages,
+      vertical,
       signal: controller.signal,
       onControl: (control) => {
         controls.current = control;
@@ -918,11 +919,13 @@ async function handle(
         error: runTruncatedMessage(describeTruncation(report.truncated)),
       });
       console.log(`  kept as truncated in ${Math.round((Date.now() - started) / 1000)}s`);
+      await captureFindingsReport(supabase, runId, vertical);
       return { recycleBrowser: true };
     }
 
     await settleThenFinish(progress, supabase, request.id, { status: 'done', runId });
     console.log(`  done in ${Math.round((Date.now() - started) / 1000)}s`);
+    await captureFindingsReport(supabase, runId, vertical);
     return { recycleBrowser: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1554,5 +1557,31 @@ async function handleSend(
       })
       .eq('id', request.id)
       .then(() => undefined, () => undefined);
+  }
+}
+
+/**
+ * An adult AI run's findings report, captured once the run has closed (cluster 4 commit 5).
+ *
+ * The peptide capture waits for a published evaluation (D-263). An adult run has none and may not have
+ * one (D-284, 0091), so its document is complete when the run is — a truncated run's included, whose
+ * report says where it stopped (D-282). After the request is settled, so the run's outcome never waits
+ * on the capture and a failed capture never changes it: the failure is logged, the run stays as it
+ * closed, and it has no capture until one succeeds. Nothing here sends (cluster 5).
+ */
+async function captureFindingsReport(supabase: WorkerSupabase, runId: string, vertical: Vertical): Promise<void> {
+  if (vertical === 'peptides') return;
+  const browser = await chromium.launch();
+  try {
+    const captured = await captureRunReport(supabase, browser, { runId, webRoot: WEB_ROOT });
+    console.log(
+      `  captured findings report ${(captured.bytes / 1048576).toFixed(1)} MB, ` +
+        `${captured.images} capture(s) → ${captured.storageKey}`,
+    );
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    console.error(`  findings report capture for run ${runId} FAILED: ${failure}`);
+  } finally {
+    await browser.close();
   }
 }

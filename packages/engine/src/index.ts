@@ -483,3 +483,19 @@ export {
   type RoutingStatus,
   type RunContext,
 } from './evaluation.js';
+
+// Per-vertical labels and headings (D-285, D-286). Browser-safe.
+export {
+  ADULT_MULTI_TURN_BOUNDARY,
+  ADULT_REPORT_POSTURE,
+  ADULT_REQUIREMENT_HEADINGS,
+  ADULT_STATE_LABEL,
+  adultNotChecked,
+  ATTESTATION_COPY,
+  clauseHeadingFor,
+  describeObservationCounts,
+  findingSense,
+  requirementHeadingsFor,
+  stateLabelFor,
+  type RequirementHeadings,
+} from './verticalLabels.js';

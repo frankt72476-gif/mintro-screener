@@ -347,6 +347,14 @@ export interface DiscoverOptions {
    * Absent: no docs host is read, whatever the vertical says.
    */
   readonly secondOrigin?: { readonly fetcher: Fetcher; readonly pageCap: number };
+  /**
+   * The origin the homepage was actually served from (cluster 4 commit 3a).
+   *
+   * A scan queued as `https://xchar.ai` is served from `https://www.xchar.ai`, and every link on the
+   * site and every sitemap entry carries the served origin. Page-type discovery reads candidates on
+   * this origin; the peptide pass is unchanged and does not read it.
+   */
+  readonly servedOrigin?: string;
 }
 
 /**
@@ -505,6 +513,20 @@ async function discoverPageTypes(
   const signupFound = await findSignupForm(browser, origin, options, attempts, artifacts, pages, say);
   done += 1;
 
+  /*
+    The site's own origin, as the homepage was served (commit 3a). Run 6571d6a9 was queued as
+    xchar.ai and served from www.xchar.ai: every link and sitemap entry carried www, the candidate
+    filter compared them with the apex, and every page type but terms came back "no candidate paths".
+  */
+  const site = options.servedOrigin ?? origin;
+
+  /*
+    Candidate links from every page established so far (commit 3a), not the homepage alone. A site
+    that links its removal policy only in an inner page's footer is a site that links it. The homepage
+    contributes every link it carries, as before; an established page contributes its nav and footer.
+  */
+  const pool: ChromeLink[] = [...(options.homepageLinks ?? [])];
+
   const probe = { undecided: 0, total: 0 };
   const located = new Map<string, Located<PageContext>>();
   const pagesByType = new Map<string, PageContext[]>();
@@ -513,8 +535,8 @@ async function discoverPageTypes(
     say(`looking for the ${document.label}`, { done, total });
     const outcome = await findDocument(
       browser,
-      origin,
-      options,
+      site,
+      { ...options, homepageLinks: [...pool] },
       attempts,
       artifacts,
       pages,
@@ -534,6 +556,7 @@ async function discoverPageTypes(
     );
     located.set(document.pageType, outcome.located);
     pagesByType.set(document.pageType, [...outcome.pages]);
+    pool.push(...chromeLinksOf(outcome.pages));
     done += 1;
   }
   say('policy pages read', { done, total });
@@ -1224,4 +1247,27 @@ async function readDocsOrigin(
   });
 
   return { origin: docsOrigin, first: outcome.located, pages: outcome.pages };
+}
+
+/** A link as discovery reads it: where it points, what it says, and whether it sits in the chrome. */
+export interface ChromeLink {
+  readonly href: string;
+  readonly text: string;
+  readonly inNav?: boolean;
+  readonly inFooter?: boolean;
+}
+
+/**
+ * The nav and footer links of pages already established, as candidate sources (commit 3a).
+ *
+ * Read from each page's rendered DOM (`PageContext.links`, extracted after render), so a nav a site
+ * builds in the browser is read as the browser shows it. The chrome only: body links on an inner page
+ * are that page's content, not the site's map of itself.
+ */
+export function chromeLinksOf(pages: readonly PageContext[]): readonly ChromeLink[] {
+  return pages.flatMap((page) =>
+    page.links
+      .filter((link) => link.inNav === true || link.inFooter === true)
+      .map((link) => ({ href: link.href, text: link.text, inNav: link.inNav, inFooter: link.inFooter })),
+  );
 }

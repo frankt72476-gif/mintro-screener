@@ -25,6 +25,7 @@ const QUESTIONS = [
 const render = (props: Record<string, unknown> = {}): string =>
   renderToStaticMarkup(
     createElement(AttestationForm, {
+      vertical: 'peptides',
       questions: QUESTIONS,
       answers: new Map(),
       identified: true,

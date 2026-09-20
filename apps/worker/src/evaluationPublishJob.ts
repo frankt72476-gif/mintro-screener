@@ -31,6 +31,7 @@
  * keeps its content at all.
  */
 
+import { evaluationRefusal } from './evaluationVertical.js';
 import { loadRulesetFile, loadAngleSetFile, ANGLES_PATH } from '@mintro/ruleset';
 import {
   publishRefusal,
@@ -126,7 +127,7 @@ export async function runPublish(
         .select('content, validator_status, handles')
         .eq('run_id', request.run_id)
         .maybeSingle(),
-      supabase.client.from('runs').select('report').eq('id', request.run_id).maybeSingle(),
+      supabase.client.from('runs').select('report, vertical').eq('id', request.run_id).maybeSingle(),
       supabase.client
         .from('findings')
         .select('id, rule_id, state, note, evidence_key')
@@ -140,6 +141,10 @@ export async function runPublish(
       findingsRead.error?.message ??
       evidenceRead.error?.message;
     if (problem !== undefined) return { kind: 'failed', error: `could not read the run: ${problem}` };
+
+    // Not the peptide programme's run: nothing is published, whatever draft exists (D-284).
+    const refused = evaluationRefusal((runRead.data as { vertical?: unknown } | null)?.vertical);
+    if (refused !== null) return { kind: 'refused', refusal: refused };
 
     if (draftRead.data === null) {
       return { kind: 'refused', refusal: `No evaluation draft exists for run ${request.run_id}.` };
