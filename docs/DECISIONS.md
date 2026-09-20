@@ -19260,10 +19260,27 @@ cites. Three properties make that safe, and all three are load-bearing:
   as observed with no published rule cited. The validator holds direction against `sense`, refuses a
   direction on a Mintro rule, and refuses a missing one in any set that uses directions.
 - **Colour is keyed to the relationship, never to a rule's state or to a rating of the merchant.**
-  One hue per group, the same hue for every row in it whatever each finding's state. The palette
-  excludes red, green, amber, yellow and orange, because those read as a verdict; a test computes the
-  hue of every colour in the block and refuses them, and refuses any class keyed to fail, pass or
-  not_evaluable.
+  One ramp per group, the same colours for every row in it whatever each finding's state. The ramps
+  are the approved ones (Frank, 2026-09-21), by stop:
+
+  | Group | Fill | Border and surface note | Heading |
+  |---|---|---|---|
+  | Consistent with the cited rule | teal 50 `#E1F5EE` | teal 600 `#0F6E56` | teal 800 `#0A4D3C` |
+  | Named as restricted by the cited rule | purple 50 `#EEEDFE` | purple 600 `#534AB7` | purple 800 `#322C7A` |
+  | Required by the cited rule, not found | pink 50 `#FBEAF0` | pink 600 `#993556` | pink 800 `#6E2440` |
+  | Observed, with no published rule cited | `--surface-1` | the stronger line `#C9C4DA` | text-primary |
+  | Not reached on this run | `--surface-1` | the stronger line `#C9C4DA` | text-primary |
+
+  A group citing no rule takes the page's own surface, because there is no source to take a colour
+  from. The test pins each group to its three stops and refuses **any** other colour in the block, and
+  refuses any class keyed to fail, pass or not_evaluable.
+
+  **Pinned by value, not by hue band.** The first version of this record excluded red, green, amber,
+  yellow and orange by hue, and the guard enforced a 180-300 degree band. The approved teal 600 sits at
+  hue 165 and the pink 600 at 340, either side of that band, while an unapproved colour inside it would
+  have passed — a band was the wrong instrument for the property, which is *these ramps, for these
+  groups*. What the exclusion was protecting holds in the palette itself: no stop here is a traffic
+  colour, and none of them says how a finding went.
 - **Grouping is not scoring.** No group is ranked above another, no group is counted, and the block
   carries a legend saying what it is: "Grouping and colour follow the cited rule's own text. Mintro
   states what it observed; it does not rate the merchant."
