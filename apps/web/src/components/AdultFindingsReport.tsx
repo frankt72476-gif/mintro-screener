@@ -4,6 +4,8 @@
  * Observation, capture, source — that is the whole report. What it carries, in order:
  *
  *   1. The masthead: the domain, the date, and what the document is (`ADULT_REPORT_POSTURE`).
+ *   1a. The index: one row per finding, in the rule set's order, each row a link to its finding
+ *      (cluster 4b). A table of contents, never a summary — no count, no total, no ranking.
  *   2. What was observed, by category in the rule set's order, each finding with its label, what was
  *      observed, its capture, and the public rule or statute it relates to under "Source" — or, for a
  *      rule Mintro wrote, "Mintro observation".
@@ -20,6 +22,7 @@
 
 import {
   ADULT_REPORT_POSTURE,
+  adultIndexRows,
   adultNotChecked,
   clauseHeadingFor,
   formatReportDate,
@@ -66,6 +69,8 @@ export function AdultFindingsReport({
         </div>
       </header>
 
+      <AdultIndex report={report} {...(attestations === undefined ? {} : { attestations })} />
+
       <section className="adult-observed" aria-labelledby="adult-observed-head">
         <h2 id="adult-observed-head">What was observed</h2>
         {report.categories.map((category) =>
@@ -99,6 +104,53 @@ export function AdultFindingsReport({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The index: every finding, in the rule set's order, with a link to it (cluster 4b commit 1).
+ *
+ * Four columns and nothing else. No count row and no total, because a tally of observations is the
+ * summary judgment A1 forbids; no colour and no icon, because "Observed" is not worse than "Not
+ * observed" until a reader decides it is (memo §9). The last column says which kind of page a row
+ * rests on, in words — the finding below carries the URL and the capture.
+ */
+function AdultIndex({
+  report,
+  attestations,
+}: {
+  readonly report: ScreeningReport;
+  readonly attestations?: RunAttestations;
+}): JSX.Element | null {
+  const rows = adultIndexRows(report, attestations);
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="adult-index" aria-labelledby="adult-index-head">
+      <h2 id="adult-index-head">What this report covers</h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Area</th>
+            <th scope="col">What Mintro looked for</th>
+            <th scope="col">What was seen</th>
+            <th scope="col">Where</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.ruleId}>
+              <td>{row.area}</td>
+              <th scope="row">
+                <a href={`#finding-${row.ruleId}`}>{row.lookedFor}</a>
+              </th>
+              <td>{row.seen}</td>
+              <td>{row.where}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

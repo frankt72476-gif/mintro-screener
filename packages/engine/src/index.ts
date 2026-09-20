@@ -499,3 +499,7 @@ export {
   stateLabelFor,
   type RequirementHeadings,
 } from './verticalLabels.js';
+
+// The adult AI findings index and the page-type classifier it reads (cluster 4b). Browser-safe.
+export { adultIndexRows, attestedSeen, whereWords, ASKED_OF_MERCHANT, NO_PAGE, type AdultIndexRow } from './adultIndex.js';
+export { pageTypeEntryOf, pageTypeOfUrl } from './pageTypeOf.js';

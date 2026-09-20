@@ -51,7 +51,7 @@
 
 import type { Browser } from 'playwright';
 import { PEPTIDE_PAGE_TYPES, type PageTypeTable, type Ruleset } from '@mintro/ruleset';
-import { containsTokenSequence, tokenizePath, type ScreeningReport } from '@mintro/engine';
+import { pageTypeEntryOf, pageTypeOfUrl, type ScreeningReport } from '@mintro/engine';
 import { extractPage } from './extract.js';
 import { createCrawlContext, PLAYWRIGHT_DEFAULT_VIEWPORT } from './render.js';
 import { storagePathForKey, type WorkerSupabase } from './store/supabase.js';
@@ -148,8 +148,7 @@ export const SURFACE_SLUGS: PageTypeTable = PEPTIDE_PAGE_TYPES;
  * not a checkout page. The table is the vertical's (D-284); absent, the peptide one.
  */
 export function surfaceFromSlug(url: string, table: PageTypeTable = SURFACE_SLUGS): string | null {
-  const index = pageTypeEntry(url, table);
-  return index === null ? null : table[index]![1];
+  return pageTypeOfUrl(url, table);
 }
 
 /**
@@ -157,22 +156,12 @@ export function surfaceFromSlug(url: string, table: PageTypeTable = SURFACE_SLUG
  *
  * `surfaceFromSlug` reads the page type off it; `rankByPageTypeOrder` reads the index itself, so a
  * terms page named by a terms slug is read ahead of one named only by a policy slug.
+ *
+ * Both delegate to the engine (cluster 4b), where the report reads the same table: two
+ * implementations would be two definitions of what a terms page is (D-181).
  */
 export function pageTypeEntry(url: string, table: PageTypeTable = SURFACE_SLUGS): number | null {
-  let path: string;
-  try {
-    path = new URL(url).pathname;
-  } catch {
-    return null;
-  }
-
-  const tokens = tokenizePath(path);
-  if (tokens.length === 0) return null;
-
-  for (let i = 0; i < table.length; i += 1) {
-    if (containsTokenSequence(tokens, tokenizePath(table[i]![0]))) return i;
-  }
-  return null;
+  return pageTypeEntryOf(url, table);
 }
 
 /** Where a page's text came from. Declared on every page, never inferred by a reader. */
