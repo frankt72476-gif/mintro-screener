@@ -502,7 +502,6 @@ export {
 
 // The adult AI findings index and the page-type classifier it reads (cluster 4b). Browser-safe.
 export type { FindingSurface } from './findings.js';
-export { adultGlance, type AdultGlance, type GlanceGroup, type GlanceGroupId, type GlanceRow } from './adultGlance.js';
 export {
   adultRelations,
   directionOf,

@@ -244,7 +244,15 @@ export function adultRelations(
         });
       }
       for (const p of members.filter((m) => m.category !== 'content_policy')) {
-        rows.push({ ruleIds: [p.finding.ruleId], title: p.finding.title, where: whereWords(p.finding) });
+        rows.push({
+          ruleIds: [p.finding.ruleId],
+          title: p.finding.title,
+          /*
+            A thing that was not found says where it was looked for, and where it could not be: "not in
+            the footer; removal page not published". Everything else names the page it rests on.
+          */
+          where: id === 'required_not_found' ? `not ${whereClause(p.finding)}` : whereWords(p.finding),
+        });
       }
     }
 

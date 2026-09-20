@@ -4,8 +4,8 @@
  * Observation, capture, source — that is the whole report. What it carries, in order:
  *
  *   1. The masthead: the domain, the date, and what the document is (`ADULT_REPORT_POSTURE`).
- *   1a. At a glance: the referral line, then four groups of one-line rows composed from the findings
- *      (cluster 4c). No tally, no ranking, no colour that says good or bad.
+ *   1a. At a glance: the referral line, then the findings by their relationship to the rule each one
+ *      cites (cluster 4d, D-290). No tally, no ranking, and no colour that rates the merchant.
  *   1a. The index: one row per finding, in the rule set's order, each row a link to its finding
  *      (cluster 4b). A table of contents, never a summary — no count, no total, no ranking.
  *   2. What was observed, by category in the rule set's order, each finding with its label, what was
@@ -24,8 +24,8 @@
 
 import {
   ADULT_REPORT_POSTURE,
-  adultGlance,
   adultIndexRows,
+  adultRelations,
   adultLeadSentence,
   whereWords,
   adultNotChecked,
@@ -38,7 +38,7 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { referralPolicyLine } from '@mintro/ruleset';
-import { citationFor } from '../lib/citations.js';
+import { citationFor, citationsFor } from '../lib/citations.js';
 import { formatStamp } from '../lib/format.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
@@ -77,6 +77,7 @@ export function AdultFindingsReport({
       </header>
 
       <AdultGlance report={report} {...(attestations === undefined ? {} : { attestations })} />
+
 
       <AdultIndex report={report} {...(attestations === undefined ? {} : { attestations })} />
 
@@ -117,17 +118,25 @@ export function AdultFindingsReport({
 }
 
 /**
- * At a glance: the referral line, then what the run saw, gathered (cluster 4c).
+ * At a glance: the referral line, then the findings by their relationship to the rule each cites.
  *
- * Every row comes from `adultGlance`, which composes it from finding data. This draws them and nothing
- * else: no row is written here, and no row is styled by its finding's state.
+ * Every row comes from `adultRelations` (D-290), which reads the rule's own citation and direction,
+ * the state the check reached and the surfaces the run read. This draws them: no row is written here
+ * and no row is styled by its finding's state.
  *
- * **The colour says which group, never how it went.** One muted hue per group — steel, indigo, teal,
- * violet, plum — carried by the heading and a rule down the left of its rows. None of them is red,
- * amber or green, because a report that colours "Not found" red has made the determination A1 forbids,
- * and one that colours "Stated in the merchant's policies" green has made the opposite one. Within a
- * group every row is the same hue whatever its finding's state.
+ * **The colour says which relationship, never how it went.** Teal where the observation and the cited
+ * rule agree, purple where the rule names the thing as restricted, plum where the rule requires
+ * something that was not found, grey where no rule was cited or nothing was reached. None of them is
+ * red, amber or green: those read as a verdict on the merchant, and Mintro makes none (A1). Within a
+ * group every row carries the same hue whatever its finding's state.
+ *
+ * The legend below the block says as much, in the document, because a reader who takes the colours
+ * for a rating will not be corrected by anything else on the page.
  */
+export const RELATION_LEGEND =
+  "Grouping and colour follow the cited rule's own text. Mintro states what it observed; it does not " +
+  'rate the merchant.';
+
 function AdultGlance({
   report,
   attestations,
@@ -135,25 +144,37 @@ function AdultGlance({
   readonly report: ScreeningReport;
   readonly attestations?: RunAttestations;
 }): JSX.Element | null {
-  const glance = adultGlance(report, attestations);
-  if (glance.headline === null && glance.groups.length === 0) return null;
+  const relations = adultRelations(report, {
+    citations: citationsFor('adult_ai'),
+    ...(attestations === undefined ? {} : { attestations }),
+  });
+  if (relations.headline === null && relations.groups.length === 0) return null;
 
   return (
     <section className="adult-glance" aria-labelledby="adult-glance-head">
       <h2 id="adult-glance-head">At a glance</h2>
-      {glance.headline !== null && <p className="glance-headline">{glance.headline}</p>}
-      {glance.groups.map((group) => (
-        <div key={group.id} className={`glance-group glance-${group.id}`}>
-          <h3>{group.heading}</h3>
-          <ul>
-            {group.rows.map((row) => (
-              <li key={row.text}>
-                {row.ruleIds.length === 1 ? <a href={`#finding-${row.ruleIds[0]!}`}>{row.text}</a> : row.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {relations.headline !== null && <p className="glance-headline">{relations.headline}</p>}
+
+      <div className="glance-cards">
+        {relations.groups.map((group) => (
+          <div key={group.id} className={`glance-card glance-${group.id.replace(/_/g, '-')}`}>
+            <h3>{group.heading}</h3>
+            {group.citations.length > 0 && <p className="glance-cite">{group.citations.join(' · ')}</p>}
+            <ul>
+              {group.rows.map((row) => (
+                <li key={`${row.title}-${row.where}`}>
+                  <span className="glance-what">
+                    {row.ruleIds.length === 1 ? <a href={`#finding-${row.ruleIds[0]!}`}>{row.title}</a> : row.title}
+                  </span>
+                  {row.where !== '' && <span className="glance-where">{row.where}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <p className="glance-legend">{RELATION_LEGEND}</p>
     </section>
   );
 }
