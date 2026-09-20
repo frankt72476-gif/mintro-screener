@@ -24,6 +24,7 @@ import {
   ADULT_REPORT_POSTURE,
   adultIndexRows,
   adultLeadSentence,
+  whereWords,
   adultNotChecked,
   clauseHeadingFor,
   formatReportDate,
@@ -34,6 +35,8 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { referralPolicyLine } from '@mintro/ruleset';
+import { citationFor } from '../lib/citations.js';
+import { formatStamp } from '../lib/format.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
@@ -79,7 +82,7 @@ export function AdultFindingsReport({
             <section key={category.id} className="adult-category">
               <h3>{category.name}</h3>
               {category.findings.map((finding, index) => (
-                <AdultFinding key={`${finding.ruleId}-${index}`} finding={finding} access={access} />
+                <AdultFinding key={`${finding.ruleId}-${index}`} finding={finding} access={access} print={print} />
               ))}
             </section>
           ),
@@ -156,8 +159,27 @@ function AdultIndex({
 }
 
 /** One finding: its label, what was observed, its capture, and what it relates to. */
-function AdultFinding({ finding, access }: { readonly finding: ReportFinding; readonly access: EvidenceAccess }): JSX.Element {
+function AdultFinding({
+  finding,
+  access,
+  print,
+}: {
+  readonly finding: ReportFinding;
+  readonly access: EvidenceAccess;
+  readonly print: boolean;
+}): JSX.Element {
   const note = finding.state === 'not_evaluable' ? notObservedSentence(finding) : finding.note;
+  const captured = finding.evidence[0]?.capturedAt;
+  const citation = citationFor('adult_ai', finding.ruleId);
+
+  /*
+    One line where the capture's provenance was (cluster 4b commit 3): when it was taken and what of.
+    Open in the delivered file, which is read without a mouse.
+  */
+  const fold =
+    captured === undefined
+      ? undefined
+      : { label: `Capture · ${formatStamp(captured)} · ${whereWords(finding)}`, open: print };
 
   return (
     <article className="adult-finding" id={`finding-${finding.ruleId}`}>
@@ -176,9 +198,14 @@ function AdultFinding({ finding, access }: { readonly finding: ReportFinding; re
       */}
       <p className="adult-lead">{adultLeadSentence(finding)}</p>
       <p className="adult-note">{note}</p>
-      <EvidenceSlip finding={finding} access={access} />
-      <div className="req-col">
+      <EvidenceSlip finding={finding} access={access} {...(fold === undefined ? {} : { fold })} />
+      <div className="req-col adult-source">
         <span className="req-h">{clauseHeadingFor('adult_ai', finding.source)}</span>
+        {/*
+          Which source, before the ninety words of it (cluster 4b commit 3). From the corpus's own
+          provenance entry, so the report cannot name a source the corpus does not.
+        */}
+        {citation !== undefined && <span className="src-cite">{citation}</span>}
         {/* Verbatim. No trim, no ellipsis, no sentence case (D-041). */}
         <blockquote className="req-t req-quote">{finding.clause}</blockquote>
       </div>

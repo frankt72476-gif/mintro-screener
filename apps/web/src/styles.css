@@ -4039,3 +4039,23 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
 /* The finding's plain sentence, and the evidence line beneath it (cluster 4b). */
 .adult-lead { margin: 8px 0 4px; }
 .adult-report .adult-note { margin: 0 0 8px; color: #4A4563; font-size: 13px; }
+
+/*
+  The capture's provenance, folded (cluster 4b commit 3). One quiet line; the capture itself and the
+  matched phrases stay where they were.
+*/
+.cap-fold > summary { cursor: pointer; color: #6D6788; font-size: 12px; list-style: none; padding: 2px 0; }
+.cap-fold > summary::-webkit-details-marker { display: none; }
+.cap-fold > summary::before { content: '\203A'; display: inline-block; width: 12px; transition: transform 120ms; }
+.cap-fold[open] > summary::before { transform: rotate(90deg); }
+.cap-fold[open] > summary { margin-bottom: 4px; }
+
+/* The source: its short name, then the clause, quietly (cluster 4b commit 3). */
+.adult-source .src-cite { display: block; color: #6D6788; font-size: 12px; margin: 2px 0 4px; }
+.adult-source .req-quote { border-left: 2px solid #E4E1EE; padding-left: 10px; margin: 0; color: #4A4563; font-size: 13px; }
+
+/* The delivered file is read without a mouse: every fold is open in print. */
+@media print {
+  .cap-fold > summary { list-style: none; }
+  .cap-fold > *:not(summary) { display: block; }
+}

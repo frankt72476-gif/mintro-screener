@@ -11,7 +11,7 @@
  *                    through a short-expiry signed URL.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Evidence, ReportFinding } from '@mintro/engine';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { shortHash, formatStamp } from '../lib/format.js';
@@ -19,6 +19,17 @@ import { shortHash, formatStamp } from '../lib/format.js';
 interface Props {
   readonly finding: ReportFinding;
   readonly access: EvidenceAccess;
+  /**
+   * Folds the capture's provenance lines under one summary (cluster 4b commit 3).
+   *
+   * Source, method and digest are what make a finding checkable and they are read by very few
+   * readers, in that order: the sentence, then the capture, then — for the one reader who is
+   * checking — where it came from. Folded, never dropped: `<details>` keeps them in the document and
+   * in the delivered file, and `open` is what the print route passes so the captured bytes show them.
+   *
+   * Absent on the peptide report, which renders exactly as it did.
+   */
+  readonly fold?: { readonly label: string; readonly open?: boolean };
 }
 
 /**
@@ -36,7 +47,7 @@ export function unlistedUrls(evidence: Evidence, note: string): readonly string[
   return (evidence.matchedUrls ?? []).filter((url) => !note.includes(url));
 }
 
-export function EvidenceSlip({ finding, access }: Props): JSX.Element {
+export function EvidenceSlip({ finding, access, fold }: Props): JSX.Element {
   // The richest evidence entry — the one carrying a matched value — is the one worth leading
   // with. Findings that observed nothing carry only the source reference.
   const primary =
@@ -102,24 +113,26 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
             the clause twice. Nothing is lost by removing the repeats: the pairing D-041 requires
             is intact, and this slip carries what only it has, which is the capture.
           */}
-          <div className="kv">
-            <span className="k">Source</span>
-            <span className="v">{primary.sourceUrl}</span>
-          </div>
-          <div className="kv">
-            <span className="k">Method</span>
-            <span className="v">
-              {primary.kind === 'document'
-                ? 'fetched document · no browser'
-                : 'rendered DOM · headless Chromium'}
-            </span>
-          </div>
-          {primary.sourceSha256 !== '' && (
+          <Provenance fold={fold}>
             <div className="kv">
-              <span className="k">SHA-256</span>
-              <span className="v">{shortHash(primary.sourceSha256)}</span>
+              <span className="k">Source</span>
+              <span className="v">{primary.sourceUrl}</span>
             </div>
-          )}
+            <div className="kv">
+              <span className="k">Method</span>
+              <span className="v">
+                {primary.kind === 'document'
+                  ? 'fetched document · no browser'
+                  : 'rendered DOM · headless Chromium'}
+              </span>
+            </div>
+            {primary.sourceSha256 !== '' && (
+              <div className="kv">
+                <span className="k">SHA-256</span>
+                <span className="v">{shortHash(primary.sourceSha256)}</span>
+              </div>
+            )}
+          </Provenance>
 
           {primary.matchedValue !== undefined && (
             <div className="capture">
@@ -177,6 +190,29 @@ export function EvidenceSlip({ finding, access }: Props): JSX.Element {
         <CapturePane evidence={primary} access={access} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Where the capture came from: as it was, or folded under one line (cluster 4b commit 3).
+ *
+ * The same rows either way. A fold that rendered different content from the open form would be a
+ * document that says one thing on screen and another in the file.
+ */
+function Provenance({
+  fold,
+  children,
+}: {
+  readonly fold: { readonly label: string; readonly open?: boolean } | undefined;
+  readonly children: ReactNode;
+}): JSX.Element {
+  if (fold === undefined) return <>{children}</>;
+
+  return (
+    <details className="cap-fold" open={fold.open === true}>
+      <summary>{fold.label}</summary>
+      {children}
+    </details>
   );
 }
 

@@ -17,6 +17,7 @@ import {
   VERTICAL_FILES,
   checkAgainstCorpus,
   checkAgainstCorpusFile,
+  citationsByRule,
   corpusClauseLines,
   loadRulesetFile,
   loadRulesetForVertical,
@@ -195,6 +196,19 @@ describe('rules/ruleset-adult-ai.json', () => {
     // Held equal to the engine's ADULT_MULTI_TURN_BOUNDARY in packages/engine/test/adultAttestations.test.ts.
   });
 
+  it('names, for every rule that quotes a source, which source it quotes (cluster 4b)', () => {
+    const citations = citationsByRule(corpusText);
+    for (const rule of adult.rules) {
+      // A rule Mintro wrote quotes nothing, so no provenance entry names it.
+      const cited = citations[rule.id];
+      if (rule.source === 'programme') expect(typeof cited, rule.id).toBe('string');
+      else expect(cited, rule.id).toBeUndefined();
+    }
+    expect(new Set(Object.values(citations))).toEqual(
+      new Set(['Mastercard Rules 5.12.7', 'TAKE IT DOWN Act § 3(a)', 'Cal. SB 243, Bus. & Prof. Code § 22602(a)']),
+    );
+  });
+
   it('is the rule set the adult_ai vertical loads', () => {
     expect(loadRulesetForVertical('adult_ai', REPO_ROOT)).toEqual(adult);
   });
@@ -236,6 +250,10 @@ describe('the peptide vertical is unchanged', () => {
     const peptides = loadRulesetForVertical('peptides', REPO_ROOT);
     expect(peptides.version).toBe('3.11.0');
     expect(peptides).toEqual(loadRulesetFile(RULESET_PATH));
+  });
+
+  it('carries no citation lines, so its report renders as it always has', () => {
+    expect(citationsByRule(readFileSync(resolve(REPO_ROOT, VERTICAL_FILES.peptides.corpus), 'utf8'))).toEqual({});
   });
 
   it('reads a peptide rule with no sense as absent', () => {
