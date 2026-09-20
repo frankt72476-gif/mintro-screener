@@ -109,12 +109,18 @@ describe('the reader\'s copy', () => {
     });
   });
 
-  it('says what was not checked, the multi-turn boundary once', () => {
+  it('says what was not checked, each boundary stated once', () => {
     for (const item of adult.not_checked) {
       expect(reader).toContain(item.subject);
-      expect(reader).toContain(item.why);
+      // The sentence is the boundary. It is stated in one place, in full, and never paraphrased.
+      expect(reader.split(item.why), item.subject).toHaveLength(2);
     }
-    expect(reader.split('Behaviour over a long conversation')).toHaveLength(2);
+    /*
+      The subject appears twice from cluster 4c on: once as a row of the glance, which lists what the
+      report does not speak to, and once at the head of the item that says why. A name repeated is a
+      pointer; the claim is made once, above.
+    */
+    expect(reader.split('Behaviour over a long conversation')).toHaveLength(3);
   });
 });
 

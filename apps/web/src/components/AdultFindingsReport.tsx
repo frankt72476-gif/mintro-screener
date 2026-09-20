@@ -4,6 +4,8 @@
  * Observation, capture, source — that is the whole report. What it carries, in order:
  *
  *   1. The masthead: the domain, the date, and what the document is (`ADULT_REPORT_POSTURE`).
+ *   1a. At a glance: the referral line, then four groups of one-line rows composed from the findings
+ *      (cluster 4c). No tally, no ranking, no colour that says good or bad.
  *   1a. The index: one row per finding, in the rule set's order, each row a link to its finding
  *      (cluster 4b). A table of contents, never a summary — no count, no total, no ranking.
  *   2. What was observed, by category in the rule set's order, each finding with its label, what was
@@ -22,6 +24,7 @@
 
 import {
   ADULT_REPORT_POSTURE,
+  adultGlance,
   adultIndexRows,
   adultLeadSentence,
   whereWords,
@@ -73,6 +76,8 @@ export function AdultFindingsReport({
         </div>
       </header>
 
+      <AdultGlance report={report} {...(attestations === undefined ? {} : { attestations })} />
+
       <AdultIndex report={report} {...(attestations === undefined ? {} : { attestations })} />
 
       <section className="adult-observed" aria-labelledby="adult-observed-head">
@@ -108,6 +113,48 @@ export function AdultFindingsReport({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * At a glance: the referral line, then what the run saw, gathered (cluster 4c).
+ *
+ * Every row comes from `adultGlance`, which composes it from finding data. This draws them and nothing
+ * else: no row is written here, and no row is styled by its finding's state.
+ *
+ * **The colour says which group, never how it went.** One muted hue per group — steel, indigo, teal,
+ * violet, plum — carried by the heading and a rule down the left of its rows. None of them is red,
+ * amber or green, because a report that colours "Not found" red has made the determination A1 forbids,
+ * and one that colours "Stated in the merchant's policies" green has made the opposite one. Within a
+ * group every row is the same hue whatever its finding's state.
+ */
+function AdultGlance({
+  report,
+  attestations,
+}: {
+  readonly report: ScreeningReport;
+  readonly attestations?: RunAttestations;
+}): JSX.Element | null {
+  const glance = adultGlance(report, attestations);
+  if (glance.headline === null && glance.groups.length === 0) return null;
+
+  return (
+    <section className="adult-glance" aria-labelledby="adult-glance-head">
+      <h2 id="adult-glance-head">At a glance</h2>
+      {glance.headline !== null && <p className="glance-headline">{glance.headline}</p>}
+      {glance.groups.map((group) => (
+        <div key={group.id} className={`glance-group glance-${group.id}`}>
+          <h3>{group.heading}</h3>
+          <ul>
+            {group.rows.map((row) => (
+              <li key={row.text}>
+                {row.ruleIds.length === 1 ? <a href={`#finding-${row.ruleIds[0]!}`}>{row.text}</a> : row.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
   );
 }
 
