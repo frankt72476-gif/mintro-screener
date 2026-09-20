@@ -29,7 +29,7 @@ const VERDICT = /\b(?:fail|pass|blocker|clean|compliant|recommend|placement)\w*|
 function finding(overrides: Partial<ReportFinding>): ReportFinding {
   return {
     ruleId: 'AIPOL-001',
-    title: 'Minors named in the terms',
+    title: 'Prohibition of depicting minors',
     clause: 'c',
     state: 'pass',
     note: 'On the terms document: Observed.',
@@ -40,12 +40,12 @@ function finding(overrides: Partial<ReportFinding>): ReportFinding {
 
 describe('every sense and state', () => {
   const cases: { sense: 'absent' | 'present'; state: ReportFinding['state']; expected: string }[] = [
-    { sense: 'absent', state: 'fail', expected: 'Minors named in the terms — observed on the terms document.' },
-    { sense: 'absent', state: 'pass', expected: 'Minors named in the terms — not observed on the terms document.' },
-    { sense: 'present', state: 'fail', expected: 'Minors named in the terms — not observed on the terms document.' },
-    { sense: 'present', state: 'pass', expected: 'Minors named in the terms — observed on the terms document.' },
-    { sense: 'absent', state: 'not_evaluable', expected: 'Minors named in the terms — could not be checked.' },
-    { sense: 'present', state: 'not_evaluable', expected: 'Minors named in the terms — could not be checked.' },
+    { sense: 'absent', state: 'fail', expected: 'Prohibition of depicting minors — observed on the terms document.' },
+    { sense: 'absent', state: 'pass', expected: 'Prohibition of depicting minors — not observed on the terms document.' },
+    { sense: 'present', state: 'fail', expected: 'Prohibition of depicting minors — not observed on the terms document.' },
+    { sense: 'present', state: 'pass', expected: 'Prohibition of depicting minors — observed on the terms document.' },
+    { sense: 'absent', state: 'not_evaluable', expected: 'Prohibition of depicting minors — could not be checked.' },
+    { sense: 'present', state: 'not_evaluable', expected: 'Prohibition of depicting minors — could not be checked.' },
   ];
 
   it.each(cases)('$sense rule, $state', ({ sense, state, expected }) => {
@@ -62,7 +62,7 @@ describe('every sense and state', () => {
   it('does not name a page a review state would have', () => {
     // `review` never arises in this rule set, and the sentence still has to be a sentence if it did.
     const sentence = adultLeadSentence(finding({ state: 'review' }));
-    expect(sentence).toMatch(/^Minors named in the terms — .+\.$/);
+    expect(sentence).toMatch(/^Prohibition of depicting minors — .+\.$/);
     expect(sentence).not.toMatch(VERDICT);
   });
 });
@@ -80,11 +80,11 @@ describe('the page it names', () => {
     const sentence = adultLeadSentence(
       finding({ state: 'fail', evidence: [capture(url)] }),
     );
-    expect(sentence).toBe(`Minors named in the terms — observed on the ${page}.`);
+    expect(sentence).toBe(`Prohibition of depicting minors — observed on the ${page}.`);
   });
 
   it('names no page where the finding rests on none', () => {
-    expect(adultLeadSentence(finding({ state: 'fail', evidence: [] }))).toBe('Minors named in the terms — observed.');
+    expect(adultLeadSentence(finding({ state: 'fail', evidence: [] }))).toBe('Prohibition of depicting minors — observed.');
   });
 
   it('names no page for a manual rule, whose question the line beneath carries', () => {

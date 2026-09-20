@@ -24,7 +24,7 @@ describe('rulesetFor', () => {
     const adult = rulesetFor('adult_ai');
     expect(adult.ok).toBe(true);
     if (!adult.ok) return;
-    expect(adult.value.version).toBe('0.4.0');
+    expect(adult.value.version).toBe('0.4.1');
     expect(adult.value.rules.every((rule) => rule.id.startsWith('AI'))).toBe(true);
   });
 });

@@ -120,8 +120,8 @@ export function adultIndexRows(
  * The plain sentence a finding opens with (cluster 4b commit 2).
  *
  * Written from data, never by a model: the rule's title, the sense label its state gives it, and the
- * page the capture is of. Titles already read as the thing looked for — "Minors named in the terms",
- * "Video generation language" — so the label completes the sentence rather than restating it.
+ * page the capture is of. Titles read as the thing looked for and name no surface (0.4.1) —
+ * "Prohibition of bestiality", "Video generation language" — so the label and the page complete it.
  *
  * One template per state, which is where the sense has already been resolved: `stateLabelFor` reads
  * the rule's sense, so "Observed" on an `absent` rule and on a `present` rule reach here as the same
