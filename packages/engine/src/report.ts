@@ -13,7 +13,18 @@
  *     no instruction attached (D-001, hard constraint 7).
  */
 
-import type { Attestation, Category, NotChecked, Rule, RuleSource, Ruleset, State, Sense, Vertical } from '@mintro/ruleset';
+import type {
+  Attestation,
+  Category,
+  Direction,
+  NotChecked,
+  Rule,
+  RuleSource,
+  Ruleset,
+  State,
+  Sense,
+  Vertical,
+} from '@mintro/ruleset';
 import type { Evidence, FetchAttempt, Finding, NotEvaluableKind } from './findings.js';
 import { STATE_LABEL_LOWER } from './stateLabel.js';
 import type { EyeTestCaptureRequest } from './eyetest.js';
@@ -61,6 +72,15 @@ export interface ReportFinding extends Finding {
    * (`findingSense`).
    */
   readonly sense?: Sense;
+  /**
+   * Which way the cited source runs, snapshotted like `sense` (D-290).
+   *
+   * What the report groups a finding by: a source that requires a thing and a source that forbids one
+   * say different things about the same observation. Absent on a rule Mintro wrote, which cites no
+   * source, and on runs recorded before the field existed — those are read from the sense, which the
+   * rule set holds equal to it.
+   */
+  readonly direction?: Direction;
   /**
    * Whose statement `clause` is (D-138).
    *
@@ -591,6 +611,7 @@ export function assembleReport(input: AssembleInput, ruleset: Ruleset): Screenin
         subject: rule.subject,
         ...expectOf(rule),
         ...(rule.sense === undefined ? {} : { sense: rule.sense }),
+        ...(rule.direction === undefined ? {} : { direction: rule.direction }),
         source: rule.source,
         severity: rule.sev,
         tier: rule.tier,
