@@ -7,7 +7,8 @@
  *
  * Also the two places a wrong answer would be dangerous rather than merely wrong:
  *
- *   - a prohibition not observed on pages that were **not all read** is not consistency, it is a gap;
+ *   - a prohibition not observed on pages that were **not all read** is not consistency, it is a gap,
+ *     and a finding that records no coverage at all is not consistency either;
  *   - a finding recorded before directions existed still groups, from the sense the rule set holds
  *     equal to the direction (D-002).
  */
@@ -71,6 +72,8 @@ describe('every cell of source, direction and state', () => {
     { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'fail', group: 'restricted' },
     { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'pass', covered: true, group: 'consistent' },
     { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'pass', covered: false, group: 'not_reached' },
+    // Coverage never recorded: silence is not "every page was read" (6571d6a9's shape).
+    { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'pass', group: 'not_reached' },
     { source: 'programme', direction: 'prohibits', sense: 'absent', state: 'not_evaluable', group: 'not_reached' },
     // A rule Mintro wrote, which cites nobody.
     { source: 'mintro', sense: 'absent', state: 'fail', group: 'no_published_rule' },
@@ -122,6 +125,40 @@ describe('a run recorded before directions existed', () => {
     expect(directionOf(finding({ sense: 'present' }))).toBe('requires');
     expect(directionOf(finding({ sense: 'absent' }))).toBe('prohibits');
     expect(directionOf(finding({ source: 'mintro', sense: 'absent' }))).toBeNull();
+  });
+
+  it('files a prohibition that recorded no coverage as not reached, with its note\'s own gap', () => {
+    const f = finding({
+      ruleId: 'AICAT-001',
+      title: 'Minor-coded terms',
+      direction: 'prohibits',
+      sense: 'absent',
+      state: 'pass',
+      note:
+        'Not observed on 1 page(s) read: the homepage (https://www.x.test/). Not published: the ' +
+        'character creation page (no candidate paths were available to try); the generation page ' +
+        '(no candidate paths were available to try).',
+    });
+
+    const [group] = adultRelations(reportOf([f])).groups;
+    expect(group?.id).toBe('not_reached');
+    expect(group?.rows[0]).toMatchObject({
+      title: 'Minor-coded terms',
+      where: 'the character creation page and the generation page not published',
+    });
+  });
+
+  it('says so plainly where the finding records neither surfaces nor a gap', () => {
+    const f = finding({
+      direction: 'prohibits',
+      sense: 'absent',
+      state: 'pass',
+      note: 'Not observed on 1 page(s) read: the homepage (https://www.x.test/).',
+    });
+
+    const [group] = adultRelations(reportOf([f])).groups;
+    expect(group?.id).toBe('not_reached');
+    expect(group?.rows[0]?.where).toBe('coverage not recorded on this run');
   });
 
   it('groups run 6571d6a9 without a single direction recorded on it', () => {

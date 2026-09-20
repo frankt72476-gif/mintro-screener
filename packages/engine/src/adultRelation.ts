@@ -26,8 +26,15 @@
  * reach the character library has not observed minor-coded terms *there*; filing that as consistent
  * would turn a gap in the crawl into a statement about the merchant, which is the worst bug this
  * system can have (hard constraint 2). Those rows go to `not_reached`, naming the surface that was
- * missing. A finding recorded before surfaces were snapshotted says nothing either way, and is read
- * as covered — the honest reading of what it recorded, not a new claim about it (D-002).
+ * missing.
+ *
+ * **Coverage that was never recorded is not coverage.** A finding from before surfaces were
+ * snapshotted says nothing about which pages were read, and an earlier version of this read that
+ * silence as "all of them": run 6571d6a9's minor-coded and real-person terms showed as consistent
+ * from the homepage alone, while the run's own note said the creation, generation and library pages
+ * were never reached. A prohibition that observed nothing is therefore filed as consistent only where
+ * the finding *records* full coverage. Absent that, it is not reached, carrying the note's own account
+ * of which pages were missing, or saying plainly that coverage was not recorded.
  */
 
 import { adultNotChecked, findingSense, stateLabelFor } from './verticalLabels.js';
@@ -101,9 +108,45 @@ export function directionOf(finding: ReportFinding): Direction | null {
   return findingSense(finding) === 'present' ? 'requires' : 'prohibits';
 }
 
-/** Whether every surface the rule listed was actually read. Unknown on an older run reads as yes. */
-function fullyCovered(finding: ReportFinding): boolean {
-  return (finding.surfaces ?? []).every((surface) => surface.status === 'read');
+/** What a finding records about which of its pages were read. */
+type Coverage = 'covered' | 'gap' | 'unrecorded';
+
+function coverageOf(finding: ReportFinding): Coverage {
+  const surfaces = finding.surfaces;
+  if (surfaces === undefined || surfaces.length === 0) return 'unrecorded';
+  return surfaces.every((surface) => surface.status === 'read') ? 'covered' : 'gap';
+}
+
+/**
+ * The pages a finding's own note says were not published, where it says so.
+ *
+ * The multi-surface runners write it: "Not published: the character creation page (…); the generation
+ * page (…)". On a finding that records no surfaces this is the only account of the gap there is, and
+ * it is the run's own words. The parenthesised reasons are left out here and stay in the note below,
+ * which is rendered whole.
+ */
+function pageGapFromNote(note: string | undefined): string | null {
+  const clause = /Not published:\s*([^.]+)\./.exec(note ?? '')?.[1];
+  if (clause === undefined) return null;
+
+  const pages = clause
+    .split(';')
+    .map((part) => part.replace(/\s*\([^)]*\)/g, '').trim())
+    .filter((part) => part !== '');
+  if (pages.length === 0) return null;
+
+  return `${sentenceList(pages)} not published`;
+}
+
+/** Where a not-reached row says it looked, from the surfaces it records or from its own note. */
+function notReachedWhere(finding: ReportFinding): string {
+  if (coverageOf(finding) !== 'unrecorded') return whereClause(finding);
+
+  const fromNote = pageGapFromNote(finding.note);
+  if (fromNote !== null) return fromNote;
+
+  // A prohibition that observed nothing and recorded neither surfaces nor a gap says exactly that.
+  return finding.state === 'not_evaluable' ? whereClause(finding) : 'coverage not recorded on this run';
 }
 
 /** The group a finding belongs to, or null where it belongs in none. */
@@ -124,7 +167,7 @@ function relationOf(finding: ReportFinding): RelationGroupId | null {
 
   if (direction === 'requires') return observed ? 'consistent' : 'required_not_found';
   if (observed) return 'restricted';
-  return fullyCovered(finding) ? 'consistent' : 'not_reached';
+  return coverageOf(finding) === 'covered' ? 'consistent' : 'not_reached';
 }
 
 /** "a, b and c" — a list a sentence can take. */
@@ -180,7 +223,7 @@ function notReachedRows(
   for (const { finding } of placed) {
     if (finding.checkType === 'manual') continue;
     if (relationOf(finding) !== 'not_reached') continue;
-    rows.push({ ruleIds: [finding.ruleId], title: finding.title, where: whereClause(finding) });
+    rows.push({ ruleIds: [finding.ruleId], title: finding.title, where: notReachedWhere(finding) });
   }
 
   for (const item of adultNotChecked(report.notChecked)) {

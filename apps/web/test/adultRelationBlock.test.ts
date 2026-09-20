@@ -113,8 +113,6 @@ describe('run 6571d6a9, by relationship', () => {
       'Prohibits minors, real-person likeness, non-consent, bestiality and mutilation — terms document',
       'Non-human disclosure statement on public pages — homepage',
       '48-hour removal commitment in the terms — terms document',
-      'Minor-coded terms — homepage',
-      'Real-person likeness terms — homepage',
     ]);
     expect(cardRows(block, 'restricted')).toEqual(['Face-swap or face-consistency language — docs site']);
     expect(cardRows(block, 'required-not-found')).toEqual([
@@ -126,7 +124,18 @@ describe('run 6571d6a9, by relationship', () => {
       'Filter-removal language in marketing — homepage',
       'Affiliate program — homepage',
     ]);
-    expect(cardRows(block, 'not-reached')).toEqual(['Behaviour over a long conversation']);
+    /*
+      The catalogue prohibitions are not consistency on this run: it read the homepage and never
+      reached the creation, generation or library pages, which is where character names live. The
+      rows carry the run's own account of that, from the note beneath each finding.
+    */
+    const gap =
+      'the character creation page, the generation page and the character library page not published';
+    expect(cardRows(block, 'not-reached')).toEqual([
+      `Minor-coded terms — ${gap}`,
+      `Real-person likeness terms — ${gap}`,
+      'Behaviour over a long conversation',
+    ]);
   });
 
   it('carries the legend, verbatim, in the document', () => {
