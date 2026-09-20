@@ -99,3 +99,6 @@ export {
   type ReferralPolicy,
   type ReferralStatus,
 } from './referralPolicy.js';
+
+// The short name of the source each rule quotes, read from the corpus's provenance (cluster 4b).
+export { citationsByRule } from './corpus.js';

@@ -12,7 +12,12 @@ source are joined with single spaces; nothing else is changed.
 
 Provenance
 
-1. Mastercard Rules, 2 June 2026 edition, Rule 5.12.7 "Illegal or Brand-damaging Transactions",
+Each entry opens with the short name the report prints above the excerpt it quotes ("Citation: ..."),
+and names the rules quoting it ("Quoted by ..."). Those two lines are what `citationsByRule` reads, so
+a report never names a source the corpus does not.
+
+1. Citation: Mastercard Rules 5.12.7
+   Mastercard Rules, 2 June 2026 edition, Rule 5.12.7 "Illegal or Brand-damaging Transactions",
    item 2 (page 125).
    https://www.mastercard.com/content/dam/mccom/shared/business/support/rules-pdfs/mastercard-rules.pdf
    Accessed 2026-09-18. The item's leading enumerator "2." is omitted. Quoted by AIPOL-001, AIPOL-002,
@@ -30,7 +35,8 @@ Provenance
    mappings that failed on the peptide PDF have nothing here to act on. The text layer was not
    compared against the rendered glyphs.
 
-2. TAKE IT DOWN Act, Public Law 119-12 (S. 146, 119th Congress, enacted 19 May 2025), section 3(a)(2)
+2. Citation: TAKE IT DOWN Act § 3(a)
+   TAKE IT DOWN Act, Public Law 119-12 (S. 146, 119th Congress, enacted 19 May 2025), section 3(a)(2)
    and section 3(a)(3).
    https://www.govinfo.gov/content/pkg/PLAW-119publ12/html/PLAW-119publ12.htm
    Accessed 2026-09-18. The source renders its dashes as "--" and those two characters are kept. The
@@ -38,7 +44,8 @@ Provenance
    is omitted. The subparagraph designators (A) and (B) are kept inline. Section 3(a)(2) is quoted by
    AITD-001; section 3(a)(3) by AITD-002.
 
-3. California Senate Bill 243 (2025), Chapter 677, Statutes of 2025, adding Business and Professions
+3. Citation: Cal. SB 243, Bus. & Prof. Code § 22602(a)
+   California Senate Bill 243 (2025), Chapter 677, Statutes of 2025, adding Business and Professions
    Code section 22602, subdivision (a).
    https://leginfo.legislature.ca.gov/faces/billTextClient.xhtml?bill_id=202520260SB243
    Accessed 2026-09-18. The subdivision designator "(a)" is omitted. Quoted by AIGATE-003.

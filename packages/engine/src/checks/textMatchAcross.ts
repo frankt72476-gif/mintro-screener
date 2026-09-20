@@ -33,7 +33,15 @@
 import type { RuleOfType, Surface } from '@mintro/ruleset';
 import type { PageContext } from '../page.js';
 import type { Located } from '../surface.js';
-import { notEvaluable, satisfied, violation, type Evidence, type Finding, type NotEvaluableKind } from '../findings.js';
+import {
+  notEvaluable,
+  satisfied,
+  violation,
+  type Evidence,
+  type Finding,
+  type FindingSurface,
+  type NotEvaluableKind,
+} from '../findings.js';
 import { checkTextMatch } from './textMatch.js';
 import { RENDERED } from './pageEvidence.js';
 
@@ -90,6 +98,14 @@ export function checkTextMatchAcross(
   readings: readonly SurfaceReading[],
 ): Finding {
   const outcomes = readings.map((reading) => readOne(rule, reading));
+  /*
+    What became of each listed surface, carried on the finding (cluster 4b commit 5).
+
+    The note already says it in prose. This says it in data, so the report can write "not observed in
+    the footer; removal page not published" without parsing a sentence back into facts (D-216).
+  */
+  const surfaces: readonly FindingSurface[] = outcomes.map((o) => ({ surface: o.surface, status: o.kind }));
+  const withSurfaces = (finding: Finding): Finding => ({ ...finding, surfaces });
   const expect = rule.params.expect ?? 'absent';
 
   const read = outcomes.filter((o): o is Extract<Outcome, { kind: 'read' }> => o.kind === 'read');
@@ -113,9 +129,11 @@ export function checkTextMatchAcross(
 
   if (hit !== undefined) {
     const note = `On ${onWhat(hit)}: ${hit.finding.note}`;
-    return expect === 'present'
-      ? satisfied(rule, note, hit.finding.evidenceKind, hit.finding.evidence)
-      : violation(rule, note, hit.finding.evidenceKind, hit.finding.evidence);
+    return withSurfaces(
+      expect === 'present'
+        ? satisfied(rule, note, hit.finding.evidenceKind, hit.finding.evidence)
+        : violation(rule, note, hit.finding.evidenceKind, hit.finding.evidence),
+    );
   }
 
   if (read.length === 0 || unreadable.length > 0) {
@@ -127,16 +145,20 @@ export function checkTextMatchAcross(
       (read.length === 0 ? 'none of the listed surfaces was read' : `not observed on ${readList}, and not every listed surface was read`) +
       ': ' +
       gaps.map((o) => `${surfaceLabel(o.surface)}: ${o.reason}`).join('; ');
-    return notEvaluable(rule, reason, RENDERED, kind, [
-      ...read.flatMap((o) => o.finding.evidence),
-      ...gaps.flatMap((o) => o.evidence),
-    ]);
+    return withSurfaces(
+      notEvaluable(rule, reason, RENDERED, kind, [
+        ...read.flatMap((o) => o.finding.evidence),
+        ...gaps.flatMap((o) => o.evidence),
+      ]),
+    );
   }
 
   // Every listed surface was read or not published, and none carried what the rule looks for.
   const evidence = read.flatMap((o) => o.finding.evidence);
   const note = `Read ${readList}. ${read[0]!.finding.note}${notPublishedClause}`;
-  return expect === 'present' ? violation(rule, note, RENDERED, evidence) : satisfied(rule, note, RENDERED, evidence);
+  return withSurfaces(
+    expect === 'present' ? violation(rule, note, RENDERED, evidence) : satisfied(rule, note, RENDERED, evidence),
+  );
 }
 
 function readOne(rule: RuleOfType<'text_match'>, reading: SurfaceReading): Outcome {

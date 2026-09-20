@@ -256,3 +256,43 @@ function indexOf(ruleset: Ruleset, rule: Rule): number {
 function truncate(value: string, limit = 72): string {
   return value.length <= limit ? value : `${value.slice(0, limit)}…`;
 }
+
+/**
+ * The short name of the source each rule quotes, from the corpus's provenance entries (cluster 4b).
+ *
+ * The report prints a whole clause verbatim (D-041), which for Mastercard 5.12.7 is ninety words of
+ * enumerated prose. A reader needs to know what they are reading before they read it, and the corpus
+ * already knows: each provenance entry names its source and lists the rules quoting it. This reads
+ * that rather than restating it in a component, so a source that is re-cited is re-cited once.
+ *
+ * An entry with no `Citation:` line contributes nothing — the peptide corpus has none, and a report
+ * with no short name prints the heading it always printed and the clause beneath it.
+ */
+export function citationsByRule(text: string): Readonly<Record<string, string>> {
+  const provenance = text.split(CORPUS_CLAUSE_HEADING)[0] ?? '';
+  const byRule: Record<string, string> = {};
+
+  // Entries are numbered from the start of a line; everything up to the next one belongs to it.
+  const entries = provenance.split(/\n(?=\d+\.\s)/);
+  for (const entry of entries) {
+    // A numbered entry only. The prose above them describes this format and quotes its own words.
+    if (!/^\d+\.\s/.test(entry.trimStart())) continue;
+
+    const citation = /Citation:\s*(.+)/.exec(entry)?.[1]?.trim();
+    if (citation === undefined || citation === '') continue;
+
+    /*
+      Every rule id named anywhere in the entry, rather than only after "Quoted by".
+
+      The entries say it in their own words — "Quoted by AIPOL-001, AIPOL-002 and AICAT-001" in one,
+      "Section 3(a)(2) is quoted by AITD-001; section 3(a)(3) by AITD-002" in the next — and a rule
+      named in a provenance entry is a rule that quotes it. Over-reading is bounded: the validator
+      already holds every clause byte for byte against this file, and the adult rule set's test holds
+      each quoting rule to exactly one citation.
+    */
+    for (const match of entry.matchAll(/\b([A-Z]{2,}-\d{3})\b/g)) {
+      byRule[match[1]!] = citation;
+    }
+  }
+  return byRule;
+}

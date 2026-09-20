@@ -86,7 +86,7 @@ export {
  * the pure half is exported beside it so a caller holding the text does not need the filesystem.
  * Deliberately absent from `browser.ts`: the frontend has no corpus and no business asserting on one.
  */
-export { checkAgainstCorpus, corpusClauseLines, CORPUS_CLAUSE_HEADING } from './corpus.js';
+export { checkAgainstCorpus, citationsByRule, corpusClauseLines, CORPUS_CLAUSE_HEADING } from './corpus.js';
 export { checkAgainstCorpusFile, CORPUS_PATH } from './corpusFile.js';
 
 // Which rule set and corpus each vertical uses (D-284, D-288). Node only.

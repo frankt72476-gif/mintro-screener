@@ -79,8 +79,10 @@ describe('what the page carries (memo §9)', () => {
 
   it('shows what was observed, by category in the rule set\'s order', () => {
     const order = ['Access and disclosure', 'Content policy', 'Takedown', 'Product features', 'Character catalogue', 'Marketing'];
-    const positions = order.map((name) => text.indexOf(name));
-    expect(positions.every((p) => p > text.indexOf('What was observed'))).toBe(true);
+    // From the heading onward: the index above names the same categories, in the same order (4b).
+    const observed = text.slice(text.indexOf('What was observed'));
+    const positions = order.map((name) => observed.indexOf(name));
+    expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 

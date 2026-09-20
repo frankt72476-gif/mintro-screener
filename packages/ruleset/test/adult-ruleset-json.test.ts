@@ -17,6 +17,7 @@ import {
   VERTICAL_FILES,
   checkAgainstCorpus,
   checkAgainstCorpusFile,
+  citationsByRule,
   corpusClauseLines,
   loadRulesetFile,
   loadRulesetForVertical,
@@ -37,8 +38,9 @@ describe('rules/ruleset-adult-ai.json', () => {
     // 0.1.1: phrase-level term lists, AIGATE-003 retitled. 0.1.2: unambiguous single words and inflections.
     // 0.2.0: rules read several page types (cluster 2). 0.3.0: dom_feature rules (cluster 2).
     // 0.4.0: the attestation set, not-checked items and AIATT- manual rules (cluster 4, D-286).
-    expect(adult.version).toBe('0.4.0');
-    expect(adult.effective).toBe('2026-09-19');
+    // 0.4.1: titles are noun phrases naming the thing looked for, with no surface (cluster 4b, D-286).
+    expect(adult.version).toBe('0.4.1');
+    expect(adult.effective).toBe('2026-09-20');
     expect(adult.source_document).toBe('Adult AI public-rule excerpts v1');
   });
 
@@ -127,6 +129,43 @@ describe('rules/ruleset-adult-ai.json', () => {
     }
   });
 
+  it('names no surface in a title, because the report\'s sentence supplies it once (cluster 4b)', () => {
+    /*
+      "Minors named in the terms" read as "Minors named in the terms \u2014 observed on the terms
+      document": the surface twice in one sentence, and wrong the moment a rule reads two. The title
+      is the thing looked for; where it was looked for is the report's to say, from what the run read.
+    */
+    for (const rule of adult.rules) {
+      // "Minor-coded terms" is words on a page, not the terms document: the phrasing is what gives a
+      // surface away — "in the terms", "on public pages", "footer".
+      expect(rule.title, rule.id).not.toMatch(/\b(?:footer|homepage|website)\b|\b(?:in|on) the\b|\bpages?\b/i);
+    }
+  });
+
+  it('carries the titles of the 0.4.1 pass, one noun phrase each', () => {
+    const titles = Object.fromEntries(
+      adult.rules.filter((rule) => rule.type !== 'manual').map((rule) => [rule.id, rule.title]),
+    );
+    expect(titles).toEqual({
+      'AIGATE-003': 'Non-human disclosure statement',
+      'AIPOL-001': 'Prohibition of depicting minors',
+      'AIPOL-002': 'Prohibition of real-person likeness',
+      'AIPOL-003': 'Prohibition of non-consensual content',
+      'AIPOL-004': 'Prohibition of bestiality',
+      'AIPOL-006': 'Prohibition of mutilation or gore',
+      'AITD-001': 'Content removal route',
+      'AITD-002': '48-hour removal commitment',
+      'AIFEAT-001': 'Upload control for images',
+      'AIFEAT-002': 'Face-swap or face-consistency language',
+      'AIFEAT-003': 'Video generation language',
+      'AIFEAT-004': 'Model selection or LoRA language',
+      'AICAT-001': 'Minor-coded terms',
+      'AICAT-002': 'Real-person likeness terms',
+      'AIMKT-001': 'Filter-removal marketing language',
+      'AIMKT-002': 'Affiliate program',
+    });
+  });
+
   it('carries no placeholder', () => {
     // A rule whose detector lands in a later cluster is left out until then (Frank, 2026-09-18).
     expect(readFileSync(ADULT_RULESET_PATH, 'utf8')).not.toMatch(/cluster \d|detector lands|TODO|placeholder/i);
@@ -195,6 +234,19 @@ describe('rules/ruleset-adult-ai.json', () => {
     // Held equal to the engine's ADULT_MULTI_TURN_BOUNDARY in packages/engine/test/adultAttestations.test.ts.
   });
 
+  it('names, for every rule that quotes a source, which source it quotes (cluster 4b)', () => {
+    const citations = citationsByRule(corpusText);
+    for (const rule of adult.rules) {
+      // A rule Mintro wrote quotes nothing, so no provenance entry names it.
+      const cited = citations[rule.id];
+      if (rule.source === 'programme') expect(typeof cited, rule.id).toBe('string');
+      else expect(cited, rule.id).toBeUndefined();
+    }
+    expect(new Set(Object.values(citations))).toEqual(
+      new Set(['Mastercard Rules 5.12.7', 'TAKE IT DOWN Act § 3(a)', 'Cal. SB 243, Bus. & Prof. Code § 22602(a)']),
+    );
+  });
+
   it('is the rule set the adult_ai vertical loads', () => {
     expect(loadRulesetForVertical('adult_ai', REPO_ROOT)).toEqual(adult);
   });
@@ -236,6 +288,10 @@ describe('the peptide vertical is unchanged', () => {
     const peptides = loadRulesetForVertical('peptides', REPO_ROOT);
     expect(peptides.version).toBe('3.11.0');
     expect(peptides).toEqual(loadRulesetFile(RULESET_PATH));
+  });
+
+  it('carries no citation lines, so its report renders as it always has', () => {
+    expect(citationsByRule(readFileSync(resolve(REPO_ROOT, VERTICAL_FILES.peptides.corpus), 'utf8'))).toEqual({});
   });
 
   it('reads a peptide rule with no sense as absent', () => {

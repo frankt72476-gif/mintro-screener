@@ -4,6 +4,8 @@
  * Observation, capture, source — that is the whole report. What it carries, in order:
  *
  *   1. The masthead: the domain, the date, and what the document is (`ADULT_REPORT_POSTURE`).
+ *   1a. The index: one row per finding, in the rule set's order, each row a link to its finding
+ *      (cluster 4b). A table of contents, never a summary — no count, no total, no ranking.
  *   2. What was observed, by category in the rule set's order, each finding with its label, what was
  *      observed, its capture, and the public rule or statute it relates to under "Source" — or, for a
  *      rule Mintro wrote, "Mintro observation".
@@ -20,6 +22,9 @@
 
 import {
   ADULT_REPORT_POSTURE,
+  adultIndexRows,
+  adultLeadSentence,
+  whereWords,
   adultNotChecked,
   clauseHeadingFor,
   formatReportDate,
@@ -30,6 +35,8 @@ import {
   type ScreeningReport,
 } from '@mintro/engine';
 import { referralPolicyLine } from '@mintro/ruleset';
+import { citationFor } from '../lib/citations.js';
+import { formatStamp } from '../lib/format.js';
 import type { EvidenceAccess } from '../lib/evidence.js';
 import { EvidenceSlip } from './EvidenceSlip.js';
 import { AttestationSection, NotCheckedSection } from './Attestations.js';
@@ -66,6 +73,8 @@ export function AdultFindingsReport({
         </div>
       </header>
 
+      <AdultIndex report={report} {...(attestations === undefined ? {} : { attestations })} />
+
       <section className="adult-observed" aria-labelledby="adult-observed-head">
         <h2 id="adult-observed-head">What was observed</h2>
         {report.categories.map((category) =>
@@ -73,7 +82,7 @@ export function AdultFindingsReport({
             <section key={category.id} className="adult-category">
               <h3>{category.name}</h3>
               {category.findings.map((finding, index) => (
-                <AdultFinding key={`${finding.ruleId}-${index}`} finding={finding} access={access} />
+                <AdultFinding key={`${finding.ruleId}-${index}`} finding={finding} access={access} print={print} />
               ))}
             </section>
           ),
@@ -102,9 +111,75 @@ export function AdultFindingsReport({
   );
 }
 
+/**
+ * The index: every finding, in the rule set's order, with a link to it (cluster 4b commit 1).
+ *
+ * Four columns and nothing else. No count row and no total, because a tally of observations is the
+ * summary judgment A1 forbids; no colour and no icon, because "Observed" is not worse than "Not
+ * observed" until a reader decides it is (memo §9). The last column says which kind of page a row
+ * rests on, in words — the finding below carries the URL and the capture.
+ */
+function AdultIndex({
+  report,
+  attestations,
+}: {
+  readonly report: ScreeningReport;
+  readonly attestations?: RunAttestations;
+}): JSX.Element | null {
+  const rows = adultIndexRows(report, attestations);
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="adult-index" aria-labelledby="adult-index-head">
+      <h2 id="adult-index-head">What this report covers</h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Area</th>
+            <th scope="col">What Mintro looked for</th>
+            <th scope="col">What was seen</th>
+            <th scope="col">Where</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.ruleId}>
+              <td>{row.area}</td>
+              <th scope="row">
+                <a href={`#finding-${row.ruleId}`}>{row.lookedFor}</a>
+              </th>
+              <td>{row.seen}</td>
+              <td>{row.where}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 /** One finding: its label, what was observed, its capture, and what it relates to. */
-function AdultFinding({ finding, access }: { readonly finding: ReportFinding; readonly access: EvidenceAccess }): JSX.Element {
+function AdultFinding({
+  finding,
+  access,
+  print,
+}: {
+  readonly finding: ReportFinding;
+  readonly access: EvidenceAccess;
+  readonly print: boolean;
+}): JSX.Element {
   const note = finding.state === 'not_evaluable' ? notObservedSentence(finding) : finding.note;
+  const captured = finding.evidence[0]?.capturedAt;
+  const citation = citationFor('adult_ai', finding.ruleId);
+
+  /*
+    One line where the capture's provenance was (cluster 4b commit 3): when it was taken and what of.
+    Open in the delivered file, which is read without a mouse.
+  */
+  const fold =
+    captured === undefined
+      ? undefined
+      : { label: `Capture · ${formatStamp(captured)} · ${whereWords(finding)}`, open: print };
 
   return (
     <article className="adult-finding" id={`finding-${finding.ruleId}`}>
@@ -114,10 +189,23 @@ function AdultFinding({ finding, access }: { readonly finding: ReportFinding; re
         <span className="find-title">{finding.title}</span>
         <span className="rid">{finding.ruleId}</span>
       </header>
+      {/*
+        The plain sentence first, the matched phrases beneath it (cluster 4b commit 2).
+
+        `adultLeadSentence` writes it from the title, the label and the page — no model, no
+        paraphrase of the merchant's words. The line beneath is the evidence exactly as the check
+        wrote it: "Observed: 'minors'", or what was attempted where nothing could be read.
+      */}
+      <p className="adult-lead">{adultLeadSentence(finding)}</p>
       <p className="adult-note">{note}</p>
-      <EvidenceSlip finding={finding} access={access} />
-      <div className="req-col">
+      <EvidenceSlip finding={finding} access={access} {...(fold === undefined ? {} : { fold })} />
+      <div className="req-col adult-source">
         <span className="req-h">{clauseHeadingFor('adult_ai', finding.source)}</span>
+        {/*
+          Which source, before the ninety words of it (cluster 4b commit 3). From the corpus's own
+          provenance entry, so the report cannot name a source the corpus does not.
+        */}
+        {citation !== undefined && <span className="src-cite">{citation}</span>}
         {/* Verbatim. No trim, no ellipsis, no sentence case (D-041). */}
         <blockquote className="req-t req-quote">{finding.clause}</blockquote>
       </div>
