@@ -19373,8 +19373,8 @@ before (D-002); its message now quotes the text it read rather than "(no text wa
 ## D-292 — A generic sign-in with a stored login, judged by positive evidence, never retried blind
 
 **Date:** 2026-10-08
-**Status:** accepted (Frank, 2026-10-08). **Stage 1 of 2** — items 1, 2, 3, 6 and 7 are built; items 4
-and 5 land in stage 2. **Stage 1 must not deploy alone** (see the end).
+**Status:** accepted (Frank, 2026-10-08). **Stage 1** built items 1, 2, 3, 6 and 7; **stage 2** built items 4
+and 5. **Stage 1 must not deploy alone** (see the end).
 **See:** D-026, D-039, D-051, D-279, D-291
 
 **The site.** app.thepeptide.com (runs dd48f232, cbd323fa) is a client-rendered SPA on no platform a
@@ -19446,7 +19446,27 @@ The credential read it cost stays in the access log; it happened.
   credential order forbids. **Open item: storing `loginUrl` outside the seal**, so the generic path can
   use a merchant-supplied sign-in page without a credential read.
 
-**4 and 5, stage 2.** Early wall detection on the homepage render, and signed-in product discovery.
+**4. Early wall detection** (stage 2). Straight after the homepage render, before the sample is
+chosen: if the homepage request ended at a sign-in page — a sign-in path, or a non-root URL whose DOM
+carries a password field — the run is walled with `signInUrl` that final URL and `walledUrl` the
+requested homepage, and escalates there (`earlySignInWall`). A challenged, gated or failed render never
+fires it. **One sign-in attempt per run:** once the early check has escalated, neither the product-wall
+escalation nor the late check escalates again. The late check (D-291) stays as the backstop, unchanged,
+for a wall the homepage did not show.
+
+**5. Signed-in product discovery** (stage 2), when the early escalation signs in
+(`signedInDiscovery.ts`). In the signed-in context it renders `walledUrl`, then up to five same-origin
+catalogue entry points that page links in its navigation, through the run's pacer (D-013). **Hrefs
+only:** nothing is clicked and nothing submitted — the consent-gate pass is off for these renders. Product
+URLs are the product cards and Product markup on the pages read, plus same-origin links under the path
+segment two or more of those share, one level deeper than the segment. They join `productUrls` ahead of
+scoring and sampling — not through `reclassify` — so the certificate fetch, Layer 2 and the gate rules'
+first product see them; the gate probes stay anonymous. The sample is rendered with the session that
+found it. Coverage records the source (`sample.productSource`, "found on pages read while signed in"),
+and the access note says signed-in pages were read. Where no product URL is identified, the note says the
+account signed in, signed-in pages were read, and no product pages could be identified on them; the
+product-surface rules are not observed, as before. The evaluation guard stops refusing on the sign-in
+wall once the sample was read with the account.
 
 **Stage 1 must not deploy alone.** With 1–3 and 6 in place but 4–5 not, a sign-in wall now attempts a
 real sign-in — a credential read, a submit against the merchant's account, a session stored — and then

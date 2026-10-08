@@ -49,6 +49,7 @@ import {
   tally,
   describeObservationCounts,
   assessSignInWall,
+  earlySignInWall,
   assessWall,
   wasServed,
   describeTruncation,
@@ -71,6 +72,7 @@ import {
 import { createCrawlContext, renderPage } from './render.js';
 import { runGateRules, type AnonymousAccess } from './gate.js';
 import { discoverLayer3 } from './signup.js';
+import { discoverSignedIn, type SignedInDiscovery } from './signedInDiscovery.js';
 import { DOCS_PAGE_CAP } from './docsOrigin.js';
 import { coaLinkVocabulary, fetchCertificate } from './coa.js';
 import { probePaths } from './probe.js';
@@ -142,6 +144,13 @@ export type Escalation =
 export interface EscalationWall {
   readonly signInUrl?: string;
   readonly walledUrl?: string;
+}
+
+/** What signed-in discovery reached, for the access note and the record (D-292). */
+export interface SignedInReach {
+  readonly signInUrl: string;
+  readonly pagesRead: number;
+  readonly productUrls: number;
 }
 
 const wallForEscalation = (wall: WallAssessment): EscalationWall => ({
@@ -297,6 +306,8 @@ export async function screenStorefront(
     sampleSettled: boolean;
     wall?: WallAssessment;
     escalation?: Escalation;
+    /** What signed-in discovery reached, where the homepage wall signed in (D-292). */
+    signedInReach?: SignedInReach;
     usedCredential: boolean;
     mode: ScanMode;
     coa?: Awaited<ReturnType<typeof fetchCertificate>>;
@@ -370,7 +381,7 @@ export async function screenStorefront(
         runId,
         ...(options.vertical === undefined ? {} : { vertical: options.vertical }),
         ...(reached.sampleSettled && reached.wall !== undefined
-          ? { access: describeAccess(reached.wall, reached.mode, reached.usedCredential, reached.escalation) }
+          ? { access: describeAccess(reached.wall, reached.mode, reached.usedCredential, reached.escalation, reached.signedInReach) }
           : {}),
         merchantDomain: new URL(reached.origin ?? target).host,
         ...(reached.homepage === undefined || reached.homepage.title === ''
@@ -466,6 +477,52 @@ export async function screenStorefront(
   reached.renderedPages = renderedPages;
   reached.layer1Findings = layer1.findings;
 
+  // ---- early wall detection (D-292, item 4) ----------------------------------------------
+  //
+  // The homepage itself was sent to sign-in. Escalate here, before the sample is chosen, so a session
+  // can find the catalogue the anonymous crawl never will. One sign-in attempt per run: the two later
+  // escalation points do not run again once this one has (`escalation !== undefined`).
+  /** What escalation found, when it ran. `undefined` means the crawl was never refused. */
+  let escalation: Escalation | undefined;
+  /** The wall the homepage met, where it met one. Kept for the note if no session widens the crawl. */
+  const earlyWall = earlySignInWall(rendered.page);
+  /** What a signed-in session found, where the early path signed in. */
+  let discovery: SignedInDiscovery | undefined;
+  let signedInContext: BrowserContext | undefined;
+  if (earlyWall !== null) {
+    say(earlyWall.reason);
+    if (options.escalate !== undefined) {
+      checkpoint();
+      escalation = await options.escalate(wallForEscalation(earlyWall));
+      reached.escalation = escalation;
+      checkpoint();
+      progress.enter('escalate', escalationLine(escalation, 'discover'));
+
+      if (escalation.kind === 'signed_in' && earlyWall.walledUrl !== undefined) {
+        signedInContext = escalation.context;
+        discovery = await discoverSignedIn({
+          browser,
+          context: signedInContext,
+          walledUrl: earlyWall.walledUrl,
+          runId,
+          pacer,
+          ...withSignal,
+        });
+        artifacts.push(...discovery.artifacts);
+        renderedPages.push(...discovery.pages);
+        for (const step of discovery.steps) say(`  ${step}`);
+        progress.productsFoundSignedIn(discovery.pagesRead);
+        if (earlyWall.signInUrl !== undefined) {
+          reached.signedInReach = {
+            signInUrl: earlyWall.signInUrl,
+            pagesRead: discovery.pagesRead,
+            productUrls: discovery.productUrls.length,
+          };
+        }
+      }
+    }
+  }
+
   // ---- feed what Layer 1 learned back into the Layer 0 classifier -----------------------
   const overrides = toScopeOverrides(rendered.page);
   const improved = reclassify(layer0, overrides);
@@ -483,7 +540,28 @@ export async function screenStorefront(
   );
 
   // ---- Layer 2: sample product pages by suspicion score --------------------------------
-  const productUrls = improved.urls.filter((url) => inScope(url, 'products'));
+  /*
+    Product URLs found while signed in join here, ahead of scoring and sampling (D-292, item 5) — not
+    through `reclassify`, which only re-labels what a sitemap listed. From here the certificate fetch,
+    Layer 2 and the gate rules' first product all see them as they see any product URL. They are
+    classified with the overrides learned from the signed-in pages, so they carry the products scope.
+  */
+  const signedInProducts: SlugUrl[] =
+    discovery === undefined || discovery.productUrls.length === 0
+      ? []
+      : discovery.productUrls
+          .map((url) =>
+            toSlugUrl(url, {
+              ...(discovery?.productSegment == null ? {} : { segments: { products: [discovery.productSegment] } }),
+              knownUrls: { products: discovery?.productUrls ?? [], collections: [] },
+            }),
+          )
+          .filter((slug): slug is SlugUrl => slug !== null && inScope(slug, 'products'));
+  const signedInKeys = new Set(signedInProducts.map((slug) => slug.url));
+  const productUrls = [
+    ...signedInProducts,
+    ...improved.urls.filter((url) => inScope(url, 'products') && !signedInKeys.has(url.url)),
+  ];
   const scored = scoreProductUrls(productUrls, ruleset);
 
   /*
@@ -560,13 +638,19 @@ export async function screenStorefront(
     return pages;
   };
 
-  // ---- public first, always ---------------------------------------------------------------
-  let sampled = await renderSample();
-  let wall = assessWall(sampled.map((entry) => entry.page));
-  let usedCredential = false;
-  /** What escalation found, when it ran. `undefined` means the crawl was never refused. */
-  let escalation: Escalation | undefined;
-  let mode: ScanMode = 'public';
+  // ---- public first — unless the homepage was walled and the account signed in -------------
+  //
+  // On the early path the sample was found while signed in, and is rendered with the session that
+  // found it, as the existing signed-in re-render is (D-292). Everywhere else, public first, always.
+  let sampled = await renderSample(signedInContext);
+  let wall = assessWall(
+    sampled.map((entry) => entry.page),
+    signedInContext === undefined ? 'anonymous' : 'screening_account',
+  );
+  let usedCredential = signedInContext !== undefined && wall.served > 0;
+  let mode: ScanMode = usedCredential ? 'screening_account' : 'public';
+  // A homepage wall the session did not get past stays the run's wall: it is what the note describes.
+  if (earlyWall !== null && !usedCredential && wall.served === 0) wall = earlyWall;
   reached.sampled = sampled;
   reached.wall = wall;
 
@@ -626,7 +710,8 @@ export async function screenStorefront(
   // The condition is what was *observed*, not what anyone selected. A credential is applied when
   // the anonymous crawl was refused and one exists; otherwise the report says coverage was
   // limited and why. Nobody is asked to predict which it will be (D-040).
-  if (wall.walled && options.escalate !== undefined) {
+  // Not when the homepage wall already escalated: one sign-in attempt per run (D-292).
+  if (wall.walled && options.escalate !== undefined && escalation === undefined) {
     checkpoint();
     escalation = await options.escalate(wallForEscalation(wall));
     reached.escalation = escalation;
@@ -900,8 +985,12 @@ export async function screenStorefront(
     Escalation runs as it does for a product wall, and its outcome is recorded. What a session
     cannot do here is widen the sample — there are no product URLs to render with it — so a sign-in
     that succeeds is reported as one, and the public crawl stands.
+
+    The backstop since D-292: where the homepage itself was sent to sign-in, the early check above
+    has already escalated, and one run makes one sign-in attempt. This reads only walls the homepage
+    did not show — a public homepage over a walled rest of the site.
   */
-  if (wall.attempted === 0) {
+  if (wall.attempted === 0 && earlyWall === null) {
     const destinations: Destination[] = [
       ...discovered.pages.map((page) => ({ requestedUrl: page.requestedUrl, finalUrl: page.finalUrl })),
       ...discovered.probe.rejected,
@@ -917,7 +1006,7 @@ export async function screenStorefront(
         escalation = await options.escalate(wallForEscalation(wall));
         reached.escalation = escalation;
         checkpoint();
-        progress.enter('escalate', escalationLine(escalation, false));
+        progress.enter('escalate', escalationLine(escalation, 'none'));
       }
     }
   }
@@ -948,7 +1037,7 @@ export async function screenStorefront(
     {
       runId,
       ...(options.vertical === undefined ? {} : { vertical: options.vertical }),
-      access: describeAccess(wall, mode, usedCredential, escalation),
+      access: describeAccess(wall, mode, usedCredential, escalation, reached.signedInReach),
       merchantDomain: new URL(layer0.origin).host,
       ...(rendered.page.title === '' ? {} : { merchantName: rendered.page.title }),
       ...(rendered.page.shop.platform === undefined ? {} : { platform: rendered.page.shop.platform }),
@@ -1118,7 +1207,14 @@ function commonSegment(urls: readonly string[]): string | null {
  * One line always. A sign-in reason can end in a Playwright call log, which the worker log already
  * holds in full; the run page and the queue row carry its first line (D-278).
  */
-export function escalationLine(escalation: Escalation, sampleToRender = true): string {
+export function escalationLine(
+  escalation: Escalation,
+  /**
+   * What a successful sign-in is used for next: re-rendering a product sample (a product wall), reading
+   * signed-in pages for the catalogue (a homepage wall, D-292), or nothing (the late backstop).
+   */
+  next: 'sample' | 'discover' | 'none' = 'sample',
+): string {
   switch (escalation.kind) {
     case 'no_credential':
       return 'a login wall was met and no screening account is stored for this merchant';
@@ -1139,9 +1235,11 @@ export function escalationLine(escalation: Escalation, sampleToRender = true): s
       // Distinct from the line above, and the distinction reaches the report (D-185).
       return `a login wall was met and the stored screening account did not sign in: ${firstLine(escalation.reason)}`;
     case 'signed_in':
-      return sampleToRender
+      return next === 'sample'
         ? 'a login wall was met; re-rendering the sample with the stored screening account'
-        : 'a login wall was met; the stored screening account signed in successfully, and no signed-in pages were crawled';
+        : next === 'discover'
+          ? 'the homepage was sent to sign-in; the stored screening account signed in successfully, and signed-in pages are read for product links'
+          : 'a login wall was met; the stored screening account signed in successfully, and no signed-in pages were crawled';
   }
 }
 
@@ -1187,7 +1285,59 @@ export function describeAccess(
   mode: ScanMode,
   usedCredential: boolean,
   escalation: Escalation | undefined,
+  /** Where the homepage was sent to sign-in and the account signed in, what reading signed-in pages found. */
+  signedIn?: SignedInReach,
 ): ReportAccess {
+  /*
+    The homepage was sent to sign-in, the account signed in, and signed-in pages were read (D-292).
+
+    Its own sentences, because neither the product-wall note nor the sign-in-wall note describes a run
+    that read pages with the account. Three outcomes: the sample was read with it; it signed in and no
+    product page could be identified on what it read; product URLs were found and none was served.
+    Observation only (D-001). The record keeps the wall and what was read, and the evaluation guard
+    stops refusing once `usedCredential` says the catalogue was read.
+  */
+  if (signedIn !== undefined) {
+    const record = {
+      url: signedIn.signInUrl,
+      outcome: 'signed_in' as const,
+      signedInPagesRead: signedIn.pagesRead,
+      productUrlsFound: signedIn.productUrls,
+    };
+    const head =
+      `The homepage was sent to the sign-in page ${signedIn.signInUrl}. ` +
+      'The stored screening account signed in successfully';
+    const found =
+      `${signedIn.productUrls} product ${signedIn.productUrls === 1 ? 'URL was' : 'URLs were'} identified on ` +
+      `${signedIn.pagesRead} ${signedIn.pagesRead === 1 ? 'page' : 'pages'} read while signed in`;
+
+    if (usedCredential) {
+      return {
+        mode,
+        wall: true,
+        usedCredential: true,
+        note:
+          `${head}, and signed-in pages were read: ${found}, and the sampled product pages were read with ` +
+          'the account. The access-gating findings are unaffected: they are decided by requests carrying ' +
+          'no session.',
+        signInWall: record,
+      };
+    }
+
+    const why =
+      signedIn.productUrls === 0
+        ? `${head}, and ${signedIn.pagesRead} ${signedIn.pagesRead === 1 ? 'page was' : 'pages were'} read ` +
+          'while signed in; no product pages could be identified on them.'
+        : `${head}, and ${found}; none of the sampled product pages was served with the account.`;
+    return {
+      mode,
+      wall: true,
+      usedCredential: false,
+      note: `${why} Product-surface rules could not be observed and are reported as not observed.`,
+      signInWall: record,
+    };
+  }
+
   if (usedCredential) {
     return {
       mode,

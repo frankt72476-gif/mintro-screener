@@ -192,7 +192,7 @@ describe('a stored login with no sign-in method for the site', () => {
   });
 
   it('enters the same fact on the progress line', () => {
-    const line = escalationLine({ kind: 'signed_in', context: null as never }, false);
+    const line = escalationLine({ kind: 'signed_in', context: null as never }, 'none');
 
     expect(line).toContain('signed in successfully');
     expect(line).toContain('no signed-in pages were crawled');

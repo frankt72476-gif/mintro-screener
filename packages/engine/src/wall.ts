@@ -196,6 +196,41 @@ export function assessSignInWall(
   };
 }
 
+/**
+ * A sign-in wall seen on the homepage render alone (D-292, item 4).
+ *
+ * The homepage request ended somewhere else, and that somewhere is a sign-in page: its path is a
+ * sign-in path, or it is not the site root and its rendered DOM carries a password field. Read
+ * straight after the homepage render, so a run that is walled at the door escalates before the
+ * sample is chosen — and a session can then be used to find the catalogue the anonymous crawl never
+ * could. `assessSignInWall` stays as the backstop for a wall this does not see.
+ *
+ * Never fires on a page that rendered with an error, was challenged, or was the merchant's own
+ * consent gate (D-264, D-266): none of those is a sign-in page, and no account opens them.
+ */
+export function earlySignInWall(homepage: PageContext): WallAssessment | null {
+  if (homepage.renderError !== undefined || homepage.challenged !== undefined || homepage.gated !== undefined) {
+    return null;
+  }
+  const finalUrl = homepage.finalUrl === '' ? homepage.requestedUrl : homepage.finalUrl;
+  if (endKey(finalUrl) === endKey(homepage.requestedUrl)) return null;
+
+  const signInPage = isSignInPath(finalUrl) || (!isSiteRoot(finalUrl) && hasPasswordField(homepage.html));
+  if (!signInPage) return null;
+
+  return {
+    walled: true,
+    attempted: 0,
+    served: 0,
+    challenged: 0,
+    consentGated: 0,
+    reason: `the homepage was sent to the sign-in page ${finalUrl}`,
+    refusals: [],
+    signInUrl: finalUrl,
+    walledUrl: homepage.requestedUrl,
+  };
+}
+
 /** Whether a URL is the site root: `/`, or no path at all. */
 function isSiteRoot(url: string): boolean {
   try {
