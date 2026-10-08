@@ -11,6 +11,7 @@ export { runLayer0, layer0Rules, type Layer0Run } from './layer0.js';
 export {
   discoverLayer0,
   reclassify,
+  servedHtmlInstead,
   DEFAULT_LIMITS,
   type FetchedDocument,
   type Layer0Limits,
@@ -336,6 +337,8 @@ export {
   type AssembleInput,
   type ReportCategory,
   type ReportAccess,
+  type SignInOutcome,
+  type SignInWallRecord,
   type ReportCoverage,
   type ChallengeSummary,
   type ConsentGateSummary,
@@ -386,7 +389,15 @@ export { checkUrlPattern, findMatches, type PatternMatch } from './checks/urlPat
  * implementations is how `evidence.key` and its storage path diverged (D-034). WebCrypto only, so
  * it is literally the same code in both runtimes.
  */
-export { assessWall, wasServed, type WallAssessment } from './wall.js';
+export {
+  assessSignInWall,
+  assessWall,
+  hasPasswordField,
+  isSignInPath,
+  wasServed,
+  type Destination,
+  type WallAssessment,
+} from './wall.js';
 
 export {
   seal,

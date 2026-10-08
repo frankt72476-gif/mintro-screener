@@ -66,7 +66,9 @@ export const PLATFORM_LOGINS: Readonly<Record<ScriptedPlatform, PlatformLogin>> 
 const MARKERS: readonly { readonly platform: DetectedPlatform; readonly pattern: RegExp }[] = [
   { platform: 'shopify', pattern: /cdn\.shopify\.com|Shopify\.theme|shopify-features/i },
   { platform: 'woocommerce', pattern: /woocommerce|wp-content\/plugins\/woocommerce/i },
-  { platform: 'magento', pattern: /Magento|mage\/|static\/version\d/i },
+  // Anchored (D-291): `mage/` unanchored matched `image/svg+xml` in a favicon tag. Kept identical to
+  // the copy in extract.ts, which runs in the page and cannot import this.
+  { platform: 'magento', pattern: /Magento|\bmage\/|\/static\/version\d+\//i },
   { platform: 'bigcommerce', pattern: /bigcommerce|cdn\d+\.bigcommerce\.com/i },
 ];
 

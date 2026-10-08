@@ -20,6 +20,7 @@ import {
   openLoginForm,
 } from '../src/auth/login.js';
 import { PLATFORM_LOGINS } from '../src/auth/platform.js';
+import { signInForScan } from '../src/auth/signIn.js';
 import { OVERLAY_NO_WAY_THROUGH } from '../src/driveAdd.js';
 import { createMemoryBackend, createVault, encrypt, keyFromToken } from '../src/auth/vault.js';
 import { createCrawlContext } from '../src/render.js';
@@ -411,5 +412,57 @@ describe('consent gates and overlays on the login page (D-279)', () => {
     expect(result.needsHuman).toBe(`scripted woocommerce login failed: ${OVERLAY_NO_WAY_THROUGH}`);
     expect(gated.loads).not.toContain('/left/');
     expect(gated.posts).toEqual([]);
+  });
+});
+
+/*
+  One credential read per sign-in (D-291).
+
+  The worker opened the credential to see whether one was stored, then `establishSession` opened it
+  again to sign in: two `read_credentials` rows in `credential_access` for one sign-in. It is now
+  opened once, in `signInForScan`, and handed to `establishSession`. A real scripted sign-in, end to
+  end, so the count is of the reads a sign-in actually makes. The vault's access log is the record
+  `createSealedVault` writes to `credential_access`, one entry per access.
+*/
+describe('a sign-in reads the credential once', () => {
+  it('writes exactly one read_credentials entry for a scripted sign-in that succeeds', async () => {
+    const gated = await gatedLogin('checkbox');
+    const token = 'a-test-token-of-sufficient-length';
+    const vaultRef = 'merchants/gated.example';
+    const vault = createVault(
+      createMemoryBackend({
+        [`${vaultRef}/credentials`]: encrypt(JSON.stringify({ username: 'u', password: 'p' }), keyFromToken(token)),
+      }),
+      token,
+    );
+    const homepageHtml = '<link href="/wp-content/plugins/woocommerce/style.css">';
+
+    const { outcome } = await signInForScan({
+      origin: gated.origin,
+      hostname: '127.0.0.1',
+      vaultRef,
+      vault,
+      credentialStored: async () => true,
+      fetchHomepage: async () => homepageHtml,
+      establish: (html, credentials) =>
+        establishSession({ browser, origin: gated.origin, vault, vaultRef, homepageHtml: html, credentials, timeoutMs: 10_000 }),
+      recordSignIn: async () => undefined,
+    });
+
+    try {
+      expect(outcome.kind).toBe('signed_in');
+      const reads = vault.accessLog().filter((entry) => entry.action === 'read_credentials');
+      expect(reads).toHaveLength(1);
+      // The session record is a separate access, named for what it is: one look for a stored
+      // session, one write of the new one. Neither reads the credential.
+      expect(vault.accessLog().map((entry) => entry.action)).toEqual([
+        'read_credentials',
+        'read_session',
+        'write_session',
+      ]);
+    } finally {
+      if (outcome.kind === 'signed_in') await outcome.context.close();
+      gated.server.close();
+    }
   });
 });

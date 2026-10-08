@@ -382,3 +382,41 @@ describe('why an earlier attempt was refused (0080)', () => {
   });
 });
 
+
+describe('why the storefront was not seen (0092)', () => {
+  const insertWithCause = (runId: string, status: string, cause: string | null) =>
+    schema.query(
+      `insert into public.evaluation_drafts
+         (run_id, angles_version, ruleset_version, model, input_sha256, content, validator_status,
+          validator_message, not_seen_cause)
+       values ($1, '1.0.0', '3.9.0', 'claude-opus-5', $2, null, $3, 'every page was sent to /login', $4)`,
+      [runId, SHA, status, cause],
+    );
+
+  it('accepts a refusal that names the sign-in wall', async () => {
+    const runId = await finishedRun();
+    await expect(insertWithCause(runId, 'run_did_not_see_storefront', 'sign_in_wall')).resolves.toBeDefined();
+  });
+
+  it('accepts a refusal with no cause, which is every refusal before it', async () => {
+    const runId = await finishedRun();
+    await expect(insertWithCause(runId, 'run_did_not_see_storefront', null)).resolves.toBeDefined();
+  });
+
+  it('accepts the consent-gate and bot-challenge causes', async () => {
+    for (const cause of ['consent_gate', 'bot_challenge']) {
+      const runId = await finishedRun();
+      await expect(insertWithCause(runId, 'run_did_not_see_storefront', cause)).resolves.toBeDefined();
+    }
+  });
+
+  it('refuses a cause it does not name', async () => {
+    const runId = await finishedRun();
+    await expect(insertWithCause(runId, 'run_did_not_see_storefront', 'text_collapse')).rejects.toThrow();
+  });
+
+  it('refuses a cause on anything but a refusal', async () => {
+    const runId = await finishedRun();
+    await expect(insertWithCause(runId, 'failed', 'sign_in_wall')).rejects.toThrow();
+  });
+});

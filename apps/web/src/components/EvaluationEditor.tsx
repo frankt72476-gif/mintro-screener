@@ -59,6 +59,8 @@ interface DraftRow {
   readonly handles: StoredHandles | null;
   readonly validator_status: string;
   readonly validator_message: string | null;
+  /** Why the storefront was not seen, where the screen branches on it (0092, D-291). */
+  readonly not_seen_cause: string | null;
   readonly ruleset_version: string;
   readonly angles_version: string;
   readonly model: string;
@@ -271,7 +273,7 @@ export function EvaluationEditor({
         client
           .from('evaluation_drafts')
           .select(
-            'content, handles, validator_status, validator_message, ruleset_version, angles_version, model, edited_at',
+            'content, handles, validator_status, validator_message, not_seen_cause, ruleset_version, angles_version, model, edited_at',
           )
           .eq('run_id', runId)
           .maybeSingle(),
@@ -356,6 +358,7 @@ export function EvaluationEditor({
         handles: null,
         validator_status: 'ok',
         validator_message: null,
+        not_seen_cause: null,
         ruleset_version: versions.rulesetVersion,
         angles_version: versions.anglesVersion,
         model: versions.model,
@@ -563,6 +566,7 @@ export function EvaluationEditor({
       <RefusedNotice
         status={load.row.validator_status}
         message={load.row.validator_message}
+        cause={load.row.not_seen_cause}
         {...(canEdit ? { onRegenerate: () => void regenerate() } : {})}
         regenerating={regenerating}
       />
@@ -593,6 +597,7 @@ export function EvaluationEditor({
         <RefusedNotice
           status={load.row.validator_status}
           message={load.row.validator_message}
+          cause={load.row.not_seen_cause}
           {...(canEdit ? { onRegenerate: () => void regenerate() } : {})}
           regenerating={regenerating}
         />
@@ -709,17 +714,45 @@ function PublishState({ row }: { readonly row: PublishRow }): JSX.Element | null
  * instead of paying for a regeneration (D-260), and a screen that hid the refusal would leave them
  * editing a document they did not know was rejected.
  */
-function RefusedNotice({
+export function RefusedNotice({
   status,
   message,
+  cause,
   onRegenerate,
   regenerating,
 }: {
   readonly status: string;
   readonly message: string | null;
+  /** Why the storefront was not seen, where one was recorded (0092). Null on every other status. */
+  readonly cause: string | null;
   readonly onRegenerate?: () => void;
   readonly regenerating: boolean;
 }): JSX.Element {
+  /*
+    A run that did not see the storefront has no draft to repair and nothing to regenerate from
+    (D-291). The banner used to offer both: "It can be repaired here, or generated again", and a
+    Regenerate button that would refuse again over the same run. The way forward is a new run, and
+    for a named cause not even that. A sign-in wall, the merchant's consent gate and bot protection
+    are each met again by a re-screen, and each message says so, so the message is shown and no
+    re-screen is pointed to. Only an unnamed refusal — a text collapse, an unserved catalogue — gets
+    the prompt.
+  */
+  if (status === 'run_did_not_see_storefront') {
+    return (
+      <div className="eval-refused">
+        <p className="eval-refused-head">
+          No draft was written: this run did not see the storefront.
+        </p>
+        {message !== null && <pre className="eval-refused-why">{message}</pre>}
+        {cause === null && (
+          <p className="eval-refused-head">
+            Re-screen the merchant to produce a new run. Regenerating over this run cannot help.
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="eval-refused">
       <p className="eval-refused-head">

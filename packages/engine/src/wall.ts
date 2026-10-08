@@ -58,6 +58,139 @@ export interface WallAssessment {
   readonly reason: string;
   /** The URLs that were not served, and what happened instead. */
   readonly refusals: readonly string[];
+  /**
+   * The sign-in page the crawl was sent to, where the wall was found without a product sample
+   * (D-291). Absent on every wall the product sample decided, and on every run that met none.
+   */
+  readonly signInUrl?: string;
+}
+
+/** One request and where it ended, for the sign-in wall below. */
+export interface Destination {
+  readonly requestedUrl: string;
+  /** Where the request ended. Empty when nothing is known beyond the request itself. */
+  readonly finalUrl: string;
+}
+
+/**
+ * Paths that name a sign-in page (D-291).
+ *
+ * Compared whole, after the trailing slash is trimmed and case folded: `/login` is a sign-in path,
+ * `/login-help` is not. `/auth/` is a prefix because providers hang every step of a sign-in off it.
+ */
+const SIGN_IN_PATHS: ReadonlySet<string> = new Set([
+  '/login',
+  '/signin',
+  '/sign-in',
+  '/account/login',
+  '/customer/account/login',
+]);
+
+export function isSignInPath(url: string): boolean {
+  let path: string;
+  try {
+    path = trimSlash(new URL(url).pathname.toLowerCase());
+  } catch {
+    return false;
+  }
+  return SIGN_IN_PATHS.has(path) || path.startsWith('/auth/');
+}
+
+/** Whether a rendered DOM carries a password field. Structural: the input's type, not its wording. */
+export function hasPasswordField(html: string): boolean {
+  return /<input\b[^>]*\btype\s*=\s*["']?password\b/i.test(html);
+}
+
+/**
+ * A login wall found without a product sample (D-291).
+ *
+ * `assessWall` needs product pages to decide anything, and says so when it has none. A storefront
+ * that sends every anonymous request to its sign-in page leaves it none: the sitemap is the sign-in
+ * page, the homepage is the sign-in page, and no product URL is ever found. Run dd48f232
+ * (app.thepeptide.com, 2026-10-08) sent every one of twenty-odd location attempts and all three
+ * gate probes to `/login`, read `walled: false`, and never reached for the credential it held.
+ *
+ * Two conditions, and both must hold:
+ *
+ *   - **A majority of the requests ended at one URL.** Strictly more than half, of every location
+ *     attempt and gate probe made. A storefront that redirects a few guessed paths to its login and
+ *     serves the rest is not walled.
+ *   - **That URL is a sign-in page**: its path is one of `SIGN_IN_PATHS`, or a rendered capture that
+ *     ended there carries a password field. The path alone would miss a sign-in page at a path we did
+ *     not list; the field alone would miss one whose form is built after the capture.
+ *
+ * Returns null when either fails. This decides coverage and whether a credential is tried, never a
+ * finding — the same boundary `assessWall` holds (D-039).
+ */
+export function assessSignInWall(
+  destinations: readonly Destination[],
+  rendered: readonly PageContext[],
+): WallAssessment | null {
+  if (destinations.length === 0) return null;
+
+  const ends = new Map<string, { url: string; count: number }>();
+  for (const destination of destinations) {
+    const url = destination.finalUrl === '' ? destination.requestedUrl : destination.finalUrl;
+    const key = endKey(url);
+    if (key === null) continue;
+    const seen = ends.get(key);
+    ends.set(key, { url: seen?.url ?? url, count: (seen?.count ?? 0) + 1 });
+  }
+
+  let top: { key: string; url: string; count: number } | undefined;
+  for (const [key, end] of ends) {
+    if (top === undefined || end.count > top.count) top = { key, ...end };
+  }
+  if (top === undefined || top.count * 2 <= destinations.length) return null;
+
+  const key = top.key;
+  /*
+    The password-field branch never accepts the site root. A public storefront that sends unknown
+    paths home and carries a sign-in widget in its header has a password field on `/`, and would
+    otherwise read as walled — a login wall reported about a site whose catalogue anyone can read.
+  */
+  const signInPage =
+    isSignInPath(top.url) ||
+    (!isSiteRoot(top.url) &&
+      rendered.some(
+        (page) =>
+          page.renderError === undefined &&
+          endKey(page.finalUrl === '' ? page.requestedUrl : page.finalUrl) === key &&
+          hasPasswordField(page.html),
+      ));
+  if (!signInPage) return null;
+
+  return {
+    walled: true,
+    attempted: 0,
+    served: 0,
+    challenged: 0,
+    consentGated: 0,
+    reason:
+      `no product pages were found to attempt, and ${top.count} of the ${destinations.length} ` +
+      `page(s) requested anonymously ended at the sign-in page ${top.url}`,
+    refusals: [],
+    signInUrl: top.url,
+  };
+}
+
+/** Whether a URL is the site root: `/`, or no path at all. */
+function isSiteRoot(url: string): boolean {
+  try {
+    return trimSlash(new URL(url).pathname) === '/';
+  } catch {
+    return false;
+  }
+}
+
+/** Origin and path, as `wasServed` compares them. */
+function endKey(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${trimSlash(parsed.pathname)}`;
+  } catch {
+    return null;
+  }
 }
 
 /** A page counts as served when the response is the page requested, not something else. */

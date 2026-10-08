@@ -130,6 +130,8 @@ export interface EvaluateResult {
   readonly message?: string;
   readonly inputSha256: string;
   readonly truncations: readonly string[];
+  /** Why the storefront was not seen, where the screen has to branch on it (D-291). */
+  readonly notSeenCause?: NotSeenCause;
   /** What the vendor reported for the accepted answer. Absent when no call was made. */
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
   /**
@@ -403,10 +405,84 @@ export const MIN_DISTINCT_TEXTS = 3;
  *
  * Returns the message rather than a boolean, because the message is the artifact: it names the
  * text and how many pages it covered, which is what tells an operator to re-scan rather than retry.
+ *
+ * The message alone. `notSeen` below is the one place the decision is made, and this reads it.
  */
 export function storefrontNotSeen(inputs: EvaluationInputs): string | null {
-  const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = inputs.pageStats;
+  return notSeen(inputs)?.message ?? null;
+}
 
+/**
+ * Why a run did not see the storefront, as data where the screen has to branch on it (D-291).
+ *
+ * Named for the three refusals a re-screen cannot get past: a sign-in wall, the merchant's consent
+ * gate, and bot protection. Each message already says a re-scan will meet the same thing; the cause
+ * is what lets the screen agree with it. Null is every other refusal — a text collapse, an unserved
+ * catalogue — where the screen points to Re-screen.
+ */
+export type NotSeenCause = 'sign_in_wall' | 'consent_gate' | 'bot_challenge';
+
+export interface NotSeen {
+  readonly message: string;
+  readonly cause: NotSeenCause | null;
+}
+
+const refusal = (cause: NotSeenCause | null, message: string): NotSeen => ({ message, cause });
+
+/**
+ * The decision, with the cause that decided it where one is named.
+ *
+ * The records first (gate, challenge, unserved catalogue), then the sign-in wall, which is also a
+ * record, then the two text inferences. The wall goes ahead of the text checks because on the run
+ * that found it the text check fired too, and its advice — re-scan — is the one thing that cannot
+ * help a storefront behind sign-in.
+ */
+export function notSeen(inputs: EvaluationInputs): NotSeen | null {
+  const recorded = recordedRefusal(inputs);
+  if (recorded !== null) return recorded;
+
+  const wall = signInWallMessage(inputs);
+  if (wall !== null) return { message: wall, cause: 'sign_in_wall' };
+
+  const text = textRefusal(inputs);
+  return text === null ? null : { message: text, cause: null };
+}
+
+/**
+ * A sign-in wall the crawl recorded (D-291), and the message for it.
+ *
+ * Read off `report.access.signInWall`, which the crawl writes when most anonymous requests ended at
+ * one sign-in page. Its own sentence because the repair differs from every other refusal here: a
+ * re-scan alone meets the same wall, so the message says which state the login is in. Only where no
+ * login is on file does it name a remedy — store one and re-screen. Where a login is on file, a
+ * re-screen changes nothing, and none is pointed to.
+ */
+function signInWallMessage(inputs: EvaluationInputs): string | null {
+  const wall = inputs.report.access?.signInWall;
+  if (wall === undefined) return null;
+
+  const state =
+    wall.outcome === 'no_sign_in_method'
+      ? 'A login is on file for this merchant, and the screener has no sign-in method for this site, so no sign-in was attempted.'
+      : wall.outcome === 'sign_in_failed'
+        ? 'A login is on file for this merchant; a sign-in was attempted and it failed.'
+        : wall.outcome === 'signed_in'
+          ? 'A login is on file for this merchant and it signed in successfully; only public pages were read, and no signed-in pages were crawled.'
+          : wall.outcome === 'no_credential'
+            ? // The one state a new run can change: with a login stored, a re-screen signs in (D-291).
+              'No login is on file for this merchant. A screening login can be stored for this ' +
+              'merchant and the merchant re-screened.'
+            : 'No stored login was consulted on this run.';
+
+  return (
+    `This run did not see the storefront: most of the pages it requested anonymously ended at the ` +
+    `sign-in page ${wall.url}. No prompt was sent. ${state} ` +
+    'What is behind the sign-in was not read, and nothing here is an observation about the merchant.'
+  );
+}
+
+/** The refusals the run recorded rather than inferred: gate, challenge, unserved catalogue. */
+function recordedRefusal(inputs: EvaluationInputs): NotSeen | null {
   /*
     The three records, read off the report rather than passed in (D-276).
 
@@ -454,23 +530,25 @@ export function storefrontNotSeen(inputs: EvaluationInputs): string | null {
   */
   const gated = report.consentGate?.gated ?? 0;
   if (gated > 0) {
-    return (
+    return refusal(
+      'consent_gate',
       `This run did not see the storefront: the merchant's own consent gate stands in front of ` +
       `${gated} of the pages it rendered, and Mintro does not attest through it on a visitor's ` +
       'behalf. No prompt was sent. The gate itself was observed and is reported under the gate ' +
       'rules; what is behind it was not read. Nothing here is a shortfall of the merchant\u2019s, ' +
-      'and re-scanning will meet the same gate.'
+      'and re-scanning will meet the same gate.',
     );
   }
 
   const challenged = report.challenge?.challenged ?? 0;
   if (challenged > 0) {
-    return (
+    return refusal(
+      'bot_challenge',
       `This run did not see the storefront: the site's bot protection answered ${challenged} of ` +
       'the pages it rendered. No prompt was sent. The pages behind the challenge were never ' +
       'served, so nothing was established about this merchant either way — and re-scanning from ' +
       'the same place will meet the same challenge, so a re-scan is not the repair. ' +
-      'Nothing here is an observation about the merchant.'
+      'Nothing here is an observation about the merchant.',
     );
   }
 
@@ -500,16 +578,24 @@ export function storefrontNotSeen(inputs: EvaluationInputs): string | null {
   const inScope = report.sample?.productsInScope ?? 0;
   const served = report.sample?.productsSampled ?? 0;
   if (inScope > 0 && served === 0) {
-    return (
+    // No cause named: the screen's Re-screen prompt is the default for an unnamed refusal (D-291).
+    return refusal(
+      null,
       `This run did not see the storefront: none of the ${inScope} product page(s) in scope were ` +
       'served to this crawl. No prompt was sent. Every product URL answered with something other ' +
       'than the product — a login form, a redirect, a refusal — so the catalogue, which is what ' +
       'six of the seven angles are about, was never read. What the run did read is the homepage ' +
       'and the policy pages, and a draft reasoned from those alone would read as an account of a ' +
-      'catalogue. Nothing here is an observation about the merchant.'
+      'catalogue. Nothing here is an observation about the merchant.',
     );
   }
 
+  return null;
+}
+
+/** The two inferences from what the pages look like, taken after every record has been read. */
+function textRefusal(inputs: EvaluationInputs): string | null {
+  const { selectedCount, distinctTexts, dominantTextCount, dominantTextSample } = inputs.pageStats;
   if (distinctTexts >= MIN_DISTINCT_TEXTS && dominantTextCount * 2 <= selectedCount) return null;
 
   const sample = dominantTextSample === '' ? '(no text was read)' : `"${dominantTextSample}"`;
@@ -520,7 +606,8 @@ export function storefrontNotSeen(inputs: EvaluationInputs): string | null {
 
   return (
     `This run did not see the storefront: ${reason}. No prompt was sent. ` +
-    `The repeated text begins: ${sample}. ` +
+    // "Repeated" only where a text was: one page read once is the text read, not a repetition (D-291).
+    `The ${dominantTextCount > 1 ? 'repeated text' : 'text read'} begins: ${sample}. ` +
     'A crawl that captured one document at many URLs has met a gate or an error page, and a draft ' +
     'reasoned from it would read as a confident account of a storefront nobody looked at. ' +
     'Re-scan the merchant; retrying the generator over the same run cannot help.'
@@ -616,9 +703,15 @@ export async function generateDraft(
     The guard runs before the key is even looked for. A run that did not see the storefront is not
     a configuration problem, and reporting it as one would send an operator to check an env var.
   */
-  const notSeen = storefrontNotSeen(inputs);
-  if (notSeen !== null) {
-    return { ...base, status: 'run_did_not_see_storefront', attempts: 0, message: notSeen };
+  const refused = notSeen(inputs);
+  if (refused !== null) {
+    return {
+      ...base,
+      status: 'run_did_not_see_storefront',
+      attempts: 0,
+      message: refused.message,
+      ...(refused.cause === null ? {} : { notSeenCause: refused.cause }),
+    };
   }
 
   const apiKey = options.apiKey ?? process.env['ANTHROPIC_API_KEY'];
@@ -850,6 +943,8 @@ export async function storeDraft(
     content: result.draft ?? null,
     validator_status: result.status,
     validator_message: result.message ?? null,
+    // Null where no cause was named, which is every status but one refusal (0092, D-291).
+    not_seen_cause: result.notSeenCause ?? null,
     truncations: result.truncations,
     handles: result.handles ?? null,
     /*

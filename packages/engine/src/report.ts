@@ -496,6 +496,32 @@ export interface ReportAccess {
   /** True when a stored screening account was used to get past it. */
   readonly usedCredential: boolean;
   readonly note: string;
+  /**
+   * A sign-in wall found without a product sample, and what the run did about it (D-291).
+   *
+   * Absent on a run that met none, and on every run recorded before it existed — absent means the
+   * distinction was not made, not that there was no wall (D-002).
+   */
+  readonly signInWall?: SignInWallRecord;
+}
+
+/**
+ * What the run did at a sign-in wall (D-291).
+ *
+ * `not_consulted`: the run had no way to ask whether a login is stored (a CLI crawl, a worker with
+ * no key). The other four are the escalation outcomes, named as the worker records them.
+ */
+export type SignInOutcome =
+  | 'not_consulted'
+  | 'no_credential'
+  | 'no_sign_in_method'
+  | 'sign_in_failed'
+  | 'signed_in';
+
+export interface SignInWallRecord {
+  /** The sign-in page every anonymous request was sent to. */
+  readonly url: string;
+  readonly outcome: SignInOutcome;
 }
 
 /**

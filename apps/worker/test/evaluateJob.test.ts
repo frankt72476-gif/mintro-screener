@@ -662,6 +662,30 @@ describe('generateDraft refuses a run that did not see the storefront', () => {
     expect(calls).toHaveLength(0);
     expect(result.draft).toBeUndefined();
     expect(result.message).toContain('28 of the 30 pages');
+    // A text collapse names no cause; only a recorded sign-in wall does (D-291).
+    expect(result.notSeenCause).toBeUndefined();
+  });
+
+  it('carries the cause of a sign-in wall out to be stored (D-291)', async () => {
+    const { impl, calls } = fakeFetch([validDraft()]);
+    const walled = {
+      ...INPUTS,
+      report: {
+        ...INPUTS.report,
+        access: {
+          mode: 'public',
+          wall: true,
+          usedCredential: false,
+          note: '',
+          signInWall: { url: 'https://app.shop.example/login', outcome: 'no_sign_in_method' },
+        },
+      },
+    } as EvaluationInputs;
+    const result = await generateDraft(angles, ruleset, walled, { apiKey: 'sk-test', fetchImpl: impl });
+
+    expect(result.status).toBe('run_did_not_see_storefront');
+    expect(result.notSeenCause).toBe('sign_in_wall');
+    expect(calls).toHaveLength(0);
   });
 
   /*
