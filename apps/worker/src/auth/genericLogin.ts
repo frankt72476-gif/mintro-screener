@@ -54,6 +54,17 @@ import type { CredentialVault, MerchantCredentials, SessionStorageByOrigin } fro
 /** Every no-form reason begins with this, so the note reads the same whichever condition failed. */
 export const FORM_NOT_IDENTIFIED = 'the sign-in form could not be identified';
 
+/**
+ * How long check (a) waits after the submit for the site to write its session (D-292, settle).
+ *
+ * Ten seconds, ruled: long enough for a slow API and a client that writes its token on a timer, short
+ * enough that a sign-in that wrote nothing costs the run ten seconds rather than a render timeout.
+ */
+export const AFTER_SUBMIT_WAIT_MS = 10_000;
+
+/** How often the snapshot is taken again while waiting. */
+const AFTER_SUBMIT_POLL_MS = 250;
+
 /** The platform recorded on a generic session, so a reused one is validated the generic way. */
 export const GENERIC_PLATFORM = 'generic';
 
@@ -297,11 +308,33 @@ async function genericAttempt(input: {
       }),
     ]);
     await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
+
+    /*
+      Check (a), waited for rather than sampled once (D-292, settle).
+
+      The settle above does not wait for a script's sign-in: a form that only starts a fetch never
+      navigates, the page reached network-idle before the click, and Playwright's load states are
+      sticky — so it returns at once. One snapshot taken then raced the site's own token write and,
+      measured on 2026-10-08, lost to a login API answering 50 ms late. A slow site is not a failed
+      sign-in. So the snapshot is taken again until a non-analytics entry is new or changed, or the
+      deadline passes; check (b) runs after either.
+    */
+    const waitStarted = Date.now();
+    let after = await snapshot(context, page);
+    let changed = changedEntries(before.entries, after.entries);
+    while (changed === 0 && Date.now() - waitStarted < AFTER_SUBMIT_WAIT_MS) {
+      await new Promise((resolve) => setTimeout(resolve, AFTER_SUBMIT_POLL_MS));
+      after = await snapshot(context, page);
+      changed = changedEntries(before.entries, after.entries);
+    }
+    const waited = Date.now() - waitStarted;
+    steps.push(
+      changed === 0
+        ? `no cookie or storage entry appeared within ${AFTER_SUBMIT_WAIT_MS / 1000} s of the submit`
+        : `a cookie or storage entry appeared ${waited} ms after the submit settled`,
+    );
     // Origin and path only: a GET-submitted form would carry the credential in the query string.
     steps.push(`after submit: ${withoutQuery(page.url())}`);
-
-    const after = await snapshot(context, page);
-    const changed = changedEntries(before.entries, after.entries);
     steps.push(`${changed} cookie or storage entr${changed === 1 ? 'y' : 'ies'} new or changed by the submit`);
 
     // (b) is checked on a new page, with what this page holds in sessionStorage carried over to it —

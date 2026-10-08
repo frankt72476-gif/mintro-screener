@@ -41,7 +41,9 @@ type Mode =
   /** An overlay covers the button as soon as anything is typed (A5: fails before the submit). */
   | 'cover-on-input'
   /** The submit changes only an analytics cookie; the server remembers the sign-in (A6). */
-  | 'ga-only';
+  | 'ga-only'
+  /** The token is written 3 s after the submit: a slow site, not a failed sign-in. */
+  | 'slow';
 
 /** The SPA shell, served at every path. */
 function spa(mode: Mode, elsewhere = ''): string {
@@ -54,7 +56,7 @@ function spa(mode: Mode, elsewhere = ''): string {
   var root = document.getElementById('root');
   function signedIn(done) {
     if (MODE === 'cookie') return done(document.cookie.indexOf('tp_session=') !== -1);
-    if (MODE === 'local' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input')
+    if (MODE === 'local' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input' || MODE === 'slow')
       return done(localStorage.getItem('tp_token') !== null);
     if (MODE === 'session') return done(sessionStorage.getItem('tp_token') !== null);
     // Writes tp_token on sign-in, but the app only ever checks a key nothing writes.
@@ -89,6 +91,14 @@ function spa(mode: Mode, elsewhere = ''): string {
         body: JSON.stringify({ email: inputs[0].value, password: inputs[1].value }),
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (!j.ok) { root.querySelector('h1').textContent = 'Incorrect email or password'; return; }
+        if (MODE === 'slow') {
+          setTimeout(function () {
+            localStorage.setItem('tp_token', j.token);
+            history.pushState(null, '', '/');
+            route();
+          }, 3000);
+          return;
+        }
         if (MODE === 'cookie') document.cookie = 'tp_session=' + j.token + '; path=/';
         if (MODE === 'local' || MODE === 'storage-only' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input')
           localStorage.setItem('tp_token', j.token);
@@ -538,4 +548,25 @@ describe('analytics cookies and storage', () => {
     // Anchored at the start of the name: a token whose name merely contains one is not excluded.
     expect(changedEntries(before, new Map([['session https://shop.example user_ga', 'x']]))).toBe(1);
   });
+});
+
+/*
+  Check (a) waits for the site (D-292, settle). The submit only starts a fetch, and the page reached
+  network-idle before the submit — so a settle that asks for network-idle returns at once, and a
+  single snapshot taken then races the site's own token write. Measured 2026-10-08: with the login
+  API answering 50 ms late, the token was absent at the snapshot and present a moment later. A site
+  that writes its token 3 s after the submit has signed in, and must not be recorded as failing.
+*/
+describe('a site that writes its token after the submit settles', () => {
+  it('signs in when the token arrives 3 s after the submit, and records a success', async () => {
+    const site = await spaSite('slow');
+    const { vault } = vaultWith(PASSWORD);
+    const recorded: boolean[] = [];
+    const { outcome, steps } = await signIn(site, vault, { recorded });
+
+    expect(outcome.kind, steps.join('\n')).toBe('signed_in');
+    expect(recorded).toEqual([true]);
+    expect(site.logins.attempts).toBe(1);
+    if (outcome.kind === 'signed_in') await outcome.context.close();
+  }, 120_000);
 });
