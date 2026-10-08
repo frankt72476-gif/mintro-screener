@@ -19404,7 +19404,12 @@ read, no access row is written, `credential_state` is untouched.
   cookies and `localStorage` for every origin the context has visited, `sessionStorage` for the page —
   **ignoring analytics names** (`_ga`, `_gid`, `_gat`, `_gcl`, `_fbp`, `_fbc`, `__utm`, `_hj`, `_clck`,
   `_clsk`, `ajs_`, `mp_`, `amplitude`, `_uetsid`, `_uetvid`, matched at the start of the name), which
-  any page load can write; and
+  any page load can write. **Waited for, not sampled once:** after the submit settles, the snapshot is
+  taken again until such an entry appears or 10 s pass. A form that only starts a fetch never
+  navigates, and the page reached network-idle before the click, so the settle returns at once — a
+  single snapshot raced the site's token write and lost to a login API answering 50 ms late
+  (measured 2026-10-08, after a CI failure on Frank's machine). A slow site is not a failed sign-in;
+  and
 - (b) re-opening the URL the wall recorded as sent to sign-in, on a new page in the signed-in context,
   ends **on the same origin, at a route that is not a sign-in route**, with no render error and 2xx
   where a status is known. A different path on the origin passes — a signed-in SPA routing `/` to
