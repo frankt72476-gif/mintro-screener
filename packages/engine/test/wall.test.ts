@@ -11,7 +11,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { assessWall, wasServed } from '../src/wall.js';
+import {
+  assessSignInWall,
+  assessWall,
+  hasPasswordField,
+  isSignInPath,
+  wasServed,
+  type Destination,
+} from '../src/wall.js';
 import type { PageContext } from '../src/page.js';
 import { NO_GATE } from '../src/page.js';
 
@@ -169,5 +176,120 @@ describe('assessWall', () => {
     expect(assessWall([served]).reason).toBe('every sampled product page was served to an anonymous request');
     expect(assessWall([served, refused]).reason).toContain('1 of 2 sampled product pages were served anonymously');
     expect(assessWall([refused]).reason).toContain('none of the 1 sampled product page(s) were served to an anonymous request');
+  });
+});
+
+/*
+  A sign-in wall with no product sample (D-291).
+
+  Run dd48f232 (app.thepeptide.com) is a client-rendered SPA. The sitemap was the SPA shell, the
+  homepage rendered as the sign-in page, and no product URL was ever found, so `assessWall` had no
+  pages and said nothing about a wall. Every location attempt and all three gate probes ended at
+  `/login`. These are the shapes that run took and the ones it must not be confused with.
+*/
+describe('assessSignInWall', () => {
+  const O = 'https://app.shop.example';
+  const to = (path: string, end: string): Destination => ({ requestedUrl: `${O}${path}`, finalUrl: `${O}${end}` });
+  const LOCATION_PATHS = ['/account/register', '/pages/terms', '/terms', '/pages/shipping-policy', '/faq'];
+  const GATE_PROBES = ['/collections/all', '/products', '/shop'];
+
+  it('finds the wall run dd48f232 met: every request ended at /login', () => {
+    const destinations = [...LOCATION_PATHS, ...GATE_PROBES].map((path) => to(path, '/login'));
+    const wall = assessSignInWall(destinations, []);
+
+    expect(wall?.walled).toBe(true);
+    expect(wall?.signInUrl).toBe(`${O}/login`);
+    expect(wall?.attempted).toBe(0);
+    expect(wall?.reason).toContain(`8 of the 8 page(s) requested anonymously ended at the sign-in page ${O}/login`);
+  });
+
+  it('needs a strict majority: half is not enough', () => {
+    const destinations = [
+      to('/a', '/login'),
+      to('/b', '/login'),
+      to('/c', '/c'),
+      to('/d', '/d'),
+    ];
+    expect(assessSignInWall(destinations, [])).toBeNull();
+    expect(assessSignInWall([...destinations, to('/e', '/login')], [])).not.toBeNull();
+  });
+
+  it('counts requests that ended at their own path in the denominator', () => {
+    // Guessed policy paths answering 404 at themselves are requests that did not end at sign-in.
+    const destinations = [
+      to('/collections/all', '/account/login'),
+      to('/products', '/account/login'),
+      ...['/terms', '/faq', '/shipping'].map((path) => to(path, path)),
+    ];
+    expect(assessSignInWall(destinations, [])).toBeNull();
+  });
+
+  it('is not a wall where the majority end somewhere that is not a sign-in page', () => {
+    const destinations = [...LOCATION_PATHS, ...GATE_PROBES].map((path) => to(path, '/'));
+    expect(assessSignInWall(destinations, [])).toBeNull();
+  });
+
+  it('accepts each listed sign-in path, and /auth/ as a prefix', () => {
+    for (const end of ['/login', '/signin', '/sign-in', '/account/login', '/customer/account/login/', '/auth/realms/shop', '/LOGIN']) {
+      const wall = assessSignInWall(GATE_PROBES.map((path) => to(path, end)), []);
+      expect(wall?.walled, end).toBe(true);
+    }
+  });
+
+  it('accepts an unlisted path where a capture that ended there carries a password field', () => {
+    const destinations = GATE_PROBES.map((path) => to(path, '/members'));
+    expect(assessSignInWall(destinations, [])).toBeNull();
+
+    const signInPage = page({
+      requestedUrl: `${O}/`,
+      finalUrl: `${O}/members`,
+      html: '<form><input type="email" name="email"><input type="password" name="pw"></form>',
+    });
+    expect(assessSignInWall(destinations, [signInPage])?.signInUrl).toBe(`${O}/members`);
+  });
+
+  /*
+    A public storefront that sends unknown paths home and carries a sign-in widget in its header
+    has a password field on `/`. The site root is never a sign-in page by that branch.
+  */
+  it('never accepts the site root by its password field', () => {
+    const widget = '<header><form class="login"><input type="email"><input type="password"></form></header>';
+    for (const root of [`${O}/`, O]) {
+      const destinations = [...LOCATION_PATHS, ...GATE_PROBES].map((path) => ({ requestedUrl: `${O}${path}`, finalUrl: root }));
+      const homepage = page({ requestedUrl: `${O}/`, finalUrl: root, html: widget });
+      expect(assessSignInWall(destinations, [homepage]), root).toBeNull();
+    }
+  });
+
+  it('does not take a password field from a page that ended somewhere else', () => {
+    const destinations = GATE_PROBES.map((path) => to(path, '/members'));
+    const elsewhere = page({
+      requestedUrl: `${O}/`,
+      finalUrl: `${O}/`,
+      html: '<input type="password">',
+    });
+    expect(assessSignInWall(destinations, [elsewhere])).toBeNull();
+  });
+
+  it('says nothing with nothing requested', () => {
+    expect(assessSignInWall([], [])).toBeNull();
+  });
+});
+
+describe('isSignInPath and hasPasswordField', () => {
+  it('compares the whole path, not a substring of it', () => {
+    expect(isSignInPath('https://s.example/login')).toBe(true);
+    expect(isSignInPath('https://s.example/login-help')).toBe(false);
+    expect(isSignInPath('https://s.example/blog/how-to-login')).toBe(false);
+    expect(isSignInPath('https://s.example/authors')).toBe(false);
+    expect(isSignInPath('not a url')).toBe(false);
+  });
+
+  it('reads the input type, not the wording', () => {
+    expect(hasPasswordField('<input type="password">')).toBe(true);
+    expect(hasPasswordField("<input name=pw type='password' />")).toBe(true);
+    expect(hasPasswordField('<input type=password>')).toBe(true);
+    expect(hasPasswordField('<label>Password</label><input type="text">')).toBe(false);
+    expect(hasPasswordField('<input type="passwordless">')).toBe(false);
   });
 });

@@ -519,6 +519,15 @@ export async function readPages(
     );
   }
 
+  /*
+    No text repeated, so no group set the sample (D-291). The text read is the sample: run dd48f232
+    read one 146-character sign-in page and its refusal said "(no text was read)" about it. Empty
+    only where every page extracted to nothing.
+  */
+  if (dominantTextSample === '') {
+    dominantTextSample = pages.find((page) => page.text !== '')?.text.slice(0, 120) ?? '';
+  }
+
   if (dropped > 0) {
     truncations.push(
       `${dropped} rendered page(s) beyond the ${MAX_PAGES}-page cap were not read. ` +

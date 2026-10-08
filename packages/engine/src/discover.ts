@@ -227,7 +227,21 @@ export async function discoverLayer0(
   // --- robots.txt ---------------------------------------------------------------------
   const robotsUrl = new URL('/robots.txt', base).toString();
   const robotsResponse = await fetcher(robotsUrl);
-  documents.push(describe(robotsResponse, 'robots'));
+  /*
+    An HTML page answering for robots.txt is not one (D-291). A client-rendered storefront serves its
+    `index.html` at every path, and run dd48f232 stored that page as the merchant's robots.txt and
+    parsed it. Recorded as not present — the same answer a 404 gives — with the page still retained,
+    because it is what evidences the absence.
+  */
+  const robotsIsHtml =
+    robotsResponse.challenged === undefined &&
+    robotsResponse.status === 200 &&
+    servedHtmlInstead(robotsResponse, 'robots');
+  documents.push(
+    robotsIsHtml
+      ? { ...describe(robotsResponse, 'robots'), error: HTML_NOT_ROBOTS }
+      : describe(robotsResponse, 'robots'),
+  );
   record(robotsResponse);
 
   /*
@@ -243,7 +257,7 @@ export async function discoverLayer0(
   else if (robotsResponse.status === 200) retain(robotsResponse, 'robots');
 
   const robots =
-    !robotsChallenged && robotsResponse.status === 200 && robotsResponse.body.trim() !== ''
+    !robotsChallenged && !robotsIsHtml && robotsResponse.status === 200 && robotsResponse.body.trim() !== ''
       ? parseRobotsTxt(robotsResponse.body, base.origin)
       : EMPTY_ROBOTS;
 
@@ -340,6 +354,17 @@ export async function discoverLayer0(
     // Retained before parsing. A 200 that turns out not to be a sitemap is exactly the
     // document that evidences why a rule was not evaluable, so it is kept too (D-012).
     retain(response, 'sitemap');
+
+    /*
+      An HTML page answering for a sitemap is not one (D-291), and is recorded as not present — the
+      answer a 404 gives. Not `acquisitionFailed`: the origin answered, and what it answered with is
+      its own page at a path where it publishes no sitemap.
+    */
+    if (servedHtmlInstead(response, 'sitemap')) {
+      documents.push({ ...describe(response, 'sitemap'), error: HTML_NOT_SITEMAP });
+      gaps.push(`${next.url} served an HTML page rather than a sitemap, so it was recorded as not present`);
+      continue;
+    }
 
     const parsed = parseSitemap(response.body, response.finalUrl);
     if (!isParsedSitemap(parsed)) {
@@ -487,6 +512,32 @@ export async function discoverLayer0(
     startedAt,
     elapsedMs: Date.now() - started,
   };
+}
+
+const HTML_NOT_ROBOTS = 'served an HTML page, not a robots.txt; recorded as not present';
+const HTML_NOT_SITEMAP = 'served an HTML page, not a sitemap; recorded as not present';
+
+/**
+ * Whether a 200 at a robots.txt or sitemap path served an HTML page instead (D-291).
+ *
+ * Two signals. **The body starts as an HTML document** (`<!doctype html` or `<html`): decisive.
+ * **The content type says HTML**: decisive unless the body is plainly the document asked for — a
+ * sitemap that declares `<urlset>` or `<sitemapindex>`, a robots.txt with a directive line. Hosts
+ * that label a real robots.txt `text/html` exist, and discarding one would discard its
+ * `Crawl-delay` (D-013); the body is the stronger witness of what was served.
+ */
+export function servedHtmlInstead(
+  response: { readonly contentType: string; readonly body: string },
+  expected: 'robots' | 'sitemap',
+): boolean {
+  if (/^\s*(<!doctype\s+html|<html[\s>])/i.test(response.body)) return true;
+  if (!/\b(text\/html|application\/xhtml\+xml)\b/i.test(response.contentType)) return false;
+
+  const isTheDocument =
+    expected === 'sitemap'
+      ? /<(urlset|sitemapindex)[\s>]/i.test(response.body)
+      : /^\s*(user-agent|disallow|allow|sitemap|crawl-delay)\s*:/im.test(response.body);
+  return !isTheDocument;
 }
 
 function describe(response: FetchResult, kind: FetchedDocument['kind']): FetchedDocument {

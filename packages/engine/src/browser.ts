@@ -92,6 +92,8 @@ export type {
   BlockingFailure,
   AssembleInput,
   ReportAccess,
+  SignInOutcome,
+  SignInWallRecord,
   ReportCategory,
   ReportCoverage,
   ReportFinding,

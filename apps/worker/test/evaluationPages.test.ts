@@ -700,6 +700,39 @@ describe('deduplication by extracted text', () => {
     expect(selection.dominantTextSample).toContain('21 or older');
   });
 
+  /*
+    Run dd48f232 read one 146-character sign-in page, and its refusal said "(no text was read)": the
+    sample was set only by a collapsed group, and one page read once forms none (D-291).
+  */
+  it('takes the one page read as the sample when nothing repeated', async () => {
+    const SIGN_IN = '<p>Welcome Back Please sign in to access your account. Email Address Password</p>';
+    const entries = entriesFor(['https://s.example/login']);
+    const selection = await readPages(report([]), entries, fakeLoader({ 'k-0': SIGN_IN }));
+
+    expect(selection.distinctTexts).toBe(1);
+    expect(selection.dominantTextCount).toBe(1);
+    expect(selection.dominantTextSample).toContain('Welcome Back Please sign in');
+  });
+
+  it('truncates that sample as the collapsed path does', async () => {
+    const long = `<p>${'sign in '.repeat(60)}</p>`;
+    const entries = entriesFor(['https://s.example/login']);
+    const selection = await readPages(report([]), entries, fakeLoader({ 'k-0': long }));
+
+    expect(selection.dominantTextSample.length).toBe(120);
+  });
+
+  it('leaves the sample empty only where no text was extracted at all', async () => {
+    const entries = entriesFor(['https://s.example/a', 'https://s.example/b']);
+    const selection = await readPages(
+      report([]),
+      entries,
+      fakeLoader({ 'k-0': '<div></div>', 'k-1': '<span></span>' }),
+    );
+
+    expect(selection.dominantTextSample).toBe('');
+  });
+
   it('leaves pages with genuinely different text alone', async () => {
     const entries = entriesFor(['https://s.example/a', 'https://s.example/b']);
     const selection = await readPages(

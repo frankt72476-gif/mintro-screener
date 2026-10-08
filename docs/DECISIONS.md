@@ -19292,3 +19292,75 @@ a gap in the crawl must never read as a statement about the merchant (hard const
 **Counsel review pending.** Whether a report that sorts observations by their relationship to a
 named rule still sits on the screening side of Sponsor Agreement 1.4 is the question to put, along
 with the group headings' wording. Until that review, the framing ships to Mintro's own review only.
+
+## D-291 — A sign-in wall without a product sample; no sign-in method is not a failed sign-in
+
+**Date:** 2026-10-08
+**Status:** accepted (Frank, 2026-10-08)
+**See:** D-040, D-185, D-264, D-266, D-276; migration 0092
+
+**The run.** dd48f232 (app.thepeptide.com, 2026-10-08) is a client-rendered SPA. The server answers
+every path with one `index.html`, and the page's script routes every path to `/login`. robots.txt and
+the sitemaps were that page, the homepage rendered as the sign-in page, and no product URL was found.
+`assessWall` decides from product pages and had none, so it returned `walled: false`, and the run never
+asked for the login stored at `merchants/app.thepeptide.com`. Every location attempt and all three
+gate probes ended at `/login`.
+
+**1. A sign-in wall can be found without a product sample.** Where no product pages were attempted,
+the run is walled when **strictly more than half** of the Layer 3 location attempts and gate probes
+(including `/collections/all`, `/products`, `/shop`) end at the same final URL, **and** that URL is a
+sign-in page: its path is `/login`, `/signin`, `/sign-in`, `/account/login` or
+`/customer/account/login` (whole path, case folded), or begins `/auth/`; or a rendered capture that
+ended there carries `input[type=password]`. The sign-in URL is recorded on the wall result and on
+`report.access.signInWall` with the escalation outcome. The product-page wall is unchanged.
+
+- *The site root is never a sign-in page by its password field.* A public storefront that sends
+  unknown paths home and carries a sign-in widget in its header has a password field on `/`; without
+  this it would read as walled. The path list still applies to every URL; the field branch does not
+  accept `/` or an empty path.
+- *Where it is read.* After Layer 3 and the gate probes, because neither exists earlier. Escalation
+  runs there as it does for a product wall. A session obtained there widens nothing — there are no
+  product URLs to render with it, and discovering them signed in is out of scope. The access note says
+  the sign-in succeeded, only public pages were read, and no signed-in pages were crawled; nothing in
+  it may imply that signed-in content was examined. The mode stays `public`.
+- *Not hard constraint 9.* A path list is a match on wording-shaped data, which constraint 9 forbids
+  for locating a *subject of a finding*. This locates nothing a finding rests on: it decides coverage
+  and whether a credential is tried (D-039), and every gate finding is still decided by the anonymous
+  probe. The password-field branch exists so a sign-in page at an unlisted path is still found.
+- *Denominator.* Every request the pass made: rendered candidates, candidates the cheap probe rejected
+  (which end at their own path), and the gate probes. A guessed path that 404s is a request that did
+  not end at sign-in, and leaving it out would let three redirects outvote twenty misses.
+
+**2. No sign-in method is its own outcome, `no_sign_in_method`, and nothing is read for it.** The worker
+asks, in order: is a credential stored (the vault path alone, no ciphertext selected), does the
+screener have a sign-in method for this site (platform detection and `loginFor`), and only then opens
+the credential. With no method, the credential is not read, no `credential_access` row is written, and
+`credential_state.last_login_ok` / `last_login_at` are **not** written: nothing was attempted, so
+nothing about the credential was learned. Recorded as `sign_in_failed` it told the credential card that
+a working login had stopped working, about a login nobody tried. The access note states that a
+screening account is stored, the storefront is behind sign-in at the recorded URL, and the screener
+has no sign-in method for this site, so no sign-in was attempted.
+
+Where a method exists, the credential is opened **once**, by `signInForScan`, and handed to
+`establishSession`. It used to be opened twice — once to see whether one was stored, once to sign in —
+so a sign-in wrote two `read_credentials` rows. One sign-in is now one credential read; the session
+record's own `read_session` and `write_session` accesses are separate rows, as before.
+
+**3. A refusal names its cause where a re-screen cannot help, and the advice is not "re-scan".**
+`storefrontNotSeen` reads `report.access.signInWall` after the recorded refusals (consent gate,
+challenge, unserved catalogue) and before the two text inferences, and refuses with
+`run_did_not_see_storefront` and cause `sign_in_wall`. The message names the sign-in URL and which state
+the login is in — no login on file, a login on file and no sign-in method for this site, or a sign-in
+attempted that failed — and never tells the operator to re-scan: a new run meets the same page.
+
+The consent-gate and bot-challenge refusals name their causes too, `consent_gate` and `bot_challenge`:
+each is met again by a re-screen, and each message already says so. None of the three causes was ever
+carried as anything but a sentence, so the cause is a new nullable column,
+`evaluation_drafts.not_seen_cause` (0092), with no back-fill. Null is every other refusal — a text
+collapse, an unserved catalogue. The editor's banner offers no repair and no Regenerate on any
+storefront-not-seen refusal, and shows the Re-screen prompt only where the cause is null. An existing
+row written before 0092 keeps a null cause whatever branch wrote it, and shows the prompt.
+
+A run recorded before this (dd48f232 itself) has no `signInWall` and is refused by the text check as
+before (D-002); its message now quotes the text it read rather than "(no text was read)".
+

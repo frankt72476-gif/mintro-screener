@@ -221,6 +221,7 @@ async function main(argv: readonly string[]): Promise<number> {
         truncations: result.truncations,
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.message === undefined ? {} : { message: result.message }),
+        ...(result.notSeenCause === undefined ? {} : { notSeenCause: result.notSeenCause }),
         ...(result.retryMessage === undefined ? {} : { retryMessage: result.retryMessage }),
         ...(result.draft === undefined ? {} : { draft: result.draft }),
       },

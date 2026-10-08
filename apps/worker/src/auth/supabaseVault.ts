@@ -183,6 +183,28 @@ export function createSealedVault(
 }
 
 /**
+ * Whether a credential is stored at a vault reference, without reading it (D-291).
+ *
+ * Selects the path and nothing else: no ciphertext leaves the table and nothing is unsealed, so this
+ * is not an access to the credential and writes no `credential_access` row. It exists so a run that
+ * has no way to sign in can still say truthfully whether a login is on file — which is the
+ * difference between *"no account is stored"* and *"one is stored and this site has no method"*.
+ *
+ * Throws on a read error, as `read` above does: "I could not tell" is not "nothing is stored".
+ */
+export async function credentialStored(supabase: WorkerSupabase, vaultRef: string): Promise<boolean> {
+  const { count, error } = await supabase.client
+    .from('vault_entries')
+    .select('path', { count: 'exact', head: true })
+    .eq('path', `${vaultRef}/credentials`);
+
+  if (error !== null) {
+    throw new Error(`could not tell whether a credential is stored at ${vaultRef}: ${error.message}`);
+  }
+  return (count ?? 0) > 0;
+}
+
+/**
  * The vault path for a merchant, derived from its domain.
  *
  * **The single choke point.** Both writers and both readers of a merchant's vault entry build

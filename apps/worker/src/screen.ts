@@ -48,6 +48,7 @@ import {
   selectSample,
   tally,
   describeObservationCounts,
+  assessSignInWall,
   assessWall,
   wasServed,
   describeTruncation,
@@ -62,6 +63,9 @@ import {
   type ScanMode,
   type ScopeOverrides,
   type ScreeningReport,
+  type Destination,
+  type ProbeResult,
+  type SignInOutcome,
   type WallAssessment,
 } from '@mintro/engine';
 import { createCrawlContext, renderPage } from './render.js';
@@ -109,6 +113,14 @@ export const RENDER_CAP = 25;
  */
 export type Escalation =
   | { readonly kind: 'no_credential' }
+  /*
+    A credential is stored and the screener has no way to sign in with it on this site (D-291).
+
+    Not `sign_in_failed`: nothing was attempted, the credential was not read, and the credential's
+    own record (`credential_state.last_login_ok`) is not touched. Reported as a failure it told the
+    credential card a working login had stopped working, about a login nobody had tried.
+  */
+  | { readonly kind: 'no_sign_in_method'; readonly platform: string }
   | { readonly kind: 'sign_in_failed'; readonly reason: string }
   | { readonly kind: 'signed_in'; readonly context: BrowserContext };
 
@@ -810,9 +822,18 @@ export async function screenStorefront(
   // with `authenticated: null` creates its own anonymous context; `runGateRules` could not accept
   // a session even if one were offered.
   checkpoint();
+  /** Every gate probe and where it ended, for the sign-in wall below (D-291). Read, never acted on. */
+  const gateProbes: ProbeResult[] = [];
   const anonymous: AnonymousAccess = {
-    probe: (paths) =>
-      probePaths(browser, layer0.origin, paths, { authenticated: null, timeoutMs: 20_000, ...withSignal }),
+    probe: async (paths) => {
+      const results = await probePaths(browser, layer0.origin, paths, {
+        authenticated: null,
+        timeoutMs: 20_000,
+        ...withSignal,
+      });
+      gateProbes.push(...results);
+      return results;
+    },
 
     async flow(productUrl) {
       const context = await createCrawlContext(browser);
@@ -842,6 +863,39 @@ export async function screenStorefront(
 
   progress.enter('gate', 'evaluating the gate rules without a session');
   say(`gate rules evaluated without a session: ${gate.map((f) => `${f.ruleId} ${f.state}`).join(', ')}`);
+
+  /*
+    A sign-in wall with no product sample to show it (D-291).
+
+    `assessWall` decides from product pages and had none here, so it said nothing about a wall. Run
+    dd48f232 sent every location attempt and every gate probe to `/login` and never reached for the
+    credential it held. The evidence for this wall is the Layer 3 pass and the gate probes, which is
+    why it is read here and not beside the sample: neither exists until now.
+
+    Escalation runs as it does for a product wall, and its outcome is recorded. What a session
+    cannot do here is widen the sample — there are no product URLs to render with it — so a sign-in
+    that succeeds is reported as one, and the public crawl stands.
+  */
+  if (wall.attempted === 0) {
+    const destinations: Destination[] = [
+      ...discovered.pages.map((page) => ({ requestedUrl: page.requestedUrl, finalUrl: page.finalUrl })),
+      ...discovered.probe.rejected,
+      ...gateProbes.map((probe) => ({ requestedUrl: probe.url, finalUrl: probe.finalUrl })),
+    ];
+    const signInWall = assessSignInWall(destinations, [rendered.page, ...discovered.pages]);
+    if (signInWall !== null) {
+      wall = signInWall;
+      reached.wall = wall;
+      say(wall.reason);
+      if (options.escalate !== undefined) {
+        checkpoint();
+        escalation = await options.escalate();
+        reached.escalation = escalation;
+        checkpoint();
+        progress.enter('escalate', escalationLine(escalation, false));
+      }
+    }
+  }
 
   // Order matters for readability only — `assembleReport` sorts by the rule set. What matters is
   // that the gate findings are the ones `runGateRules` produced: no Layer 3 rule is selected on a
@@ -1039,16 +1093,29 @@ function commonSegment(urls: readonly string[]): string | null {
  * One line always. A sign-in reason can end in a Playwright call log, which the worker log already
  * holds in full; the run page and the queue row carry its first line (D-278).
  */
-export function escalationLine(escalation: Escalation): string {
+export function escalationLine(escalation: Escalation, sampleToRender = true): string {
   switch (escalation.kind) {
     case 'no_credential':
       return 'a login wall was met and no screening account is stored for this merchant';
+    case 'no_sign_in_method':
+      // Not a failed sign-in: none was attempted, and the line must not read as one (D-291).
+      return (
+        'a login wall was met; a screening account is stored, and the screener has no sign-in ' +
+        `method for this site (platform detected: ${escalation.platform}), so no sign-in was attempted`
+      );
     case 'sign_in_failed':
       // Distinct from the line above, and the distinction reaches the report (D-185).
       return `a login wall was met and the stored screening account did not sign in: ${firstLine(escalation.reason)}`;
     case 'signed_in':
-      return 'a login wall was met; re-rendering the sample with the stored screening account';
+      return sampleToRender
+        ? 'a login wall was met; re-rendering the sample with the stored screening account'
+        : 'a login wall was met; the stored screening account signed in successfully, and no signed-in pages were crawled';
   }
+}
+
+/** The outcome a sign-in wall records, from what escalation returned (D-291). */
+function signInOutcome(escalation: Escalation | undefined): SignInOutcome {
+  return escalation === undefined ? 'not_consulted' : escalation.kind;
 }
 
 /**
@@ -1088,6 +1155,42 @@ export function describeAccess(
     };
   }
 
+  /*
+    A sign-in wall found without a product sample (D-291).
+
+    Its own sentence, because the product-wall sentence describes a sample this run never had. It
+    names the page every request was sent to and which of the escalation outcomes held, and the
+    outcome travels as a record too, because the evaluation guard reads it rather than this prose.
+  */
+  if (wall.walled && wall.signInUrl !== undefined) {
+    const url = wall.signInUrl;
+    const behind = `The storefront is behind sign-in at ${url}`;
+    const why =
+      escalation === undefined
+        ? `${behind}, and no screening account was available to this run`
+        : escalation.kind === 'no_credential'
+          ? `${behind}, and no screening account is stored for this merchant`
+          : escalation.kind === 'no_sign_in_method'
+            ? `A screening account is stored for this merchant. ${behind}, and the screener has no ` +
+              'sign-in method for this site, so no sign-in was attempted'
+            : escalation.kind === 'sign_in_failed'
+              ? `${behind}. A screening account is stored for this merchant and it did not sign in on ` +
+                `this run (${noteReason(escalation.reason)}), so it was not used`
+              : // Signed in, and nothing was read with the session: say both, plainly (D-291).
+                `${behind}. The stored screening account signed in successfully. Only public pages ` +
+                'were read on this run; no signed-in pages were crawled';
+
+    return {
+      mode,
+      wall: true,
+      usedCredential: false,
+      note:
+        `${wall.reason.charAt(0).toUpperCase()}${wall.reason.slice(1)}. ${why}. ` +
+        'Product-surface rules could not be observed and are reported as not observed.',
+      signInWall: { url, outcome: signInOutcome(escalation) },
+    };
+  }
+
   if (wall.walled) {
     /*
       Why coverage was limited, distinguishing a missing account from a broken one (D-185).
@@ -1103,11 +1206,13 @@ export function describeAccess(
     const why =
       escalation?.kind === 'sign_in_failed'
         ? `A screening account is stored for this merchant and it did not sign in on this run (${noteReason(escalation.reason)}), so it was not used`
-        : escalation?.kind === 'signed_in'
-          ? 'A stored screening account signed in but the product pages were still not served'
-          : escalation === undefined
-            ? 'No screening account was available to this run'
-            : 'No screening account is stored for this merchant';
+        : escalation?.kind === 'no_sign_in_method'
+          ? 'A screening account is stored for this merchant and the screener has no sign-in method for this site, so no sign-in was attempted'
+          : escalation?.kind === 'signed_in'
+            ? 'A stored screening account signed in but the product pages were still not served'
+            : escalation === undefined
+              ? 'No screening account was available to this run'
+              : 'No screening account is stored for this merchant';
 
     return {
       mode,

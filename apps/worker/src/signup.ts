@@ -27,6 +27,7 @@
 
 import type { Browser, BrowserContext } from 'playwright';
 import type {
+  Destination,
   EvidenceArtifact,
   FetchAttempt,
   Located,
@@ -276,7 +277,24 @@ export interface Layer3Discovery {
    * request behaves exactly like one where every path answered — same findings, same cost — and
    * would be invisible without a count.
    */
-  readonly probe: { readonly undecided: number; readonly total: number };
+  readonly probe: {
+    readonly undecided: number;
+    readonly total: number;
+    /**
+     * Candidates the probe rejected, and where each ended (D-291).
+     *
+     * They are not rendered, so `pages` never holds them, and the sign-in wall needs every request
+     * this pass made in its denominator — a rejected guess is a request that did not end at sign-in.
+     */
+    readonly rejected: readonly Destination[];
+  };
+}
+
+/** The probe's running tally, shared across every surface this pass looks for. */
+interface ProbeTally {
+  undecided: number;
+  total: number;
+  readonly rejected: Destination[];
 }
 
 export interface DiscoverOptions {
@@ -441,7 +459,7 @@ export async function discoverLayer3(
   const signup = signupFound.form;
   done += 1;
 
-  const probe = { undecided: 0, total: 0 };
+  const probe: ProbeTally = { undecided: 0, total: 0, rejected: [] };
   const found = new Map<string, Located<PageContext>>();
   /** Every page each surface established, for the surfaces that yield more than one (D-274). */
   const established = new Map<string, readonly PageContext[]>();
@@ -527,7 +545,7 @@ async function discoverPageTypes(
   */
   const pool: ChromeLink[] = [...(options.homepageLinks ?? [])];
 
-  const probe = { undecided: 0, total: 0 };
+  const probe: ProbeTally = { undecided: 0, total: 0, rejected: [] };
   const located = new Map<string, Located<PageContext>>();
   const pagesByType = new Map<string, PageContext[]>();
   for (const document of documents) {
@@ -866,7 +884,7 @@ async function findDocument(
      */
     readonly candidates?: readonly string[];
   },
-  probeTally: { undecided: number; total: number },
+  probeTally: ProbeTally,
 ): Promise<{ readonly located: Located<PageContext>; readonly pages: readonly PageContext[] }> {
   /*
     This surface's own attempts, kept separately from the run-wide list (D-182).
@@ -987,6 +1005,8 @@ async function findDocument(
     if (probe.verdict === 'rejected') {
       // The origin's own answer about this path, recorded as the status it actually returned.
       record({ url, status: probe.status, error: `the origin answered HTTP ${probe.status}` });
+      // Where it ended, for the sign-in wall's denominator (D-291). Never rendered, so not in `pages`.
+      probeTally.rejected.push({ requestedUrl: url, finalUrl: probe.finalUrl });
       continue;
     }
 
@@ -1159,7 +1179,7 @@ async function readDocsOrigin(
     readonly pages: PageContext[];
     readonly say: (line: string, count?: { readonly done: number; readonly total: number }) => void;
   },
-  probe: { undecided: number; total: number },
+  probe: ProbeTally,
 ): Promise<{ readonly origin: string; readonly first: Located<PageContext>; readonly pages: readonly PageContext[] } | undefined> {
   if (options.secondOrigin === undefined) return undefined;
   const links = options.homepageLinks ?? [];

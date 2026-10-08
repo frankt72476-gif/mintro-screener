@@ -50,7 +50,8 @@ import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun } from '../src/store/completeness.js';
-import { createSealedVault, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
+import { createSealedVault, credentialStored, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
+import { signInForScan } from '../src/auth/signIn.js';
 import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
 import { recordSignIn } from '../src/auth/credentialState.js';
@@ -971,63 +972,35 @@ async function signIn(
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
 ): Promise<{ outcome: Escalation; steps: readonly string[] }> {
-  // Null, not an exception. A merchant we hold no credential for is the ordinary case, and the
-  // report says coverage was limited by a wall rather than the run failing. Failing here would
-  // turn "we could not see past their login" into "the scan broke", which is a worse answer to a
-  // question the analyst can act on.
-  if (keys === undefined) {
-    // No key, so no credential could be opened whatever is stored. Reported as absent rather than
-    // as a failed sign-in: nothing was attempted (D-185).
-    return {
-      outcome: { kind: 'no_credential' },
-      steps: ['no credential key is configured on this worker, so no stored login can be opened'],
-    };
-  }
-
+  // The order — stored? a method? only then open — lives in `signInForScan`, where it is tested
+  // (D-291). Failing here would turn "we could not see past their login" into "the scan broke".
   const origin = new URL(request.url).origin;
   const hostname = new URL(request.url).hostname;
   const vaultRef = vaultRefFor(hostname);
-  const vault = createSealedVault(supabase, keys);
+  const vault = keys === undefined ? null : createSealedVault(supabase, keys);
 
-  const credentials = await vault.open(vaultRef, `screening scan of ${origin}`);
-  if (credentials === null) {
-    return { outcome: { kind: 'no_credential' }, steps: [`no screening account is stored for ${hostname}`] };
-  }
-
-  // The homepage markup, for platform detection. A plain fetch rather than a render: it is one
-  // request and the browser is about to do the real work anyway.
-  const fetched = await createHttpFetcher({ timeoutMs: 15_000 })(`${origin}/`);
-
-  const established = await establishSession({
-    browser,
+  return signInForScan({
     origin,
-    vault,
+    hostname,
     vaultRef,
-    homepageHtml: fetched.body,
-    timeoutMs: 30_000,
+    vault,
+    credentialStored: () => credentialStored(supabase, vaultRef),
+    fetchHomepage: async () => (await createHttpFetcher({ timeoutMs: 15_000 })(`${origin}/`)).body,
+    establish: (homepageHtml, credentials) =>
+      establishSession({
+        browser,
+        origin,
+        // Not null here: `signInForScan` returns before establishing when there is no vault.
+        vault: vault!,
+        vaultRef,
+        homepageHtml,
+        // Already opened, once, by `signInForScan`: one credential read per sign-in (D-291).
+        credentials,
+        timeoutMs: 30_000,
+      }),
+    // Never allowed to fail the run — `recordSignIn` swallows its own errors (D-185).
+    recordSignIn: (ok) => recordSignIn(supabase, hostname, ok),
   });
-
-  // A sign-in that failed is reported and the run continues anonymously. It is honest about
-  // coverage either way, and a merchant whose login script we cannot drive is a coverage limit,
-  // not a broken scan.
-  /*
-    The other two of the three points a credential's state changes (D-185).
-
-    A credential was found and a sign-in was attempted, so the outcome is known either way. Recorded
-    before returning, and never allowed to fail the run — `recordSignIn` swallows its own errors,
-    because a scan that screened the storefront correctly is not spoiled by a status row.
-  */
-  const signedIn = established.context !== null;
-  await recordSignIn(supabase, hostname, signedIn);
-
-  const failure = `could not sign in to ${origin}${established.needsHuman === undefined ? '' : ` — ${established.needsHuman}`}`;
-
-  return {
-    outcome: signedIn
-      ? { kind: 'signed_in', context: established.context as BrowserContext }
-      : { kind: 'sign_in_failed', reason: established.needsHuman ?? 'the sign-in did not take' },
-    steps: [...established.steps, ...(signedIn ? [] : [failure])],
-  };
 }
 
 /**

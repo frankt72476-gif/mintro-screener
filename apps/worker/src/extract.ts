@@ -466,7 +466,9 @@ export function extractPage(args: ExtractArgs): RawExtraction {
   const html = document.documentElement.outerHTML;
   if (/cdn\.shopify\.com|Shopify\.theme/i.test(html)) platform = 'shopify';
   else if (/woocommerce|wp-content\/plugins\/woocommerce/i.test(html)) platform = 'woocommerce';
-  else if (/Magento|mage\/|static\/version/i.test(html)) platform = 'magento';
+  // Anchored (D-291): `mage/` unanchored matched `image/svg+xml` in a favicon tag, and tagged an
+  // SPA with no Magento in it. Kept identical to `MARKERS` in auth/platform.ts; this runs in the page.
+  else if (/Magento|\bmage\/|\/static\/version\d+\//i.test(html)) platform = 'magento';
   else if (/bigcommerce/i.test(html)) platform = 'bigcommerce';
   if (platform !== undefined) signals.push(`platform markup indicates ${platform}`);
 

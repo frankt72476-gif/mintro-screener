@@ -27,7 +27,7 @@ import { withDeadline } from '../deadline.js';
 import { clearInterstitial, OVERLAY_NO_WAY_THROUGH, type InterstitialOutcome } from '../driveAdd.js';
 import { extractConsentGate } from '../extract.js';
 import { createCrawlContext } from '../render.js';
-import type { CredentialVault } from './vault.js';
+import type { CredentialVault, MerchantCredentials } from './vault.js';
 import { detectPlatform, loginFor, type PlatformLogin } from './platform.js';
 
 export interface EstablishInput {
@@ -39,6 +39,14 @@ export interface EstablishInput {
   /** Homepage markup, for platform detection. */
   readonly homepageHtml: string;
   readonly timeoutMs?: number;
+  /**
+   * The credential, already opened by the caller (D-291).
+   *
+   * `signInForScan` opens it once, after it knows a sign-in method exists, and hands it here, so a
+   * sign-in reads the credential once and writes one `read_credentials` row. Absent, it is opened
+   * from the vault as before — `bin/auth-check.ts` calls this directly.
+   */
+  readonly credentials?: MerchantCredentials;
 }
 
 export interface EstablishResult {
@@ -73,7 +81,8 @@ export async function establishSession(input: EstablishInput): Promise<Establish
     };
   }
 
-  const credentials = await input.vault.open(input.vaultRef, `screening login for ${input.origin}`);
+  const credentials =
+    input.credentials ?? (await input.vault.open(input.vaultRef, `screening login for ${input.origin}`));
   if (credentials === null) {
     return {
       context: null,
