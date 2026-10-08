@@ -94,7 +94,9 @@ export function credentialLine(
   return state.lastLoginOk
     ? { text: `Stored login · ${stored} · signed in ${shortDate(state.lastLoginAt)}`, tone: 'ok' }
     : {
-        text: `Stored login · ${stored} · last sign-in failed ${shortDate(state.lastLoginAt)}`,
+        // Paused, not merely failed (D-292): no scan attempts this login again until it is replaced.
+        // Storing a login resets the record, so a failed row is always the login that failed.
+        text: `Stored login · ${stored} · last sign-in failed ${shortDate(state.lastLoginAt)} · sign-in paused until the login is replaced`,
         tone: 'failed',
       };
 }
@@ -202,7 +204,9 @@ export function CredentialCard({
         */
         <p className="fhint cred-stale">
           A scan reached this merchant's login wall and the stored account did not sign in, so
-          product pages were not read. Replacing it needs a fresh account from the merchant.
+          product pages were not read. Sign-in with this login is paused: no scan tries it again
+          until the login is replaced, so a wrong password is not retried against the merchant's
+          account. Replacing it needs an updated login from the merchant.
         </p>
       )}
     </div>

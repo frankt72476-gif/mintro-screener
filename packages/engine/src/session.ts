@@ -25,6 +25,8 @@ export type SessionOrigin =
   | 'reused'
   /** Stored state was absent or stale, so a scripted login ran. */
   | 'scripted_login'
+  /** Signed in through the generic form locator, with a merchant-supplied credential (D-292). */
+  | 'generic_login'
   /** A human signed in and handed the session over. */
   | 'assisted_handoff';
 

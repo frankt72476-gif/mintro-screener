@@ -391,6 +391,7 @@ export { checkUrlPattern, findMatches, type PatternMatch } from './checks/urlPat
  */
 export {
   assessSignInWall,
+  earlySignInWall,
   assessWall,
   hasPasswordField,
   isSignInPath,

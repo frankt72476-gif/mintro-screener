@@ -35,7 +35,16 @@ export interface SessionRecord {
   /** UTC, ISO 8601. */
   readonly establishedAt: string;
   readonly platform: string;
+  /**
+   * `sessionStorage` per origin, captured at sign-in (D-292). `storageState` holds cookies and
+   * `localStorage` only, and a site that keeps its token in `sessionStorage` loses it on every new
+   * page. Absent on every session stored before this existed, which still load.
+   */
+  readonly sessionStorage?: SessionStorageByOrigin;
 }
+
+/** Origin → its `sessionStorage` entries, in insertion order. A bearer token: sealed, never logged. */
+export type SessionStorageByOrigin = Readonly<Record<string, readonly (readonly [string, string])[]>>;
 
 /** One access, for the audit trail. Values never appear. */
 export interface AccessLogEntry {

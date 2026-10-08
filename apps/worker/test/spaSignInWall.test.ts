@@ -22,7 +22,7 @@ import type { AddressInfo } from 'node:net';
 import { chromium, type Browser } from 'playwright';
 import { loadRulesetFile } from '@mintro/ruleset';
 import { NO_SESSION, type ScreeningReport } from '@mintro/engine';
-import { screenStorefront, type Escalation } from '../src/screen.js';
+import { screenStorefront, type Escalation, type EscalationWall } from '../src/screen.js';
 import { signInForScan } from '../src/auth/signIn.js';
 import { createMemoryBackend, createVault, encrypt, keyFromToken } from '../src/auth/vault.js';
 import { notSeen, type EvaluationInputs } from '../src/evaluateJob.js';
@@ -115,10 +115,17 @@ function escalation(stored: boolean) {
       : {},
   );
   const vault = createVault(backend, TOKEN);
-  const state = { calls: 0, establishCalls: 0, recorded: [] as boolean[], vault };
+  const state = { calls: 0, establishCalls: 0, recorded: [] as boolean[], vault, walls: [] as EscalationWall[] };
 
-  const escalate = async (): Promise<Escalation> => {
+  /*
+    The wall and the refusal are what this file is about (D-291). The generic form path (D-292) would
+    find this fixture's form and attempt a sign-in; that path has its own real-browser tests in
+    `genericSignIn.test.ts`. Here the form step answers as an unidentifiable form would, so the
+    outcomes below are the no-method ones this file has always asserted.
+  */
+  const escalate = async (wall: EscalationWall): Promise<Escalation> => {
     state.calls += 1;
+    state.walls.push(wall);
     const { outcome } = await signInForScan({
       origin,
       hostname: '127.0.0.1',
@@ -126,7 +133,10 @@ function escalation(stored: boolean) {
       vault,
       credentialStored: async () => stored,
       fetchHomepage: async () => (await fetch(`${origin}/`)).text(),
-      establish: async () => {
+      reuseSession: async () => ({ context: null, session: NO_SESSION, steps: [] }),
+      attemptHistory: async () => ({ lastLoginOk: null, lastLoginAt: null, credentialUpdatedAt: null }),
+      prepareGeneric: async () => ({ ok: false, reason: 'the sign-in form could not be identified: (stubbed)', steps: [] }),
+      attemptScripted: async () => {
         state.establishCalls += 1;
         return { context: null, session: NO_SESSION, steps: [], needsHuman: 'not reached' };
       },
@@ -186,6 +196,11 @@ describe('a client-rendered storefront that routes every path to /login', () => 
   it('asks for the credential: escalation runs once on each crawl', () => {
     expect(withLoginState.calls).toBe(1);
     expect(withoutLoginState.calls).toBe(1);
+  });
+
+  // What the generic path signs in at and checks against (D-292): the homepage was sent to sign-in.
+  it('hands escalation the sign-in page and the homepage as the page to check a sign-in against', () => {
+    expect(withLoginState.walls).toEqual([{ signInUrl: `${origin}/login`, walledUrl: `${origin}/` }]);
   });
 
   describe('with a stored login', () => {

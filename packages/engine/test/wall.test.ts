@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessSignInWall,
+  earlySignInWall,
   assessWall,
   hasPasswordField,
   isSignInPath,
@@ -291,5 +292,47 @@ describe('isSignInPath and hasPasswordField', () => {
     expect(hasPasswordField('<input type=password>')).toBe(true);
     expect(hasPasswordField('<label>Password</label><input type="text">')).toBe(false);
     expect(hasPasswordField('<input type="passwordless">')).toBe(false);
+  });
+});
+
+/*
+  The wall seen on the homepage render alone (D-292, item 4). The homepage request ended somewhere
+  else, and that somewhere is a sign-in page.
+*/
+describe('earlySignInWall', () => {
+  const O = 'https://app.shop.example';
+  const home = (finalUrl: string, overrides: Partial<PageContext> = {}): PageContext =>
+    page({ requestedUrl: `${O}/`, finalUrl, ...overrides });
+
+  it('fires when the homepage was sent to a sign-in path, with the homepage as the walled URL', () => {
+    expect(earlySignInWall(home(`${O}/login`))).toMatchObject({
+      walled: true,
+      signInUrl: `${O}/login`,
+      walledUrl: `${O}/`,
+      reason: `the homepage was sent to the sign-in page ${O}/login`,
+    });
+  });
+
+  it('fires on an unlisted path whose DOM carries a password field', () => {
+    const wall = earlySignInWall(home(`${O}/members`, { html: '<form><input type="email"><input type="password"></form>' }));
+    expect(wall?.signInUrl).toBe(`${O}/members`);
+  });
+
+  it('never fires on the site root, password field or not', () => {
+    expect(earlySignInWall(page({ requestedUrl: `${O}/home`, finalUrl: `${O}/`, html: '<input type="password">' }))).toBeNull();
+  });
+
+  it('does not fire on a homepage served at itself', () => {
+    expect(earlySignInWall(home(`${O}/`, { html: '<header><input type="password"></header>' }))).toBeNull();
+  });
+
+  it('does not fire where the homepage went somewhere that is not a sign-in page', () => {
+    expect(earlySignInWall(home(`${O}/welcome`))).toBeNull();
+  });
+
+  it('does not fire on a render error, a challenge or a consent gate', () => {
+    expect(earlySignInWall(home(`${O}/login`, { renderError: 'timeout' }))).toBeNull();
+    expect(earlySignInWall(home(`${O}/login`, { challenged: 'cf-mitigated' }))).toBeNull();
+    expect(earlySignInWall(home(`${O}/login`, { gated: 'age gate' }))).toBeNull();
   });
 });

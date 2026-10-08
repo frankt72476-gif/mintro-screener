@@ -27,7 +27,7 @@ import { withDeadline } from '../deadline.js';
 import { clearInterstitial, OVERLAY_NO_WAY_THROUGH, type InterstitialOutcome } from '../driveAdd.js';
 import { extractConsentGate } from '../extract.js';
 import { createCrawlContext } from '../render.js';
-import type { CredentialVault, MerchantCredentials } from './vault.js';
+import type { CredentialVault, MerchantCredentials, SessionStorageByOrigin } from './vault.js';
 import { detectPlatform, loginFor, type PlatformLogin } from './platform.js';
 
 export interface EstablishInput {
@@ -57,6 +57,15 @@ export interface EstablishResult {
   readonly steps: readonly string[];
   /** Set when a human is needed. The run continues unauthenticated regardless. */
   readonly needsHuman?: string;
+  /**
+   * True once the sign-in form's submit was clicked (D-292, A5).
+   *
+   * Only a submitted attempt says anything about the credential, so only one is recorded in
+   * `credential_state`. A failure before the click — the page blocked, the form gone, the button
+   * covered, a fill that threw — is reported as `sign_in_failed` and recorded nowhere: the password
+   * never reached the merchant, so it neither failed nor counts towards the lockout guard.
+   */
+  readonly submitted?: boolean;
 }
 
 /**
@@ -93,34 +102,117 @@ export async function establishSession(input: EstablishInput): Promise<Establish
   }
 
   // ---- 1. reuse ------------------------------------------------------------------------
-  const stored = await input.vault.readSession(input.vaultRef, `session reuse for ${input.origin}`);
-  if (stored !== null) {
-    steps.push(`stored session found, established ${stored.establishedAt}`);
-    const context = await createCrawlContext(input.browser, { storageState: stored.state as never });
-
-    if (await stillValid(context, input.origin, login, timeout)) {
-      steps.push('stored session revalidated');
-      return {
-        context,
-        session: {
-          mode: 'screening_account',
-          origin: 'reused',
-          vaultRef: input.vaultRef,
-          establishedAt: stored.establishedAt,
-          platform: login.platform,
-        },
-        steps,
-      };
-    }
-
-    steps.push('stored session no longer valid — discarded');
-    await context.close();
-    await input.vault.clearSession(input.vaultRef, `stale session for ${input.origin}`);
-  }
+  const reused = await reuseStoredSession({
+    browser: input.browser,
+    origin: input.origin,
+    vault: input.vault,
+    vaultRef: input.vaultRef,
+    validate: (context) => stillValid(context, input.origin, login, timeout),
+  });
+  steps.push(...reused.steps);
+  if (reused.context !== null) return { ...reused, steps };
 
   // ---- 2. scripted login ---------------------------------------------------------------
+  const attempted = await scriptedAttempt({
+    browser: input.browser,
+    origin: input.origin,
+    vault: input.vault,
+    vaultRef: input.vaultRef,
+    login,
+    credentials,
+    timeoutMs: timeout,
+  });
+  return { ...attempted, steps: [...steps, ...attempted.steps] };
+}
+
+/**
+ * Restores captured `sessionStorage` on every page a context opens (D-292).
+ *
+ * `storageState` carries cookies and `localStorage` and nothing else, and `sessionStorage` is per
+ * page: a token kept there is gone on the next page the crawl opens. An init script runs in every
+ * document the context creates, before the page's own scripts, so the restore is in place when the
+ * site looks for its token. Scoped to its own origin, and only into an empty store — a page that has
+ * already written its own session is not overwritten.
+ *
+ * Never logs what it restores: the entries are a bearer token.
+ */
+export async function installSessionStorage(
+  context: BrowserContext,
+  byOrigin: SessionStorageByOrigin | undefined,
+): Promise<void> {
+  if (byOrigin === undefined) return;
+  for (const [origin, entries] of Object.entries(byOrigin)) {
+    if (entries.length === 0) continue;
+    await context.addInitScript(
+      (arg: { readonly scope: string; readonly items: readonly (readonly [string, string])[] }) => {
+        try {
+          if (location.origin !== arg.scope || sessionStorage.length !== 0) return;
+          for (const [key, value] of arg.items) sessionStorage.setItem(key, value);
+        } catch {
+          // A document with no storage access (sandboxed, opaque origin) keeps none.
+        }
+      },
+      { scope: origin, items: entries },
+    );
+  }
+}
+
+/**
+ * Reuses a stored session if it still passes `validate`, or discards it (D-026, D-292).
+ *
+ * Reading the session is not reading the credential: no password is opened here, and nothing is
+ * recorded in `credential_state` either way — a reused session says nothing new about the login.
+ * Returns a context of `null` when there was no session or it no longer passed.
+ */
+export async function reuseStoredSession(input: {
+  readonly browser: Browser;
+  readonly origin: string;
+  readonly vault: CredentialVault;
+  readonly vaultRef: string;
+  readonly validate: (context: BrowserContext) => Promise<boolean>;
+}): Promise<EstablishResult> {
+  const stored = await input.vault.readSession(input.vaultRef, `session reuse for ${input.origin}`);
+  if (stored === null) return { context: null, session: NO_SESSION, steps: [] };
+
+  const steps = [`stored session found, established ${stored.establishedAt}`];
+  const context = await createCrawlContext(input.browser, { storageState: stored.state as never });
+  await installSessionStorage(context, stored.sessionStorage);
+
+  if (await input.validate(context)) {
+    steps.push('stored session revalidated');
+    return {
+      context,
+      session: {
+        mode: 'screening_account',
+        origin: 'reused',
+        vaultRef: input.vaultRef,
+        establishedAt: stored.establishedAt,
+        platform: stored.platform,
+      },
+      steps,
+    };
+  }
+
+  steps.push('stored session no longer valid — discarded');
+  await context.close();
+  await input.vault.clearSession(input.vaultRef, `stale session for ${input.origin}`);
+  return { context: null, session: NO_SESSION, steps };
+}
+
+/** One scripted login with a credential already opened, and the session stored if it took. */
+export async function scriptedAttempt(input: {
+  readonly browser: Browser;
+  readonly origin: string;
+  readonly vault: CredentialVault;
+  readonly vaultRef: string;
+  readonly login: PlatformLogin;
+  readonly credentials: MerchantCredentials;
+  readonly timeoutMs?: number;
+}): Promise<EstablishResult> {
+  const timeout = input.timeoutMs ?? 30_000;
+  const steps: string[] = [];
   const context = await createCrawlContext(input.browser);
-  const outcome = await scriptedLogin(context, input.origin, login, credentials, timeout);
+  const outcome = await scriptedLogin(context, input.origin, input.login, input.credentials, timeout);
   steps.push(...outcome.steps, outcome.detail);
 
   if (!outcome.ok) {
@@ -130,14 +222,15 @@ export async function establishSession(input: EstablishInput): Promise<Establish
       session: NO_SESSION,
       steps,
       // 3. Only now is a person worth interrupting.
-      needsHuman: `scripted ${login.platform} login failed: ${outcome.detail}`,
+      needsHuman: `scripted ${input.login.platform} login failed: ${outcome.detail}`,
+      submitted: outcome.submitted === true,
     };
   }
 
   const establishedAt = new Date().toISOString();
   await input.vault.writeSession(
     input.vaultRef,
-    { state: await context.storageState(), establishedAt, platform: login.platform },
+    { state: await context.storageState(), establishedAt, platform: input.login.platform },
     `session established for ${input.origin}`,
   );
   steps.push('session stored, encrypted, for reuse');
@@ -149,9 +242,10 @@ export async function establishSession(input: EstablishInput): Promise<Establish
       origin: 'scripted_login',
       vaultRef: input.vaultRef,
       establishedAt,
-      platform: login.platform,
+      platform: input.login.platform,
     },
     steps,
+    submitted: true,
   };
 }
 
@@ -170,7 +264,7 @@ export async function establishSession(input: EstablishInput): Promise<Establish
  * Status is checked too. A site that has expired a session usually answers 200 with a login form
  * rather than 401, so status alone is insufficient — but a non-success status is still decisive.
  */
-async function stillValid(
+export async function stillValid(
   context: BrowserContext,
   origin: string,
   login: PlatformLogin,
@@ -201,6 +295,8 @@ interface LoginOutcome {
   readonly detail: string;
   /** What happened on the way, on success as on failure, for the worker log (D-279). */
   readonly steps: readonly string[];
+  /** True once the submit click completed (A5). Absent on every failure before it. */
+  readonly submitted?: boolean;
 }
 
 /** A consent gate on the login page was classified and did not take (D-279). Authored. */
@@ -210,7 +306,7 @@ export const LOGIN_GATE_NOT_PASSED = 'consent gate on the login page was not pas
 export const LOGIN_BUTTON_COVERED = 'the login button was covered by an overlay';
 
 /** How long the login page is given to go quiet before anything in the way is looked for (D-227). */
-const SETTLE_MS = 8_000;
+export const SETTLE_MS = 8_000;
 
 /** How long a sweep waits to see whether its own dismissal navigated the page (D-279). */
 const NAVIGATION_GRACE_MS = 2_000;
@@ -343,6 +439,7 @@ async function scriptedLogin(
   const page = await context.newPage();
   const url = credentials.loginUrl ?? new URL(login.loginPath, origin).toString();
   const steps: string[] = [];
+  let submitted = false;
 
   try {
     const loaded = await loadLoginPage(page, url, timeout);
@@ -389,7 +486,10 @@ async function scriptedLogin(
 
     await Promise.all([
       page.waitForLoadState('domcontentloaded', { timeout }).catch(() => undefined),
-      form.submit.click({ timeout }),
+      form.submit.click({ timeout }).then(() => {
+        // From here the password has reached the merchant: whatever follows is a recorded attempt (A5).
+        submitted = true;
+      }),
     ]);
     await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => undefined);
 
@@ -401,15 +501,15 @@ async function scriptedLogin(
     if (signedIn === 0) {
       // Deliberately does not quote the page. A failed-login page can echo the username, and an
       // error string that travels into a log is a credential fragment in a log.
-      return { ok: false, detail: 'the form submitted but no signed-in marker appeared', steps };
+      return { ok: false, detail: 'the form submitted but no signed-in marker appeared', steps, submitted };
     }
 
-    return { ok: true, detail: `signed in via scripted ${login.platform} login`, steps };
+    return { ok: true, detail: `signed in via scripted ${login.platform} login`, steps, submitted };
   } catch (error) {
     // In full, call log included: this reaches the worker log through `steps`, and the coverage note
     // shortens it (D-278).
     const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, detail: `${LOGIN_ATTEMPT_FAILED}: ${message}`, steps };
+    return { ok: false, detail: `${LOGIN_ATTEMPT_FAILED}: ${message}`, steps, submitted };
   } finally {
     await page.close().catch(() => undefined);
   }
@@ -424,7 +524,7 @@ async function scriptedLogin(
  *
  * `ok` with no steps means there was no gate, which is the ordinary case.
  */
-async function enterLoginGate(
+export async function enterLoginGate(
   page: Page,
   url: string,
   status: number,
@@ -473,7 +573,7 @@ async function enterLoginGate(
  * that document here is what lets the fields be re-located on the page that will be submitted. `unread`
  * waits too: a reload that began inside the sweep is one way the page stops answering it.
  */
-async function sweepLoginOverlay(page: Page, control: string, timeout: number): Promise<InterstitialOutcome> {
+export async function sweepLoginOverlay(page: Page, control: string, timeout: number): Promise<InterstitialOutcome> {
   const navigated = page
     .waitForEvent('framenavigated', {
       predicate: (frame) => frame === page.mainFrame(),
@@ -500,7 +600,7 @@ async function sweepLoginOverlay(page: Page, control: string, timeout: number): 
  * a click reaches. Run 905b4e0e left `locator.click` to find that out by retrying for thirty seconds.
  * A button with no box answers `false`, and the click reports whatever it meets.
  */
-async function buttonCovered(submit: Locator, timeout: number): Promise<boolean> {
+export async function buttonCovered(submit: Locator, timeout: number): Promise<boolean> {
   return submit.evaluate(
     (control) => {
       control.scrollIntoView({ block: 'center' });

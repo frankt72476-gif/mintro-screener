@@ -515,6 +515,8 @@ export type SignInOutcome =
   | 'not_consulted'
   | 'no_credential'
   | 'no_sign_in_method'
+  /** The last attempt with the stored login failed and it was not replaced since: none made (D-292). */
+  | 'sign_in_suppressed'
   | 'sign_in_failed'
   | 'signed_in';
 
@@ -522,6 +524,18 @@ export interface SignInWallRecord {
   /** The sign-in page every anonymous request was sent to. */
   readonly url: string;
   readonly outcome: SignInOutcome;
+  /**
+   * Why no sign-in method was found, where the generic path looked and could not identify a form
+   * (D-292). Structural facts about the page only, never its text.
+   */
+  readonly reason?: string;
+  /**
+   * Pages read while signed in, looking for the catalogue, where the wall was seen on the homepage and
+   * the account signed in (D-292). Absent where no signed-in page was read.
+   */
+  readonly signedInPagesRead?: number;
+  /** Product URLs identified on those pages. Present with `signedInPagesRead`. */
+  readonly productUrlsFound?: number;
 }
 
 /**
@@ -555,6 +569,14 @@ export interface SampleBasis {
    * existed (D-002).
    */
   readonly secondOrigin?: { readonly host: string; readonly pagesRead: number };
+  /**
+   * Where the product URLs came from, where it was not the sitemap (D-292).
+   *
+   * `signed_in_pages`: found on pages read while signed in with the merchant-supplied account, because
+   * the anonymous crawl was sent to sign-in before it could find any. Absent on every other run and
+   * on every run before this existed (D-002).
+   */
+  readonly productSource?: { readonly kind: 'signed_in_pages'; readonly pagesRead: number };
   /**
    * Product pages the run did not render, and why they were the ones left (D-223, D-076).
    *

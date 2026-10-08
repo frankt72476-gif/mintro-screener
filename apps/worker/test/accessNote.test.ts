@@ -192,7 +192,7 @@ describe('a stored login with no sign-in method for the site', () => {
   });
 
   it('enters the same fact on the progress line', () => {
-    const line = escalationLine({ kind: 'signed_in', context: null as never }, false);
+    const line = escalationLine({ kind: 'signed_in', context: null as never }, 'none');
 
     expect(line).toContain('signed in successfully');
     expect(line).toContain('no signed-in pages were crawled');
@@ -201,5 +201,60 @@ describe('a stored login with no sign-in method for the site', () => {
 
   it('leaves a product wall without a sign-in record', () => {
     expect(describeAccess(walled as never, 'public', false, noMethod).signInWall).toBeUndefined();
+  });
+});
+
+/*
+  Every outcome its own sentence, on both kinds of wall (A8). The consequence follows it as a sentence
+  of its own, so an outcome that carries clauses — a reason in parentheses, the lockout guard's two
+  halves — never runs into it.
+*/
+describe('the note is whole sentences, for every outcome on both kinds of wall', () => {
+  const CONSEQUENCE = 'Product-surface rules could not be observed and are reported as not observed.';
+  const signInWall = {
+    walled: true as const,
+    attempted: 0,
+    served: 0,
+    challenged: 0,
+    consentGated: 0,
+    reason: 'no product pages were found to attempt, and 24 of the 24 page(s) requested anonymously ended at the sign-in page https://shop.example/login',
+    refusals: [],
+    signInUrl: 'https://shop.example/login',
+  };
+  const outcomes: (Escalation | undefined)[] = [
+    undefined,
+    { kind: 'no_credential' },
+    { kind: 'no_sign_in_method', platform: 'unknown' },
+    { kind: 'no_sign_in_method', platform: 'unknown', reason: 'the sign-in form could not be identified: the form has 2 text fields' },
+    { kind: 'sign_in_suppressed', lastAttemptAt: '2026-10-08T12:00:00Z' },
+    { kind: 'sign_in_failed', reason: 'generic sign-in failed: no cookie or storage entry was set or changed by the submit' },
+    { kind: 'signed_in', context: null as never },
+  ];
+
+  for (const [label, wall] of [
+    ['product wall', walled],
+    ['sign-in wall', signInWall],
+  ] as const) {
+    for (const escalation of outcomes) {
+      it(`${label}, ${escalation?.kind ?? 'not consulted'}${escalation?.kind === 'no_sign_in_method' && 'reason' in escalation && escalation.reason !== undefined ? ' with a reason' : ''}`, () => {
+        const note = describeAccess(wall as never, 'public', false, escalation).note;
+
+        expect(note).toContain(`. ${CONSEQUENCE}`);
+        expect(note).not.toMatch(/\.\./);
+        expect(note).not.toContain(', so product-surface');
+        expect(note).not.toContain('; so ');
+        expect(note.charAt(0)).toBe(note.charAt(0).toUpperCase());
+      });
+    }
+  }
+
+  it('reads, in full, for the product wall when the guard held', () => {
+    expect(describeAccess(walled as never, 'public', false, { kind: 'sign_in_suppressed', lastAttemptAt: '2026-10-08T12:00:00Z' }).note).toBe(
+      'None of the 5 sampled product pages was served to an anonymous request. ' +
+        'A screening account is stored for this merchant. The last sign-in attempt with it failed and it has not ' +
+        'been replaced since, so no attempt was made; storing an updated login allows another attempt. ' +
+        'Product-surface rules could not be observed and are reported as not observed. ' +
+        'Coverage of those rules would be wider with a merchant-supplied login that signs in.',
+    );
   });
 });

@@ -460,12 +460,29 @@ export function notSeen(inputs: EvaluationInputs): NotSeen | null {
 function signInWallMessage(inputs: EvaluationInputs): string | null {
   const wall = inputs.report.access?.signInWall;
   if (wall === undefined) return null;
+  // The account signed in and the sampled product pages were read with it (D-292): the storefront was
+  // seen, and the wall is history rather than a reason to refuse.
+  if (inputs.report.access?.usedCredential === true) return null;
 
   const state =
     wall.outcome === 'no_sign_in_method'
-      ? 'A login is on file for this merchant, and the screener has no sign-in method for this site, so no sign-in was attempted.'
+      ? 'A login is on file for this merchant, and the screener has no sign-in method for this site' +
+        // Which structural condition failed, where the generic path looked (D-292).
+        `${wall.reason === undefined ? '' : ` (${wall.reason})`}, so no sign-in was attempted.`
+      : wall.outcome === 'sign_in_suppressed'
+        ? // Same substance as the access note (D-292); no re-screen, which would meet the same pause.
+          'A login is on file for this merchant. The last sign-in attempt with it failed and it has ' +
+          'not been replaced since, so no attempt was made on this run; storing an updated login ' +
+          'allows another attempt.'
       : wall.outcome === 'sign_in_failed'
         ? 'A login is on file for this merchant; a sign-in was attempted and it failed.'
+        : wall.outcome === 'signed_in' && wall.signedInPagesRead !== undefined
+          ? // Signed in at the homepage wall and read pages with the account, finding no product (D-292).
+            'A login is on file for this merchant and it signed in successfully; ' +
+            `${wall.signedInPagesRead} ${wall.signedInPagesRead === 1 ? 'page was' : 'pages were'} read while ` +
+            (wall.productUrlsFound === undefined || wall.productUrlsFound === 0
+              ? 'signed in and no product pages could be identified on them.'
+              : `signed in and ${wall.productUrlsFound} product URL(s) found on them, none of which was served with the account.`)
         : wall.outcome === 'signed_in'
           ? 'A login is on file for this merchant and it signed in successfully; only public pages were read, and no signed-in pages were crawled.'
           : wall.outcome === 'no_credential'

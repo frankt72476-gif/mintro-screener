@@ -19370,3 +19370,110 @@ after 0092 is applied; a whole-table back-fill remains off.
 A run recorded before this (dd48f232 itself) has no `signInWall` and is refused by the text check as
 before (D-002); its message now quotes the text it read rather than "(no text was read)".
 
+## D-292 — A generic sign-in with a stored login, judged by positive evidence, never retried blind
+
+**Date:** 2026-10-08
+**Status:** accepted (Frank, 2026-10-08). **Stage 1** built items 1, 2, 3, 6 and 7; **stage 2** built items 4
+and 5. **Stage 1 must not deploy alone** (see the end).
+**See:** D-026, D-039, D-051, D-279, D-291
+
+**The site.** app.thepeptide.com (runs dd48f232, cbd323fa) is a client-rendered SPA on no platform a
+script covers. Every route goes to `/login`; a merchant-supplied login is stored at
+`merchants/app.thepeptide.com`. Its form is one text input and one password input with no name, id or
+autocomplete, a "Forgot Password?" `type=button` and a submit button, and no CAPTCHA, MFA or third-party
+sign-in. Scripted login (Shopify, WooCommerce) cannot reach it, and assisted sign-in is not built.
+
+**Hard limits, throughout.** Only a stored merchant-supplied credential (D-039, D-051). One attempt per
+run. Never create an account, never solve a CAPTCHA, never answer a one-time code or MFA prompt. The
+login form is the only form submitted for identity; a consent prompt standing on the sign-in page
+follows D-279, passed once by the crawl's own handler, as it is for scripted login.
+
+**1. A generic form locator** (`auth/genericLogin.ts`), used only where `loginFor` returns null. It
+signs in at the wall's recorded sign-in page and identifies the form **before** the credential is
+opened (D-291). It accepts only when all hold, over visible, enabled elements: exactly one `<form>`
+containing exactly one password input; exactly one other input in it of type text, email or tel; exactly
+one submit control (a button whose effective type is submit, or `input[type=submit]`); no CAPTCHA marker
+on the page, no iframe in the form, no one-time-code field. Located by structure only — `nth-child`
+paths, never wording. Otherwise the outcome stays `no_sign_in_method`, with the failed condition as its
+reason ("the sign-in form could not be identified: the form has 2 text fields"); the credential is not
+read, no access row is written, `credential_state` is untouched.
+
+**2. Success by positive evidence only** (generic path; scripted logins unchanged). Both:
+
+- (a) a cookie or storage entry is new or changed versus a snapshot taken just before the submit —
+  cookies and `localStorage` for every origin the context has visited, `sessionStorage` for the page —
+  **ignoring analytics names** (`_ga`, `_gid`, `_gat`, `_gcl`, `_fbp`, `_fbc`, `__utm`, `_hj`, `_clck`,
+  `_clsk`, `ajs_`, `mp_`, `amplitude`, `_uetsid`, `_uetvid`, matched at the start of the name), which
+  any page load can write; and
+- (b) re-opening the URL the wall recorded as sent to sign-in, on a new page in the signed-in context,
+  ends **on the same origin, at a route that is not a sign-in route**, with no render error and 2xx
+  where a status is known. A different path on the origin passes — a signed-in SPA routing `/` to
+  `/dashboard` has served its visitor — and the final path is recorded. Ending on another origin fails.
+
+A reused generic session is validated by (b); where no walled URL was recorded it is not validated, and
+the step says so. Neither "the form disappeared" nor "the URL changed" counts (D-026). No reason quotes
+the page.
+
+**3. `sessionStorage` carried over.** `storageState` holds cookies and `localStorage` only, and
+`sessionStorage` is per page. At a generic sign-in the page's `sessionStorage` is captured per origin and
+sealed with the session; every page a signed-in context opens restores it through an init script,
+scoped to its own origin and only into an empty store. Never logged. A session stored without it still
+loads.
+
+**6. The lockout guard** (all platforms). Before the credential is opened: if `last_login_ok` is false
+and the vault entry's `updated_at` is not later than `last_login_at`, no attempt is made — outcome
+`sign_in_suppressed`, nothing read, no access row, `credential_state` untouched. A still-valid stored
+session is reused regardless; the guard covers new attempts only. The access note, the refusal message
+and the credential card each say that a screening account is stored, its last sign-in attempt failed,
+it has not been replaced since, so no attempt was made — and that storing an updated login allows
+another. No database constraint covers escalation outcomes; none needed changing.
+
+**Only a submitted attempt is recorded** (all platforms). A failure before the submit click — the form
+not re-identified after the credential was opened, the button covered, a fill that threw — is
+`sign_in_failed` with its reason, but writes neither `last_login_ok` nor `last_login_at`: the password
+never reached the merchant, so it says nothing about the login and does not count towards the guard.
+The credential read it cost stays in the access log; it happened.
+
+**7.** `assisted.ts` no longer calls the authorization question open: D-039 and D-051 answered it.
+
+**Two orderings fixed in stage 1.**
+
+- *A stored session is checked before the guard and before the credential*, and reusing it records
+  nothing in `credential_state`. It used to record `last_login_ok = true`, which would lift the guard
+  on the strength of a session while the stored password was still the one that failed.
+- *The generic path signs in at the run's recorded `signInUrl` only* (accepted). `credentials.loginUrl`
+  is inside the sealed credential and cannot be read without opening it, which the form-before-
+  credential order forbids. **Open item: storing `loginUrl` outside the seal**, so the generic path can
+  use a merchant-supplied sign-in page without a credential read.
+
+**4. Early wall detection** (stage 2). Straight after the homepage render, before the sample is
+chosen: if the homepage request ended at a sign-in page — a sign-in path, or a non-root URL whose DOM
+carries a password field — the run is walled with `signInUrl` that final URL and `walledUrl` the
+requested homepage, and escalates there (`earlySignInWall`). A challenged, gated or failed render never
+fires it. **One sign-in attempt per run:** once the early check has escalated, neither the product-wall
+escalation nor the late check escalates again. The late check (D-291) stays as the backstop, unchanged,
+for a wall the homepage did not show.
+
+**5. Signed-in product discovery** (stage 2), when the early escalation signs in
+(`signedInDiscovery.ts`). In the signed-in context it renders `walledUrl`, then up to five same-origin
+catalogue entry points that page links in its navigation, through the run's pacer (D-013). **Hrefs
+only:** nothing is clicked and nothing submitted — the consent-gate pass is off for these renders. Product
+URLs are the product cards and Product markup on the pages read, plus same-origin links under the path
+segment two or more of those share, one level deeper than the segment. They join `productUrls` ahead of
+scoring and sampling — not through `reclassify` — so the certificate fetch, Layer 2 and the gate rules'
+first product see them; the gate probes stay anonymous. The sample is rendered with the session that
+found it. Coverage records the source (`sample.productSource`, "found on pages read while signed in"),
+and the access note says signed-in pages were read. Where no product URL is identified, the note says the
+account signed in, signed-in pages were read, and no product pages could be identified on them; the
+product-surface rules are not observed, as before. The evaluation guard stops refusing on the sign-in
+wall once the sample was read with the account.
+
+**Stage 1 must not deploy alone.** With 1–3 and 6 in place but 4–5 not, a sign-in wall now attempts a
+real sign-in — a credential read, a submit against the merchant's account, a session stored — and then
+crawls only public pages, because there is nowhere for the session to go. That is a sign-in for no
+coverage, and on a false (b) result it pauses the login until replaced.
+
+**Report copy.** Each access-note outcome is a sentence of its own, ending in a full stop, and
+"Product-surface rules could not be observed and are reported as not observed." follows it as its own
+sentence, for every outcome on both kinds of wall.
+

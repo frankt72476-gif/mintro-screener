@@ -1608,6 +1608,12 @@ function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.
       `Screened ${sample.productsSampled} of ${sample.productsInScope} product pages${coverageSurfaces(sample)}.`,
     );
 
+    // Where the product URLs came from, where it was not the sitemap (D-292). Absent on every other run.
+    const source = sample.productSource;
+    if (source?.kind === 'signed_in_pages') {
+      sentences.push(productSourceSentence(source.pagesRead));
+    }
+
     /*
       Which pages were left, in plain words (D-223, D-076).
 
@@ -1659,6 +1665,14 @@ function SampleBasisLine({ report }: { readonly report: ScreeningReport }): JSX.
 
 const plural = (n: number, one: string, many?: string): string =>
   n === 1 ? one : (many ?? `${one}s`);
+
+/** The coverage line's account of where the product URLs came from, when signed in (D-292). */
+export function productSourceSentence(pagesRead: number): string {
+  return (
+    `The product URLs were found on ${pagesRead} ${plural(pagesRead, 'page')} read while signed in ` +
+    'with the merchant-supplied screening account.'
+  );
+}
 
 /** "a, b and c" — an Oxford-free list, because these are read aloud in meetings. */
 /**

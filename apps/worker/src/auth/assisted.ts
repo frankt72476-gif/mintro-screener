@@ -45,11 +45,16 @@
  *
  * ## Why it is not built yet
  *
- * Every step above needs a decision that is not ours to make: which machine the analyst uses,
- * whether a hosted vendor is acceptable for a live handoff, and — the blocking one — whether
- * Mintro is authorised to hold merchant sessions established by a person rather than by stored
- * credentials. That is the same credential-authorization question that keeps M4 pointed at a
- * local testbed.
+ * Two decisions that are not ours to make remain open: which machine the analyst uses, and whether
+ * a hosted vendor is acceptable for a live handoff.
+ *
+ * The third, which this comment used to call the blocking one — whether Mintro is authorised to hold
+ * merchant sessions at all — is answered. D-039 authorises merchant-supplied logins and keeps account
+ * creation blocked; D-051 confirms it and supersedes the open credential-authorization item ("build
+ * against merchant-supplied credentials only. Do not create accounts"). The generic sign-in path
+ * (`genericLogin.ts`, D-292) is built on that answer and uses stored credentials only; whether a
+ * session established by a person is equally acceptable is the part of this design those rulings did
+ * not address.
  */
 
 import { NO_SESSION, type SessionDescriptor } from '@mintro/engine';

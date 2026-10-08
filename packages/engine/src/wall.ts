@@ -63,6 +63,15 @@ export interface WallAssessment {
    * (D-291). Absent on every wall the product sample decided, and on every run that met none.
    */
   readonly signInUrl?: string;
+  /**
+   * A URL that was requested and not served — the one a sign-in is checked against (D-292).
+   *
+   * After a generic sign-in, the session counts only if re-opening this URL now ends at it. For a
+   * sign-in wall it is the homepage where the homepage was sent to sign-in (the route an SPA is
+   * likeliest to serve once signed in), else the first request that was; for a product wall, the
+   * first sampled product page refused by the origin rather than by a challenge or a consent gate.
+   */
+  readonly walledUrl?: string;
 }
 
 /** One request and where it ended, for the sign-in wall below. */
@@ -160,6 +169,18 @@ export function assessSignInWall(
       ));
   if (!signInPage) return null;
 
+  /*
+    The URL a sign-in is later checked against (D-292): a request that was sent to this sign-in page.
+    Rendered pages first, and the caller passes the homepage first — the route an SPA is likeliest to
+    serve once signed in. A guessed policy path may route somewhere else for a signed-in visitor too,
+    which would read as the sign-in having failed.
+  */
+  const sentHere = (requestedUrl: string, finalUrl: string): boolean =>
+    endKey(finalUrl === '' ? requestedUrl : finalUrl) === key && endKey(requestedUrl) !== key;
+  const walledUrl =
+    rendered.find((page) => sentHere(page.requestedUrl, page.finalUrl))?.requestedUrl ??
+    destinations.find((d) => sentHere(d.requestedUrl, d.finalUrl))?.requestedUrl;
+
   return {
     walled: true,
     attempted: 0,
@@ -171,6 +192,42 @@ export function assessSignInWall(
       `page(s) requested anonymously ended at the sign-in page ${top.url}`,
     refusals: [],
     signInUrl: top.url,
+    ...(walledUrl === undefined ? {} : { walledUrl }),
+  };
+}
+
+/**
+ * A sign-in wall seen on the homepage render alone (D-292, item 4).
+ *
+ * The homepage request ended somewhere else, and that somewhere is a sign-in page: its path is a
+ * sign-in path, or it is not the site root and its rendered DOM carries a password field. Read
+ * straight after the homepage render, so a run that is walled at the door escalates before the
+ * sample is chosen — and a session can then be used to find the catalogue the anonymous crawl never
+ * could. `assessSignInWall` stays as the backstop for a wall this does not see.
+ *
+ * Never fires on a page that rendered with an error, was challenged, or was the merchant's own
+ * consent gate (D-264, D-266): none of those is a sign-in page, and no account opens them.
+ */
+export function earlySignInWall(homepage: PageContext): WallAssessment | null {
+  if (homepage.renderError !== undefined || homepage.challenged !== undefined || homepage.gated !== undefined) {
+    return null;
+  }
+  const finalUrl = homepage.finalUrl === '' ? homepage.requestedUrl : homepage.finalUrl;
+  if (endKey(finalUrl) === endKey(homepage.requestedUrl)) return null;
+
+  const signInPage = isSignInPath(finalUrl) || (!isSiteRoot(finalUrl) && hasPasswordField(homepage.html));
+  if (!signInPage) return null;
+
+  return {
+    walled: true,
+    attempted: 0,
+    served: 0,
+    challenged: 0,
+    consentGated: 0,
+    reason: `the homepage was sent to the sign-in page ${finalUrl}`,
+    refusals: [],
+    signInUrl: finalUrl,
+    walledUrl: homepage.requestedUrl,
   };
 }
 
@@ -326,6 +383,9 @@ export function assessWall(
     };
   }
 
+  const refused = pages.find(
+    (page) => !wasServed(page) && page.challenged === undefined && page.gated === undefined,
+  );
   return {
     walled: true,
     attempted,
@@ -337,6 +397,7 @@ export function assessWall(
       describeChallenged(challenged, attempted) +
       describeGated(consentGated, attempted),
     refusals,
+    ...(refused === undefined ? {} : { walledUrl: refused.requestedUrl }),
   };
 }
 

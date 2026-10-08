@@ -21,6 +21,7 @@ import {
 } from '../src/auth/login.js';
 import { PLATFORM_LOGINS } from '../src/auth/platform.js';
 import { signInForScan } from '../src/auth/signIn.js';
+import { browserSignIn } from '../src/auth/signInBrowser.js';
 import { OVERLAY_NO_WAY_THROUGH } from '../src/driveAdd.js';
 import { createMemoryBackend, createVault, encrypt, keyFromToken } from '../src/auth/vault.js';
 import { createCrawlContext } from '../src/render.js';
@@ -444,8 +445,8 @@ describe('a sign-in reads the credential once', () => {
       vault,
       credentialStored: async () => true,
       fetchHomepage: async () => homepageHtml,
-      establish: (html, credentials) =>
-        establishSession({ browser, origin: gated.origin, vault, vaultRef, homepageHtml: html, credentials, timeoutMs: 10_000 }),
+      attemptHistory: async () => ({ lastLoginOk: null, lastLoginAt: null, credentialUpdatedAt: null }),
+      ...browserSignIn({ browser, origin: gated.origin, vaultRef, vault, wall: {}, timeoutMs: 10_000 }),
       recordSignIn: async () => undefined,
     });
 
@@ -454,10 +455,11 @@ describe('a sign-in reads the credential once', () => {
       const reads = vault.accessLog().filter((entry) => entry.action === 'read_credentials');
       expect(reads).toHaveLength(1);
       // The session record is a separate access, named for what it is: one look for a stored
-      // session, one write of the new one. Neither reads the credential.
+      // session — before the credential, since D-292 — and one write of the new one. Neither reads
+      // the credential.
       expect(vault.accessLog().map((entry) => entry.action)).toEqual([
-        'read_credentials',
         'read_session',
+        'read_credentials',
         'write_session',
       ]);
     } finally {

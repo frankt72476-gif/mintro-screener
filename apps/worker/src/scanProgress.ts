@@ -47,6 +47,8 @@ export interface ScanProgress {
   readonly surfaceRead: (label: string) => void;
   /** The docs host read as a second origin, with the pages read from it (cluster 2). */
   readonly secondOriginRead: (host: string, pagesRead: number) => void;
+  /** The product URLs were found on pages read while signed in, and how many pages (D-292). */
+  readonly productsFoundSignedIn: (pagesRead: number) => void;
   /**
    * What the run left unrendered, and which kind (D-223).
    *
@@ -67,6 +69,7 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
   let productsSampled = 0;
   const surfacesRead: string[] = [];
   let secondOrigin: { host: string; pagesRead: number } | undefined;
+  let productSource: { kind: 'signed_in_pages'; pagesRead: number } | undefined;
 
   const send = (line: string, count?: { done: number; total: number }): void => {
     /*
@@ -101,6 +104,9 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
     secondOriginRead(host, pagesRead) {
       secondOrigin = { host, pagesRead };
     },
+    productsFoundSignedIn(pagesRead) {
+      productSource = { kind: 'signed_in_pages', pagesRead };
+    },
     notRenderedIs(recognised, overCap) {
       notRendered = { recognised, overCap };
     },
@@ -113,6 +119,7 @@ export function createScanProgress(emit: (event: ProgressEvent) => void): ScanPr
         productsSampled,
         surfacesRead: [...surfacesRead],
         ...(secondOrigin === undefined ? {} : { secondOrigin: { ...secondOrigin } }),
+        ...(productSource === undefined ? {} : { productSource: { ...productSource } }),
         // Omitted rather than zeroed when nothing recorded it: a run that never declared what it
         // left out is not a run that left nothing out, and the coverage line has to tell those
         // apart (D-002, D-044's shape).

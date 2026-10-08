@@ -49,7 +49,10 @@ describe('the four states', () => {
     // The state the whole change exists for.
     expect(
       credentialLine(stored({ lastLoginOk: false, lastLoginAt: '2026-08-28T11:00:00.000Z' }), false),
-    ).toEqual({ text: 'Stored login · stored 12 Aug · last sign-in failed 28 Aug', tone: 'failed' });
+    ).toEqual({
+      text: 'Stored login · stored 12 Aug · last sign-in failed 28 Aug · sign-in paused until the login is replaced',
+      tone: 'failed',
+    });
   });
 });
 
@@ -115,6 +118,19 @@ describe('the action', () => {
 
     expect(markup).toContain('did not sign in');
     expect(markup).toContain('data-tone="failed"');
+  });
+
+  it('says sign-in is paused until the login is replaced (D-292)', () => {
+    // The worker makes no further attempt with a login whose last attempt failed. The analyst is told
+    // here, where the replacing is done, and not only in a report they may not have opened.
+    const markup = render(stored({ lastLoginOk: false, lastLoginAt: '2026-08-28T11:00:00.000Z' }));
+
+    expect(markup).toContain('sign-in paused until the login is replaced');
+    expect(markup).toContain('Sign-in with this login is paused: no scan tries it again');
+    expect(markup).toContain('until the login is replaced');
+    // Presence where it applies, absence where it does not.
+    expect(render(stored({ lastLoginOk: true, lastLoginAt: '2026-08-28T11:00:00.000Z' }))).not.toContain('paused');
+    expect(render(stored())).not.toContain('paused');
   });
 
   it('says why the button is unavailable rather than only disabling it', () => {
