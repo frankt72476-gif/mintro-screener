@@ -120,9 +120,34 @@ export type Escalation =
     own record (`credential_state.last_login_ok`) is not touched. Reported as a failure it told the
     credential card a working login had stopped working, about a login nobody had tried.
   */
-  | { readonly kind: 'no_sign_in_method'; readonly platform: string }
+  /*
+    `reason` is set where the generic path looked and could not identify a form (D-292): which
+    structural condition failed, never the page's text. Absent where no path applied at all.
+  */
+  | { readonly kind: 'no_sign_in_method'; readonly platform: string; readonly reason?: string }
+  /*
+    The last attempt with the stored login failed and it has not been replaced since, so none was
+    made (D-292). Not `sign_in_failed`: nothing was attempted on this run and nothing was read.
+  */
+  | { readonly kind: 'sign_in_suppressed'; readonly lastAttemptAt: string }
   | { readonly kind: 'sign_in_failed'; readonly reason: string }
   | { readonly kind: 'signed_in'; readonly context: BrowserContext };
+
+/**
+ * What the wall recorded, handed to escalation (D-292).
+ *
+ * The generic path signs in at `signInUrl` and checks the sign-in against `walledUrl`. A product
+ * wall records no sign-in page, so the generic path has nowhere to go there and says so.
+ */
+export interface EscalationWall {
+  readonly signInUrl?: string;
+  readonly walledUrl?: string;
+}
+
+const wallForEscalation = (wall: WallAssessment): EscalationWall => ({
+  ...(wall.signInUrl === undefined ? {} : { signInUrl: wall.signInUrl }),
+  ...(wall.walledUrl === undefined ? {} : { walledUrl: wall.walledUrl }),
+});
 
 export interface ScreenOptions {
   readonly runId: string;
@@ -167,7 +192,7 @@ export interface ScreenOptions {
    * been supplied when one had, and had stopped working. The person reading the report is not
    * always the person who would look at the credential card.
    */
-  readonly escalate?: () => Promise<Escalation>;
+  readonly escalate?: (wall: EscalationWall) => Promise<Escalation>;
   /**
    * The run's cancellation (D-281).
    *
@@ -603,7 +628,7 @@ export async function screenStorefront(
   // limited and why. Nobody is asked to predict which it will be (D-040).
   if (wall.walled && options.escalate !== undefined) {
     checkpoint();
-    escalation = await options.escalate();
+    escalation = await options.escalate(wallForEscalation(wall));
     reached.escalation = escalation;
     checkpoint();
     progress.enter('escalate', escalationLine(escalation));
@@ -889,7 +914,7 @@ export async function screenStorefront(
       say(wall.reason);
       if (options.escalate !== undefined) {
         checkpoint();
-        escalation = await options.escalate();
+        escalation = await options.escalate(wallForEscalation(wall));
         reached.escalation = escalation;
         checkpoint();
         progress.enter('escalate', escalationLine(escalation, false));
@@ -1101,7 +1126,14 @@ export function escalationLine(escalation: Escalation, sampleToRender = true): s
       // Not a failed sign-in: none was attempted, and the line must not read as one (D-291).
       return (
         'a login wall was met; a screening account is stored, and the screener has no sign-in ' +
-        `method for this site (platform detected: ${escalation.platform}), so no sign-in was attempted`
+        `method for this site (platform detected: ${escalation.platform}` +
+        `${escalation.reason === undefined ? '' : `; ${escalation.reason}`}), so no sign-in was attempted`
+      );
+    case 'sign_in_suppressed':
+      // Not a failed sign-in either: nothing was attempted on this run (D-292).
+      return (
+        'a login wall was met; the last sign-in attempt with the stored screening account failed and ' +
+        'it has not been replaced since, so no attempt was made'
       );
     case 'sign_in_failed':
       // Distinct from the line above, and the distinction reaches the report (D-185).
@@ -1128,6 +1160,19 @@ function signInOutcome(escalation: Escalation | undefined): SignInOutcome {
 function noteReason(reason: string): string {
   return reason.includes(`${LOGIN_ATTEMPT_FAILED}:`) ? 'the login attempt failed' : reason;
 }
+
+/** Why no method applied, in parentheses, where the generic path recorded one (D-292). */
+function methodReason(escalation: Escalation & { readonly kind: 'no_sign_in_method' }): string {
+  return escalation.reason === undefined ? '' : ` (${escalation.reason})`;
+}
+
+/**
+ * The lockout guard's sentence (D-292). Observation, not instruction (D-001): it says what holds and
+ * what would change it, as the coverage note says a login that signs in would widen coverage.
+ */
+const SUPPRESSED =
+  'The last sign-in attempt with it failed and it has not been replaced since, so no attempt was ' +
+  'made; storing an updated login allows another attempt';
 
 /**
  * What the report says about its own reach.
@@ -1172,7 +1217,9 @@ export function describeAccess(
           ? `${behind}, and no screening account is stored for this merchant`
           : escalation.kind === 'no_sign_in_method'
             ? `A screening account is stored for this merchant. ${behind}, and the screener has no ` +
-              'sign-in method for this site, so no sign-in was attempted'
+              `sign-in method for this site${methodReason(escalation)}, so no sign-in was attempted`
+            : escalation.kind === 'sign_in_suppressed'
+              ? `A screening account is stored for this merchant. ${behind}. ${SUPPRESSED}`
             : escalation.kind === 'sign_in_failed'
               ? `${behind}. A screening account is stored for this merchant and it did not sign in on ` +
                 `this run (${noteReason(escalation.reason)}), so it was not used`
@@ -1187,7 +1234,13 @@ export function describeAccess(
       note:
         `${wall.reason.charAt(0).toUpperCase()}${wall.reason.slice(1)}. ${why}. ` +
         'Product-surface rules could not be observed and are reported as not observed.',
-      signInWall: { url, outcome: signInOutcome(escalation) },
+      signInWall: {
+        url,
+        outcome: signInOutcome(escalation),
+        ...(escalation?.kind === 'no_sign_in_method' && escalation.reason !== undefined
+          ? { reason: escalation.reason }
+          : {}),
+      },
     };
   }
 
@@ -1207,7 +1260,9 @@ export function describeAccess(
       escalation?.kind === 'sign_in_failed'
         ? `A screening account is stored for this merchant and it did not sign in on this run (${noteReason(escalation.reason)}), so it was not used`
         : escalation?.kind === 'no_sign_in_method'
-          ? 'A screening account is stored for this merchant and the screener has no sign-in method for this site, so no sign-in was attempted'
+          ? `A screening account is stored for this merchant and the screener has no sign-in method for this site${methodReason(escalation)}, so no sign-in was attempted`
+          : escalation?.kind === 'sign_in_suppressed'
+            ? `A screening account is stored for this merchant. ${SUPPRESSED}`
           : escalation?.kind === 'signed_in'
             ? 'A stored screening account signed in but the product pages were still not served'
             : escalation === undefined
@@ -1218,9 +1273,11 @@ export function describeAccess(
       mode,
       wall: true,
       usedCredential: false,
+      // Each outcome its own sentence, and the consequence its own after it (A8): the outcome
+      // sentences now carry clauses of their own, and a trailing ", so …" ran them together.
       note:
-        `${wall.reason}. ${why}, ` +
-        'so product-surface rules could not be observed and are reported as not observed. ' +
+        `${wall.reason.charAt(0).toUpperCase()}${wall.reason.slice(1)}. ${why}. ` +
+        'Product-surface rules could not be observed and are reported as not observed. ' +
         'Coverage of those rules would be wider with a merchant-supplied login that signs in.',
     };
   }

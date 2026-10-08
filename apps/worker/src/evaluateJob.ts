@@ -463,7 +463,14 @@ function signInWallMessage(inputs: EvaluationInputs): string | null {
 
   const state =
     wall.outcome === 'no_sign_in_method'
-      ? 'A login is on file for this merchant, and the screener has no sign-in method for this site, so no sign-in was attempted.'
+      ? 'A login is on file for this merchant, and the screener has no sign-in method for this site' +
+        // Which structural condition failed, where the generic path looked (D-292).
+        `${wall.reason === undefined ? '' : ` (${wall.reason})`}, so no sign-in was attempted.`
+      : wall.outcome === 'sign_in_suppressed'
+        ? // Same substance as the access note (D-292); no re-screen, which would meet the same pause.
+          'A login is on file for this merchant. The last sign-in attempt with it failed and it has ' +
+          'not been replaced since, so no attempt was made on this run; storing an updated login ' +
+          'allows another attempt.'
       : wall.outcome === 'sign_in_failed'
         ? 'A login is on file for this merchant; a sign-in was attempted and it failed.'
         : wall.outcome === 'signed_in'

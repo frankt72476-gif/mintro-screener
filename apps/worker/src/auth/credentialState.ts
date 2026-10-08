@@ -70,6 +70,45 @@ export async function recordSignIn(
   }
 }
 
+/** What the lockout guard reads (D-292). */
+export interface AttemptHistory {
+  readonly lastLoginOk: boolean | null;
+  readonly lastLoginAt: string | null;
+  /** When the stored credential was last written. Null when no entry exists. */
+  readonly credentialUpdatedAt: string | null;
+}
+
+/**
+ * The last sign-in attempt's outcome, and when the credential was last replaced (D-292).
+ *
+ * Reads `credential_state` and the vault entry's `updated_at` — never `sealed`, so nothing is opened
+ * and no `credential_access` row is written. Throws on a read error, as the vault does: "I could not
+ * tell" must not become "nothing failed before", which would lift the guard.
+ */
+export async function readAttemptHistory(
+  supabase: WorkerSupabase,
+  merchantDomain: string,
+  vaultRef: string,
+): Promise<AttemptHistory> {
+  const [state, entry] = await Promise.all([
+    supabase.client
+      .from('credential_state')
+      .select('last_login_ok, last_login_at')
+      .eq('merchant_domain', fold(merchantDomain))
+      .maybeSingle(),
+    supabase.client.from('vault_entries').select('updated_at').eq('path', `${vaultRef}/credentials`).maybeSingle(),
+  ]);
+  if (state.error !== null) throw new Error(`could not read the last sign-in attempt: ${state.error.message}`);
+  if (entry.error !== null) throw new Error(`could not read when the login was stored: ${entry.error.message}`);
+
+  const row = state.data as { last_login_ok: boolean | null; last_login_at: string | null } | null;
+  return {
+    lastLoginOk: row?.last_login_ok ?? null,
+    lastLoginAt: row?.last_login_at ?? null,
+    credentialUpdatedAt: (entry.data as { updated_at: string } | null)?.updated_at ?? null,
+  };
+}
+
 async function upsert(
   supabase: WorkerSupabase,
   row: Record<string, unknown>,

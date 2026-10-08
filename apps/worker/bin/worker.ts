@@ -45,17 +45,18 @@ import {
   type Ruleset,
   type Vertical,
 } from '@mintro/ruleset';
-import { screenStorefront , type Escalation, type ScreenControl } from '../src/screen.js';
+import { screenStorefront , type Escalation, type EscalationWall, type ScreenControl } from '../src/screen.js';
 import { createWorkerSupabase, type WorkerSupabase } from '../src/store/supabase.js';
 import { persistRun } from '../src/store/persist.js';
 import { preflight } from '../src/store/preflight.js';
 import { assessRun } from '../src/store/completeness.js';
 import { createSealedVault, credentialStored, vaultRefFor, type SealedVaultKeys } from '../src/auth/supabaseVault.js';
 import { signInForScan } from '../src/auth/signIn.js';
+import { browserSignIn } from '../src/auth/signInBrowser.js';
 import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
-import { recordSignIn } from '../src/auth/credentialState.js';
-import { establishSession, recordSignInSteps } from '../src/auth/login.js';
+import { readAttemptHistory, recordSignIn } from '../src/auth/credentialState.js';
+import { recordSignInSteps } from '../src/auth/login.js';
 import { DeadlineExceeded } from '../src/deadline.js';
 import {
   createHttpFetcher,
@@ -780,8 +781,8 @@ async function handle(
 
       // Called only if the anonymous crawl is refused. The analyst chose nothing; this is the
       // escalation D-040 describes, and it happens on evidence or not at all.
-      escalate: async () => {
-        const established = await signIn(supabase, browser, request, keys);
+      escalate: async (wall) => {
+        const established = await signIn(supabase, browser, request, keys, wall);
         recordSignInSteps(
           established.steps,
           (step) => console.log(`  ${step}`),
@@ -971,9 +972,11 @@ async function signIn(
   browser: Browser,
   request: ScanRequest,
   keys: SealedVaultKeys | undefined,
+  wall: EscalationWall,
 ): Promise<{ outcome: Escalation; steps: readonly string[] }> {
-  // The order — stored? a method? only then open — lives in `signInForScan`, where it is tested
-  // (D-291). Failing here would turn "we could not see past their login" into "the scan broke".
+  // The order — stored? a method? a session? the lockout guard? a form? only then open — lives in
+  // `signInForScan`, where it is tested (D-291, D-292). Failing here would turn "we could not see
+  // past their login" into "the scan broke".
   const origin = new URL(request.url).origin;
   const hostname = new URL(request.url).hostname;
   const vaultRef = vaultRefFor(hostname);
@@ -986,18 +989,8 @@ async function signIn(
     vault,
     credentialStored: () => credentialStored(supabase, vaultRef),
     fetchHomepage: async () => (await createHttpFetcher({ timeoutMs: 15_000 })(`${origin}/`)).body,
-    establish: (homepageHtml, credentials) =>
-      establishSession({
-        browser,
-        origin,
-        // Not null here: `signInForScan` returns before establishing when there is no vault.
-        vault: vault!,
-        vaultRef,
-        homepageHtml,
-        // Already opened, once, by `signInForScan`: one credential read per sign-in (D-291).
-        credentials,
-        timeoutMs: 30_000,
-      }),
+    attemptHistory: () => readAttemptHistory(supabase, hostname, vaultRef),
+    ...browserSignIn({ browser, origin, vaultRef, vault, wall, timeoutMs: 30_000 }),
     // Never allowed to fail the run — `recordSignIn` swallows its own errors (D-185).
     recordSignIn: (ok) => recordSignIn(supabase, hostname, ok),
   });

@@ -515,6 +515,8 @@ export type SignInOutcome =
   | 'not_consulted'
   | 'no_credential'
   | 'no_sign_in_method'
+  /** The last attempt with the stored login failed and it was not replaced since: none made (D-292). */
+  | 'sign_in_suppressed'
   | 'sign_in_failed'
   | 'signed_in';
 
@@ -522,6 +524,11 @@ export interface SignInWallRecord {
   /** The sign-in page every anonymous request was sent to. */
   readonly url: string;
   readonly outcome: SignInOutcome;
+  /**
+   * Why no sign-in method was found, where the generic path looked and could not identify a form
+   * (D-292). Structural facts about the page only, never its text.
+   */
+  readonly reason?: string;
 }
 
 /**
