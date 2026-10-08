@@ -66,12 +66,24 @@ describe('a recorded sign-in wall', () => {
     expect(notSeen(inputs('no_credential', HEALTHY))?.cause).toBe('sign_in_wall');
   });
 
-  it('never tells the operator to re-scan', () => {
-    for (const outcome of ['not_consulted', 'no_credential', 'no_sign_in_method', 'sign_in_failed', 'signed_in']) {
+  it('never points to re-screening where a login is on file: a re-screen meets the same wall', () => {
+    for (const outcome of ['not_consulted', 'no_sign_in_method', 'sign_in_failed', 'signed_in']) {
       const message = storefrontNotSeen(inputs(outcome)) ?? '';
       expect(message, outcome).not.toMatch(/re-?scan/i);
       expect(message, outcome).not.toMatch(/re-?screen/i);
     }
+  });
+
+  /*
+    The one state a new run can change. With no login on file, storing one and re-screening is the
+    way through, and the message says so (D-291).
+  */
+  it('states the remedy where no login is on file', () => {
+    const message = storefrontNotSeen(inputs('no_credential')) ?? '';
+    expect(message).toContain(
+      'No login is on file for this merchant. A screening login can be stored for this merchant and the merchant re-screened.',
+    );
+    expect(message).not.toMatch(/re-?scan\b/i);
   });
 });
 
@@ -79,7 +91,9 @@ describe('which state the login is in, by reading alone', () => {
   const message = (outcome: string): string => storefrontNotSeen(inputs(outcome)) ?? '';
 
   it('no login on file', () => {
-    expect(message('no_credential')).toContain('No login is on file for this merchant.');
+    expect(message('no_credential')).toContain(
+      'No login is on file for this merchant. A screening login can be stored for this merchant and the merchant re-screened.',
+    );
   });
 
   it('a login on file and no sign-in method for this site', () => {

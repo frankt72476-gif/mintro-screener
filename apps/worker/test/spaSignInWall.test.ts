@@ -228,7 +228,9 @@ describe('a client-rendered storefront that routes every path to /login', () => 
     it('is refused with cause sign_in_wall, saying no login is on file', () => {
       const refused = guard(withoutLogin.report);
       expect(refused?.cause).toBe('sign_in_wall');
-      expect(refused?.message).toContain('No login is on file for this merchant.');
+      expect(refused?.message).toContain(
+        'No login is on file for this merchant. A screening login can be stored for this merchant and the merchant re-screened.',
+      );
     });
   });
 

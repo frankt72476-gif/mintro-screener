@@ -19351,7 +19351,9 @@ record's own `read_session` and `write_session` accesses are separate rows, as b
 challenge, unserved catalogue) and before the two text inferences, and refuses with
 `run_did_not_see_storefront` and cause `sign_in_wall`. The message names the sign-in URL and which state
 the login is in — no login on file, a login on file and no sign-in method for this site, or a sign-in
-attempted that failed — and never tells the operator to re-scan: a new run meets the same page.
+attempted that failed. Where a login is on file it never points to re-screening: a new run meets the
+same page. Where none is on file it states the remedy — a screening login can be stored for the
+merchant and the merchant re-screened — because that is the one state a new run can change.
 
 The consent-gate and bot-challenge refusals name their causes too, `consent_gate` and `bot_challenge`:
 each is met again by a re-screen, and each message already says so. None of the three causes was ever
@@ -19360,6 +19362,10 @@ carried as anything but a sentence, so the cause is a new nullable column,
 collapse, an unserved catalogue. The editor's banner offers no repair and no Regenerate on any
 storefront-not-seen refusal, and shows the Re-screen prompt only where the cause is null. An existing
 row written before 0092 keeps a null cause whatever branch wrote it, and shows the prompt.
+
+One-row correction: run `3e1008c5` (2026-10-07), the only existing refusal from the consent-gate or
+bot-challenge branch, is set to `bot_challenge` by `supabase/manual/2026-10-08_fix_3e1008c5_cause.sql`
+after 0092 is applied; a whole-table back-fill remains off.
 
 A run recorded before this (dd48f232 itself) has no `signInWall` and is refused by the text check as
 before (D-002); its message now quotes the text it read rather than "(no text was read)".

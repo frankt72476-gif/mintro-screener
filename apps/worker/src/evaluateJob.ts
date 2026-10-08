@@ -453,8 +453,9 @@ export function notSeen(inputs: EvaluationInputs): NotSeen | null {
  *
  * Read off `report.access.signInWall`, which the crawl writes when most anonymous requests ended at
  * one sign-in page. Its own sentence because the repair differs from every other refusal here: a
- * re-scan meets the same wall, so the message says which of the three states the login is in and
- * never tells anyone to re-scan.
+ * re-scan alone meets the same wall, so the message says which state the login is in. Only where no
+ * login is on file does it name a remedy — store one and re-screen. Where a login is on file, a
+ * re-screen changes nothing, and none is pointed to.
  */
 function signInWallMessage(inputs: EvaluationInputs): string | null {
   const wall = inputs.report.access?.signInWall;
@@ -468,7 +469,9 @@ function signInWallMessage(inputs: EvaluationInputs): string | null {
         : wall.outcome === 'signed_in'
           ? 'A login is on file for this merchant and it signed in successfully; only public pages were read, and no signed-in pages were crawled.'
           : wall.outcome === 'no_credential'
-            ? 'No login is on file for this merchant.'
+            ? // The one state a new run can change: with a login stored, a re-screen signs in (D-291).
+              'No login is on file for this merchant. A screening login can be stored for this ' +
+              'merchant and the merchant re-screened.'
             : 'No stored login was consulted on this run.';
 
   return (
