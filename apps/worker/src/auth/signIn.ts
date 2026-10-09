@@ -50,6 +50,11 @@ export interface SignInInput {
   readonly attemptScripted: (login: PlatformLogin, credentials: MerchantCredentials) => Promise<EstablishResult>;
   /** Records the outcome of an attempted sign-in. Never called when none was attempted. */
   readonly recordSignIn: (ok: boolean) => Promise<void>;
+  /**
+   * Records that the site asked for a second-factor code after the submit (D-293). Never touches
+   * `last_login_ok` or `last_login_at`, which the lockout guard reads.
+   */
+  readonly recordSecondFactor: () => Promise<void>;
 }
 
 /**
@@ -150,6 +155,23 @@ export async function signInForScan(
 
   const established = await attempt(credentials);
   steps.push(...established.steps);
+
+  /*
+    The password was submitted and the site asked for a code, which is never answered (D-293).
+
+    Not `sign_in_failed`, and not recorded as one: nothing says the password was wrong, and a
+    failure here paused a working login on the next re-screen. `last_login_ok` and `last_login_at`
+    are left as they were, so the lockout guard reads what it read before this run. The credential
+    read stays in the access log — the credential was opened.
+  */
+  if (established.secondFactor === true) {
+    await input.recordSecondFactor();
+    steps.push(
+      'the site asked for a second-factor code after the submit, which the screener does not answer, so ' +
+        'the outcome was not recorded as a failed sign-in',
+    );
+    return { outcome: { kind: 'second_factor_required' }, steps };
+  }
 
   // A sign-in that failed is reported and the run continues anonymously (D-185).
   const signedIn = established.context !== null;

@@ -39,6 +39,34 @@ export async function recordCredentialStored(
 }
 
 /**
+ * Records that a scan submitted the login and the site then asked for a second-factor code (D-293).
+ *
+ * Writes `last_second_factor_at` alone. `last_login_ok` and `last_login_at` are the lockout guard's
+ * input and say whether the password worked; a code step does not say that, so they are left as
+ * they were. Swallows its own failure, like every write here.
+ */
+export async function recordSecondFactor(supabase: WorkerSupabase, merchantDomain: string): Promise<void> {
+  const domain = fold(merchantDomain);
+
+  try {
+    const { error } = await supabase.client
+      .from('credential_state')
+      .update({ last_second_factor_at: new Date().toISOString() })
+      .eq('merchant_domain', domain);
+
+    if (error !== null) {
+      console.error(`could not record the second-factor step for ${domain}: ${error.message}`);
+    }
+  } catch (cause) {
+    console.error(
+      `could not record the second-factor step for ${domain}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+  }
+}
+
+/**
  * Records the outcome of a sign-in attempt.
  *
  * `updated_at` and `updated_by` are left alone: they say when the credential was deposited, and a

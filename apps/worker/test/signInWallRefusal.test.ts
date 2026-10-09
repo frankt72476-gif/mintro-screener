@@ -67,7 +67,7 @@ describe('a recorded sign-in wall', () => {
   });
 
   it('never points to re-screening where a login is on file: a re-screen meets the same wall', () => {
-    for (const outcome of ['not_consulted', 'no_sign_in_method', 'sign_in_failed', 'signed_in']) {
+    for (const outcome of ['not_consulted', 'no_sign_in_method', 'sign_in_failed', 'second_factor_required', 'signed_in']) {
       const message = storefrontNotSeen(inputs(outcome)) ?? '';
       expect(message, outcome).not.toMatch(/re-?scan/i);
       expect(message, outcome).not.toMatch(/re-?screen/i);
@@ -115,6 +115,22 @@ describe('which state the login is in, by reading alone', () => {
   it('the three read apart from each other', () => {
     const three = ['no_credential', 'no_sign_in_method', 'sign_in_failed'].map(message);
     expect(new Set(three).size).toBe(3);
+  });
+
+  /*
+    The password was submitted and the site asked for a code (D-293). Not a failure, and not
+    suppressed: its own sentence, under the same cause, with no re-screen pointed to.
+  */
+  it('a login submitted and then asked for a second-factor code', () => {
+    const text = message('second_factor_required');
+    expect(text).toContain(
+      'A login is on file for this merchant. The stored login was submitted and the site then asked for a ' +
+        'second-factor code, which the screener does not answer; a login without a second factor is needed to ' +
+        'read signed-in pages.',
+    );
+    expect(text).not.toContain('failed');
+    expect(notSeen(inputs('second_factor_required'))?.cause).toBe('sign_in_wall');
+    expect(new Set(['sign_in_failed', 'sign_in_suppressed', 'second_factor_required'].map(message)).size).toBe(3);
   });
 });
 

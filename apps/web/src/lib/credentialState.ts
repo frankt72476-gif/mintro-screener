@@ -26,6 +26,11 @@ export interface CredentialState {
   readonly updatedAt: string;
   readonly lastLoginOk: boolean | null;
   readonly lastLoginAt: string | null;
+  /**
+   * When a scan last submitted this login and the site asked for a second-factor code (D-293). Not a
+   * sign-in outcome. Null where it never happened, or on a database without migration 0093.
+   */
+  readonly lastSecondFactorAt: string | null;
 }
 
 interface Row {
@@ -33,6 +38,7 @@ interface Row {
   readonly updated_at: string;
   readonly last_login_ok: boolean | null;
   readonly last_login_at: string | null;
+  readonly last_second_factor_at?: string | null;
 }
 
 /**
@@ -49,9 +55,15 @@ export async function readCredentialState(
   const domain = normaliseDomain(merchantDomain);
   if (domain === null) return null;
 
+  /*
+    Every column, not a list, so the read survives a database that has not applied 0093 (D-293): the
+    web deploys on push, the migration is applied by hand, and naming a column that is not there yet
+    would fail the read — the card would say it could not check, for every merchant. Nothing in this
+    table can carry a secret (0048), so reading all of it reads nothing it should not.
+  */
   const { data, error } = await client
     .from('credential_state')
-    .select('merchant_domain, updated_at, last_login_ok, last_login_at')
+    .select('*')
     .eq('merchant_domain', domain)
     .maybeSingle();
 
@@ -64,6 +76,7 @@ export async function readCredentialState(
     updatedAt: row.updated_at,
     lastLoginOk: row.last_login_ok,
     lastLoginAt: row.last_login_at,
+    lastSecondFactorAt: row.last_second_factor_at ?? null,
   };
 }
 

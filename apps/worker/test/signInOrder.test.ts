@@ -76,12 +76,26 @@ function harness(options: {
   signsIn?: boolean;
   /** Fails before the submit click, as a covered button or a vanished form does. */
   failsBeforeSubmit?: boolean;
+  /** The submit leads to a code-entry step (D-293). */
+  asksForCode?: boolean;
 }) {
   const vault = storedVault();
-  const calls = { reuse: 0, history: 0, prepare: 0, attempts: 0, closed: 0, recorded: [] as boolean[], fetched: 0 };
+  const calls = {
+    reuse: 0,
+    history: 0,
+    prepare: 0,
+    attempts: 0,
+    closed: 0,
+    recorded: [] as boolean[],
+    secondFactor: 0,
+    fetched: 0,
+  };
   const attempt = async (): Promise<EstablishResult> => {
     calls.attempts += 1;
     if (options.failsBeforeSubmit === true) return notSignedIn('the login button was covered by an overlay', false);
+    if (options.asksForCode === true) {
+      return { ...notSignedIn('the site asked for a second-factor code after the submit'), secondFactor: true };
+    }
     return options.signsIn === true ? signedIn() : notSignedIn('the form submitted but no signed-in marker appeared');
   };
   const input: SignInInput = {
@@ -112,6 +126,9 @@ function harness(options: {
     attemptScripted: attempt,
     recordSignIn: async (ok) => {
       calls.recorded.push(ok);
+    },
+    recordSecondFactor: async () => {
+      calls.secondFactor += 1;
     },
   };
   return { input, vault, calls };
@@ -286,6 +303,28 @@ describe('the lockout guard', () => {
     it('is off once the login was written after the failure', () => {
       expect(attemptSuppressed(REPLACED_AFTER_FAILURE)).toBe(false);
     });
+  });
+});
+
+/*
+  A code asked for after the password (D-293). Its own outcome, recorded only as that: the guard's input
+  (`last_login_ok`, `last_login_at`) is not written, so the next run is not suppressed.
+*/
+describe('a second-factor step after the submit', () => {
+  it('is second_factor_required, writes no sign-in outcome, and records the step once', async () => {
+    const { input, vault, calls } = harness({ stored: true, homepage: SPA_SHELL, form: 'found', asksForCode: true });
+    const { outcome, steps } = await signInForScan(input);
+
+    expect(outcome).toEqual({ kind: 'second_factor_required' });
+    expect(calls.recorded).toEqual([]);
+    expect(calls.secondFactor).toBe(1);
+    expect(calls.attempts).toBe(1);
+    // The credential was opened, once, and its access row stands.
+    expect(vault.accessLog().filter((entry) => entry.action === 'read_credentials')).toHaveLength(1);
+    expect(steps).toContain(
+      'the site asked for a second-factor code after the submit, which the screener does not answer, so the ' +
+        'outcome was not recorded as a failed sign-in',
+    );
   });
 });
 

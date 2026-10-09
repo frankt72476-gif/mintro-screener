@@ -27,6 +27,12 @@
  * alone. (a) without (b) is a site that wrote something and still will not serve the page; (b)
  * without (a) is a page served for some reason other than this sign-in.
  *
+ * ## A code asked for after the submit (D-293)
+ *
+ * A one-time-code field shown after the submit — on the same route or a new one — stops the attempt
+ * there, unfilled. It is `second_factor_required`, not a failure: the password may well have been
+ * right, and recording it as failed would pause a login that worked.
+ *
  * No failure reason quotes the page (login.ts, the scripted rule): a failed-login page can echo the
  * username. Nor does anything log a URL's query string, which a GET-submitted form would fill with the
  * credential.
@@ -65,6 +71,15 @@ export const AFTER_SUBMIT_WAIT_MS = 10_000;
 /** How often the snapshot is taken again while waiting. */
 const AFTER_SUBMIT_POLL_MS = 250;
 
+/** The reason `identifySignInForm` gives for a code field; it writes the same string out in the page. */
+export const ONE_TIME_CODE_PRESENT = 'a one-time-code field is present';
+
+/** The reason it gives, after the submit, for a code step recognised by shape (D-293). Written out there too. */
+export const CODE_STEP_SHAPE = 'a code-entry step is shown';
+
+/** The step line when the submit led to a code-entry step (D-293). A fixed sentence: it quotes nothing. */
+export const SECOND_FACTOR_ASKED = 'the site asked for a second-factor code after the submit';
+
 /** The platform recorded on a generic session, so a reused one is validated the generic way. */
 export const GENERIC_PLATFORM = 'generic';
 
@@ -79,13 +94,19 @@ export interface IdentifiedForm {
 export type FormIdentification = IdentifiedForm | { readonly ok: false; readonly reason: string };
 
 /**
+ * What `identifySignInForm` is asked: the whole sign-in form, before the submit, or only whether a
+ * one-time-code field is shown, after it (D-293).
+ */
+export type SignInPageQuestion = 'form' | 'one_time_code';
+
+/**
  * Identifies the sign-in form on the page as it stands. Runs in the page; reads structure only.
  *
  * Self-contained, because Playwright serialises it into the page. The paths it returns are
  * `nth-child` chains from the document root — a position, not a class or a label — and are recomputed
  * after anything that may have changed the document.
  */
-export function identifySignInForm(): FormIdentification {
+export function identifySignInForm(scope: SignInPageQuestion): FormIdentification {
   const visible = (el: Element): boolean => {
     const style = getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
@@ -106,6 +127,49 @@ export function identifySignInForm(): FormIdentification {
   };
   const fail = (reason: string): FormIdentification => ({ ok: false, reason });
 
+  const inputs = Array.from(document.querySelectorAll('input')).filter(usable);
+
+  // A one-time code anywhere on the page. Never answered.
+  const oneTimeCode = inputs.some((input) => {
+    const autocomplete = (input.getAttribute('autocomplete') ?? '').toLowerCase().split(/\s+/);
+    if (autocomplete.includes('one-time-code')) return true;
+    if (/(^|[^a-z])(otp|totp|one[-_]?time|2fa|mfa)([^a-z]|$)/i.test(`${input.name} ${input.id}`)) return true;
+    const numeric = /^(numeric|decimal)$/i.test(input.inputMode);
+    return numeric && input.maxLength >= 1 && input.maxLength <= 8;
+  });
+  /*
+    After the submit, only this question is asked (D-293): a CAPTCHA script the sign-in page loaded is
+    still on it, and must not hide a code field that appeared beside it. The strings are written out
+    rather than named: this function runs in the page, where no module constant exists.
+
+    Two tests. By attribute, as above. By shape, for a code step that carries no name, id or
+    autocomplete — thePeptide's sign-in form carries none, and its code step is not expected to. A
+    code step by shape is a page with no visible password field (so a sign-in page re-drawn after a
+    wrong password is never one), where a visible form — or the body, on a page with no form — holds
+    either one text/tel/number input and one submit control, or 4 to 8 such inputs of one character
+    each.
+  */
+  if (scope === 'one_time_code') {
+    if (oneTimeCode) return fail('a one-time-code field is present');
+    const shown = Array.from(document.querySelectorAll('input')).filter(visible);
+    if (shown.some((input) => input.type === 'password') || document.body === null) {
+      return fail('no one-time-code field is shown');
+    }
+    const forms = Array.from(document.forms);
+    const containers: Element[] = forms.length === 0 ? [document.body] : forms.filter(visible);
+    const codeShaped = containers.some((container) => {
+      const fields = shown.filter(
+        (input) => container.contains(input) && (input.type === 'text' || input.type === 'tel' || input.type === 'number'),
+      );
+      const submits = Array.from(container.querySelectorAll('button, input[type="submit"]'))
+        .filter(visible)
+        .filter((el) => (el instanceof HTMLButtonElement ? el.type === 'submit' : true));
+      if (fields.length === 1 && submits.length === 1) return true;
+      return fields.length >= 4 && fields.length <= 8 && fields.every((input) => input.maxLength === 1);
+    });
+    return fail(codeShaped ? 'a code-entry step is shown' : 'no one-time-code field is shown');
+  }
+
   // A CAPTCHA anywhere on the page: its script, its frame, or its container. Never answered.
   const captchaSource = /recaptcha|hcaptcha|turnstile|challenges\.cloudflare\.com/i;
   const captcha =
@@ -118,16 +182,6 @@ export function identifySignInForm(): FormIdentification {
     ) !== null;
   if (captcha) return fail('a CAPTCHA is present on the page');
 
-  const inputs = Array.from(document.querySelectorAll('input')).filter(usable);
-
-  // A one-time code anywhere on the page. Never answered.
-  const oneTimeCode = inputs.some((input) => {
-    const autocomplete = (input.getAttribute('autocomplete') ?? '').toLowerCase().split(/\s+/);
-    if (autocomplete.includes('one-time-code')) return true;
-    if (/(^|[^a-z])(otp|totp|one[-_]?time|2fa|mfa)([^a-z]|$)/i.test(`${input.name} ${input.id}`)) return true;
-    const numeric = /^(numeric|decimal)$/i.test(input.inputMode);
-    return numeric && input.maxLength >= 1 && input.maxLength <= 8;
-  });
   if (oneTimeCode) return fail('a one-time-code field is present');
 
   const passwords = inputs.filter((input) => input.type === 'password');
@@ -265,7 +319,23 @@ export async function prepareGenericSignIn(input: {
 }
 
 async function identify(page: Page, timeout: number): Promise<FormIdentification> {
-  return withDeadline(page.evaluate(identifySignInForm), timeout, 'identifying the sign-in form');
+  return withDeadline(page.evaluate(identifySignInForm, 'form' as SignInPageQuestion), timeout, 'identifying the sign-in form');
+}
+
+/**
+ * Whether the page now shows a code step (D-293), and by which test: `attribute` is the one-time-code
+ * field `identifySignInForm` refuses a sign-in page on; `shape` is a code-entry form recognised by its
+ * structure alone. A page between documents cannot be read, and reads as neither — the wait asks again.
+ */
+async function codeStepShown(page: Page, timeout: number): Promise<'attribute' | 'shape' | null> {
+  const found = await withDeadline(
+    page.evaluate(identifySignInForm, 'one_time_code' as SignInPageQuestion),
+    timeout,
+    'looking for a one-time-code field',
+  ).catch(() => null);
+  if (found === null || found.ok) return null;
+  if (found.reason === ONE_TIME_CODE_PRESENT) return 'attribute';
+  return found.reason === CODE_STEP_SHAPE ? 'shape' : null;
 }
 
 /** One submit of the identified form, judged by the two positive checks. */
@@ -287,6 +357,28 @@ async function genericAttempt(input: {
     steps.push(detail);
     await context.close().catch(() => undefined);
     return { context: null, session: NO_SESSION, steps, needsHuman: `generic sign-in failed: ${detail}`, submitted };
+  };
+  /*
+    The password was taken and the site asked for a one-time code (D-293). The code field is never
+    filled, and nothing else is touched: the page is closed as it stands. Not a failure — the login
+    may be right — so it is returned apart from `failed`, and nothing is recorded against it.
+  */
+  const secondFactor = async (by: 'attribute' | 'shape'): Promise<EstablishResult> => {
+    steps.push(
+      by === 'attribute'
+        ? 'after the submit the page showed a one-time-code field; it was not filled and the sign-in stopped there'
+        : 'after the submit the page showed a code-entry step, recognised by its shape; nothing on it was filled ' +
+            'and the sign-in stopped there',
+    );
+    await context.close().catch(() => undefined);
+    return {
+      context: null,
+      session: NO_SESSION,
+      steps,
+      needsHuman: SECOND_FACTOR_ASKED,
+      submitted,
+      secondFactor: true,
+    };
   };
 
   try {
@@ -322,20 +414,32 @@ async function genericAttempt(input: {
     const waitStarted = Date.now();
     let after = await snapshot(context, page);
     let changed = changedEntries(before.entries, after.entries);
-    while (changed === 0 && Date.now() - waitStarted < AFTER_SUBMIT_WAIT_MS) {
+    // A code-entry step ends the wait as well (D-293): nothing more will be written until it is answered.
+    let codeAsked = await codeStepShown(page, timeout);
+    while (changed === 0 && codeAsked === null && Date.now() - waitStarted < AFTER_SUBMIT_WAIT_MS) {
       await new Promise((resolve) => setTimeout(resolve, AFTER_SUBMIT_POLL_MS));
       after = await snapshot(context, page);
       changed = changedEntries(before.entries, after.entries);
+      codeAsked = await codeStepShown(page, timeout);
     }
     const waited = Date.now() - waitStarted;
     steps.push(
       changed === 0
-        ? `no cookie or storage entry appeared within ${AFTER_SUBMIT_WAIT_MS / 1000} s of the submit`
+        ? codeAsked !== null
+          ? `no cookie or storage entry appeared before a code step was shown, ${waited} ms after the submit settled`
+          : `no cookie or storage entry appeared within ${AFTER_SUBMIT_WAIT_MS / 1000} s of the submit`
         : `a cookie or storage entry appeared ${waited} ms after the submit settled`,
     );
     // Origin and path only: a GET-submitted form would carry the credential in the query string.
     steps.push(`after submit: ${withoutQuery(page.url())}`);
     steps.push(`${changed} cookie or storage entr${changed === 1 ? 'y' : 'ies'} new or changed by the submit`);
+    /*
+      A one-time-code field by attribute stops here, as it always did. A code step by shape does not
+      yet (D-293): one text field and one submit control is also a signed-in dashboard's search box, so
+      check (b) is run first — a page served with the session is a sign-in whatever form it shows — and
+      the shape decides only where (a) or (b) fails. Neither fills anything.
+    */
+    if (codeAsked === 'attribute') return await secondFactor('attribute');
 
     // (b) is checked on a new page, with what this page holds in sessionStorage carried over to it —
     // the same way every signed-in render will open its pages.
@@ -343,6 +447,16 @@ async function genericAttempt(input: {
     await installSessionStorage(context, sessionStorage);
     const served = await walledUrlServed(context, input.walledUrl, timeout);
 
+    /*
+      Asked once more before either check fails (D-293). A site that wrote its session cookie with the
+      password ends the wait above at once, and may draw its code step a moment later — after the wait,
+      during check (b). The walled page is then sent to sign-in because the second factor is pending,
+      not because the password was wrong, and failing it would pause a login that worked.
+    */
+    if (changed === 0 || !served.ok) {
+      const late = (await codeStepShown(page, timeout)) ?? codeAsked;
+      if (late !== null) return await secondFactor(late);
+    }
     if (changed === 0) return await failed('no cookie or storage entry was set or changed by the submit');
     if (!served.ok) return await failed(served.reason);
     steps.push(`the page that was sent to sign-in is now served, at ${served.finalPath}`);

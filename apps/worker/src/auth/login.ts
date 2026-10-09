@@ -66,6 +66,13 @@ export interface EstablishResult {
    * never reached the merchant, so it neither failed nor counts towards the lockout guard.
    */
   readonly submitted?: boolean;
+  /**
+   * True when the submit led to a one-time-code field, which was not filled (D-293).
+   *
+   * Says nothing about whether the password was right, so neither outcome is written to
+   * `credential_state.last_login_ok` and it never trips the lockout guard.
+   */
+  readonly secondFactor?: boolean;
 }
 
 /**

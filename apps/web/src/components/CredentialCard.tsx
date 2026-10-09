@@ -55,6 +55,14 @@ function shortDate(iso: string): string {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
+/** Whether a second-factor step is the latest thing known about this login (D-293). */
+function secondFactorIsLatest(state: CredentialState): boolean {
+  if (state.lastSecondFactorAt === null) return false;
+  const at = Date.parse(state.lastSecondFactorAt);
+  if (Number.isNaN(at) || at <= Date.parse(state.updatedAt)) return false;
+  return state.lastLoginAt === null || at > Date.parse(state.lastLoginAt);
+}
+
 /**
  * The status line, as a pure function of the state.
  *
@@ -67,7 +75,10 @@ export function credentialLine(
   state: CredentialState | null | undefined,
   loading: boolean,
   pending = false,
-): { readonly text: string; readonly tone: 'none' | 'stored' | 'ok' | 'failed' | 'unknown' | 'pending' } {
+): {
+  readonly text: string;
+  readonly tone: 'none' | 'stored' | 'ok' | 'failed' | 'second_factor' | 'unknown' | 'pending';
+} {
   if (loading) return { text: 'Checking…', tone: 'unknown' };
   /*
     Sealed here and not yet collected, which is not "no login stored" (D-192).
@@ -84,6 +95,20 @@ export function credentialLine(
   }
 
   const stored = `stored ${shortDate(state.updatedAt)}`;
+
+  /*
+    The site asked for a code after the password, and that is the latest thing known (D-293).
+
+    Ahead of the sign-in outcome because it is not one: `last_login_*` is left as it was, so the
+    outcome below can be older than this. Shown only while it is later than both the login being
+    stored and the last outcome — a login stored since, or an attempt since, has not met it.
+  */
+  if (secondFactorIsLatest(state)) {
+    return {
+      text: `Stored login · ${stored} · second-factor code asked for ${shortDate(state.lastSecondFactorAt as string)}`,
+      tone: 'second_factor',
+    };
+  }
 
   if (state.lastLoginOk === null || state.lastLoginAt === null) {
     // Never opened. Escalation only runs when an anonymous crawl is refused (D-040), so this is
@@ -207,6 +232,19 @@ export function CredentialCard({
           product pages were not read. Sign-in with this login is paused: no scan tries it again
           until the login is replaced, so a wrong password is not retried against the merchant's
           account. Replacing it needs an updated login from the merchant.
+        </p>
+      )}
+
+      {line.tone === 'second_factor' && (
+        /*
+          Not the paused paragraph above: nothing is paused, and the password may be right (D-293).
+          What happened and what a signed-in read would take; no re-screen is pointed to, because the
+          next scan meets the same code step.
+        */
+        <p className="fhint cred-stale">
+          A scan reached this merchant's login wall. The stored login was submitted and the site then
+          asked for a second-factor code, which the screener does not answer; a login without a second
+          factor is needed to read signed-in pages.
         </p>
       )}
     </div>

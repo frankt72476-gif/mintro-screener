@@ -518,6 +518,8 @@ export type SignInOutcome =
   /** The last attempt with the stored login failed and it was not replaced since: none made (D-292). */
   | 'sign_in_suppressed'
   | 'sign_in_failed'
+  /** The login was submitted and the site asked for a second-factor code, never answered (D-293). */
+  | 'second_factor_required'
   | 'signed_in';
 
 export interface SignInWallRecord {

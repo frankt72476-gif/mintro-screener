@@ -23,6 +23,7 @@ const stored = (over: Partial<CredentialState> = {}): CredentialState => ({
   updatedAt: '2026-08-12T09:00:00.000Z',
   lastLoginOk: null,
   lastLoginAt: null,
+  lastSecondFactorAt: null,
   ...over,
 });
 
@@ -133,6 +134,45 @@ describe('the action', () => {
     expect(render(stored())).not.toContain('paused');
   });
 
+  /*
+    The site asked for a code after the password (D-293). Not paused and not failed: the outcome columns
+    were left alone, and the card says what happened and what a signed-in read would take.
+  */
+  it('says a second-factor code was asked for, where that is the latest thing known', () => {
+    const asked = stored({ lastSecondFactorAt: '2026-10-08T19:45:00.000Z' });
+    expect(credentialLine(asked, false)).toEqual({
+      text: 'Stored login · stored 12 Aug · second-factor code asked for 8 Oct',
+      tone: 'second_factor',
+    });
+
+    const markup = render(asked);
+    expect(markup).toContain('data-tone="second_factor"');
+    expect(markup).toContain(
+      'The stored login was submitted and the site then asked for a second-factor code, which the screener does ' +
+        'not answer; a login without a second factor is needed to read signed-in pages.',
+    );
+    expect(markup).not.toContain('paused');
+    expect(markup).not.toContain('did not sign in');
+    expect(markup).not.toMatch(/re-?screen|re-?scan/i);
+
+    // Over an older sign-in outcome, which the code step left in place, it is still the latest.
+    expect(
+      credentialLine(stored({ lastLoginOk: true, lastLoginAt: '2026-09-01T00:00:00.000Z', lastSecondFactorAt: '2026-10-08T19:45:00.000Z' }), false).tone,
+    ).toBe('second_factor');
+  });
+
+  it('stops saying it once a login is stored or a sign-in outcome is recorded since', () => {
+    // A login stored after the code step has not met it.
+    expect(
+      credentialLine(stored({ updatedAt: '2026-10-09T00:00:00.000Z', lastSecondFactorAt: '2026-10-08T19:45:00.000Z' }), false).tone,
+    ).toBe('stored');
+    // An attempt since says something newer about the login.
+    expect(
+      credentialLine(stored({ lastLoginOk: true, lastLoginAt: '2026-10-09T00:00:00.000Z', lastSecondFactorAt: '2026-10-08T19:45:00.000Z' }), false).tone,
+    ).toBe('ok');
+    expect(render(stored())).not.toContain('second-factor');
+  });
+
   it('says why the button is unavailable rather than only disabling it', () => {
     const markup = renderToStaticMarkup(
       createElement(CredentialCard, {
@@ -207,6 +247,7 @@ describe('a deposit that has not been collected', () => {
       updatedAt: '2026-08-29T10:16:00.000Z',
       lastLoginOk: null,
       lastLoginAt: null,
+      lastSecondFactorAt: null,
     };
 
     expect(render(collected, '2026-08-29T10:15:00.000Z')).not.toContain('Sealed and queued');

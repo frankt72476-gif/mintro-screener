@@ -189,6 +189,7 @@ function workerEscalation(site: Site, options: { history?: AttemptHistory } = {}
       recordSignIn: async (ok) => {
         state.recorded.push(ok);
       },
+      recordSecondFactor: async () => undefined,
     });
     return outcome;
   };

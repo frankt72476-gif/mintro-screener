@@ -133,6 +133,12 @@ export type Escalation =
   */
   | { readonly kind: 'sign_in_suppressed'; readonly lastAttemptAt: string }
   | { readonly kind: 'sign_in_failed'; readonly reason: string }
+  /*
+    The stored login was submitted and the site then asked for a one-time code, which the screener
+    never answers (D-293). Not `sign_in_failed`: the password may have been accepted, and nothing is
+    recorded against the login.
+  */
+  | { readonly kind: 'second_factor_required' }
   | { readonly kind: 'signed_in'; readonly context: BrowserContext };
 
 /**
@@ -1231,6 +1237,12 @@ export function escalationLine(
         'a login wall was met; the last sign-in attempt with the stored screening account failed and ' +
         'it has not been replaced since, so no attempt was made'
       );
+    case 'second_factor_required':
+      // Not a failed sign-in: the site asked for a code after the password, and none is answered (D-293).
+      return (
+        'a login wall was met; the stored screening account was submitted and the site then asked for a ' +
+        'second-factor code, which the screener does not answer'
+      );
     case 'sign_in_failed':
       // Distinct from the line above, and the distinction reaches the report (D-185).
       return `a login wall was met and the stored screening account did not sign in: ${firstLine(escalation.reason)}`;
@@ -1271,6 +1283,14 @@ function methodReason(escalation: Escalation & { readonly kind: 'no_sign_in_meth
 const SUPPRESSED =
   'The last sign-in attempt with it failed and it has not been replaced since, so no attempt was ' +
   'made; storing an updated login allows another attempt';
+
+/**
+ * The second-factor sentence (D-293), shared by both access notes. As ruled: what happened, and what a
+ * signed-in read would take. No re-screen is pointed to — the next run meets the same code step.
+ */
+const SECOND_FACTOR =
+  'The stored login was submitted and the site then asked for a second-factor code, which the screener ' +
+  'does not answer; a login without a second factor is needed to read signed-in pages';
 
 /**
  * What the report says about its own reach.
@@ -1370,6 +1390,8 @@ export function describeAccess(
               `sign-in method for this site${methodReason(escalation)}, so no sign-in was attempted`
             : escalation.kind === 'sign_in_suppressed'
               ? `A screening account is stored for this merchant. ${behind}. ${SUPPRESSED}`
+            : escalation.kind === 'second_factor_required'
+              ? `A screening account is stored for this merchant. ${behind}. ${SECOND_FACTOR}`
             : escalation.kind === 'sign_in_failed'
               ? `${behind}. A screening account is stored for this merchant and it did not sign in on ` +
                 `this run (${noteReason(escalation.reason)}), so it was not used`
@@ -1413,6 +1435,8 @@ export function describeAccess(
           ? `A screening account is stored for this merchant and the screener has no sign-in method for this site${methodReason(escalation)}, so no sign-in was attempted`
           : escalation?.kind === 'sign_in_suppressed'
             ? `A screening account is stored for this merchant. ${SUPPRESSED}`
+          : escalation?.kind === 'second_factor_required'
+            ? `A screening account is stored for this merchant. ${SECOND_FACTOR}`
           : escalation?.kind === 'signed_in'
             ? 'A stored screening account signed in but the product pages were still not served'
             : escalation === undefined
