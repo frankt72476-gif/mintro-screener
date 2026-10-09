@@ -43,7 +43,24 @@ type Mode =
   /** The submit changes only an analytics cookie; the server remembers the sign-in (A6). */
   | 'ga-only'
   /** The token is written 3 s after the submit: a slow site, not a failed sign-in. */
-  | 'slow';
+  | 'slow'
+  /** The password is taken and a code field replaces the form on `/login`; nothing is written (D-293). */
+  | 'code-same-route'
+  /**
+   * The password is taken, a pending cookie is set, and the browser is sent to `/verify`, where the
+   * code field is drawn 300 ms after load (D-293) — so the cookie ends the wait before the field shows.
+   */
+  | 'code-new-route'
+  /** As `code-same-route`, the code field a bare `<input type="text">` with no attribute (D-293, shape). */
+  | 'code-bare-same-route'
+  /** As `code-new-route`, the code field a bare `<input type="text">`. */
+  | 'code-bare-new-route'
+  /** The code step as six one-character boxes, on the same route. */
+  | 'code-boxes'
+  /** The password is taken and a three-field form follows, writing nothing: not a code step. */
+  | 'three-fields'
+  /** Signs in with a local token; the signed-in page carries a one-field search form. */
+  | 'search-after';
 
 /** The SPA shell, served at every path. */
 function spa(mode: Mode, elsewhere = ''): string {
@@ -54,11 +71,16 @@ function spa(mode: Mode, elsewhere = ''): string {
   var MODE = ${JSON.stringify(mode)};
   var ELSEWHERE = ${JSON.stringify(elsewhere)};
   var root = document.getElementById('root');
+  var CODE_MODES = ['code-same-route', 'code-new-route', 'code-bare-same-route', 'code-bare-new-route', 'code-boxes'];
+  var NEW_ROUTE = MODE === 'code-new-route' || MODE === 'code-bare-new-route';
   function signedIn(done) {
     if (MODE === 'cookie') return done(document.cookie.indexOf('tp_session=') !== -1);
     if (MODE === 'local' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input' || MODE === 'slow')
       return done(localStorage.getItem('tp_token') !== null);
     if (MODE === 'session') return done(sessionStorage.getItem('tp_token') !== null);
+    // Signed in only once a code is answered, which writes tp_token. Nothing here answers one.
+    if (CODE_MODES.indexOf(MODE) !== -1 || MODE === 'three-fields' || MODE === 'search-after')
+      return done(localStorage.getItem('tp_token') !== null);
     // Writes tp_token on sign-in, but the app only ever checks a key nothing writes.
     if (MODE === 'storage-only') return done(localStorage.getItem('tp_other') !== null);
     // url-only and ga-only store nothing that signs in: the server remembers, and the app asks it.
@@ -91,6 +113,19 @@ function spa(mode: Mode, elsewhere = ''): string {
         body: JSON.stringify({ email: inputs[0].value, password: inputs[1].value }),
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (!j.ok) { root.querySelector('h1').textContent = 'Incorrect email or password'; return; }
+        if (MODE === 'three-fields') {
+          root.innerHTML =
+            '<main><h1>Complete your profile</h1><form>' +
+            '<input type="text"><input type="text"><input type="text">' +
+            '<button type="submit">Save</button></form></main>';
+          return;
+        }
+        if (CODE_MODES.indexOf(MODE) !== -1 && !NEW_ROUTE) { renderCode(); return; }
+        if (NEW_ROUTE) {
+          document.cookie = 'tp_pending=' + j.token + '; path=/';
+          location.assign('/verify');
+          return;
+        }
         if (MODE === 'slow') {
           setTimeout(function () {
             localStorage.setItem('tp_token', j.token);
@@ -100,7 +135,7 @@ function spa(mode: Mode, elsewhere = ''): string {
           return;
         }
         if (MODE === 'cookie') document.cookie = 'tp_session=' + j.token + '; path=/';
-        if (MODE === 'local' || MODE === 'storage-only' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input')
+        if (MODE === 'local' || MODE === 'storage-only' || MODE === 'dashboard' || MODE === 'cross-origin' || MODE === 'cover-on-input' || MODE === 'search-after')
           localStorage.setItem('tp_token', j.token);
         if (MODE === 'ga-only') document.cookie = '_ga=GA1.2.' + Date.now() + '; path=/';
         if (MODE === 'session') sessionStorage.setItem('tp_token', j.token);
@@ -112,9 +147,37 @@ function spa(mode: Mode, elsewhere = ''): string {
   function renderApp() {
     if (MODE === 'cross-origin') { location.replace(ELSEWHERE); return; }
     if (MODE === 'dashboard' && location.pathname === '/') { history.replaceState(null, '', '/dashboard'); }
-    root.innerHTML = '<main><h1>Catalogue</h1><p>Signed in at ' + location.pathname + '</p></main>';
+    root.innerHTML = '<main><h1>Catalogue</h1><p>Signed in at ' + location.pathname + '</p>' +
+      (MODE === 'search-after' ? '<form role="search"><input type="text"><button type="submit">Search</button></form>' : '') +
+      '</main>';
   }
-  function route() { signedIn(function (ok) { ok ? renderApp() : renderLogin(); }); }
+  // The code step. Any keystroke in it, and any submit of it, is reported to the server, which counts
+  // them: the screener must cause neither (D-293).
+  function renderCode() {
+    var field =
+      MODE === 'code-boxes'
+        ? '<span><input type="text" maxlength="1"><input type="text" maxlength="1"><input type="text" maxlength="1">' +
+          '<input type="text" maxlength="1"><input type="text" maxlength="1"><input type="text" maxlength="1"></span>'
+        : MODE === 'code-bare-same-route' || MODE === 'code-bare-new-route'
+          ? '<span><input type="text"></span>'
+          : '<span><input class="ant-input" inputmode="numeric" maxlength="6"></span>';
+    root.innerHTML =
+      '<main><h1>Two-step verification</h1><form>' + field +
+      '<button type="submit" class="ant-btn-primary">Verify</button></form></main>';
+    var form = root.querySelector('form');
+    form.addEventListener('input', function () { fetch('/api/code', { method: 'POST', body: 'typed' }); });
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      fetch('/api/code', { method: 'POST', body: 'submitted' });
+    });
+  }
+  function route() {
+    if (NEW_ROUTE && location.pathname === '/verify' && document.cookie.indexOf('tp_pending=') !== -1) {
+      setTimeout(renderCode, 300);
+      return;
+    }
+    signedIn(function (ok) { ok ? renderApp() : renderLogin(); });
+  }
   route();
 })();
 </script></body></html>`;
@@ -162,21 +225,25 @@ interface Site {
   readonly origin: string;
   /** The sign-in POSTs the server received: the attempts, counted at the merchant's end. */
   readonly logins: { attempts: number };
+  /** Keystrokes in, and submits of, a code field, as the page reported them (D-293). */
+  readonly codes: { touched: number };
 }
 
 async function serve(handler: (req: IncomingMessage, res: ServerResponse, body: string) => void): Promise<Site> {
   const logins = { attempts: 0 };
+  const codes = { touched: 0 };
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
       if (req.method === 'POST' && req.url === '/api/login') logins.attempts += 1;
+      if (req.method === 'POST' && req.url === '/api/code') codes.touched += 1;
       handler(req, res, body);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, logins };
+  return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, logins, codes };
 }
 
 /** The SPA in one mode, with the server's own record of a sign-in for the url-only shape. */
@@ -237,6 +304,8 @@ async function signIn(
     recorded?: boolean[];
     /** Called with each recorded outcome, as `recordSignIn` writes `credential_state`. */
     onRecord?: (ok: boolean) => void;
+    /** Counts `recordSecondFactor` calls, which write only `last_second_factor_at` (D-293). */
+    secondFactors?: { count: number };
   } = {},
 ): Promise<{ outcome: Escalation; steps: readonly string[] }> {
   servers.push(site.server);
@@ -260,6 +329,9 @@ async function signIn(
     recordSignIn: async (ok) => {
       options.recorded?.push(ok);
       options.onRecord?.(ok);
+    },
+    recordSecondFactor: async () => {
+      if (options.secondFactors !== undefined) options.secondFactors.count += 1;
     },
   });
 }
@@ -457,6 +529,117 @@ describe('a failed sign-in is not retried until the login is replaced', () => {
     expect(vault.accessLog().filter((entry) => entry.action === 'read_credentials')).toHaveLength(readsBefore);
     expect(recorded).toEqual([]);
     if (reused.outcome.kind === 'signed_in') await reused.outcome.context.close();
+  }, 120_000);
+});
+
+/*
+  A code asked for after the password (D-293). Live on app.thepeptide.com, 2026-10-08: the password was
+  accepted, the site asked for a 2FA code, and the run recorded a failed sign-in — which paused the
+  login for every later run. Here the same shape, on the same route and on a new one, with
+  credential_state kept in memory as the lockout guard reads it.
+*/
+describe('a second-factor step after the submit', () => {
+  const BY_ATTRIBUTE =
+    'after the submit the page showed a one-time-code field; it was not filled and the sign-in stopped there';
+  const BY_SHAPE =
+    'after the submit the page showed a code-entry step, recognised by its shape; nothing on it was filled and ' +
+    'the sign-in stopped there';
+  for (const [mode, label, expectedStep] of [
+    ['code-same-route', 'a one-time-code field on the same route', BY_ATTRIBUTE],
+    ['code-new-route', 'a one-time-code field on a new route', BY_ATTRIBUTE],
+    // thePeptide-shaped: the code field carries no name, id, autocomplete or inputmode (amendment 1).
+    ['code-bare-same-route', 'a bare text input on the same route', BY_SHAPE],
+    ['code-bare-new-route', 'a bare text input on a new route', BY_SHAPE],
+    ['code-boxes', 'six one-character boxes', BY_SHAPE],
+  ] as const) {
+    it(`${label}: second_factor_required, the code field never filled, nothing recorded against the login, and the next run not suppressed`, async () => {
+      const site = await spaSite(mode);
+      const { vault } = vaultWith(PASSWORD);
+      const state: AttemptHistory = { lastLoginOk: null, lastLoginAt: null, credentialUpdatedAt: '2026-10-01T00:00:00.000Z' };
+      const recorded: boolean[] = [];
+      const secondFactors = { count: 0 };
+      const options = { history: async (): Promise<AttemptHistory> => ({ ...state }), recorded, secondFactors };
+      const reads = (): number => vault.accessLog().filter((entry) => entry.action === 'read_credentials').length;
+
+      const first = await signIn(site, vault, options);
+      expect(first.outcome, first.steps.join('\n')).toEqual({ kind: 'second_factor_required' });
+      expect(first.steps).toContain(expectedStep);
+      if (mode === 'code-new-route' || mode === 'code-bare-new-route') {
+        // The pending cookie ended the wait before the field was drawn; the field was found by the
+        // look taken again before a failure was declared.
+        expect(first.steps.some((step) => step.startsWith('a cookie or storage entry appeared'))).toBe(true);
+        expect(first.steps).toContain('1 cookie or storage entry new or changed by the submit');
+      }
+      // The password was sent once; the code field was neither typed in nor submitted.
+      expect(site.logins.attempts).toBe(1);
+      expect(site.codes.touched).toBe(0);
+      // No credential_state outcome: the lockout guard reads exactly what it read before.
+      expect(recorded).toEqual([]);
+      expect(secondFactors.count).toBe(1);
+      // The credential was opened, and its access row stands.
+      expect(reads()).toBe(1);
+      // Nothing was stored as a session.
+      expect(vault.accessLog().map((entry) => entry.action)).not.toContain('write_session');
+
+      // The re-screen is not suppressed: it attempts again, and meets the same step.
+      const second = await signIn(site, vault, options);
+      expect(second.outcome, second.steps.join('\n')).toEqual({ kind: 'second_factor_required' });
+      expect(second.steps.some((step) => step.includes('so no attempt was made'))).toBe(false);
+      expect(site.logins.attempts).toBe(2);
+      expect(site.codes.touched).toBe(0);
+      expect(recorded).toEqual([]);
+      expect(reads()).toBe(2);
+    }, 120_000);
+  }
+
+  // The sign-in page re-drawn after a wrong password still shows its password field, so it is never a
+  // code step by either test — on the attribute variant and on the bare thePeptide-shaped one.
+  for (const mode of ['code-same-route', 'code-bare-same-route'] as const) {
+    it(`a wrong password re-render (${mode}) is still sign_in_failed and recorded [false]`, async () => {
+      const site = await spaSite(mode);
+      const { vault } = vaultWith('the-wrong-password');
+      const recorded: boolean[] = [];
+      const secondFactors = { count: 0 };
+
+      const { outcome, steps } = await signIn(site, vault, { recorded, secondFactors });
+
+      expect(outcome.kind, steps.join('\n')).toBe('sign_in_failed');
+      expect(recorded).toEqual([false]);
+      expect(secondFactors.count).toBe(0);
+    }, 120_000);
+  }
+
+  it('a post-submit form of three text fields is not a code step', async () => {
+    const site = await spaSite('three-fields');
+    const { vault } = vaultWith(PASSWORD);
+    const recorded: boolean[] = [];
+    const secondFactors = { count: 0 };
+
+    const { outcome, steps } = await signIn(site, vault, { recorded, secondFactors });
+
+    expect(outcome.kind, steps.join('\n')).toBe('sign_in_failed');
+    expect(steps.some((step) => step.includes('code-entry step') || step.includes('one-time-code'))).toBe(false);
+    expect(recorded).toEqual([false]);
+    expect(secondFactors.count).toBe(0);
+  }, 120_000);
+
+  /*
+    One text field and one submit control is also a search box. A sign-in that wrote its token and whose
+    walled page is served is a sign-in, whatever form the page after it shows: the shape decides only
+    where check (a) or (b) fails.
+  */
+  it('a signed-in page with a one-field search form is signed_in, not a code step', async () => {
+    const site = await spaSite('search-after');
+    const { vault } = vaultWith(PASSWORD);
+    const recorded: boolean[] = [];
+    const secondFactors = { count: 0 };
+
+    const { outcome, steps } = await signIn(site, vault, { recorded, secondFactors });
+
+    expect(outcome.kind, steps.join('\n')).toBe('signed_in');
+    expect(recorded).toEqual([true]);
+    expect(secondFactors.count).toBe(0);
+    if (outcome.kind === 'signed_in') await outcome.context.close();
   }, 120_000);
 });
 

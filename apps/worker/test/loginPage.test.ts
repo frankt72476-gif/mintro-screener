@@ -448,6 +448,7 @@ describe('a sign-in reads the credential once', () => {
       attemptHistory: async () => ({ lastLoginOk: null, lastLoginAt: null, credentialUpdatedAt: null }),
       ...browserSignIn({ browser, origin: gated.origin, vaultRef, vault, wall: {}, timeoutMs: 10_000 }),
       recordSignIn: async () => undefined,
+      recordSecondFactor: async () => undefined,
     });
 
     try {

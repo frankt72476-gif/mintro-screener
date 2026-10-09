@@ -909,6 +909,7 @@ h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-
 
 .cred-card[data-tone="failed"] { border-left-color: var(--amber); }
 .cred-card[data-tone="pending"] { border-left-color: var(--amber); }
+.cred-card[data-tone="second_factor"] { border-left-color: var(--amber); }
 .cred-card[data-tone="ok"]     { border-left-color: var(--violet); }
 .cred-card[data-tone="stored"] { border-left-color: var(--violet); }
 
@@ -3430,7 +3431,7 @@ a.headline-label:hover { text-decoration-color: var(--violet); color: var(--viol
 
 /* ── The reference number (D-248, D-250) ────────────────────────────────────────────────────────────────
    `ref-n`, not `find-n`. The pool covers findings, eye-test impressions and operational questions,
-   and `attestationSection.test.ts` refuses any class matching `find` on an attestation row —
+   and `attestationSection.test.ts` refuses any class matching `\bfind\b` on an attestation row —
    "a row that carried `find` ... would look like a finding whatever the heading said". That guard
    caught the first name, and it was right to: a chip called `find-n` on a merchant's own statement
    is the finding/attestation boundary blurring by class name.

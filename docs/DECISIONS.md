@@ -19482,3 +19482,53 @@ coverage, and on a false (b) result it pauses the login until replaced.
 "Product-surface rules could not be observed and are reported as not observed." follows it as its own
 sentence, for every outcome on both kinds of wall.
 
+## D-293 — A second-factor step after the submit is its own outcome, not a failed sign-in
+
+**Date:** 2026-10-09
+**Status:** accepted (Frank, 2026-10-09), with amendments 1 (structural detection) and 2 (a stray byte
+in `styles.css`)
+**See:** D-185, D-292
+
+**The finding.** app.thepeptide.com, runs at 15:37 and 15:45 ET on 2026-10-08: the generic sign-in
+(D-292) submitted the stored login, the site took the password and then asked for a 2FA code. Check (b)
+recorded "the page sent to sign-in was sent to a sign-in route again", the run reported `sign_in_failed`,
+and `credential_state.last_login_ok` was written false — so the lockout guard paused a login whose
+password had been accepted, for every later run, until someone replaced a login that was not wrong.
+
+**1. Detection.** After the submit settles, and on every poll of the check-(a) wait, the page is asked
+whether it shows a one-time-code field — the same structural test `identifySignInForm` refuses a sign-in
+page on (autocomplete `one-time-code`; an otp/totp/one-time/2fa/mfa name or id; a numeric `inputmode` with
+a `maxlength` of 1–8), run alone so a CAPTCHA script the sign-in page loaded cannot hide it. A code field
+ends the wait. It is asked once more before either check fails: a site that sets a pending cookie with the
+password ends the wait at once and may draw its code step a moment later, while check (b) runs. Either way
+the attempt stops there. **The code field is never filled**, and nothing on the page is touched again.
+
+**1a. By shape, as well (amendment 1).** thePeptide's sign-in form carries no name, id or autocomplete,
+and its code step is not expected to either, so at the same points a code step is also recognised by
+structure: **no visible password field on the page** (so a sign-in page re-drawn after a wrong password
+is never one), and a visible form — or the body, on a page with no `<form>` — holding either (a) exactly
+one visible text/tel/number input and exactly one submit control, or (b) 4 to 8 visible text/tel/number
+inputs, each `maxlength` 1. A three-field form is neither.
+
+**One difference in when it decides**, flagged at the build: shape (a) is also a signed-in page's
+search box. So a match by shape ends the wait like any other, but check (b) still runs, and the shape
+decides only where check (a) or (b) fails — a page served with the session is a sign-in whatever form
+it shows. A match by attribute stops at once, as in 1. Neither fills anything.
+
+**2. Outcome `second_factor_required`**, distinct from `sign_in_failed`: an escalation outcome, a
+`SignInOutcome` on `report.access.signInWall`, and its own progress line. It writes neither
+`last_login_ok` nor `last_login_at`, so the lockout guard reads after the run what it read before it and
+the next run attempts again. The credential was opened, and that access row stands.
+
+**3. The credential card** reads only `credential_state`, so the step is recorded there in a column of its
+own, `last_second_factor_at` (migration 0093: nullable, no default, no constraint, so nothing over existing
+rows can violate it). The card shows it while it is the latest thing known — later than `updated_at` and
+than `last_login_at` where set — and is compared, not cleared, so the deposit path does not write the
+column. The web reads `credential_state` with `select('*')` so a deploy ahead of the migration still
+reads. A worker ahead of the migration fails only the second-factor write, which swallows its error.
+
+**4. Copy**, in observation wording, the same substance in the access note, the refusal message and the
+card: the stored login was submitted and the site then asked for a second-factor code, which the screener
+does not answer; a login without a second factor is needed to read signed-in pages. No re-screen is
+pointed to — the next run meets the same code step.
+

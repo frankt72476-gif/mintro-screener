@@ -143,6 +143,7 @@ function escalation(stored: boolean) {
       recordSignIn: async (ok) => {
         state.recorded.push(ok);
       },
+      recordSecondFactor: async () => undefined,
     });
     return outcome;
   };

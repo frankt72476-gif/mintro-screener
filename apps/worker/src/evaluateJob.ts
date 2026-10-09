@@ -474,6 +474,11 @@ function signInWallMessage(inputs: EvaluationInputs): string | null {
           'A login is on file for this merchant. The last sign-in attempt with it failed and it has ' +
           'not been replaced since, so no attempt was made on this run; storing an updated login ' +
           'allows another attempt.'
+      : wall.outcome === 'second_factor_required'
+        ? // Not a failure, and no re-screen: the next run meets the same code step (D-293).
+          'A login is on file for this merchant. The stored login was submitted and the site then asked ' +
+          'for a second-factor code, which the screener does not answer; a login without a second ' +
+          'factor is needed to read signed-in pages.'
       : wall.outcome === 'sign_in_failed'
         ? 'A login is on file for this merchant; a sign-in was attempted and it failed.'
         : wall.outcome === 'signed_in' && wall.signedInPagesRead !== undefined

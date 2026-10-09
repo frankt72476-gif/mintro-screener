@@ -228,6 +228,7 @@ describe('the note is whole sentences, for every outcome on both kinds of wall',
     { kind: 'no_sign_in_method', platform: 'unknown', reason: 'the sign-in form could not be identified: the form has 2 text fields' },
     { kind: 'sign_in_suppressed', lastAttemptAt: '2026-10-08T12:00:00Z' },
     { kind: 'sign_in_failed', reason: 'generic sign-in failed: no cookie or storage entry was set or changed by the submit' },
+    { kind: 'second_factor_required' },
     { kind: 'signed_in', context: null as never },
   ];
 
@@ -247,6 +248,35 @@ describe('the note is whole sentences, for every outcome on both kinds of wall',
       });
     }
   }
+
+  /*
+    The site asked for a code after the password (D-293). Both notes, in full: neither says the login
+    failed, and neither points to a re-screen.
+  */
+  it('reads, in full, for both walls when a second-factor code was asked for', () => {
+    expect(describeAccess(walled as never, 'public', false, { kind: 'second_factor_required' }).note).toBe(
+      'None of the 5 sampled product pages was served to an anonymous request. ' +
+        'A screening account is stored for this merchant. The stored login was submitted and the site then asked ' +
+        'for a second-factor code, which the screener does not answer; a login without a second factor is ' +
+        'needed to read signed-in pages. ' +
+        'Product-surface rules could not be observed and are reported as not observed. ' +
+        'Coverage of those rules would be wider with a merchant-supplied login that signs in.',
+    );
+    const access = describeAccess(signInWall as never, 'public', false, { kind: 'second_factor_required' });
+    expect(access.note).toBe(
+      'No product pages were found to attempt, and 24 of the 24 page(s) requested anonymously ended at the sign-in ' +
+        'page https://shop.example/login. A screening account is stored for this merchant. The storefront is behind ' +
+        'sign-in at https://shop.example/login. The stored login was submitted and the site then asked for a ' +
+        'second-factor code, which the screener does not answer; a login without a second factor is needed to ' +
+        'read signed-in pages. ' +
+        'Product-surface rules could not be observed and are reported as not observed.',
+    );
+    expect(access.signInWall?.outcome).toBe('second_factor_required');
+    for (const text of [access.note, escalationLine({ kind: 'second_factor_required' })]) {
+      expect(text).not.toMatch(/fail/i);
+      expect(text).not.toMatch(/re-?screen|re-?scan/i);
+    }
+  });
 
   it('reads, in full, for the product wall when the guard held', () => {
     expect(describeAccess(walled as never, 'public', false, { kind: 'sign_in_suppressed', lastAttemptAt: '2026-10-08T12:00:00Z' }).note).toBe(

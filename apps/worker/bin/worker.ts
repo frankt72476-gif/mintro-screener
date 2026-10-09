@@ -55,7 +55,7 @@ import { signInForScan } from '../src/auth/signIn.js';
 import { browserSignIn } from '../src/auth/signInBrowser.js';
 import { credentialPreflight } from '../src/auth/preflight.js';
 import { collectDeposits } from '../src/auth/deposits.js';
-import { readAttemptHistory, recordSignIn } from '../src/auth/credentialState.js';
+import { readAttemptHistory, recordSecondFactor, recordSignIn } from '../src/auth/credentialState.js';
 import { recordSignInSteps } from '../src/auth/login.js';
 import { DeadlineExceeded } from '../src/deadline.js';
 import {
@@ -993,6 +993,8 @@ async function signIn(
     ...browserSignIn({ browser, origin, vaultRef, vault, wall, timeoutMs: 30_000 }),
     // Never allowed to fail the run — `recordSignIn` swallows its own errors (D-185).
     recordSignIn: (ok) => recordSignIn(supabase, hostname, ok),
+    // Not a sign-in outcome, so not through `recordSignIn` (D-293). Swallows its own errors too.
+    recordSecondFactor: () => recordSecondFactor(supabase, hostname),
   });
 }
 
